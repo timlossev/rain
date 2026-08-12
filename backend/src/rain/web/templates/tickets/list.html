@@ -23,7 +23,7 @@
       <select id="ticket_status" name="ticket_status" onchange="this.form.submit()">
         <option value="">All statuses</option>
         {% for s in statuses %}
-        <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
+        <option value="{{ s.key }}" {% if selected_status == s.key %}selected{% endif %}>{{ s.label }}</option>
         {% endfor %}
       </select>
     </div>
@@ -37,7 +37,7 @@
         <td><a href="/tickets/{{ t.id }}">{{ t.ticket_number }}</a></td>
         <td>{{ t.title }}</td>
         <td><span class="badge severity-{{ t.severity }}">{{ t.severity }}</span></td>
-        <td><span class="badge">{{ t.status }}</span></td>
+        <td><span class="status-pill" style="--pill-color: {{ status_colors.get(t.status, '#6b7280') }};">{{ t.status }}</span></td>
         <td class="muted">{{ t.asset.name if t.asset else "-" }}</td>
         <td class="muted">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "-" }}</td>
       </tr>

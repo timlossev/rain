@@ -72,7 +72,7 @@
         <option value="">-</option>
         {% for c in channels %}<option value="{{ c.id }}">{{ c.name }} ({{ c.channel_type }})</option>{% endfor %}
       </select>
-      {% if not channels %}<div class="field-hint">No channels yet -- create one under <a href="/tickets/notifications/all">Notifications</a>.</div>{% endif %}
+      {% if not channels %}<div class="field-hint">No channels yet -- create one under <a href="/admin/notification-channels">Admin &gt; Notification Channels</a>.</div>{% endif %}
     </div>
 
     <div class="form-row">

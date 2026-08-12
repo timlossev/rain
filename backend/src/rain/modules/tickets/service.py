@@ -6,7 +6,7 @@ from sqlalchemy import Sequence, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from rain.db.tenant_models import SyslogEvent, Ticket, TicketComment
+from rain.db.tenant_models import SyslogEvent, Ticket, TicketComment, TicketStatus, TicketStatusChange
 from rain.modules.tickets.schemas import TICKET_TYPE_PREFIX
 
 _SEQUENCE_NAMES = {"incident": "inc_number_seq", "vulnerability": "vuln_number_seq"}
@@ -99,7 +99,12 @@ async def get_ticket(db: AsyncSession, ticket_id: int) -> Ticket | None:
     stmt = (
         select(Ticket)
         .where(Ticket.id == ticket_id)
-        .options(selectinload(Ticket.asset), selectinload(Ticket.comments), selectinload(Ticket.rule_triggers))
+        .options(
+            selectinload(Ticket.asset),
+            selectinload(Ticket.comments),
+            selectinload(Ticket.status_changes),
+            selectinload(Ticket.rule_triggers),
+        )
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
@@ -112,10 +117,41 @@ async def add_comment(db: AsyncSession, ticket_id: int, author_user_id: int | No
     return comment
 
 
-async def update_status(db: AsyncSession, ticket: Ticket, new_status: str) -> None:
+async def list_statuses(db: AsyncSession, *, active_only: bool = False) -> list[TicketStatus]:
+    stmt = select(TicketStatus).order_by(TicketStatus.sort_order, TicketStatus.label)
+    if active_only:
+        stmt = stmt.where(TicketStatus.is_active.is_(True))
+    result = await db.execute(stmt)
+    return list(result.scalars())
+
+
+async def get_status_by_key(db: AsyncSession, key: str) -> TicketStatus | None:
+    result = await db.execute(select(TicketStatus).where(TicketStatus.key == key))
+    return result.scalar_one_or_none()
+
+
+async def update_status(
+    db: AsyncSession, ticket: Ticket, new_status: str, *, changed_by_user_id: int | None = None
+) -> bool:
+    """Returns False (no-op) if new_status isn't one of this tenant's
+    configured statuses -- the caller decides how to surface that. A no-op
+    if new_status already equals the current status (no duplicate log
+    entry for re-clicking the current pill)."""
+    if new_status == ticket.status:
+        return True
+    status_row = await get_status_by_key(db, new_status)
+    if status_row is None:
+        return False
+    old_status = ticket.status
     ticket.status = new_status
-    ticket.closed_at = dt.datetime.now(dt.timezone.utc) if new_status == "closed" else None
+    ticket.closed_at = dt.datetime.now(dt.timezone.utc) if status_row.is_closed else None
+    db.add(
+        TicketStatusChange(
+            ticket_id=ticket.id, changed_by_user_id=changed_by_user_id, from_status=old_status, to_status=new_status
+        )
+    )
     await db.commit()
+    return True
 
 
 async def get_event(db: AsyncSession, event_id: int) -> SyslogEvent | None:

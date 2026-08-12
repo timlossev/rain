@@ -7,6 +7,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from rain.core.config_store import FONT_CHOICES, config_store
@@ -14,10 +15,12 @@ from rain.core.crypto import encrypt_json
 from rain.core.pagination import paginate
 from rain.core.rbac import require_internal_admin, require_login
 from rain.core.security import hash_password
-from rain.core.tenancy import CurrentUser, RequestContext, get_request_context
+from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.db.base import control_session
 from rain.db.control_models import AuthProviderConfig, Session as SessionRow, SyslogSourceMap, Tenant, User
 from rain.db.provisioning import InvalidSlugError, provision_tenant
+from rain.db.tenant_models import NotificationChannel, TicketStatus
+from rain.modules.tickets.schemas import CHANNEL_TYPES
 from rain.settings import get_settings
 from rain.web.nav import build_nav_context
 from rain.web.templating import templates
@@ -344,3 +347,128 @@ async def auth_providers_list(
             (await session.execute(select(AuthProviderConfig).order_by(AuthProviderConfig.id))).scalars()
         )
     return templates.TemplateResponse(request, "admin/auth_providers.html", {**nav, "ctx": ctx, "providers": providers})
+
+
+# --------------------------------------------------------- ticket statuses
+# The one screen in this module that isn't control-schema: ticket_statuses
+# lives per-tenant, but is configured here (internal_admin only, against
+# whichever tenant is currently active) rather than under Tickets, at the
+# same tier as Branding/Users/SMTP/Syslog Sources.
+
+
+@router.get("/ticket-statuses", response_class=HTMLResponse)
+async def ticket_statuses_list(
+    request: Request,
+    page: int = 1,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    nav = await build_nav_context(ctx)
+    stmt = select(TicketStatus).order_by(TicketStatus.sort_order, TicketStatus.label)
+    status_page = await paginate(tenant_db, stmt, page=page)
+    return templates.TemplateResponse(
+        request, "admin/ticket_statuses.html", {**nav, "ctx": ctx, "page": status_page}
+    )
+
+
+@router.post("/ticket-statuses")
+async def ticket_statuses_create(
+    key: str = Form(...),
+    label: str = Form(...),
+    color: str = Form("#6b7280"),
+    is_closed: bool = Form(False),
+    sort_order: int = Form(0),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    tenant_db.add(
+        TicketStatus(
+            key=key.strip().lower().replace(" ", "_"),
+            label=label.strip(),
+            color=color.strip() or "#6b7280",
+            is_closed=is_closed,
+            sort_order=sort_order,
+        )
+    )
+    await tenant_db.commit()
+    return RedirectResponse("/admin/ticket-statuses", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/ticket-statuses/{status_id:int}/delete")
+async def ticket_statuses_delete(
+    status_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+):
+    row = await tenant_db.get(TicketStatus, status_id)
+    if row is not None:
+        await tenant_db.delete(row)
+        await tenant_db.commit()
+    return RedirectResponse("/admin/ticket-statuses", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/ticket-statuses/{status_id:int}/toggle")
+async def ticket_statuses_toggle(
+    status_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+):
+    row = await tenant_db.get(TicketStatus, status_id)
+    if row is not None:
+        row.is_active = not row.is_active
+        await tenant_db.commit()
+    return RedirectResponse("/admin/ticket-statuses", status_code=status.HTTP_303_SEE_OTHER)
+
+
+# ------------------------------------------------------ notif. channels --
+# Also per-tenant (not control-schema) like ticket-statuses above. Just the
+# Slack/email destinations -- *when* they fire is entirely decided by
+# Tickets > Platform Event rules, not by anything configured here.
+
+
+@router.get("/notification-channels", response_class=HTMLResponse)
+async def notification_channels_list(
+    request: Request,
+    page: int = 1,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    nav = await build_nav_context(ctx)
+    stmt = select(NotificationChannel).order_by(NotificationChannel.name)
+    channel_page = await paginate(tenant_db, stmt, page=page)
+    return templates.TemplateResponse(
+        request,
+        "admin/notification_channels.html",
+        {**nav, "ctx": ctx, "page": channel_page, "channel_types": CHANNEL_TYPES},
+    )
+
+
+@router.post("/notification-channels")
+async def notification_channels_create(
+    request: Request,
+    channel_type: str = Form(...),
+    name: str = Form(...),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    form = await request.form()
+    if channel_type == "email":
+        recipients = [addr.strip() for addr in str(form.get("recipients", "")).split(",") if addr.strip()]
+        config = {"recipients": recipients}
+    else:
+        config = {"webhook_url": str(form.get("webhook_url", "")).strip()}
+
+    tenant_db.add(
+        NotificationChannel(channel_type=channel_type, name=name.strip(), config_encrypted=encrypt_json(config))
+    )
+    await tenant_db.commit()
+    return RedirectResponse("/admin/notification-channels", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/notification-channels/{channel_id:int}/delete")
+async def notification_channels_delete(
+    channel_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+):
+    channel = await tenant_db.get(NotificationChannel, channel_id)
+    if channel is not None:
+        await tenant_db.delete(channel)
+        await tenant_db.commit()
+    return RedirectResponse("/admin/notification-channels", status_code=status.HTTP_303_SEE_OTHER)

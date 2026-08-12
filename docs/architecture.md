@@ -270,7 +270,8 @@ Everything above was verified through Milestone 3 by static checks only
 (`py_compile`, importing the app from the source tree, rendering templates
 against mock context) -- no Docker was available until partway through
 hardening. Running the real stack surfaced four bugs no amount of that
-static verification would have caught, all now fixed:
+static verification would have caught, all now fixed (plus a couple more
+added since, from later real-Docker testing of subsequent features):
 
 - **`op.create_sequence()`/`op.drop_sequence()` don't exist** on the
   Alembic version that actually gets installed (1.19.1) -- `AttributeError`
@@ -308,6 +309,22 @@ static verification would have caught, all now fixed:
   (`engine.execution_options(...)`, a lightweight proxy over the same
   pool) instead, which survives any number of commits/reconnects within
   the session.
+
+- **`op.bulk_insert()` and `op.add_column()`/`op.drop_column()` don't
+  respect `schema_translate_map`** either, unlike `op.create_table()`/
+  `op.create_index()`/`op.create_foreign_key()`/`op.execute(<DDL
+  construct>)` which all do. Hit this twice back to back (migrations 0005
+  and 0006): both emitted unqualified SQL (`INSERT INTO ticket_statuses
+  ...`, `ALTER TABLE notification_channels ...`) and raised
+  `UndefinedTableError` against a tenant schema with nothing of that name
+  on the default search_path. Fixed by not trusting translate_map for
+  these specific ops: `op.add_column()`/`op.drop_column()` take an
+  explicit `schema=` kwarg (just pass it); for DML, read the schema off
+  `op.get_bind().get_execution_options()["schema_translate_map"][None]`
+  and fully-qualify your own raw SQL. This note is now baked into
+  `migrations/tenant/script.py.mako`'s header comment, so it lands in
+  every future revision file `alembic revision` generates -- don't delete
+  it when trimming a new migration's boilerplate.
 
 The third bug is the one worth internalizing: it made the other two look
 far stranger than they were, because every debugging signal (logs,

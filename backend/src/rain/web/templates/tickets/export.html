@@ -17,7 +17,7 @@
         <label for="ticket_status">Status</label>
         <select id="ticket_status" name="ticket_status">
           <option value="">All statuses</option>
-          {% for s in statuses %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+          {% for s in statuses %}<option value="{{ s.key }}">{{ s.label }}</option>{% endfor %}
         </select>
       </div>
       <div class="field">

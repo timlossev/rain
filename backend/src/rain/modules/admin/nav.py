@@ -29,6 +29,20 @@ nav_registry.register(
                 order=6,
                 roles=("internal_admin",),
             ),
+            NavNode(
+                key="admin-ticket-statuses",
+                label="Ticket Statuses",
+                href="/admin/ticket-statuses",
+                order=7,
+                roles=("internal_admin",),
+            ),
+            NavNode(
+                key="admin-notification-channels",
+                label="Notification Channels",
+                href="/admin/notification-channels",
+                order=8,
+                roles=("internal_admin",),
+            ),
         ],
     )
 )

@@ -203,6 +203,27 @@ class TicketRule(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class TicketStatus(TenantBase):
+    """Per-tenant customizable ticket status ('Open', 'In Progress', ...).
+    Ticket.status stores this row's `key` as a plain string rather than a
+    real FK -- app-validated (rain.modules.tickets.service.update_status),
+    same trade-off this codebase already makes for other loosely-coupled
+    references, and it avoids having to decide what happens to existing
+    tickets' status column on a hard FK when an admin deletes a status."""
+
+    __tablename__ = "ticket_statuses"
+    __table_args__ = (UniqueConstraint("key", name="uq_ticket_statuses_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(31))
+    label: Mapped[str] = mapped_column(String(63))
+    color: Mapped[str] = mapped_column(String(7), default="#6b7280", server_default="#6b7280")
+    is_closed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Ticket(TenantBase):
     __tablename__ = "tickets"
 
@@ -226,6 +247,9 @@ class Ticket(TenantBase):
 
     asset: Mapped[Asset | None] = relationship()
     comments: Mapped[list["TicketComment"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")
+    status_changes: Mapped[list["TicketStatusChange"]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan", order_by="TicketStatusChange.created_at"
+    )
     rule_triggers: Mapped[list["PlatformEventTrigger"]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan", order_by="PlatformEventTrigger.created_at"
     )
@@ -243,12 +267,37 @@ class TicketComment(TenantBase):
     ticket: Mapped[Ticket] = relationship(back_populates="comments")
 
 
+class TicketStatusChange(TenantBase):
+    """Audit trail entry for a status transition -- shown interleaved with
+    comments in the ticket detail activity feed. `from_status` is null for
+    a ticket's very first status (there's nothing to transition from)."""
+
+    __tablename__ = "ticket_status_changes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True)
+    changed_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    from_status: Mapped[str | None] = mapped_column(String(31), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(31))
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    ticket: Mapped[Ticket] = relationship(back_populates="status_changes")
+
+
 class NotificationChannel(TenantBase):
     """email | slack. Config is Fernet-encrypted at rest (recipient list /
     webhook URL), same helper as SyncConnection.config_encrypted. The SMTP
     relay itself is instance-wide (control.global_config, set by
     internal_admin) -- this table only holds who gets notified for this
-    tenant and through which channel."""
+    tenant and through which channel.
+
+    No longer carries notify_on_incident/notify_on_vulnerability: those
+    drove an unconditional "notify on every ticket of this type" firing
+    that ran in parallel with (and was a strict subset of) Platform Event
+    rules -- a rule with an action pointed at this channel and pattern
+    ".*" covers the same case, explicitly and visibly, so the always-on
+    duplicate was removed rather than kept as a second code path (see
+    migration 0006)."""
 
     __tablename__ = "notification_channels"
 
@@ -256,8 +305,6 @@ class NotificationChannel(TenantBase):
     channel_type: Mapped[str] = mapped_column(String(15))  # email | slack
     name: Mapped[str] = mapped_column(String(255))
     config_encrypted: Mapped[bytes] = mapped_column(LargeBinary)
-    notify_on_incident: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-    notify_on_vulnerability: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

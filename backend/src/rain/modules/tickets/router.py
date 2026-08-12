@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
@@ -9,15 +9,22 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from rain.core.crypto import encrypt_json
 from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
-from rain.db.tenant_models import NotificationChannel, PlatformEventAction, PlatformEventRule, Ticket, TicketRule
+from rain.db.base import control_session
+from rain.db.control_models import User
+from rain.db.tenant_models import (
+    NotificationChannel,
+    PlatformEventAction,
+    PlatformEventRule,
+    Ticket,
+    TicketRule,
+)
 from rain.modules.assets import service as asset_service
 from rain.modules.documents import service as document_service
 from rain.modules.tickets import exporter, platform_events, service
-from rain.modules.tickets.schemas import CHANNEL_TYPES, MATCH_FIELDS, SEVERITIES, TICKET_STATUSES, TICKET_TYPES
+from rain.modules.tickets.schemas import MATCH_FIELDS, SEVERITIES, TICKET_TYPES
 from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
 from rain.web.templating import templates
@@ -41,6 +48,8 @@ async def list_tickets(
     nav = await build_nav_context(ctx)
     stmt = service.ticket_list_stmt(ticket_type=ticket_type, status=ticket_status)
     ticket_page = await paginate(tenant_db, stmt, page=page)
+    statuses = await service.list_statuses(tenant_db)
+    status_colors = {s.key: s.color for s in statuses}
     return templates.TemplateResponse(
         request,
         "tickets/list.html",
@@ -49,7 +58,8 @@ async def list_tickets(
             "ctx": ctx,
             "page": ticket_page,
             "ticket_types": TICKET_TYPES,
-            "statuses": TICKET_STATUSES,
+            "statuses": statuses,
+            "status_colors": status_colors,
             "selected_type": ticket_type,
             "selected_status": ticket_status,
         },
@@ -108,8 +118,10 @@ async def create_ticket(
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
-    from rain.modules.tickets.notifications import notify_ticket_created
-
+    # service.create_ticket() already evaluates Platform Event rules
+    # (notify Slack/email/webhook/etc, if any are configured to match) --
+    # see rain.modules.tickets.notifications for why there's no separate
+    # unconditional notify step here anymore.
     ticket = await service.create_ticket(
         tenant_db,
         ticket_type=ticket_type,
@@ -120,8 +132,21 @@ async def create_ticket(
         source_event_id=int(source_event_id) if source_event_id else None,
         reporter_user_id=ctx.user.id,
     )
-    await notify_ticket_created(tenant_db, ticket)
     return RedirectResponse(f"/tickets/{ticket.id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+async def _user_names(user_ids: set[int | None]) -> dict[int, str]:
+    """Ticket comments/status changes/reporter fields store a plain
+    control.users id (cross-schema, app-validated -- see tenant_models'
+    module docstring), so resolving them to a display name takes a
+    separate control-schema query. Batched into one lookup per page render
+    rather than N+1 per activity-feed entry."""
+    ids = {i for i in user_ids if i is not None}
+    if not ids:
+        return {}
+    async with control_session() as session:
+        result = await session.execute(select(User).where(User.id.in_(ids)))
+        return {u.id: u.display_name for u in result.scalars()}
 
 
 @router.get("/{ticket_id:int}", response_class=HTMLResponse)
@@ -137,10 +162,40 @@ async def ticket_detail(
     if ticket is None:
         return RedirectResponse("/tickets", status_code=status.HTTP_303_SEE_OTHER)
     document_links = await document_service.links_for(tenant_db, "ticket", ticket_id)
+    # Not active_only: a ticket already sitting on a since-deactivated
+    # status should still show it (and its color) in the stepper -- only
+    # the "New ticket"/filter dropdowns need to hide deactivated ones.
+    statuses = await service.list_statuses(tenant_db)
+    status_labels = {s.key: s.label for s in statuses}
+
+    user_names = await _user_names(
+        {ticket.reporter_user_id, ticket.assignee_user_id}
+        | {c.author_user_id for c in ticket.comments}
+        | {sc.changed_by_user_id for sc in ticket.status_changes}
+    )
+
+    # Comments and status changes interleaved into one chronological feed
+    # ("Activity"), each tagged with its kind so the template can render
+    # them differently.
+    activity = sorted(
+        [{"kind": "comment", "at": c.created_at, "item": c} for c in ticket.comments]
+        + [{"kind": "status_change", "at": sc.created_at, "item": sc} for sc in ticket.status_changes],
+        key=lambda entry: entry["at"] or datetime.min.replace(tzinfo=timezone.utc),
+    )
+
     return templates.TemplateResponse(
         request,
         "tickets/detail.html",
-        {**nav, "ctx": ctx, "ticket": ticket, "statuses": TICKET_STATUSES, "document_links": document_links},
+        {
+            **nav,
+            "ctx": ctx,
+            "ticket": ticket,
+            "statuses": statuses,
+            "status_labels": status_labels,
+            "document_links": document_links,
+            "user_names": user_names,
+            "activity": activity,
+        },
     )
 
 
@@ -154,11 +209,17 @@ async def ticket_pdf(
     if ticket is None:
         return RedirectResponse("/tickets", status_code=status.HTTP_303_SEE_OTHER)
     document_links = await document_service.links_for(tenant_db, "ticket", ticket_id)
+    user_names = await _user_names(
+        {ticket.reporter_user_id}
+        | {c.author_user_id for c in ticket.comments}
+        | {sc.changed_by_user_id for sc in ticket.status_changes}
+    )
     pdf_bytes = render_pdf(
         "pdf/ticket.html",
         {
             "ticket": ticket,
             "document_links": document_links,
+            "user_names": user_names,
             "doc_kind": "Ticket",
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         },
@@ -187,12 +248,13 @@ async def add_comment(
 async def change_status(
     ticket_id: int,
     new_status: str = Form(...),
+    ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     ticket = await tenant_db.get(Ticket, ticket_id)
     if ticket is not None:
-        await service.update_status(tenant_db, ticket, new_status)
+        await service.update_status(tenant_db, ticket, new_status, changed_by_user_id=ctx.user.id)
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -203,9 +265,11 @@ async def change_status(
 async def export_form(
     request: Request,
     ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
+    statuses = await service.list_statuses(tenant_db)
     return templates.TemplateResponse(
         request,
         "tickets/export.html",
@@ -213,7 +277,7 @@ async def export_form(
             **nav,
             "ctx": ctx,
             "ticket_types": TICKET_TYPES,
-            "statuses": TICKET_STATUSES,
+            "statuses": statuses,
             "columns": exporter.available_columns(),
         },
     )
@@ -361,68 +425,6 @@ async def rules_test(
             "test_result": {"rule_id": rule_id, "sample": sample, "matched": matched},
         },
     )
-
-
-# --------------------------------------------------------- notifications -
-
-
-@router.get("/notifications/all", response_class=HTMLResponse)
-async def notifications_list(
-    request: Request,
-    page: int = 1,
-    ctx: RequestContext = Depends(get_request_context),
-    tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
-):
-    nav = await build_nav_context(ctx)
-    stmt = select(NotificationChannel).order_by(NotificationChannel.name)
-    channel_page = await paginate(tenant_db, stmt, page=page)
-    return templates.TemplateResponse(
-        request,
-        "tickets/notifications.html",
-        {**nav, "ctx": ctx, "page": channel_page, "channel_types": CHANNEL_TYPES},
-    )
-
-
-@router.post("/notifications/all")
-async def notifications_create(
-    request: Request,
-    channel_type: str = Form(...),
-    name: str = Form(...),
-    notify_on_incident: bool = Form(False),
-    notify_on_vulnerability: bool = Form(False),
-    tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
-):
-    form = await request.form()
-    if channel_type == "email":
-        recipients = [addr.strip() for addr in str(form.get("recipients", "")).split(",") if addr.strip()]
-        config = {"recipients": recipients}
-    else:
-        config = {"webhook_url": str(form.get("webhook_url", "")).strip()}
-
-    tenant_db.add(
-        NotificationChannel(
-            channel_type=channel_type,
-            name=name.strip(),
-            config_encrypted=encrypt_json(config),
-            notify_on_incident=notify_on_incident,
-            notify_on_vulnerability=notify_on_vulnerability,
-        )
-    )
-    await tenant_db.commit()
-    return RedirectResponse("/tickets/notifications/all", status_code=status.HTTP_303_SEE_OTHER)
-
-
-@router.post("/notifications/{channel_id:int}/delete")
-async def notifications_delete(
-    channel_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_login)
-):
-    channel = await tenant_db.get(NotificationChannel, channel_id)
-    if channel is not None:
-        await tenant_db.delete(channel)
-        await tenant_db.commit()
-    return RedirectResponse("/tickets/notifications/all", status_code=status.HTTP_303_SEE_OTHER)
 
 
 # ----------------------------------------------------- platform events ---

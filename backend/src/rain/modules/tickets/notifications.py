@@ -1,7 +1,19 @@
-"""Email + Slack notification on ticket creation. The SMTP relay is
-instance-wide (control.global_config, set once by internal_admin in
-Admin > SMTP); who gets notified is per-tenant
-(rain.db.tenant_models.NotificationChannel)."""
+"""Low-level email + Slack senders. Who gets notified, and under what
+condition, is decided by Platform Event rules
+(rain.modules.tickets.platform_events) -- this module just knows how to
+actually deliver a message once a rule's action decides to. The SMTP
+relay is instance-wide (control.global_config, set once by internal_admin
+in Admin > SMTP); channel config (recipients / webhook URL) is per-tenant
+(rain.db.tenant_models.NotificationChannel).
+
+There used to also be an unconditional "notify on every ticket of this
+type" path here (notify_ticket_created(), run on every ticket creation
+regardless of any rule), driven by NotificationChannel.notify_on_incident/
+notify_on_vulnerability. It was removed: Platform Events already lets an
+admin express the same "always notify" behavior explicitly (a rule with
+pattern ".*" and a notify_slack/notify_email action), so keeping both
+meant every ticket could double-notify through two independent, easily
+out-of-sync code paths for no added capability. See migration 0006."""
 from __future__ import annotations
 
 import logging
@@ -10,12 +22,9 @@ from typing import Any
 
 import aiosmtplib
 import httpx
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from rain.core.config_store import config_store
 from rain.core.crypto import decrypt_json
-from rain.db.tenant_models import NotificationChannel, Ticket
 
 logger = logging.getLogger("rain.notifications")
 
@@ -54,25 +63,3 @@ async def send_slack(webhook_url: str, text: str) -> None:
             await client.post(webhook_url, json={"text": text})
     except Exception:
         logger.exception("failed to send Slack notification")
-
-
-async def notify_ticket_created(db: AsyncSession, ticket: Ticket) -> None:
-    result = await db.execute(select(NotificationChannel).where(NotificationChannel.is_enabled.is_(True)))
-    channels = list(result.scalars())
-    if not channels:
-        return
-
-    flag = "notify_on_incident" if ticket.ticket_type == "incident" else "notify_on_vulnerability"
-    subject = f"[RAIN] {ticket.ticket_number}: {ticket.title}"
-    body = f"{ticket.ticket_number} ({ticket.severity}) created.\n\n{ticket.description or ''}"
-
-    for channel in channels:
-        if not getattr(channel, flag):
-            continue
-        config = decrypt_json(channel.config_encrypted)
-        if channel.channel_type == "email":
-            await send_email(config.get("recipients", []), subject, body)
-        elif channel.channel_type == "slack":
-            webhook_url = config.get("webhook_url")
-            if webhook_url:
-                await send_slack(webhook_url, f"*{ticket.ticket_number}* ({ticket.severity}) {ticket.title}")

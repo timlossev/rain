@@ -9,6 +9,11 @@ This is SQLAlchemy/Alembic's documented "schema per tenant" recipe: models
 in rain.db.tenant_models declare no explicit schema, so schema_translate_map
 redirects every table (and type) to the target schema at execution time, and
 each schema tracks its own alembic_version via version_table_schema.
+
+Writing a new migration? Not every op.* helper actually respects that
+translate map -- see the NOTE at the top of script.py.mako (also copied
+into every new revision file by `alembic revision`) before using
+op.bulk_insert() or op.add_column()/op.drop_column().
 """
 from __future__ import annotations
 

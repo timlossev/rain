@@ -42,11 +42,21 @@
 {% endfor %}
 {% endif %}
 
+{% if ticket.status_changes %}
+<h2 class="pdf-section">Status history</h2>
+{% for sc in ticket.status_changes %}
+<div class="pdf-comment">
+  <div class="pdf-comment-meta">{{ sc.created_at.strftime("%Y-%m-%d %H:%M") if sc.created_at else "" }} &mdash; {{ user_names.get(sc.changed_by_user_id, "Someone") }}</div>
+  <div>{% if sc.from_status %}{{ sc.from_status }} &rarr; {% endif %}{{ sc.to_status }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
 <h2 class="pdf-section">Comments ({{ ticket.comments | length }})</h2>
 {% if ticket.comments %}
   {% for c in ticket.comments %}
   <div class="pdf-comment">
-    <div class="pdf-comment-meta">{{ c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "" }}</div>
+    <div class="pdf-comment-meta">{{ c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "" }} &mdash; {{ user_names.get(c.author_user_id, "Someone") }}</div>
     <div>{{ c.body }}</div>
   </div>
   {% endfor %}

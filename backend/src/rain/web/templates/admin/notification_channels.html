@@ -1,10 +1,12 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
-{% block title %}Notifications - {{ branding.instance_name }}{% endblock %}
+{% block title %}Notification Channels - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>Notifications</h1>
-<p class="muted">Who gets notified when a ticket is created, for this tenant. The outbound mail relay itself is
-  configured once, instance-wide, in <a href="/admin/smtp">Admin &gt; SMTP Relay</a>.</p>
+<h1>Notification Channels</h1>
+<p class="muted">Slack/email destinations for the active tenant ({{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}).
+  These don't fire on their own -- point a <a href="/tickets/platform-events">Platform Event</a> rule's action at
+  one to decide when it actually gets used. The outbound mail relay itself is configured once, instance-wide, in
+  <a href="/admin/smtp">Admin &gt; SMTP Relay</a>.</p>
 
 <div class="tabs" data-tabs>
   <div class="tab-buttons">
@@ -15,22 +17,20 @@
 <div class="tab-panel active" data-tab-panel="list">
 <div class="card">
   <table>
-    <thead><tr><th>Name</th><th>Type</th><th>Incidents</th><th>Vulnerabilities</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Type</th><th></th></tr></thead>
     <tbody>
       {% for c in page.items %}
       <tr>
         <td>{{ c.name }}</td>
         <td><span class="badge">{{ c.channel_type }}</span></td>
-        <td>{{ "yes" if c.notify_on_incident else "-" }}</td>
-        <td>{{ "yes" if c.notify_on_vulnerability else "-" }}</td>
         <td class="actions">
-          <form class="inline" method="post" action="/tickets/notifications/{{ c.id }}/delete" data-confirm="Delete channel '{{ c.name }}'?">
+          <form class="inline" method="post" action="/admin/notification-channels/{{ c.id }}/delete" data-confirm="Delete channel '{{ c.name }}'? Any Platform Event actions pointed at it will stop working.">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="5" class="muted">No notification channels yet.</td></tr>
+      <tr><td colspan="3" class="muted">No notification channels yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -40,7 +40,7 @@
 
 <div class="tab-panel" data-tab-panel="new">
 <div class="card">
-  <form method="post" action="/tickets/notifications/all">
+  <form method="post" action="/admin/notification-channels">
     <div class="form-row">
       <div class="field">
         <label for="channel_type">Type</label>
@@ -57,10 +57,6 @@
     <div class="field">
       <label for="webhook_url">Slack incoming webhook URL (if type = slack)</label>
       <input type="text" id="webhook_url" name="webhook_url" placeholder="https://hooks.slack.com/services/...">
-    </div>
-    <div class="form-row">
-      <div class="field"><label class="checkbox-row"><input type="checkbox" name="notify_on_incident" checked> Notify on incident</label></div>
-      <div class="field"><label class="checkbox-row"><input type="checkbox" name="notify_on_vulnerability" checked> Notify on vulnerability</label></div>
     </div>
     <button class="btn btn-primary" type="submit">Add channel</button>
   </form>

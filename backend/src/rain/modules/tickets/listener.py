@@ -23,7 +23,6 @@ from rain.db.control_models import Tenant
 from rain.db.tenant_models import SyslogEvent
 from rain.modules.tickets import rules
 from rain.modules.tickets.live_bus import live_bus
-from rain.modules.tickets.notifications import notify_ticket_created
 from rain.modules.tickets.routing import resolve_tenant_for_event
 from rain.modules.tickets.syslog_parser import parse_line, severity_label
 
@@ -91,8 +90,11 @@ async def handle_raw_line(raw_line: str) -> None:
 
             matched_rule = await rules.find_matching_rule(db, event)
             if matched_rule is not None:
-                ticket = await rules.apply_rule(db, matched_rule, event)
-                await notify_ticket_created(db, ticket)
+                # apply_rule() -> service.create_ticket() already evaluates
+                # Platform Event rules (notify Slack/email/webhook/etc, if
+                # any are configured to match) -- no separate notify step
+                # needed here.
+                await rules.apply_rule(db, matched_rule, event)
     except Exception:
         logger.exception("failed to handle syslog line: %r", raw_line[:200])
 

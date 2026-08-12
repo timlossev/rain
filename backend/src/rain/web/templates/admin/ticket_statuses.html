@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% import "_pagination.html" as pg %}
+{% block title %}Ticket Statuses - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Ticket Statuses</h1>
+<p class="muted">Customize the set of statuses tickets can move through, for the active tenant ({{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}).
+  Statuses flagged "closed" stamp a ticket's closed date when it's moved there. Deactivating a status hides it from
+  new selections without breaking tickets already set to it.</p>
+
+<div class="tabs" data-tabs>
+  <div class="tab-buttons">
+    <button type="button" class="tab-btn active" data-tab-btn="list">Statuses</button>
+    <button type="button" class="tab-btn" data-tab-btn="new">New status</button>
+  </div>
+
+<div class="tab-panel active" data-tab-panel="list">
+<div class="card">
+  <table>
+    <thead><tr><th>Order</th><th>Status</th><th>Key</th><th>Closed?</th><th>Active</th><th></th></tr></thead>
+    <tbody>
+      {% for s in page.items %}
+      <tr>
+        <td class="muted">{{ s.sort_order }}</td>
+        <td><span class="status-pill" style="--pill-color: {{ s.color }};">{{ s.label }}</span></td>
+        <td class="muted">{{ s.key }}</td>
+        <td>{{ "yes" if s.is_closed else "-" }}</td>
+        <td>
+          <form class="inline" method="post" action="/admin/ticket-statuses/{{ s.id }}/toggle">
+            {% if s.is_active %}<button class="btn btn-sm" type="submit">active</button>
+            {% else %}<button class="btn btn-sm btn-danger" type="submit">disabled</button>{% endif %}
+          </form>
+        </td>
+        <td class="actions">
+          <form class="inline" method="post" action="/admin/ticket-statuses/{{ s.id }}/delete" data-confirm="Delete status '{{ s.label }}'? Tickets already set to it keep the value but it won't be selectable.">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">No statuses configured.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ pg.render_pagination(page) }}
+</div>
+</div>
+
+<div class="tab-panel" data-tab-panel="new">
+<div class="card">
+  <form method="post" action="/admin/ticket-statuses">
+    <div class="form-row">
+      <div class="field"><label for="label">Label</label><input type="text" id="label" name="label" placeholder="Waiting on vendor" required></div>
+      <div class="field"><label for="key">Key</label><input type="text" id="key" name="key" placeholder="waiting_on_vendor" pattern="[a-z][a-z0-9_]*" required></div>
+      <div class="field" style="flex:0 0 90px;"><label for="color">Color</label><input type="color" id="color" name="color" value="#6b7280"></div>
+    </div>
+    <div class="form-row">
+      <div class="field" style="flex:0 0 160px;"><label class="checkbox-row" style="margin-top:8px;"><input type="checkbox" name="is_closed"> Counts as closed</label></div>
+      <div class="field" style="flex:0 0 100px;"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="0"></div>
+    </div>
+    <button class="btn btn-primary" type="submit">Add status</button>
+  </form>
+</div>
+</div>
+</div>
+{% endblock %}
