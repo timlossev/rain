@@ -31,11 +31,22 @@ SETUP_EXEMPT_PREFIXES = ("/setup", "/media", "/static", "/healthz")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await migrate.upgrade_control_async()
-    await provisioning.reconcile_all_tenant_schemas()
-    await config_store.load_all()
-    await config_store.start_listener()
-    logger.info("RAIN startup complete")
+    # uvicorn's default lifespan="auto" mode swallows the traceback of a
+    # startup exception (only logs "Application startup failed. Exiting."),
+    # which makes failures here needlessly hard to diagnose -- log it
+    # ourselves before letting it propagate.
+    try:
+        logger.info("running control-schema migrations...")
+        await migrate.upgrade_control_async()
+        logger.info("reconciling tenant schemas...")
+        await provisioning.reconcile_all_tenant_schemas()
+        logger.info("loading global config...")
+        await config_store.load_all()
+        await config_store.start_listener()
+        logger.info("RAIN startup complete")
+    except Exception:
+        logger.exception("RAIN startup failed")
+        raise
     try:
         yield
     finally:

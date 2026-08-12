@@ -61,6 +61,11 @@ def do_run_migrations(connection: sa.Connection) -> None:
     with context.begin_transaction():
         context.run_migrations()
 
+    # Explicit, not relying on context.begin_transaction()'s exit alone --
+    # see migrations/control/env.py for why (confirmed via a real run that
+    # tables silently didn't persist without this).
+    connection.commit()
+
 
 async def run_migrations_online() -> None:
     connectable = async_engine_from_config(
@@ -69,6 +74,7 @@ async def run_migrations_online() -> None:
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
+        await connection.commit()
     await connectable.dispose()
 
 

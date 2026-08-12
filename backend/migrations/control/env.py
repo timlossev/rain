@@ -50,6 +50,19 @@ def do_run_migrations(connection: sa.Connection) -> None:
     with context.begin_transaction():
         context.run_migrations()
 
+    # Explicit, not relying on context.begin_transaction()'s exit alone:
+    # a real run against Docker showed Alembic logging every revision as
+    # applied ("Running upgrade -> 0001", "0001 -> 0002", ...) while the
+    # tables silently never persisted -- every container restart re-ran
+    # both migrations from an empty schema again, with the same async
+    # connect()+run_sync()+dispose() sequence the official Alembic async
+    # template itself uses. Whatever the precise cause, an explicit
+    # connection.commit() here (and again in run_migrations_online, after
+    # run_sync returns) made it persist reliably; verified directly
+    # against the running container (RestartCount stayed 0, and
+    # `\dt control.*` in psql showed the tables) rather than assumed.
+    connection.commit()
+
 
 async def run_migrations_online() -> None:
     connectable = async_engine_from_config(
@@ -58,6 +71,7 @@ async def run_migrations_online() -> None:
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
+        await connection.commit()
     await connectable.dispose()
 
 

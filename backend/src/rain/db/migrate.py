@@ -37,12 +37,23 @@ two real invocation contexts already guarantee cwd == the directory
 holding these files -- that's what's used below, with an explicit check
 so a wrong invocation directory fails with a clear message instead of a
 confusing Alembic internal error.
+
+Concurrency: the `app` and `worker` containers both call `upgrade_control_
+async()` (and, via `reconcile_all_tenant_schemas()`, `upgrade_tenant_async()`
+for every existing tenant) independently at startup -- on a fresh database
+that's two processes issuing concurrent, unguarded `CREATE TABLE` DDL
+against the same objects. Each `*_async` helper below holds a Postgres
+session-level advisory lock (keyed by section, or by section+schema for
+tenants so different tenants can still migrate in parallel) for the
+duration of its migration, so the second process to arrive simply blocks
+until the first finishes instead of racing it.
 """
 from __future__ import annotations
 
 import asyncio
 from pathlib import Path
 
+import asyncpg
 from alembic import command
 from alembic.config import Config
 
@@ -51,6 +62,10 @@ from rain.settings import get_settings
 APP_ROOT = Path.cwd()
 ALEMBIC_INI = APP_ROOT / "alembic.ini"
 MIGRATIONS_DIR = APP_ROOT / "migrations"
+
+
+def _asyncpg_dsn() -> str:
+    return get_settings().database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
 
 
 def _config(section: str) -> Config:
@@ -79,9 +94,25 @@ def upgrade_tenant(schema: str, revision: str = "head") -> None:
     command.upgrade(cfg, revision)
 
 
+async def _with_advisory_lock(lock_key: str, fn, *args) -> None:
+    conn = await asyncpg.connect(dsn=_asyncpg_dsn())
+    try:
+        # pg_advisory_lock (session-scoped, not pg_advisory_xact_lock) blocks
+        # this connection until any other session holding the same key
+        # releases it -- exactly the mutual exclusion we need across
+        # separate app/worker processes/connections.
+        await conn.execute("SELECT pg_advisory_lock(hashtext($1))", lock_key)
+        try:
+            await asyncio.to_thread(fn, *args)
+        finally:
+            await conn.execute("SELECT pg_advisory_unlock(hashtext($1))", lock_key)
+    finally:
+        await conn.close()
+
+
 async def upgrade_control_async() -> None:
-    await asyncio.to_thread(upgrade_control)
+    await _with_advisory_lock("rain_migrate_control", upgrade_control)
 
 
 async def upgrade_tenant_async(schema: str) -> None:
-    await asyncio.to_thread(upgrade_tenant, schema)
+    await _with_advisory_lock(f"rain_migrate_tenant_{schema}", upgrade_tenant, schema)

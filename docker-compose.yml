@@ -52,6 +52,15 @@ services:
       - "${SYSLOG_PORT:-5514}:${SYSLOG_PORT:-5514}/udp"
     volumes:
       - rain_uploads:/data/uploads
+    # Overrides the image's inherited HEALTHCHECK (backend/Dockerfile checks
+    # :8000/healthz -- the web app's endpoint, which this container doesn't
+    # serve; worker runs the syslog listener instead). Checks the syslog
+    # TCP listener is actually accepting connections.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', ${SYSLOG_PORT:-5514}), timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
     depends_on:
       db:
         condition: service_healthy
