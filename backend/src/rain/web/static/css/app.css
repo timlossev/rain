@@ -319,6 +319,53 @@ form.inline { display: inline; }
 .panel-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
 .muted { color: var(--text-muted); }
 
+/* ---------- calendar ---------- */
+table.calendar-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; color: var(--text-muted); border: none; }
+.calendar-day {
+  border: 1px solid var(--border);
+  vertical-align: top;
+  height: 108px;
+  padding: 5px;
+  overflow: hidden;
+}
+.calendar-day.outside-month { background: var(--surface-sunken); }
+.calendar-day.outside-month .calendar-day-num { color: var(--text-muted); }
+.calendar-day.today { background: color-mix(in srgb, var(--accent) 7%, white); border-color: var(--accent); }
+.calendar-day-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+.calendar-day-num { font-size: 0.82rem; font-weight: 600; }
+.calendar-day.today .calendar-day-num { color: var(--accent); }
+.calendar-day-add {
+  display: none;
+  width: 16px;
+  height: 16px;
+  line-height: 15px;
+  text-align: center;
+  border-radius: 4px;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.calendar-day:hover .calendar-day-add { display: inline-block; text-decoration: none; }
+.calendar-entry-chip {
+  display: block;
+  font-size: 0.72rem;
+  padding: 2px 5px;
+  margin-bottom: 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 14%, white);
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.calendar-entry-chip:hover { text-decoration: none; filter: brightness(0.95); }
+@media (max-width: 860px) {
+  .calendar-day { height: 72px; font-size: 0.8rem; }
+  .calendar-entry-chip { font-size: 0.65rem; }
+}
+
 /* ---------- pagination ---------- */
 .pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
 .pagination-controls { display: flex; align-items: center; gap: 10px; }

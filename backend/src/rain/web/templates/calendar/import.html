@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Import Calendar - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Import Calendar (.ics)</h1>
+<p class="muted">Best-effort iCalendar import -- SUMMARY, DESCRIPTION, DTSTART, and RRULE (YEARLY, or MONTHLY with a
+  3- or 6-month interval -- mapped to Annually/Quarterly/Every 6 months) are read; anything else in the file is
+  ignored.</p>
+
+{% if imported is not none %}
+<div class="flash flash-ok">Imported {{ imported }} entr{{ "y" if imported == 1 else "ies" }}.</div>
+{% endif %}
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+<div class="card" style="max-width:520px;">
+  <form method="post" action="/calendar/import" enctype="multipart/form-data">
+    <div class="field">
+      <label for="file">.ics file</label>
+      <input type="file" id="file" name="file" accept=".ics,text/calendar" required>
+    </div>
+    <button class="btn btn-primary" type="submit">Import</button>
+  </form>
+</div>
+<a class="btn btn-sm" href="/calendar">&larr; Back to calendar</a>
+{% endblock %}

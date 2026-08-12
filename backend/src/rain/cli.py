@@ -38,6 +38,7 @@ async def _worker_main() -> None:
     await config_store.load_all()
     await config_store.start_listener()
 
+    from rain.modules.calendar.sweep import calendar_sweep_loop
     from rain.modules.tickets.listener import retention_loop, start_listener
     from rain.modules.tickets.live_bus import live_bus
 
@@ -45,13 +46,15 @@ async def _worker_main() -> None:
     settings = get_settings()
     tcp_server, udp_transport = await start_listener(port=settings.syslog_port)
     retention_task = asyncio.create_task(retention_loop())
+    calendar_task = asyncio.create_task(calendar_sweep_loop())
 
-    logger.info("rain-worker up: syslog listener + rule engine + notifications")
+    logger.info("rain-worker up: syslog listener + rule engine + notifications + calendar sweep")
     try:
         async with tcp_server:
             await tcp_server.serve_forever()
     finally:
         retention_task.cancel()
+        calendar_task.cancel()
         udp_transport.close()
         await live_bus.stop()
         await config_store.stop_listener()

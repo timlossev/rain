@@ -25,6 +25,9 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# Claude Code session-local state, not project content
+.claude/
+
 # Caddy local state if bind-mounted
 /caddy_data/
 /caddy_config/

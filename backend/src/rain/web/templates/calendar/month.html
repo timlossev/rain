@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Calendar - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<div class="panel-row">
+  <h1 style="margin:0;">Calendar</h1>
+  <div>
+    <a class="btn btn-sm" href="/calendar/export">Export .ics</a>
+    <a class="btn btn-sm" href="/calendar/import">Import .ics</a>
+    <a class="btn btn-primary" href="/calendar/new?date={{ today.isoformat() }}">+ New entry</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="panel-row" style="margin-bottom:14px;">
+    <a class="btn btn-sm" href="/calendar?year={{ prev_year }}&month={{ prev_month }}">&larr; Prev</a>
+    <h2 style="margin:0;">{{ month_name }}</h2>
+    <a class="btn btn-sm" href="/calendar?year={{ next_year }}&month={{ next_month }}">Next &rarr;</a>
+  </div>
+
+  <table class="calendar-grid">
+    <thead>
+      <tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>
+    </thead>
+    <tbody>
+      {% for week in weeks %}
+      <tr>
+        {% for day in week %}
+        <td class="calendar-day{% if day.month != month %} outside-month{% endif %}{% if day == today %} today{% endif %}">
+          <div class="calendar-day-head">
+            <span class="calendar-day-num">{{ day.day }}</span>
+            <a class="calendar-day-add" href="/calendar/new?date={{ day.isoformat() }}" title="New entry on {{ day.isoformat() }}">+</a>
+          </div>
+          {% for entry in by_date.get(day, []) %}
+          <a class="calendar-entry-chip" href="/calendar/{{ entry.id }}/edit" title="{{ entry.title }}">
+            {% if entry.recurrence %}<span aria-hidden="true">&orarr;</span> {% endif %}{{ entry.title }}
+          </a>
+          {% endfor %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

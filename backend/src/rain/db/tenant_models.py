@@ -14,7 +14,19 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -416,6 +428,49 @@ class PlatformEventTrigger(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     ticket: Mapped[Ticket] = relationship(back_populates="rule_triggers")
+
+
+class CalendarEntry(TenantBase):
+    """Per-tenant calendar: one-off or recurring dated entries (renewals,
+    maintenance windows, audits...). `recurrence` is one of the fixed
+    presets below or null for a one-time entry -- occurrences are computed
+    on the fly (rain.modules.calendar.recurrence), never materialized as
+    rows, so a recurring entry stays a single record no matter how far out
+    it's projected.
+
+    `emit_syslog_event`/`event_program` are the bridge requested to make
+    calendar entries usable as Event Policy triggers: when an occurrence
+    falls due, the worker synthesizes a SyslogEvent exactly as if it had
+    arrived over the wire (rain.modules.calendar.sweep), so the *existing*
+    rule engine (TicketRule/Platform Events) reacts to it with no separate
+    calendar-specific rule system needed. `last_fired_date` is the sweep's
+    own dedup marker (one synthetic event per occurrence, not one per
+    sweep tick).
+
+    `policy_ref` is an inert, opaque JSON blob -- a forward-looking hook
+    for a future "recurring policy" concept (e.g. "update document X
+    quarterly") that doesn't exist yet. Nothing reads it today; it exists
+    now purely so it round-trips through .ics export/import (as a custom
+    X-RAIN-POLICY property) without a later migration."""
+
+    __tablename__ = "calendar_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    start_date: Mapped[dt.date] = mapped_column(Date)
+    recurrence: Mapped[str | None] = mapped_column(String(15), nullable=True)  # null|quarterly|biannual|annual
+    recurrence_end: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    emit_syslog_event: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    event_program: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    policy_ref: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    last_fired_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class AuditLog(TenantBase):

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if entry else "New" }} calendar entry - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>{{ "Edit entry" if entry else "New entry" }}</h1>
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+<div class="card" style="max-width:640px;">
+  <form method="post" action="{{ '/calendar/' ~ entry.id if entry else '/calendar' }}">
+    <div class="form-row">
+      <div class="field"><label for="title">Title</label><input type="text" id="title" name="title" value="{{ entry.title if entry else '' }}" required autofocus></div>
+      <div class="field" style="flex:0 0 170px;"><label for="start_date">Date</label><input type="date" id="start_date" name="start_date" value="{{ prefill_date }}" required></div>
+    </div>
+    <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="3">{{ entry.description if entry else "" }}</textarea></div>
+
+    <div class="form-row">
+      <div class="field">
+        <label for="recurrence">Repeats</label>
+        <select id="recurrence" name="recurrence">
+          {% for value, label in recurrence_presets %}
+          <option value="{{ value }}" {% if entry and entry.recurrence == value or (not entry and not value) %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="recurrence_end">Repeat until (optional)</label><input type="date" id="recurrence_end" name="recurrence_end" value="{{ entry.recurrence_end.isoformat() if entry and entry.recurrence_end else '' }}"></div>
+    </div>
+
+    {% if entry %}
+    <div class="field"><label class="checkbox-row"><input type="checkbox" name="is_active" {% if entry.is_active %}checked{% endif %}> Active</label></div>
+    {% endif %}
+
+    <h3>Syslog bridge</h3>
+    <p class="field-hint">When checked, each occurrence synthesizes a syslog event (host <code>calendar</code>) that
+      <a href="/tickets/rules/all">Event Policies</a> can match on -- use this to auto-create a ticket from a
+      recurring entry (e.g. a quarterly access review).</p>
+    <div class="form-row">
+      <div class="field" style="flex:0 0 260px;"><label class="checkbox-row" style="margin-top:8px;"><input type="checkbox" name="emit_syslog_event" {% if entry and entry.emit_syslog_event %}checked{% endif %}> Emit syslog event on occurrence</label></div>
+      <div class="field"><label for="event_program">Event "program" value (optional)</label><input type="text" id="event_program" name="event_program" value="{{ entry.event_program if entry and entry.event_program else '' }}" placeholder="Defaults to the title"></div>
+    </div>
+
+    <button class="btn btn-primary" type="submit">{{ "Save changes" if entry else "Create entry" }}</button>
+    <a class="btn" href="/calendar">Cancel</a>
+  </form>
+</div>
+
+{% if entry %}
+<div class="card" style="max-width:640px;">
+  <div class="card-title">Delete</div>
+  <form method="post" action="/calendar/{{ entry.id }}/delete" data-confirm="Delete calendar entry '{{ entry.title }}'?">
+    <button class="btn btn-danger" type="submit">Delete entry</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
