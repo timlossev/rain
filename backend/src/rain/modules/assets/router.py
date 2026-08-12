@@ -6,8 +6,11 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.db.tenant_models import Asset, AssetType, CustomField
@@ -29,17 +32,18 @@ router = APIRouter(prefix="/assets")
 async def list_assets(
     request: Request,
     asset_type_id: int | None = None,
+    page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    assets = await service.list_assets(tenant_db, asset_type_id=asset_type_id)
+    asset_page = await paginate(tenant_db, service.asset_list_stmt(asset_type_id=asset_type_id), page=page)
     asset_types = await service.list_asset_types(tenant_db)
     return templates.TemplateResponse(
         request,
         "assets/list.html",
-        {**nav, "ctx": ctx, "assets": assets, "asset_types": asset_types, "selected_type": asset_type_id},
+        {**nav, "ctx": ctx, "page": asset_page, "asset_types": asset_types, "selected_type": asset_type_id},
     )
 
 
@@ -221,19 +225,21 @@ async def delete_asset(
 @router.get("/types", response_class=HTMLResponse)
 async def types_list(
     request: Request,
+    page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    asset_types = await service.list_asset_types(tenant_db)
-    fields_by_type: dict[int | None, list] = {}
+    stmt = select(AssetType).order_by(AssetType.sort_order, AssetType.name)
+    type_page = await paginate(tenant_db, stmt, page=page)
+    field_counts: dict[int | None, int] = {}
     for f in await service.all_fields(tenant_db):
-        fields_by_type.setdefault(f.asset_type_id, []).append(f)
+        field_counts[f.asset_type_id] = field_counts.get(f.asset_type_id, 0) + 1
     return templates.TemplateResponse(
         request,
         "assets/types.html",
-        {**nav, "ctx": ctx, "asset_types": asset_types, "fields_by_type": fields_by_type, "error": None},
+        {**nav, "ctx": ctx, "page": type_page, "field_counts": field_counts, "error": None},
     )
 
 
@@ -264,6 +270,29 @@ async def delete_type(
     return RedirectResponse("/assets/types", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.get("/fields", response_class=HTMLResponse)
+async def fields_list(
+    request: Request,
+    page: int = 1,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    nav = await build_nav_context(ctx)
+    asset_types = await service.list_asset_types(tenant_db)
+    stmt = (
+        select(CustomField)
+        .options(selectinload(CustomField.asset_type))
+        .order_by(CustomField.asset_type_id.is_(None), CustomField.sort_order, CustomField.label)
+    )
+    field_page = await paginate(tenant_db, stmt, page=page)
+    return templates.TemplateResponse(
+        request,
+        "assets/fields.html",
+        {**nav, "ctx": ctx, "asset_types": asset_types, "page": field_page, "error": None},
+    )
+
+
 @router.post("/fields")
 async def create_field(
     asset_type_id: str = Form(""),
@@ -287,7 +316,7 @@ async def create_field(
         )
     )
     await tenant_db.commit()
-    return RedirectResponse("/assets/types", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/assets/fields", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/fields/{field_id:int}/delete")
@@ -300,7 +329,7 @@ async def delete_field(
     if field is not None:
         await tenant_db.delete(field)
         await tenant_db.commit()
-    return RedirectResponse("/assets/types", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/assets/fields", status_code=status.HTTP_303_SEE_OTHER)
 
 
 # ------------------------------------------------------------- export ----
@@ -352,14 +381,18 @@ async def export_run(
             tenant_db, name=save_as.strip(), asset_type_id=type_id, fmt=fmt, columns=columns, actor_id=ctx.user.id
         )
 
+    headers = [c["header"] for c in columns]
     if fmt == "json":
-        content, media_type, filename = exporter.render_json(rows), "application/json", "assets-export.json"
+        body, media_type, filename = exporter.render_json(rows).encode("utf-8"), "application/json", "assets-export.json"
+    elif fmt == "xlsx":
+        body = exporter.render_xlsx(rows, headers)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = "assets-export.xlsx"
     else:
-        headers = [c["header"] for c in columns]
-        content, media_type, filename = exporter.render_csv(rows, headers), "text/csv", "assets-export.csv"
+        body, media_type, filename = exporter.render_csv(rows, headers).encode("utf-8"), "text/csv", "assets-export.csv"
 
     return StreamingResponse(
-        io.BytesIO(content.encode("utf-8")),
+        io.BytesIO(body),
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
@@ -453,13 +486,14 @@ async def import_commit(
 @router.get("/sync", response_class=HTMLResponse)
 async def sync_list(
     request: Request,
+    page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    connections = await sync_service.list_connections(tenant_db)
-    return templates.TemplateResponse(request, "assets/sync.html", {**nav, "ctx": ctx, "connections": connections})
+    connection_page = await paginate(tenant_db, sync_service.connection_list_stmt(), page=page)
+    return templates.TemplateResponse(request, "assets/sync.html", {**nav, "ctx": ctx, "page": connection_page})
 
 
 @router.post("/sync")

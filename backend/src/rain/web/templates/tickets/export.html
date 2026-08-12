@@ -2,7 +2,8 @@
 {% block title %}Export Tickets - {{ branding.instance_name }}{% endblock %}
 {% block content %}
 <h1>Export Tickets</h1>
-<div class="card" style="max-width:520px;">
+
+<div class="card" style="max-width:720px;">
   <form method="post" action="/tickets/export/run">
     <div class="form-row">
       <div class="field">
@@ -24,10 +25,27 @@
         <select id="fmt" name="fmt">
           <option value="csv">CSV</option>
           <option value="json">JSON</option>
+          <option value="xlsx">Excel (.xlsx)</option>
         </select>
       </div>
     </div>
-    <button class="btn btn-primary" type="submit">Export</button>
+
+    <h3>Columns</h3>
+    <table data-export-columns>
+      <thead><tr><th>Include</th><th>Source</th><th>Header</th><th>Order</th></tr></thead>
+      <tbody>
+        {% for source, label in columns %}
+        <tr>
+          <td><input type="checkbox" id="use_{{ source }}" name="use_{{ source }}" value="{{ source }}" checked></td>
+          <td class="muted">{{ source }}</td>
+          <td><input type="text" name="header_{{ source }}" value="{{ label }}"></td>
+          <td><input type="number" name="order_{{ source }}" style="width:70px;" value="{{ loop.index0 }}"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <button class="btn btn-primary" type="submit" style="margin-top:16px;">Export</button>
   </form>
 </div>
 {% endblock %}

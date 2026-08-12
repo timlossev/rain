@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% import "_pagination.html" as pg %}
+{% block title %}Platform Events - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Platform Events</h1>
+<p class="muted">React to tickets as they're created -- every active rule whose pattern matches fires (not just the
+  first), each running one or more actions. Open a rule to add actions. Every firing is logged on the ticket itself.</p>
+
+<div class="tabs" data-tabs>
+  <div class="tab-buttons">
+    <button type="button" class="tab-btn active" data-tab-btn="list">Rules</button>
+    <button type="button" class="tab-btn" data-tab-btn="new">New rule</button>
+  </div>
+
+<div class="tab-panel active" data-tab-panel="list">
+<div class="card">
+  <table>
+    <thead><tr><th>Order</th><th>Name</th><th>Trigger</th><th>Match on</th><th>Pattern</th><th>Actions</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for r in page.items %}
+      <tr>
+        <td class="muted">{{ r.sort_order }}</td>
+        <td><a href="/tickets/platform-events/{{ r.id }}">{{ r.name }}</a></td>
+        <td class="muted">{{ trigger_event_labels.get(r.trigger_event, r.trigger_event) }}</td>
+        <td class="muted">{{ r.match_field }}</td>
+        <td><code>{{ r.pattern }}</code></td>
+        <td class="muted">{{ r.actions | length }}</td>
+        <td>{% if r.is_active %}<span class="badge badge-accent">active</span>{% else %}<span class="badge">inactive</span>{% endif %}</td>
+        <td class="actions">
+          <a class="btn btn-sm" href="/tickets/platform-events/{{ r.id }}">Open</a>
+          <form class="inline" method="post" action="/tickets/platform-events/{{ r.id }}/delete" data-confirm="Delete rule '{{ r.name }}' and all its actions?">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="muted">No platform event rules yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ pg.render_pagination(page) }}
+</div>
+</div>
+
+<div class="tab-panel" data-tab-panel="new">
+<div class="card">
+  <form method="post" action="/tickets/platform-events">
+    <div class="form-row">
+      <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" placeholder="Critical DB incidents" required></div>
+      <div class="field">
+        <label for="trigger_event">Trigger</label>
+        <select id="trigger_event" name="trigger_event">
+          {% for value, label in trigger_events %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label for="match_field">Match on</label>
+        <select id="match_field" name="match_field">
+          {% for f in match_fields %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="pattern">Pattern (regex)</label><input type="text" id="pattern" name="pattern" placeholder="(?i)database" required></div>
+      <div class="field" style="flex:0 0 100px;"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="0"></div>
+    </div>
+    <button class="btn btn-primary" type="submit">Create rule &amp; add actions &rarr;</button>
+  </form>
+</div>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ rule.name }} - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<div class="panel-row">
+  <h1 style="margin:0;">{{ rule.name }}</h1>
+  <div>
+    <a class="btn btn-sm" href="/tickets/platform-events">&larr; All rules</a>
+    <form class="inline" method="post" action="/tickets/platform-events/{{ rule.id }}/delete" data-confirm="Delete rule '{{ rule.name }}' and all its actions?">
+      <button class="btn btn-sm btn-danger" type="submit">Delete rule</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <table>
+    <tbody>
+      <tr><th>Trigger</th><td>{{ trigger_event_labels.get(rule.trigger_event, rule.trigger_event) }}</td></tr>
+      <tr><th>Match on</th><td class="muted">{{ rule.match_field }}</td></tr>
+      <tr><th>Pattern</th><td><code>{{ rule.pattern }}</code></td></tr>
+      <tr><th>Status</th><td>{% if rule.is_active %}<span class="badge badge-accent">active</span>{% else %}<span class="badge">inactive</span>{% endif %}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">Actions ({{ rule.actions | length }})</div>
+  {% if rule.actions %}
+  <table>
+    <thead><tr><th>Type</th><th>Config</th><th></th></tr></thead>
+    <tbody>
+      {% for a in rule.actions %}
+      <tr>
+        <td><span class="badge">{{ a.action_type }}</span></td>
+        <td class="muted">
+          {% if a.action_type in ("notify_slack", "notify_email") %}
+            channel_id: {{ a.config.get("channel_id", "-") }}
+          {% elif a.action_type == "webhook" %}
+            {{ a.config.get("url", "-") }}
+          {% elif a.action_type == "attach_document" %}
+            document_id: {{ a.config.get("document_id", "-") }}
+          {% elif a.action_type == "attach_asset" %}
+            asset_id: {{ a.config.get("asset_id", "-") }}
+          {% endif %}
+        </td>
+        <td class="actions">
+          <form class="inline" method="post" action="/tickets/platform-events/{{ rule.id }}/actions/{{ a.id }}/delete" data-confirm="Remove this action?">
+            <button class="btn btn-sm btn-danger" type="submit">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No actions yet -- this rule matches but does nothing. Add one below.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-title">Add action</div>
+  <form method="post" action="/tickets/platform-events/{{ rule.id }}/actions">
+    <div class="field">
+      <label for="action_type">Action</label>
+      <select id="action_type" name="action_type">
+        {% for value, label in action_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="channel_id">Notification channel (for Notify Slack / Notify Email)</label>
+      <select id="channel_id" name="channel_id">
+        <option value="">-</option>
+        {% for c in channels %}<option value="{{ c.id }}">{{ c.name }} ({{ c.channel_type }})</option>{% endfor %}
+      </select>
+      {% if not channels %}<div class="field-hint">No channels yet -- create one under <a href="/tickets/notifications/all">Notifications</a>.</div>{% endif %}
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label for="webhook_url">Webhook URL (for Call a webhook)</label>
+        <input type="text" id="webhook_url" name="webhook_url" placeholder="https://example.com/hook">
+      </div>
+    </div>
+    <div class="field">
+      <label for="payload_template">Webhook payload (JSON, for Call a webhook)</label>
+      <textarea id="payload_template" name="payload_template" rows="3" placeholder='{"text": "{{ticket_number}}: {{title}}"}'></textarea>
+      <div class="field-hint">Double-brace placeholders (so they don't collide with the JSON syntax itself): <code>{{ticket_number}}</code>, <code>{{ticket_type}}</code>, <code>{{title}}</code>, <code>{{description}}</code>, <code>{{severity}}</code>, <code>{{status}}</code>. Sent as-is if not valid JSON after substitution.</div>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label for="document_id">Document (for Attach a document)</label>
+        <select id="document_id" name="document_id">
+          <option value="">-</option>
+          {% for d in documents %}<option value="{{ d.id }}">{{ d.doc_number }}: {{ d.title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="asset_id">Asset (for Attach an asset)</label>
+        <select id="asset_id" name="asset_id">
+          <option value="">-</option>
+          {% for a in assets %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Add action</button>
+  </form>
+</div>
+{% endblock %}

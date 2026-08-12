@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_pagination.html" as pg %}
 {% block title %}Tenants - {{ branding.instance_name }}{% endblock %}
 {% block content %}
 <h1>Tenants</h1>
@@ -15,7 +16,7 @@
   <table>
     <thead><tr><th>Name</th><th>Slug</th><th>Schema</th><th>Status</th><th></th></tr></thead>
     <tbody>
-      {% for tenant in tenants %}
+      {% for tenant in page.items %}
       <tr>
         <td>{{ tenant.name }}</td>
         <td>{{ tenant.slug }}</td>
@@ -35,6 +36,7 @@
       {% endfor %}
     </tbody>
   </table>
+  {{ pg.render_pagination(page) }}
 </div>
 </div>
 

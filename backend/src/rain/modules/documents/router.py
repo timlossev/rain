@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.modules.documents import service, storage
@@ -22,14 +23,15 @@ router = APIRouter(prefix="/documents")
 async def list_documents(
     request: Request,
     search: str | None = None,
+    page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    documents = await service.list_documents(tenant_db, search=search)
+    doc_page = await paginate(tenant_db, service.document_list_stmt(search=search), page=page)
     return templates.TemplateResponse(
-        request, "documents/list.html", {**nav, "ctx": ctx, "documents": documents, "search": search or ""}
+        request, "documents/list.html", {**nav, "ctx": ctx, "page": doc_page, "search": search or ""}
     )
 
 

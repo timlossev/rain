@@ -7,14 +7,16 @@ from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from rain.core.crypto import encrypt_json
+from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
-from rain.db.tenant_models import NotificationChannel, Ticket, TicketRule
+from rain.db.tenant_models import NotificationChannel, PlatformEventAction, PlatformEventRule, Ticket, TicketRule
 from rain.modules.assets import service as asset_service
 from rain.modules.documents import service as document_service
-from rain.modules.tickets import exporter, service
+from rain.modules.tickets import exporter, platform_events, service
 from rain.modules.tickets.schemas import CHANNEL_TYPES, MATCH_FIELDS, SEVERITIES, TICKET_STATUSES, TICKET_TYPES
 from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
@@ -31,19 +33,21 @@ async def list_tickets(
     request: Request,
     ticket_type: str | None = None,
     ticket_status: str | None = None,
+    page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    tickets = await service.list_tickets(tenant_db, ticket_type=ticket_type, status=ticket_status)
+    stmt = service.ticket_list_stmt(ticket_type=ticket_type, status=ticket_status)
+    ticket_page = await paginate(tenant_db, stmt, page=page)
     return templates.TemplateResponse(
         request,
         "tickets/list.html",
         {
             **nav,
             "ctx": ctx,
-            "tickets": tickets,
+            "page": ticket_page,
             "ticket_types": TICKET_TYPES,
             "statuses": TICKET_STATUSES,
             "selected_type": ticket_type,
@@ -203,25 +207,54 @@ async def export_form(
 ):
     nav = await build_nav_context(ctx)
     return templates.TemplateResponse(
-        request, "tickets/export.html", {**nav, "ctx": ctx, "ticket_types": TICKET_TYPES, "statuses": TICKET_STATUSES}
+        request,
+        "tickets/export.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "ticket_types": TICKET_TYPES,
+            "statuses": TICKET_STATUSES,
+            "columns": exporter.available_columns(),
+        },
     )
 
 
 @router.post("/export/run")
 async def export_run(
+    request: Request,
     ticket_type: str = Form(""),
     ticket_status: str = Form(""),
     fmt: str = Form("csv"),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
-    rows = await exporter.build_rows(tenant_db, ticket_type=ticket_type or None, status=ticket_status or None)
+    form = await request.form()
+    columns = []
+    for key in form.keys():
+        if key.startswith("use_"):
+            source = key[len("use_") :]
+            header = str(form.get(f"header_{source}", source)).strip() or source
+            columns.append({"source": source, "header": header, "order": int(form.get(f"order_{source}", 0) or 0)})
+    columns.sort(key=lambda c: c["order"])
+    if not columns:
+        columns = [{"source": s, "header": h} for s, h in exporter.available_columns()]
+
+    rows = await exporter.build_rows(
+        tenant_db, ticket_type=ticket_type or None, status=ticket_status or None, columns=columns
+    )
+
+    headers = [c["header"] for c in columns]
     if fmt == "json":
-        content, media_type, filename = exporter.render_json(rows), "application/json", "tickets-export.json"
+        body, media_type, filename = exporter.render_json(rows).encode("utf-8"), "application/json", "tickets-export.json"
+    elif fmt == "xlsx":
+        body = exporter.render_xlsx(rows, headers)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = "tickets-export.xlsx"
     else:
-        content, media_type, filename = exporter.render_csv(rows), "text/csv", "tickets-export.csv"
+        body, media_type, filename = exporter.render_csv(rows, headers).encode("utf-8"), "text/csv", "tickets-export.csv"
+
     return StreamingResponse(
-        io.BytesIO(content.encode("utf-8")),
+        io.BytesIO(body),
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
@@ -233,20 +266,21 @@ async def export_run(
 @router.get("/rules/all", response_class=HTMLResponse)
 async def rules_list(
     request: Request,
+    page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    result = await tenant_db.execute(select(TicketRule).order_by(TicketRule.sort_order))
-    rule_rows = list(result.scalars())
+    stmt = select(TicketRule).order_by(TicketRule.sort_order)
+    rule_page = await paginate(tenant_db, stmt, page=page)
     return templates.TemplateResponse(
         request,
         "tickets/rules.html",
         {
             **nav,
             "ctx": ctx,
-            "rules": rule_rows,
+            "page": rule_page,
             "ticket_types": TICKET_TYPES,
             "severities": SEVERITIES,
             "match_fields": MATCH_FIELDS,
@@ -312,15 +346,15 @@ async def rules_test(
     matched = bool(rule and re.search(rule.pattern, sample))
 
     nav = await build_nav_context(ctx)
-    result = await tenant_db.execute(select(TicketRule).order_by(TicketRule.sort_order))
-    rule_rows = list(result.scalars())
+    stmt = select(TicketRule).order_by(TicketRule.sort_order)
+    rule_page = await paginate(tenant_db, stmt, page=1)
     return templates.TemplateResponse(
         request,
         "tickets/rules.html",
         {
             **nav,
             "ctx": ctx,
-            "rules": rule_rows,
+            "page": rule_page,
             "ticket_types": TICKET_TYPES,
             "severities": SEVERITIES,
             "match_fields": MATCH_FIELDS,
@@ -335,17 +369,18 @@ async def rules_test(
 @router.get("/notifications/all", response_class=HTMLResponse)
 async def notifications_list(
     request: Request,
+    page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    result = await tenant_db.execute(select(NotificationChannel).order_by(NotificationChannel.name))
-    channels = list(result.scalars())
+    stmt = select(NotificationChannel).order_by(NotificationChannel.name)
+    channel_page = await paginate(tenant_db, stmt, page=page)
     return templates.TemplateResponse(
         request,
         "tickets/notifications.html",
-        {**nav, "ctx": ctx, "channels": channels, "channel_types": CHANNEL_TYPES},
+        {**nav, "ctx": ctx, "page": channel_page, "channel_types": CHANNEL_TYPES},
     )
 
 
@@ -388,3 +423,150 @@ async def notifications_delete(
         await tenant_db.delete(channel)
         await tenant_db.commit()
     return RedirectResponse("/tickets/notifications/all", status_code=status.HTTP_303_SEE_OTHER)
+
+
+# ----------------------------------------------------- platform events ---
+
+
+@router.get("/platform-events", response_class=HTMLResponse)
+async def platform_events_list(
+    request: Request,
+    page: int = 1,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    nav = await build_nav_context(ctx)
+    stmt = (
+        select(PlatformEventRule)
+        .options(selectinload(PlatformEventRule.actions))
+        .order_by(PlatformEventRule.sort_order)
+    )
+    rule_page = await paginate(tenant_db, stmt, page=page)
+    return templates.TemplateResponse(
+        request,
+        "tickets/platform_events.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "page": rule_page,
+            "trigger_events": platform_events.TRIGGER_EVENTS,
+            "trigger_event_labels": dict(platform_events.TRIGGER_EVENTS),
+            "match_fields": platform_events.MATCH_FIELDS,
+        },
+    )
+
+
+@router.post("/platform-events")
+async def platform_events_create(
+    name: str = Form(...),
+    trigger_event: str = Form(...),
+    match_field: str = Form("title"),
+    pattern: str = Form(...),
+    sort_order: int = Form(0),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    rule = PlatformEventRule(
+        name=name.strip(),
+        trigger_event=trigger_event,
+        match_field=match_field,
+        pattern=pattern,
+        sort_order=sort_order,
+        created_by=ctx.user.id,
+    )
+    tenant_db.add(rule)
+    await tenant_db.flush()
+    rule_id = rule.id
+    await tenant_db.commit()
+    return RedirectResponse(f"/tickets/platform-events/{rule_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/platform-events/{rule_id:int}/delete")
+async def platform_events_delete(
+    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_login)
+):
+    rule = await tenant_db.get(PlatformEventRule, rule_id)
+    if rule is not None:
+        await tenant_db.delete(rule)
+        await tenant_db.commit()
+    return RedirectResponse("/tickets/platform-events", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/platform-events/{rule_id:int}", response_class=HTMLResponse)
+async def platform_event_detail(
+    request: Request,
+    rule_id: int,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    nav = await build_nav_context(ctx)
+    stmt = (
+        select(PlatformEventRule).where(PlatformEventRule.id == rule_id).options(selectinload(PlatformEventRule.actions))
+    )
+    rule = (await tenant_db.execute(stmt)).scalar_one_or_none()
+    if rule is None:
+        return RedirectResponse("/tickets/platform-events", status_code=status.HTTP_303_SEE_OTHER)
+    channels = list((await tenant_db.execute(select(NotificationChannel).order_by(NotificationChannel.name))).scalars())
+    documents = await document_service.list_documents(tenant_db)
+    assets = await asset_service.list_assets(tenant_db)
+    return templates.TemplateResponse(
+        request,
+        "tickets/platform_event_detail.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "rule": rule,
+            "trigger_event_labels": dict(platform_events.TRIGGER_EVENTS),
+            "action_types": platform_events.ACTION_TYPES,
+            "channels": channels,
+            "documents": documents,
+            "assets": assets,
+        },
+    )
+
+
+@router.post("/platform-events/{rule_id:int}/actions")
+async def platform_event_action_create(
+    request: Request,
+    rule_id: int,
+    action_type: str = Form(...),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    form = await request.form()
+    if action_type in ("notify_slack", "notify_email"):
+        channel_id = form.get("channel_id")
+        config = {"channel_id": int(channel_id)} if channel_id else {}
+    elif action_type == "webhook":
+        config = {
+            "url": str(form.get("webhook_url", "")).strip(),
+            "payload_template": str(form.get("payload_template", "")).strip() or "{}",
+        }
+    elif action_type == "attach_document":
+        document_id = form.get("document_id")
+        config = {"document_id": int(document_id)} if document_id else {}
+    elif action_type == "attach_asset":
+        asset_id = form.get("asset_id")
+        config = {"asset_id": int(asset_id)} if asset_id else {}
+    else:
+        config = {}
+    tenant_db.add(PlatformEventAction(rule_id=rule_id, action_type=action_type, config=config))
+    await tenant_db.commit()
+    return RedirectResponse(f"/tickets/platform-events/{rule_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/platform-events/{rule_id:int}/actions/{action_id:int}/delete")
+async def platform_event_action_delete(
+    rule_id: int,
+    action_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    action = await tenant_db.get(PlatformEventAction, action_id)
+    if action is not None:
+        await tenant_db.delete(action)
+        await tenant_db.commit()
+    return RedirectResponse(f"/tickets/platform-events/{rule_id}", status_code=status.HTTP_303_SEE_OTHER)

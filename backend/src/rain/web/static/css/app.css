@@ -33,7 +33,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Inter, Roboto, sans-serif;
+  font-family: var(--font-family, "Segoe UI", -apple-system, BlinkMacSystemFont, Inter, Roboto, sans-serif);
   line-height: 1.5;
 }
 a { color: var(--accent); text-decoration: none; }
@@ -44,15 +44,29 @@ p { margin: 0 0 1em; }
 /* ---------- shell layout ---------- */
 .shell { display: flex; min-height: 100vh; }
 .sidebar {
-  width: 250px;
+  width: var(--sidebar-width, 272px);
   flex-shrink: 0;
   background: var(--sidebar-bg);
   color: var(--sidebar-text);
   display: flex;
   flex-direction: column;
   padding: 16px 0;
+  position: relative;
   transition: width 0.15s ease;
 }
+.sidebar.resizing { transition: none; }
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 25;
+  background: transparent;
+}
+.sidebar-resize-handle:hover, .sidebar-resize-handle.active { background: var(--accent); opacity: 0.5; }
+.sidebar.collapsed .sidebar-resize-handle { display: none; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 16px 20px; overflow: hidden; }
 .brand-logo { width: 28px; height: 28px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
 .brand-name { font-weight: 700; font-size: 1.05rem; color: #fff; letter-spacing: 0.02em; white-space: nowrap; }
@@ -87,39 +101,41 @@ p { margin: 0 0 1em; }
    file-tree pattern) -- so parent/child is unambiguous even without
    color, and holds up at any nesting depth (e.g. Assets > By Type > a
    specific type). */
-.nav-tree { list-style: none; margin: 0; padding: 0 6px; }
+.nav-tree { list-style: none; margin: 0; padding: 0 10px; }
 .nav-tree .nav-tree {
-  margin: 1px 0 3px 9px;
-  padding-left: 8px;
+  margin: 2px 0 5px 18px;
+  padding-left: 13px;
   border-left: 1px solid rgba(255, 255, 255, 0.14);
 }
 .nav-tree .nav-tree > .nav-item { position: relative; }
 .nav-tree .nav-tree > .nav-item::before {
   content: "";
   position: absolute;
-  left: -8px;
-  top: 13px;
-  width: 6px;
+  left: -13px;
+  top: 16px;
+  width: 10px;
   height: 1px;
   background: rgba(255, 255, 255, 0.14);
 }
-.nav-item { margin: 0; }
+.nav-item { margin: 1px 0; }
 .nav-icon {
   display: inline-flex;
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   color: var(--sidebar-text-dim);
 }
 .nav-icon svg { width: 100%; height: 100%; }
 .nav-link, .nav-toggle {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  gap: 10px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   color: var(--sidebar-text);
-  font-size: 0.87rem;
+  font-size: 0.92rem;
 }
 .nav-link .nav-label { font-weight: 400; }
 .nav-toggle .nav-label { font-weight: 600; color: #eef0f5; flex: 1; text-align: left; }
@@ -133,10 +149,10 @@ p { margin: 0 0 1em; }
   all: unset;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 10px;
   width: 100%;
   cursor: pointer;
-  padding: 5px 8px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   box-sizing: border-box;
 }
@@ -303,6 +319,13 @@ form.inline { display: inline; }
 .panel-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
 .muted { color: var(--text-muted); }
 
+/* ---------- pagination ---------- */
+.pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.pagination-controls { display: flex; align-items: center; gap: 10px; }
+.pagination-controls .btn[aria-disabled] { opacity: 0.4; pointer-events: none; }
+.pagination-page { font-size: 0.82rem; white-space: nowrap; }
+.pagination-summary { font-size: 0.82rem; }
+
 /* ---------- tables ---------- */
 table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -370,7 +393,8 @@ td.actions { text-align: right; white-space: nowrap; }
 .auth-card .brand { justify-content: center; padding-bottom: 24px; }
 
 @media (max-width: 860px) {
-  .sidebar { position: fixed; inset: 0 auto 0 0; transform: translateX(-100%); transition: transform 0.2s ease, width 0.15s ease; z-index: 20; }
+  .sidebar { position: fixed; inset: 0 auto 0 0; width: 272px !important; transform: translateX(-100%); transition: transform 0.2s ease; z-index: 20; }
   body.nav-open .sidebar { transform: translateX(0); }
+  .sidebar-resize-handle { display: none; }
   .content { padding: 16px; }
 }

@@ -32,6 +32,16 @@
 <p class="pdf-muted">No documents linked.</p>
 {% endif %}
 
+{% if ticket.rule_triggers %}
+<h2 class="pdf-section">Platform event rule triggers</h2>
+{% for t in ticket.rule_triggers %}
+<div class="pdf-comment">
+  <div class="pdf-comment-meta">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "" }} &mdash; {{ t.rule_name }}</div>
+  <div>{{ t.summary }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
 <h2 class="pdf-section">Comments ({{ ticket.comments | length }})</h2>
 {% if ticket.comments %}
   {% for c in ticket.comments %}

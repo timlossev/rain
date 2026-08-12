@@ -1,0 +1,24 @@
+{% macro render_pagination(page) %}
+{% if page.total_pages > 1 or page.total > 0 %}
+<div class="pagination">
+  <span class="pagination-summary muted">
+    {% if page.total == 0 %}No results{% else %}Showing {{ page.start_index }}&ndash;{{ page.end_index }} of {{ page.total }}{% endif %}
+  </span>
+  {% if page.total_pages > 1 %}
+  <div class="pagination-controls">
+    {% if page.has_prev %}
+    <a class="btn btn-sm" href="{{ request.url.include_query_params(page=page.page - 1) }}">&larr; Prev</a>
+    {% else %}
+    <span class="btn btn-sm" aria-disabled="true">&larr; Prev</span>
+    {% endif %}
+    <span class="pagination-page muted">Page {{ page.page }} of {{ page.total_pages }}</span>
+    {% if page.has_next %}
+    <a class="btn btn-sm" href="{{ request.url.include_query_params(page=page.page + 1) }}">Next &rarr;</a>
+    {% else %}
+    <span class="btn btn-sm" aria-disabled="true">Next &rarr;</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endmacro %}

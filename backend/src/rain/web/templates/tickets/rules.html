@@ -1,14 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Ticket Rules - {{ branding.instance_name }}{% endblock %}
+{% import "_pagination.html" as pg %}
+{% block title %}Event Policies - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>Rules</h1>
+<h1>Event Policies</h1>
 <p class="muted">A syslog event whose <code>match_field</code> matches <code>pattern</code> (regex) is automatically
-  promoted into a ticket of the selected type. Rules are evaluated in order; the first match wins.</p>
+  promoted into a ticket of the selected type. Policies are evaluated in order; the first match wins.</p>
 
 <div class="tabs" data-tabs>
   <div class="tab-buttons">
-    <button type="button" class="tab-btn active" data-tab-btn="list">Active rules</button>
-    <button type="button" class="tab-btn" data-tab-btn="new">New rule</button>
+    <button type="button" class="tab-btn active" data-tab-btn="list">Active policies</button>
+    <button type="button" class="tab-btn" data-tab-btn="new">New policy</button>
   </div>
 
 <div class="tab-panel active" data-tab-panel="list">
@@ -16,7 +17,7 @@
   <table>
     <thead><tr><th>Order</th><th>Name</th><th>Type</th><th>Match on</th><th>Pattern</th><th>Severity</th><th></th></tr></thead>
     <tbody>
-      {% for r in rules %}
+      {% for r in page.items %}
       <tr>
         <td class="muted">{{ r.sort_order }}</td>
         <td>{{ r.name }}</td>
@@ -25,7 +26,7 @@
         <td><code>{{ r.pattern }}</code></td>
         <td><span class="badge severity-{{ r.severity }}">{{ r.severity }}</span></td>
         <td class="actions">
-          <form class="inline" method="post" action="/tickets/rules/{{ r.id }}/delete" data-confirm="Delete rule '{{ r.name }}'?">
+          <form class="inline" method="post" action="/tickets/rules/{{ r.id }}/delete" data-confirm="Delete policy '{{ r.name }}'?">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>
@@ -52,10 +53,11 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="7" class="muted">No rules yet -- every event just shows up in the live viewer.</td></tr>
+      <tr><td colspan="7" class="muted">No policies yet -- every event just shows up in Events.</td></tr>
       {% endfor %}
     </tbody>
   </table>
+  {{ pg.render_pagination(page) }}
 </div>
 </div>
 
@@ -100,7 +102,7 @@
         <option value="program">Event program = asset External ID</option>
       </select>
     </div>
-    <button class="btn btn-primary" type="submit">Add rule</button>
+    <button class="btn btn-primary" type="submit">Add policy</button>
   </form>
 </div>
 </div>

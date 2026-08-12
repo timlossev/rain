@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_pagination.html" as pg %}
 {% block title %}Documents - {{ branding.instance_name }}{% endblock %}
 {% block content %}
 <div class="panel-row">
@@ -18,7 +19,7 @@
   <table>
     <thead><tr><th>Number</th><th>Title</th><th>File</th><th>Uploaded</th></tr></thead>
     <tbody>
-      {% for doc in documents %}
+      {% for doc in page.items %}
       <tr>
         <td><a href="/documents/{{ doc.id }}">{{ doc.doc_number }}</a></td>
         <td>{{ doc.title }}</td>
@@ -30,5 +31,6 @@
       {% endfor %}
     </tbody>
   </table>
+  {{ pg.render_pagination(page) }}
 </div>
 {% endblock %}

@@ -19,11 +19,27 @@ logger = logging.getLogger("rain.config_store")
 
 NOTIFY_CHANNEL = "rain_global_config_changed"
 
+# Curated, dependency-free font stacks (system/web-safe fonts only -- no
+# Google Fonts/CDN download, consistent with the rest of the app). The
+# admin branding picker offers exactly these; the CSS value itself is what
+# gets stored in global_config and injected into base.html's <style> block.
+FONT_CHOICES: list[tuple[str, str]] = [
+    ("System UI (default)", '"Segoe UI", -apple-system, BlinkMacSystemFont, Inter, Roboto, sans-serif'),
+    ("Classic (Arial)", "Arial, Helvetica, sans-serif"),
+    ("Humanist (Verdana)", "Verdana, Geneva, sans-serif"),
+    ("Friendly (Trebuchet MS)", '"Trebuchet MS", Tahoma, sans-serif'),
+    ("Serif (Georgia)", 'Georgia, "Times New Roman", serif'),
+    ("Serif (Times New Roman)", '"Times New Roman", Times, serif'),
+    ("Monospace (Consolas)", 'Consolas, "Cascadia Mono", "SF Mono", monospace'),
+]
+DEFAULT_FONT_FAMILY = FONT_CHOICES[0][1]
+
 # Defaults used until the setup wizard writes real values.
 DEFAULTS: dict[str, Any] = {
     "instance_name": "RAIN",
     "accent_color": "#6366f1",
     "logo_path": None,
+    "font_family": DEFAULT_FONT_FAMILY,
     "setup_complete": False,
 }
 

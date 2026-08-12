@@ -60,8 +60,12 @@ class AzureProvider:
 PROVIDERS: dict[str, SyncProvider] = {"aws": AWSProvider(), "azure": AzureProvider()}
 
 
+def connection_list_stmt():
+    return select(SyncConnection).order_by(SyncConnection.name)
+
+
 async def list_connections(db: AsyncSession) -> list[SyncConnection]:
-    result = await db.execute(select(SyncConnection).order_by(SyncConnection.name))
+    result = await db.execute(connection_list_stmt())
     return list(result.scalars())
 
 

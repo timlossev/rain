@@ -9,8 +9,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from rain.core.config_store import config_store
+from rain.core.config_store import FONT_CHOICES, config_store
 from rain.core.crypto import encrypt_json
+from rain.core.pagination import paginate
 from rain.core.rbac import require_internal_admin, require_login
 from rain.core.security import hash_password
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context
@@ -40,7 +41,9 @@ async def branding_form(
     _: CurrentUser = Depends(require_internal_admin),
 ):
     nav = await build_nav_context(ctx)
-    return templates.TemplateResponse(request, "admin/branding.html", {**nav, "ctx": ctx, "error": None})
+    return templates.TemplateResponse(
+        request, "admin/branding.html", {**nav, "ctx": ctx, "error": None, "font_choices": FONT_CHOICES}
+    )
 
 
 @router.post("/branding")
@@ -48,12 +51,20 @@ async def branding_submit(
     request: Request,
     instance_name: str = Form(...),
     accent_color: str = Form(...),
+    font_family: str = Form(""),
     logo: UploadFile | None = None,
     ctx: RequestContext = Depends(get_request_context),
     user: CurrentUser = Depends(require_internal_admin),
 ):
     await config_store.set("instance_name", instance_name.strip(), updated_by=user.id)
     await config_store.set("accent_color", accent_color.strip(), updated_by=user.id)
+    # Whitelisted against FONT_CHOICES (not just server-rendered <select>
+    # options) since the stored value is injected into base.html's <style>
+    # block with the `safe` filter -- an arbitrary POST body must not be
+    # able to smuggle CSS/HTML through it.
+    allowed_fonts = {css for _, css in FONT_CHOICES}
+    if font_family in allowed_fonts:
+        await config_store.set("font_family", font_family, updated_by=user.id)
     if logo is not None and logo.filename:
         try:
             logo_path = await save_logo_upload(logo)
@@ -69,15 +80,16 @@ async def branding_submit(
 @router.get("/tenants", response_class=HTMLResponse)
 async def tenants_list(
     request: Request,
+    page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     _: CurrentUser = Depends(require_internal_admin),
 ):
     nav = await build_nav_context(ctx)
     async with control_session() as session:
-        result = await session.execute(select(Tenant).order_by(Tenant.name))
-        tenants = list(result.scalars())
+        stmt = select(Tenant).order_by(Tenant.name)
+        tenant_page = await paginate(session, stmt, page=page)
     return templates.TemplateResponse(
-        request, "admin/tenants.html", {**nav, "ctx": ctx, "tenants": tenants, "error": None}
+        request, "admin/tenants.html", {**nav, "ctx": ctx, "page": tenant_page, "error": None}
     )
 
 
@@ -119,16 +131,17 @@ async def switch_tenant(request: Request, tenant_id: int = Form(...), _: Current
 @router.get("/users", response_class=HTMLResponse)
 async def users_list(
     request: Request,
+    page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     _: CurrentUser = Depends(require_internal_admin),
 ):
     nav = await build_nav_context(ctx)
     async with control_session() as session:
         stmt = select(User).options(selectinload(User.tenant)).order_by(User.email)
-        users = list((await session.execute(stmt)).scalars())
+        user_page = await paginate(session, stmt, page=page)
         tenants = list((await session.execute(select(Tenant).order_by(Tenant.name))).scalars())
     return templates.TemplateResponse(
-        request, "admin/users.html", {**nav, "ctx": ctx, "users": users, "tenants": tenants, "error": None}
+        request, "admin/users.html", {**nav, "ctx": ctx, "page": user_page, "tenants": tenants, "error": None}
     )
 
 
@@ -170,6 +183,67 @@ async def deactivate_user(user_id: int, _: CurrentUser = Depends(require_interna
     return RedirectResponse("/admin/users", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.get("/users/{user_id:int}/edit", response_class=HTMLResponse)
+async def edit_user_form(
+    request: Request,
+    user_id: int,
+    ctx: RequestContext = Depends(get_request_context),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    nav = await build_nav_context(ctx)
+    async with control_session() as session:
+        user = await session.get(User, user_id)
+        if user is None:
+            return RedirectResponse("/admin/users", status_code=status.HTTP_303_SEE_OTHER)
+        tenants = list((await session.execute(select(Tenant).order_by(Tenant.name))).scalars())
+        return templates.TemplateResponse(
+            request, "admin/user_edit.html", {**nav, "ctx": ctx, "edit_user": user, "tenants": tenants, "error": None}
+        )
+
+
+@router.post("/users/{user_id:int}")
+async def update_user(
+    request: Request,
+    user_id: int,
+    display_name: str = Form(...),
+    role_key: str = Form(...),
+    tenant_id: str = Form(""),
+    password: str = Form(""),
+    is_active: bool = Form(False),
+    ctx: RequestContext = Depends(get_request_context),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    if role_key == "client" and not tenant_id:
+        nav = await build_nav_context(ctx)
+        async with control_session() as session:
+            user = await session.get(User, user_id)
+            tenants = list((await session.execute(select(Tenant).order_by(Tenant.name))).scalars())
+            return templates.TemplateResponse(
+                request,
+                "admin/user_edit.html",
+                {
+                    **nav,
+                    "ctx": ctx,
+                    "edit_user": user,
+                    "tenants": tenants,
+                    "error": "Client users must be assigned a tenant.",
+                },
+                status_code=400,
+            )
+
+    async with control_session() as session:
+        user = await session.get(User, user_id)
+        if user is not None:
+            user.display_name = display_name.strip()
+            user.role_key = role_key
+            user.tenant_id = int(tenant_id) if tenant_id else None
+            user.is_active = is_active
+            if password.strip():
+                user.password_hash = hash_password(password.strip())
+            await session.commit()
+    return RedirectResponse("/admin/users?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.get("/smtp", response_class=HTMLResponse)
 async def smtp_form(
     request: Request,
@@ -205,6 +279,7 @@ async def smtp_submit(
 @router.get("/syslog-sources", response_class=HTMLResponse)
 async def syslog_sources_list(
     request: Request,
+    page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     _: CurrentUser = Depends(require_internal_admin),
 ):
@@ -215,12 +290,12 @@ async def syslog_sources_list(
             .options(selectinload(SyslogSourceMap.tenant))
             .order_by(SyslogSourceMap.sort_order)
         )
-        sources = list((await session.execute(stmt)).scalars())
+        source_page = await paginate(session, stmt, page=page)
         tenants = list((await session.execute(select(Tenant).order_by(Tenant.name))).scalars())
     return templates.TemplateResponse(
         request,
         "admin/syslog_sources.html",
-        {**nav, "ctx": ctx, "sources": sources, "tenants": tenants, "listener_port": get_settings().syslog_port},
+        {**nav, "ctx": ctx, "page": source_page, "tenants": tenants, "listener_port": get_settings().syslog_port},
     )
 
 

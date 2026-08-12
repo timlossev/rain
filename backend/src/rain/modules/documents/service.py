@@ -43,12 +43,16 @@ async def create_document(
     return doc
 
 
-async def list_documents(db: AsyncSession, *, search: str | None = None) -> list[Document]:
+def document_list_stmt(*, search: str | None = None):
     stmt = select(Document).order_by(Document.created_at.desc())
     if search:
         like = f"%{search}%"
         stmt = stmt.where(Document.title.ilike(like) | Document.doc_number.ilike(like))
-    result = await db.execute(stmt)
+    return stmt
+
+
+async def list_documents(db: AsyncSession, *, search: str | None = None) -> list[Document]:
+    result = await db.execute(document_list_stmt(search=search))
     return list(result.scalars())
 
 

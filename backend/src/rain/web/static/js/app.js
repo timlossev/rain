@@ -66,6 +66,41 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
     }
+
+    // Drag-to-resize, expanded state only. Width persisted across visits;
+    // collapsed (icons-only) mode ignores it and falls back to its own
+    // fixed width.
+    const WIDTH_KEY = "rain-sidebar-width";
+    const MIN_WIDTH = 200;
+    const MAX_WIDTH = 440;
+    const savedWidth = parseInt(localStorage.getItem(WIDTH_KEY) || "", 10);
+    if (!isMobile() && savedWidth >= MIN_WIDTH && savedWidth <= MAX_WIDTH) {
+      sidebar.style.setProperty("--sidebar-width", savedWidth + "px");
+    }
+    const handle = document.querySelector("[data-sidebar-resize]");
+    if (handle) {
+      handle.addEventListener("mousedown", (evt) => {
+        if (isMobile() || sidebar.classList.contains("collapsed")) return;
+        evt.preventDefault();
+        sidebar.classList.add("resizing");
+        handle.classList.add("active");
+        const startX = evt.clientX;
+        const startWidth = sidebar.getBoundingClientRect().width;
+        const onMove = (moveEvt) => {
+          const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + (moveEvt.clientX - startX)));
+          sidebar.style.setProperty("--sidebar-width", next + "px");
+        };
+        const onUp = () => {
+          sidebar.classList.remove("resizing");
+          handle.classList.remove("active");
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          localStorage.setItem(WIDTH_KEY, Math.round(sidebar.getBoundingClientRect().width));
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    }
   }
 
   // Asset form: reload the custom-field inputs when the asset type changes.

@@ -52,6 +52,18 @@ async def create_ticket(
             event.promoted_ticket_id = ticket.id
 
     await db.commit()
+
+    # Platform event rules (Admin > Platform Events) react to every newly
+    # created ticket regardless of origin -- both this function's callers
+    # (the manual "New ticket" form and the syslog auto-promotion path in
+    # rain.modules.tickets.rules) land here, so hooking it in this single
+    # choke point covers both. Imported locally to avoid a module-load-time
+    # cycle (platform_events -> documents.service, notifications -> ... ->
+    # back into this module).
+    from rain.modules.tickets.platform_events import evaluate_ticket_created
+
+    await evaluate_ticket_created(db, ticket)
+
     # No db.refresh(ticket) here: this session's connection carries a
     # schema_translate_map set once at checkout (see rain.db.base.
     # tenant_session), and a refresh *after* commit checks out a fresh
@@ -65,15 +77,21 @@ async def create_ticket(
     return ticket
 
 
-async def list_tickets(
-    db: AsyncSession, *, ticket_type: str | None = None, status: str | None = None
-) -> list[Ticket]:
+def ticket_list_stmt(*, ticket_type: str | None = None, status: str | None = None):
+    """Shared statement builder -- used both by list_tickets() (full list,
+    for exports/etc) and the Tickets screen's paginated query."""
     stmt = select(Ticket).options(selectinload(Ticket.asset)).order_by(Ticket.created_at.desc())
     if ticket_type:
         stmt = stmt.where(Ticket.ticket_type == ticket_type)
     if status:
         stmt = stmt.where(Ticket.status == status)
-    result = await db.execute(stmt)
+    return stmt
+
+
+async def list_tickets(
+    db: AsyncSession, *, ticket_type: str | None = None, status: str | None = None
+) -> list[Ticket]:
+    result = await db.execute(ticket_list_stmt(ticket_type=ticket_type, status=status))
     return list(result.scalars())
 
 
@@ -81,7 +99,7 @@ async def get_ticket(db: AsyncSession, ticket_id: int) -> Ticket | None:
     stmt = (
         select(Ticket)
         .where(Ticket.id == ticket_id)
-        .options(selectinload(Ticket.asset), selectinload(Ticket.comments))
+        .options(selectinload(Ticket.asset), selectinload(Ticket.comments), selectinload(Ticket.rule_triggers))
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()

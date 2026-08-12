@@ -38,18 +38,22 @@ async def all_fields(db: AsyncSession) -> list[CustomField]:
     return list(result.scalars())
 
 
-def _asset_list_stmt():
-    return select(Asset).options(
+def asset_list_stmt(*, asset_type_id: int | None = None):
+    """Shared statement builder -- used both by list_assets() (full list,
+    for exports/dropdowns/etc, where pagination would be wrong) and the
+    Assets screen's paginated query (rain.modules.assets.router), so the
+    two never drift apart on filtering/eager-load options."""
+    stmt = select(Asset).options(
         selectinload(Asset.asset_type),
         selectinload(Asset.field_values).selectinload(AssetFieldValue.field),
-    )
+    ).order_by(Asset.name)
+    if asset_type_id is not None:
+        stmt = stmt.where(Asset.asset_type_id == asset_type_id)
+    return stmt
 
 
 async def list_assets(db: AsyncSession, *, asset_type_id: int | None = None) -> list[Asset]:
-    stmt = _asset_list_stmt().order_by(Asset.name)
-    if asset_type_id is not None:
-        stmt = stmt.where(Asset.asset_type_id == asset_type_id)
-    result = await db.execute(stmt)
+    result = await db.execute(asset_list_stmt(asset_type_id=asset_type_id))
     return list(result.scalars())
 
 

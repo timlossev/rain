@@ -226,6 +226,9 @@ class Ticket(TenantBase):
 
     asset: Mapped[Asset | None] = relationship()
     comments: Mapped[list["TicketComment"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")
+    rule_triggers: Mapped[list["PlatformEventTrigger"]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan", order_by="PlatformEventTrigger.created_at"
+    )
 
 
 class TicketComment(TenantBase):
@@ -301,6 +304,71 @@ class DocumentLink(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     document: Mapped[Document] = relationship(back_populates="links")
+
+
+class PlatformEventRule(TenantBase):
+    """A rule that fires one or more actions when a platform event occurs
+    (today: a ticket of a given type is created) and `pattern` matches.
+    Unlike TicketRule (syslog -> ticket promotion, first match wins), every
+    active matching platform event rule fires -- this is a downstream
+    reaction layer, not a routing decision, so multiple rules can react to
+    the same ticket."""
+
+    __tablename__ = "platform_event_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    trigger_event: Mapped[str] = mapped_column(String(31))  # incident_created | vulnerability_created
+    match_field: Mapped[str] = mapped_column(String(15), default="title", server_default="title")  # title | description
+    pattern: Mapped[str] = mapped_column(String(500))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    actions: Mapped[list["PlatformEventAction"]] = relationship(
+        back_populates="rule", cascade="all, delete-orphan", order_by="PlatformEventAction.id"
+    )
+
+
+class PlatformEventAction(TenantBase):
+    """One action a PlatformEventRule fires on match. `config` shape depends
+    on action_type:
+      notify_slack / notify_email -> {"channel_id": <NotificationChannel.id>}
+      webhook                     -> {"url": str, "payload_template": str}
+      attach_document              -> {"document_id": int}
+      attach_asset                 -> {"asset_id": int}
+    Reuses NotificationChannel for the Slack/email actions rather than
+    storing a second copy of webhook URLs/recipient lists."""
+
+    __tablename__ = "platform_event_actions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rule_id: Mapped[int] = mapped_column(ForeignKey("platform_event_rules.id", ondelete="CASCADE"), index=True)
+    action_type: Mapped[str] = mapped_column(String(31))
+    config: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    rule: Mapped[PlatformEventRule] = relationship(back_populates="actions")
+
+
+class PlatformEventTrigger(TenantBase):
+    """Audit trail: this rule fired for this ticket, with a human-readable
+    summary of what each action did. `rule_name` is a snapshot (kept even
+    if the rule is later edited/deleted) so the ticket's history stays
+    meaningful; `rule_id` itself is SET NULL on rule deletion rather than
+    cascading, so the log entry survives."""
+
+    __tablename__ = "platform_event_triggers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rule_id: Mapped[int | None] = mapped_column(ForeignKey("platform_event_rules.id", ondelete="SET NULL"), nullable=True)
+    rule_name: Mapped[str] = mapped_column(String(255))
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True)
+    summary: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    ticket: Mapped[Ticket] = relationship(back_populates="rule_triggers")
 
 
 class AuditLog(TenantBase):

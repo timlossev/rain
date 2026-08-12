@@ -10,6 +10,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from rain.core.xlsx_export import render_xlsx as _render_xlsx
 from rain.modules.assets import service
 
 BUILTIN_SOURCES = [
@@ -63,3 +64,7 @@ def render_csv(rows: list[dict[str, Any]], headers: list[str]) -> str:
 
 def render_json(rows: list[dict[str, Any]]) -> str:
     return json.dumps(rows, indent=2, default=str)
+
+
+def render_xlsx(rows: list[dict[str, Any]], headers: list[str]) -> bytes:
+    return _render_xlsx(rows, headers)

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ branding.instance_name }}{% endblock %}</title>
   <link rel="stylesheet" href="/static/css/app.css">
-  <style>:root { --accent: {{ branding.accent_color }}; }</style>
+  <style>:root { --accent: {{ branding.accent_color }}; --font-family: {{ branding.font_family | safe }}; }</style>
 </head>
 <body>
 {% macro nav_icon(name) %}{% if name == "ticket" %}
@@ -64,6 +64,7 @@
       <div class="active-tenant" title="Active tenant: {{ ctx.active_tenant.name }}">Tenant: <strong>{{ ctx.active_tenant.name }}</strong></div>
     </div>
     {% endif %}
+    <div class="sidebar-resize-handle" data-sidebar-resize title="Drag to resize"></div>
   </aside>
   <div class="main">
     <header class="topbar">

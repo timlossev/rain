@@ -32,10 +32,11 @@ nav_registry.register(
         children=[
             NavNode(key="assets-all", label="All Assets", href="/assets", order=1),
             NavNode(key="assets-by-type", label="By Type", order=2, children_provider=_asset_type_children),
-            NavNode(key="assets-types", label="Types & Fields", href="/assets/types", order=3),
-            NavNode(key="assets-export", label="Export", href="/assets/export", order=4),
-            NavNode(key="assets-import", label="Import", href="/assets/import", order=5),
-            NavNode(key="assets-sync", label="Cloud Sync", href="/assets/sync", order=6),
+            NavNode(key="assets-types", label="Asset Types", href="/assets/types", order=3),
+            NavNode(key="assets-fields", label="Custom Fields", href="/assets/fields", order=4),
+            NavNode(key="assets-export", label="Export", href="/assets/export", order=5),
+            NavNode(key="assets-import", label="Import", href="/assets/import", order=6),
+            NavNode(key="assets-sync", label="Cloud Sync", href="/assets/sync", order=7),
         ],
     )
 )

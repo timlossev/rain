@@ -20,7 +20,7 @@ from rain.db.tenant_models import NotificationChannel, Ticket
 logger = logging.getLogger("rain.notifications")
 
 
-async def _send_email(recipients: list[str], subject: str, body: str) -> None:
+async def send_email(recipients: list[str], subject: str, body: str) -> None:
     host = config_store.get("smtp_host")
     if not host or not recipients:
         return
@@ -48,7 +48,7 @@ async def _send_email(recipients: list[str], subject: str, body: str) -> None:
         logger.exception("failed to send email notification to %s", recipients)
 
 
-async def _send_slack(webhook_url: str, text: str) -> None:
+async def send_slack(webhook_url: str, text: str) -> None:
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             await client.post(webhook_url, json={"text": text})
@@ -71,8 +71,8 @@ async def notify_ticket_created(db: AsyncSession, ticket: Ticket) -> None:
             continue
         config = decrypt_json(channel.config_encrypted)
         if channel.channel_type == "email":
-            await _send_email(config.get("recipients", []), subject, body)
+            await send_email(config.get("recipients", []), subject, body)
         elif channel.channel_type == "slack":
             webhook_url = config.get("webhook_url")
             if webhook_url:
-                await _send_slack(webhook_url, f"*{ticket.ticket_number}* ({ticket.severity}) {ticket.title}")
+                await send_slack(webhook_url, f"*{ticket.ticket_number}* ({ticket.severity}) {ticket.title}")
