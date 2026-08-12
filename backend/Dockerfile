@@ -22,6 +22,7 @@ COPY --from=builder /venv /venv
 WORKDIR /app
 COPY src ./src
 COPY alembic.ini ./
+COPY migrations ./migrations
 
 ENV PATH="/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
