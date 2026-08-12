@@ -87,6 +87,12 @@ app, migrations are driven programmatically (`rain.db.migrate`) and run
 automatically at startup, including catching up any tenant schema that's
 behind head.
 
+Set `DEBUG=true` in `.env` to get full tracebacks inline in 500 responses
+instead of a bare "Internal Server Error" (requires recreating the `app`
+container to pick up). Never set it true anywhere but a local checkout --
+see [`docs/architecture.md`](docs/architecture.md#lessons-from-the-first-real-docker-run)
+for why it exists.
+
 ## Roadmap
 
 All three planned milestones are implemented. What's left, per

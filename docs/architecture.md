@@ -264,6 +264,62 @@ form -- one POST creates the `Document` and the `DocumentLink` together.
 Documents can also be linked to additional assets/tickets later from the
 document's own detail page.
 
+## Lessons from the first real Docker run
+
+Everything above was verified through Milestone 3 by static checks only
+(`py_compile`, importing the app from the source tree, rendering templates
+against mock context) -- no Docker was available until partway through
+hardening. Running the real stack surfaced four bugs no amount of that
+static verification would have caught, all now fixed:
+
+- **`op.create_sequence()`/`op.drop_sequence()` don't exist** on the
+  Alembic version that actually gets installed (1.19.1) -- `AttributeError`
+  inside the tenant migration. Fixed with
+  `op.execute(CreateSequence(Sequence("...")))`, which (unlike raw SQL
+  text) still respects `schema_translate_map`.
+- **A lazy relationship touched via plain attribute access on a
+  freshly-constructed, non-eager-loaded object** raises
+  `sqlalchemy.exc.MissingGreenlet` under `AsyncSession` --
+  `Asset.field_values` in the create-asset path. Query explicitly instead
+  of relying on lazy-load; `selectinload(...)` at read time doesn't help
+  a just-`Asset(...)`-constructed object that was never queried.
+- **`env.py`'s `fileConfig(config.config_file_name)`** -- standard Alembic
+  boilerplate -- applies `alembic.ini`'s `[logger_root] level = WARN`
+  globally (and defaults to `disable_existing_loggers=True` separately).
+  Between the two, the *first* migration at app/worker startup permanently
+  silenced every `rain.*` logger for the rest of the process's life. This
+  is why several bugs during hardening appeared to raise with nothing
+  logged anywhere, at any layer, despite explicit `logger.exception()`
+  calls -- fixed by not calling `fileConfig()` at all; Alembic's own
+  migration-progress messages still log fine through normal propagation.
+  `rain.cli`'s `uvicorn.run(..., log_config=None)` is defense in depth
+  against the same footgun from uvicorn's own logging setup.
+- **`schema_translate_map` applied to a single `Connection` checkout**
+  (`session.connection(execution_options=...)`) rather than the engine
+  doesn't survive a mid-session commit: the connection is released back to
+  the pool, and the next statement on that session checks out a fresh one
+  with no translate map, silently querying the wrong schema
+  (`asyncpg.exceptions.UndefinedTableError`). Hit this via `db.refresh()`
+  after commit (three call sites: ticket/document/syslog-event creation)
+  and via a separate query after an earlier commit in the same session
+  (`notify_ticket_created()` running right after `create_ticket()`
+  commits). Fixed in `rain.db.base.tenant_session()` by binding
+  `schema_translate_map` at the engine level
+  (`engine.execution_options(...)`, a lightweight proxy over the same
+  pool) instead, which survives any number of commits/reconnects within
+  the session.
+
+The third bug is the one worth internalizing: it made the other two look
+far stranger than they were, because every debugging signal (logs,
+exception handlers) had gone silent. **`rain.settings.Settings.debug`**
+(env `DEBUG`, default `false`, wired through `docker-compose.yml`) exists
+because of this -- when true, `rain.main`'s catch-all exception handler
+puts the full traceback inline in the 500 response instead of a bare
+"Internal Server Error", which is what made the remaining bugs tractable
+to find at all. Never set it true against a real deployment; it includes
+source paths, local variables, and SQL text in every unhandled-exception
+response.
+
 ## Roadmap
 
 - **LLM search hook**: pgvector is already installed; add an `embeddings`
