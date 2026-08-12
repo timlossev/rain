@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -257,6 +257,50 @@ class NotificationChannel(TenantBase):
     notify_on_vulnerability: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Document(TenantBase):
+    """A DOC-xxxxxx knowledge-base entry. The file itself lives in a
+    storage backend (rain.modules.documents.storage -- local volume today,
+    swappable for S3 later); `storage_key` is that backend's opaque
+    identifier, not a filesystem path callers should ever build by hand."""
+
+    __tablename__ = "documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    doc_number: Mapped[str] = mapped_column(String(31), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    storage_key: Mapped[str] = mapped_column(String(500))
+    mime_type: Mapped[str | None] = mapped_column(String(127), nullable=True)
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    uploaded_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    links: Mapped[list["DocumentLink"]] = relationship(back_populates="document", cascade="all, delete-orphan")
+
+
+class DocumentLink(TenantBase):
+    """Polymorphic association: a document linked to an asset or a ticket.
+    No real FK to either target (they're different tables), so
+    `linked_type`/`linked_id` are app-validated, same trade-off as the
+    cross-schema integers elsewhere in this file."""
+
+    __tablename__ = "document_links"
+    __table_args__ = (
+        UniqueConstraint("document_id", "linked_type", "linked_id", name="uq_document_links"),
+        Index("ix_document_links_target", "linked_type", "linked_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
+    linked_type: Mapped[str] = mapped_column(String(15))  # asset | ticket
+    linked_id: Mapped[int] = mapped_column(Integer)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    document: Mapped[Document] = relationship(back_populates="links")
 
 
 class AuditLog(TenantBase):

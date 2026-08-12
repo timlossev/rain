@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Documents - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<div class="panel-row">
+  <h1 style="margin:0;">Documents</h1>
+  <a class="btn btn-primary" href="/documents/new">+ Upload document</a>
+</div>
+
+<div class="card">
+  <form method="get" action="/documents" class="form-row" style="align-items:end; margin-bottom:16px;">
+    <div class="field" style="margin-bottom:0; flex:1;">
+      <label for="search">Search</label>
+      <input type="text" id="search" name="search" value="{{ search }}" placeholder="title or DOC-000123">
+    </div>
+    <button class="btn" type="submit">Search</button>
+  </form>
+
+  <table>
+    <thead><tr><th>Number</th><th>Title</th><th>File</th><th>Uploaded</th></tr></thead>
+    <tbody>
+      {% for doc in documents %}
+      <tr>
+        <td><a href="/documents/{{ doc.id }}">{{ doc.doc_number }}</a></td>
+        <td>{{ doc.title }}</td>
+        <td class="muted">{{ doc.filename }}</td>
+        <td class="muted">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">No documents yet. <a href="/documents/new">Upload the first one</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

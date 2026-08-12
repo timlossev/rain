@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.doc_number }} - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<div class="panel-row">
+  <h1 style="margin:0;">{{ doc.doc_number }}: {{ doc.title }}</h1>
+  <div>
+    <a class="btn btn-primary" href="/documents/{{ doc.id }}/download">Download</a>
+    <form class="inline" method="post" action="/documents/{{ doc.id }}/delete" data-confirm="Delete '{{ doc.title }}'? This cannot be undone.">
+      <button class="btn btn-danger" type="submit">Delete</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <p>{{ doc.description or "No description." }}</p>
+  <table>
+    <tbody>
+      <tr><th>File</th><td class="muted">{{ doc.filename }} ({{ (doc.size_bytes / 1024) | round(1) }} KB)</td></tr>
+      <tr><th>Uploaded</th><td class="muted">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">Linked to</div>
+  <table>
+    <thead><tr><th>Type</th><th>ID</th><th></th></tr></thead>
+    <tbody>
+      {% for link in doc.links %}
+      <tr>
+        <td><span class="badge">{{ link.linked_type }}</span></td>
+        <td>
+          {% if link.linked_type == "asset" %}<a href="/assets/{{ link.linked_id }}/edit">#{{ link.linked_id }}</a>
+          {% elif link.linked_type == "ticket" %}<a href="/tickets/{{ link.linked_id }}">#{{ link.linked_id }}</a>
+          {% else %}#{{ link.linked_id }}{% endif %}
+        </td>
+        <td class="actions">
+          <form class="inline" method="post" action="/documents/{{ doc.id }}/unlink/{{ link.id }}" data-confirm="Remove this link?">
+            <button class="btn btn-sm btn-danger" type="submit">Unlink</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="muted">Not linked to anything yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <form method="post" action="/documents/{{ doc.id }}/link" class="form-row" style="margin-top:12px; align-items:end;">
+    <div class="field" style="margin-bottom:0;">
+      <label for="linked_type">Link to</label>
+      <select id="linked_type" name="linked_type">
+        {% for t in linked_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label for="linked_id">ID</label>
+      <input type="number" id="linked_id" name="linked_id" required style="width:120px;">
+    </div>
+    <button class="btn btn-sm" type="submit">Add link</button>
+  </form>
+</div>
+{% endblock %}

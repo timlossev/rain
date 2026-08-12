@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Upload Document - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Upload Document</h1>
+{% if linked_type and linked_id %}
+<p class="muted">This will be attached to the {{ linked_type }} #{{ linked_id }} automatically.</p>
+{% endif %}
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+<div class="card" style="max-width:560px;">
+  <form method="post" action="/documents" enctype="multipart/form-data">
+    {% if linked_type %}<input type="hidden" name="linked_type" value="{{ linked_type }}">{% endif %}
+    {% if linked_id %}<input type="hidden" name="linked_id" value="{{ linked_id }}">{% endif %}
+    <div class="field">
+      <label for="title">Title</label>
+      <input type="text" id="title" name="title" required autofocus>
+    </div>
+    <div class="field">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" rows="3"></textarea>
+    </div>
+    <div class="field">
+      <label for="file">File</label>
+      <input type="file" id="file" name="file" required>
+      <div class="field-hint">Up to 25MB.</div>
+    </div>
+    <button class="btn btn-primary" type="submit">Upload</button>
+    <a class="btn" href="/documents">Cancel</a>
+  </form>
+</div>
+{% endblock %}

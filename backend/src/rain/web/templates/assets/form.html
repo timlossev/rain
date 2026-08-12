@@ -48,4 +48,10 @@
   </form>
   {% endif %}
 </div>
+
+{% if asset %}
+{% with links = document_links, linked_type = "asset", linked_id = asset.id %}
+{% include "documents/_links_fragment.html" %}
+{% endwith %}
+{% endif %}
 {% endblock %}

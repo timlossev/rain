@@ -1,6 +1,6 @@
 # RAIN architecture
 
-This is the living design doc for RAIN, kept in-repo so Milestone 3 extends
+This is the living design doc for RAIN, kept in-repo so future work extends
 the same foundation rather than re-deriving it. See the repo root
 [`README.md`](../README.md) for the quickstart.
 
@@ -29,8 +29,8 @@ setup wizard and Admin UI.
 - `tenant_<slug>` schema per tenant: `asset_types`, `custom_fields`,
   `assets`, `asset_field_values`, `export_profiles`, `sync_connections`,
   `sync_runs`, `tenant_config`, `syslog_events`, `ticket_rules`, `tickets`,
-  `ticket_comments`, `notification_channels`, `audit_log`. Milestone 3
-  adds its tables here too.
+  `ticket_comments`, `notification_channels`, `documents`, `document_links`,
+  `audit_log`.
 - Postgres can't enforce foreign keys across schemas, so references back
   into `control` (e.g. `assets.owner_user_id`) are plain integers,
   validated at the application layer instead of the DB.
@@ -199,8 +199,7 @@ Fernet-encrypted); *who* gets notified is per-tenant
 Asset Registry exporter's configurable-column picker).
 
 **Document linking** (the ticketing spec's "link to a document repository
-as a knowledge base") is a placeholder in the ticket detail template until
-Milestone 3 adds the `documents` table to link against.
+as a knowledge base") is live -- see Document Repository below.
 
 ### A routing bug worth knowing about
 
@@ -222,11 +221,57 @@ script that instantiates the app and asserts no literal path incorrectly
 matches a dynamic sibling pattern -- worth re-running by hand after adding
 routes in future milestones.
 
+## Document Repository (Milestone 3, full scope)
+
+**Storage.** `rain.modules.documents.storage` is a small `StorageBackend`
+protocol (`save`/`read`/`delete` on an opaque string key) with one
+implementation, `LocalStorageBackend`, writing under
+`{uploads_dir}/documents/<tenant_schema>/<random-token>-<filename>` on the
+shared `rain_uploads` volume. Swapping in S3 later means implementing the
+same three methods and changing `get_storage()` -- nothing in the router or
+service layer touches the filesystem directly. `make_storage_key()` both
+namespaces by tenant and strips any path components from the uploaded
+filename (`Path(name).name`), so a filename like `../../etc/passwd` can't
+escape the tenant's subtree.
+
+**Access control.** Documents are *never* served through the static file
+mount. `/media` was previously mounted over the whole `uploads_dir` --
+harmless while it only held branding logos, but Milestone 3 also uses that
+volume for tenant documents and the CSV/JSON import stash, both of which
+must stay tenant-scoped and authenticated. Fixed by mounting only
+`/media/branding` (the one thing that legitimately needs to be
+fetchable pre-auth, for the login/setup page); documents are downloaded
+exclusively through `GET /documents/{id}/download`, which goes through the
+normal `get_tenant_db` dependency chain (login + correct tenant schema
+required) and always responds `Content-Disposition: attachment` so a
+browser never renders an untrusted upload inline in the app's origin
+regardless of its claimed `mime_type`.
+
+**Records.** `documents` (`DOC-000123` numbers from a per-tenant
+`doc_number_seq`, same `Sequence(...).next_value()` pattern as ticket
+numbering) plus `document_links` -- a polymorphic join table
+(`linked_type` `asset`|`ticket`, `linked_id` a plain integer, since Postgres
+can't FK into two different target tables). `rain.modules.documents.service`
+is the only place that touches either table; `links_for(db, linked_type,
+linked_id)` is what the asset edit page and ticket detail page call to
+render their "Linked Documents" panel
+(`documents/_links_fragment.html`, shared by both).
+
+**Flow.** Upload from the general repository (`/documents/new`) or directly
+from an asset/ticket page's "+ Attach document" link, which pre-fills and
+auto-links via hidden `linked_type`/`linked_id` fields on the same upload
+form -- one POST creates the `Document` and the `DocumentLink` together.
+Documents can also be linked to additional assets/tickets later from the
+document's own detail page.
+
 ## Roadmap
 
-- **Milestone 3 -- Documents**: `DOC-xxxx` entries, local-volume storage
-  behind a small swappable-for-S3 storage abstraction, polymorphic
-  `document_links(document_id, linked_type[asset|ticket], linked_id)`.
-- **Future -- LLM search hook**: pgvector is already installed; add an
-  `embeddings` table and a `SearchProvider` interface once a concrete
-  model/API is chosen.
+- **LLM search hook**: pgvector is already installed; add an `embeddings`
+  table and a `SearchProvider` interface once a concrete model/API is
+  chosen. Natural to wire into the Document Repository first (index
+  `documents` content) and extend to tickets/assets from there.
+- **Cloud sync**: implement `AWSProvider`/`AzureProvider.discover_assets()`
+  (currently `NotImplementedError` stubs -- see Asset Registry above).
+- **OIDC/SAML/LDAP**: `control.auth_providers` rows already exist,
+  disabled -- implement `authenticate_<provider>()` alongside
+  `rain.modules.auth.provider.authenticate_local`.

@@ -25,10 +25,13 @@
       <tr><th>Asset</th><td class="muted">{{ ticket.asset.name if ticket.asset else "-" }}</td></tr>
       <tr><th>Source event</th><td class="muted">{% if ticket.source_event_id %}#{{ ticket.source_event_id }}{% else %}manually created{% endif %}</td></tr>
       <tr><th>Created</th><td class="muted">{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td></tr>
-      <tr><th>Linked documents</th><td class="muted">Coming in Milestone 3 (Document repository).</td></tr>
     </tbody>
   </table>
 </div>
+
+{% with links = document_links, linked_type = "ticket", linked_id = ticket.id %}
+{% include "documents/_links_fragment.html" %}
+{% endwith %}
 
 <div class="card">
   <div class="card-title">Comments</div>

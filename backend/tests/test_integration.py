@@ -140,3 +140,43 @@ async def test_syslog_source_routing():
 
         resolved_none = await resolve_tenant_for_event(session, host="db-01", program=None)
         assert resolved_none is None
+
+
+async def test_document_numbering_and_linking():
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import Asset, AssetType
+    from rain.modules.documents import service as document_service
+
+    tenant = await provision_tenant(slug="gamma", name="Gamma LLC")
+
+    async with tenant_session(tenant.schema_name) as session:
+        asset_type = AssetType(key="server", name="Server")
+        session.add(asset_type)
+        await session.flush()
+        asset = Asset(asset_type_id=asset_type.id, name="web-01")
+        session.add(asset)
+        await session.commit()
+        await session.refresh(asset)
+
+        doc1 = await document_service.create_document(
+            session, title="Runbook", description=None, filename="runbook.pdf",
+            storage_key="gamma/abc-runbook.pdf", mime_type="application/pdf", size_bytes=1024, uploaded_by=None,
+        )
+        doc2 = await document_service.create_document(
+            session, title="Postmortem", description=None, filename="pm.md",
+            storage_key="gamma/def-pm.md", mime_type="text/markdown", size_bytes=512, uploaded_by=None,
+        )
+        assert doc1.doc_number == "DOC-000001"
+        assert doc2.doc_number == "DOC-000002"
+
+        await document_service.add_link(session, doc1.id, "asset", asset.id, None)
+        links = await document_service.links_for(session, "asset", asset.id)
+        assert len(links) == 1
+        assert links[0].document.doc_number == "DOC-000001"
+
+        found = await document_service.get_document(session, doc1.id)
+        assert found is not None
+        await document_service.delete_document(session, found)
+
+        assert await document_service.links_for(session, "asset", asset.id) == []

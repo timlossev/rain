@@ -12,6 +12,7 @@ from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.db.tenant_models import NotificationChannel, Ticket, TicketRule
 from rain.modules.assets import service as asset_service
+from rain.modules.documents import service as document_service
 from rain.modules.tickets import exporter, service
 from rain.modules.tickets.schemas import CHANNEL_TYPES, MATCH_FIELDS, SEVERITIES, TICKET_STATUSES, TICKET_TYPES
 from rain.web.nav import build_nav_context
@@ -129,10 +130,11 @@ async def ticket_detail(
     ticket = await service.get_ticket(tenant_db, ticket_id)
     if ticket is None:
         return RedirectResponse("/tickets", status_code=status.HTTP_303_SEE_OTHER)
+    document_links = await document_service.links_for(tenant_db, "ticket", ticket_id)
     return templates.TemplateResponse(
         request,
         "tickets/detail.html",
-        {**nav, "ctx": ctx, "ticket": ticket, "statuses": TICKET_STATUSES},
+        {**nav, "ctx": ctx, "ticket": ticket, "statuses": TICKET_STATUSES, "document_links": document_links},
     )
 
 

@@ -49,7 +49,15 @@ def create_app() -> FastAPI:
     settings = get_settings()
     uploads_dir = Path(settings.uploads_dir)
     uploads_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/media", StaticFiles(directory=str(uploads_dir)), name="media")
+
+    # Only the branding subfolder is served statically (logos need to
+    # render on the public login/setup page, before auth). Everything else
+    # under uploads_dir -- tenant documents, the CSV/JSON import stash --
+    # must go through an authenticated, tenant-scoped route instead; mounting
+    # the whole uploads_dir here would make it all fetchable by URL alone.
+    branding_dir = uploads_dir / "branding"
+    branding_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/media/branding", StaticFiles(directory=str(branding_dir)), name="media_branding")
 
     static_dir = Path(__file__).resolve().parent / "web" / "static"
     static_dir.mkdir(parents=True, exist_ok=True)
@@ -59,11 +67,13 @@ def create_app() -> FastAPI:
     # to rain.core.nav_registry) before any router that renders the tree.
     from rain.modules.admin import nav as _admin_nav  # noqa: F401
     from rain.modules.assets import nav as _assets_nav  # noqa: F401
+    from rain.modules.documents import nav as _documents_nav  # noqa: F401
     from rain.modules.tickets import nav as _tickets_nav  # noqa: F401
 
     from rain.modules.admin.router import router as admin_router
     from rain.modules.assets.router import router as assets_router
     from rain.modules.auth.router import router as auth_router
+    from rain.modules.documents.router import router as documents_router
     from rain.modules.setup.router import router as setup_router
     from rain.modules.tickets.live import router as tickets_live_router
     from rain.modules.tickets.router import router as tickets_router
@@ -74,6 +84,7 @@ def create_app() -> FastAPI:
     app.include_router(assets_router)
     app.include_router(tickets_router)
     app.include_router(tickets_live_router)
+    app.include_router(documents_router)
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz():

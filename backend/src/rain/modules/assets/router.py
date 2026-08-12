@@ -12,6 +12,7 @@ from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, 
 from rain.db.tenant_models import Asset, AssetType, CustomField
 from rain.modules.assets import exporter, importer, service, sync as sync_service
 from rain.modules.assets.schemas import coerce_field_value
+from rain.modules.documents import service as document_service
 from rain.web.nav import build_nav_context
 from rain.web.templating import templates
 from rain.web.uploads import import_stash_path
@@ -117,10 +118,20 @@ async def edit_asset_form(
     asset_types = await service.list_asset_types(tenant_db)
     fields = await service.fields_for_type(tenant_db, asset.asset_type_id)
     values = {fv.field_id: fv.value for fv in asset.field_values}
+    document_links = await document_service.links_for(tenant_db, "asset", asset_id)
     return templates.TemplateResponse(
         request,
         "assets/form.html",
-        {**nav, "ctx": ctx, "asset": asset, "asset_types": asset_types, "fields": fields, "values": values, "error": None},
+        {
+            **nav,
+            "ctx": ctx,
+            "asset": asset,
+            "asset_types": asset_types,
+            "fields": fields,
+            "values": values,
+            "document_links": document_links,
+            "error": None,
+        },
     )
 
 
