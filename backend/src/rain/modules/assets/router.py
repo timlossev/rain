@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import io
 import secrets
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, Request, UploadFile, status
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from rain.core.rbac import require_login
@@ -14,6 +15,7 @@ from rain.modules.assets import exporter, importer, service, sync as sync_servic
 from rain.modules.assets.schemas import coerce_field_value
 from rain.modules.documents import service as document_service
 from rain.web.nav import build_nav_context
+from rain.web.pdf import render_pdf
 from rain.web.templating import templates
 from rain.web.uploads import import_stash_path
 
@@ -132,6 +134,37 @@ async def edit_asset_form(
             "document_links": document_links,
             "error": None,
         },
+    )
+
+
+@router.get("/{asset_id:int}/pdf")
+async def asset_pdf(
+    asset_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    asset = await service.get_asset(tenant_db, asset_id)
+    if asset is None:
+        return RedirectResponse("/assets", status_code=status.HTTP_303_SEE_OTHER)
+    fields = await service.fields_for_type(tenant_db, asset.asset_type_id)
+    values = {fv.field_id: fv.value for fv in asset.field_values}
+    document_links = await document_service.links_for(tenant_db, "asset", asset_id)
+    pdf_bytes = render_pdf(
+        "pdf/asset.html",
+        {
+            "asset": asset,
+            "fields": fields,
+            "values": values,
+            "document_links": document_links,
+            "doc_kind": "Asset",
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        },
+    )
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "-" for c in asset.name).strip("-") or "asset"
+    return Response(
+        pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="asset-{asset.id}-{safe_name}.pdf"'},
     )
 
 

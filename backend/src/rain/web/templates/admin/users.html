@@ -4,8 +4,14 @@
 <h1>Users</h1>
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
+<div class="tabs" data-tabs>
+  <div class="tab-buttons">
+    <button type="button" class="tab-btn active" data-tab-btn="list">All users</button>
+    <button type="button" class="tab-btn" data-tab-btn="new">New user</button>
+  </div>
+
+<div class="tab-panel active" data-tab-panel="list">
 <div class="card">
-  <div class="card-title">All users</div>
   <table>
     <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Tenant</th><th>Status</th><th></th></tr></thead>
     <tbody>
@@ -30,9 +36,10 @@
     </tbody>
   </table>
 </div>
+</div>
 
+<div class="tab-panel" data-tab-panel="new">
 <div class="card">
-  <div class="card-title">New user</div>
   <form method="post" action="/admin/users">
     <div class="form-row">
       <div class="field">
@@ -68,5 +75,7 @@
     </div>
     <button class="btn btn-primary" type="submit">Create user</button>
   </form>
+</div>
+</div>
 </div>
 {% endblock %}

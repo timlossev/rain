@@ -25,6 +25,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // List/create tab pairs (and any other same-page tab group).
+  document.querySelectorAll("[data-tabs]").forEach((container) => {
+    const buttons = container.querySelectorAll("[data-tab-btn]");
+    const panels = container.querySelectorAll("[data-tab-panel]");
+    buttons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.tabBtn;
+        buttons.forEach((b) => b.classList.toggle("active", b === btn));
+        panels.forEach((p) => p.classList.toggle("active", p.dataset.tabPanel === target));
+      });
+    });
+  });
+
   // Confirm before any destructive form submit.
   document.querySelectorAll("form[data-confirm]").forEach((form) => {
     form.addEventListener("submit", (evt) => {
@@ -32,9 +45,28 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Mobile nav toggle.
+  // Single "Menu" button drives both behaviors, depending on viewport:
+  // on narrow screens it opens/closes the off-canvas sidebar; on wide
+  // screens it collapses the sidebar down to icons-only, persisted across
+  // visits via localStorage.
+  const sidebar = document.querySelector(".sidebar");
   const navBtn = document.querySelector("[data-nav-open]");
-  if (navBtn) navBtn.addEventListener("click", () => document.body.classList.toggle("nav-open"));
+  const isMobile = () => window.matchMedia("(max-width: 860px)").matches;
+  if (sidebar) {
+    const COLLAPSE_KEY = "rain-sidebar-collapsed";
+    if (!isMobile()) sidebar.classList.toggle("collapsed", localStorage.getItem(COLLAPSE_KEY) === "1");
+    if (navBtn) {
+      navBtn.addEventListener("click", () => {
+        if (isMobile()) {
+          document.body.classList.toggle("nav-open");
+        } else {
+          const collapsed = !sidebar.classList.contains("collapsed");
+          sidebar.classList.toggle("collapsed", collapsed);
+          localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
+        }
+      });
+    }
+  }
 
   // Asset form: reload the custom-field inputs when the asset type changes.
   const typeSelect = document.querySelector("[data-asset-type-select]");

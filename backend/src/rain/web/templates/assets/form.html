@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ "Edit" if asset else "New" }} asset - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>{{ "Edit asset" if asset else "New asset" }}</h1>
+<div class="panel-row">
+  <h1 style="margin:0;">{{ "Edit asset" if asset else "New asset" }}</h1>
+  {% if asset %}<a class="btn btn-sm" href="/assets/{{ asset.id }}/pdf">Export to PDF</a>{% endif %}
+</div>
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
 <div class="card" style="max-width:640px;">

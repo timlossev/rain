@@ -1,0 +1,48 @@
+{% extends "pdf/_base_pdf.html" %}
+{% block pdf_content %}
+<div class="pdf-title">{{ asset.name }}</div>
+<div class="pdf-subtitle">
+  <span class="pdf-badge">{{ asset.asset_type.name if asset.asset_type else "-" }}</span>
+  <span class="pdf-badge">status: {{ asset.status }}</span>
+</div>
+
+<table class="pdf-kv">
+  <tr><th>Name</th><td>{{ asset.name }}</td></tr>
+  <tr><th>Type</th><td>{{ asset.asset_type.name if asset.asset_type else "-" }}</td></tr>
+  <tr><th>External ID</th><td>{{ asset.external_id or "-" }}</td></tr>
+  <tr><th>Status</th><td>{{ asset.status }}</td></tr>
+  <tr><th>Created</th><td>{{ asset.created_at.strftime("%Y-%m-%d %H:%M") if asset.created_at else "-" }}</td></tr>
+  <tr><th>Last updated</th><td>{{ asset.updated_at.strftime("%Y-%m-%d %H:%M") if asset.updated_at else "-" }}</td></tr>
+</table>
+
+<h2 class="pdf-section">Custom fields</h2>
+{% if fields %}
+<table class="pdf-kv">
+  {% for f in fields %}
+  {% set val = values.get(f.id) %}
+  <tr>
+    <th>{{ f.label }}</th>
+    <td>
+      {% if f.field_type == "boolean" %}{{ "Yes" if val else "No" }}
+      {% elif val is none or val == "" %}-
+      {% else %}{{ val }}{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="pdf-muted">This asset type has no custom fields.</p>
+{% endif %}
+
+<h2 class="pdf-section">Linked documents</h2>
+{% if document_links %}
+<table class="pdf-list">
+  <tr><th>Document</th><th>Title</th></tr>
+  {% for link in document_links %}
+  <tr><td>{{ link.document.doc_number }}</td><td>{{ link.document.title }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="pdf-muted">No documents linked.</p>
+{% endif %}
+{% endblock %}

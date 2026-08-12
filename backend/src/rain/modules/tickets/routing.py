@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from rain.db.control_models import SyslogSourceMap, Tenant
 
 
-async def resolve_tenant_for_event(control_db: AsyncSession, *, host: str | None, program: str | None) -> Tenant | None:
+async def resolve_tenant_for_event(
+    control_db: AsyncSession, *, host: str | None, program: str | None, message: str | None = None
+) -> Tenant | None:
     result = await control_db.execute(
         select(SyslogSourceMap, Tenant)
         .join(Tenant, SyslogSourceMap.tenant_id == Tenant.id)
@@ -19,7 +21,7 @@ async def resolve_tenant_for_event(control_db: AsyncSession, *, host: str | None
         .order_by(SyslogSourceMap.sort_order)
     )
     for source_map, tenant in result.all():
-        value = host if source_map.match_field == "host" else program
+        value = {"host": host, "program": program, "message": message}.get(source_map.match_field, host)
         if value is None:
             continue
         try:

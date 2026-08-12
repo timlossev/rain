@@ -51,10 +51,11 @@ p { margin: 0 0 1em; }
   display: flex;
   flex-direction: column;
   padding: 16px 0;
+  transition: width 0.15s ease;
 }
-.brand { display: flex; align-items: center; gap: 10px; padding: 4px 16px 20px; }
-.brand-logo { width: 28px; height: 28px; object-fit: contain; border-radius: 6px; }
-.brand-name { font-weight: 700; font-size: 1.05rem; color: #fff; letter-spacing: 0.02em; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 16px 20px; overflow: hidden; }
+.brand-logo { width: 28px; height: 28px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
+.brand-name { font-weight: 700; font-size: 1.05rem; color: #fff; letter-spacing: 0.02em; white-space: nowrap; }
 
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .topbar {
@@ -66,6 +67,9 @@ p { margin: 0 0 1em; }
   border-bottom: 1px solid var(--border);
 }
 .topbar-user { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--text-muted); }
+.topbar-user .sign-out-btn { color: var(--text-muted); margin-left: 6px; padding: 5px 8px; border-radius: var(--radius-sm); }
+.topbar-user .sign-out-btn:hover { color: var(--text); background: var(--surface-sunken); }
+.topbar-user .sign-out-btn .nav-icon { color: inherit; }
 .content { padding: 24px; max-width: 1100px; width: 100%; }
 .content-standalone {
   min-height: 100vh;
@@ -75,33 +79,159 @@ p { margin: 0 0 1em; }
   padding: 24px;
 }
 
-/* ---------- nav tree ---------- */
-.nav-tree { list-style: none; margin: 0; padding: 0 8px; }
-.nav-tree .nav-tree { padding-left: 14px; }
-.nav-item { margin: 1px 0; }
-.nav-link, .nav-toggle .nav-label {
-  display: block;
-  padding: 7px 10px;
+/* ---------- nav tree ----------
+   Visual grammar: items with children get an icon + bold label + caret
+   ("branches"); plain links get a small dot instead of an icon ("leaves").
+   Nesting is shown two ways at once -- indentation *and* a vertical guide
+   line with a small horizontal tick into each child (the classic
+   file-tree pattern) -- so parent/child is unambiguous even without
+   color, and holds up at any nesting depth (e.g. Assets > By Type > a
+   specific type). */
+.nav-tree { list-style: none; margin: 0; padding: 0 6px; }
+.nav-tree .nav-tree {
+  margin: 1px 0 3px 9px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+.nav-tree .nav-tree > .nav-item { position: relative; }
+.nav-tree .nav-tree > .nav-item::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 13px;
+  width: 6px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.nav-item { margin: 0; }
+.nav-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--sidebar-text-dim);
+}
+.nav-icon svg { width: 100%; height: 100%; }
+.nav-link, .nav-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
   border-radius: var(--radius-sm);
   color: var(--sidebar-text);
-  font-size: 0.9rem;
+  font-size: 0.87rem;
 }
-.nav-link:hover, .nav-toggle:hover .nav-label { background: rgba(255,255,255,0.06); text-decoration: none; color: #fff; }
+.nav-link .nav-label { font-weight: 400; }
+.nav-toggle .nav-label { font-weight: 600; color: #eef0f5; flex: 1; text-align: left; }
+.nav-link:hover, .nav-toggle:hover {
+  background: rgba(255, 255, 255, 0.07);
+  text-decoration: none;
+  color: #fff;
+}
+.nav-link:hover .nav-icon, .nav-toggle:hover .nav-icon { color: #fff; }
 .nav-toggle {
   all: unset;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   width: 100%;
   cursor: pointer;
-  padding-right: 6px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
 }
-.nav-caret { font-size: 0.65rem; color: var(--sidebar-text-dim); transition: transform 0.15s ease; width: 10px; }
-.nav-item.open > .nav-toggle .nav-caret { transform: rotate(90deg); }
+.nav-caret {
+  display: inline-flex;
+  width: 13px;
+  height: 13px;
+  color: var(--sidebar-text-dim);
+  transition: transform 0.15s ease;
+  transform: rotate(180deg);
+  flex-shrink: 0;
+}
+.nav-caret svg { width: 100%; height: 100%; }
+.nav-item.open > .nav-toggle .nav-caret { transform: rotate(-90deg); }
 .nav-children { display: none; }
 .nav-item.open > .nav-children { display: block; }
+.nav-flyout-heading { display: none; }
+
 .sidebar-footer { margin-top: auto; padding: 12px 16px 0; border-top: 1px solid rgba(255,255,255,0.08); }
-.active-tenant { font-size: 0.78rem; color: var(--sidebar-text-dim); margin-bottom: 8px; }
+.active-tenant { font-size: 0.78rem; color: var(--sidebar-text-dim); margin: 8px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sign-out-btn {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+/* ---------- collapsed sidebar: icons only, children become flyouts ---------- */
+.sidebar.collapsed { width: 60px; }
+.sidebar.collapsed .brand-name,
+.sidebar.collapsed .active-tenant,
+.sidebar.collapsed .label-text { display: none; }
+
+.sidebar.collapsed > nav > .nav-tree > .nav-item > .nav-link,
+.sidebar.collapsed > nav > .nav-tree > .nav-item > .nav-toggle {
+  justify-content: center;
+  padding: 10px 0;
+}
+.sidebar.collapsed > nav > .nav-tree > .nav-item > .nav-link .nav-label,
+.sidebar.collapsed > nav > .nav-tree > .nav-item > .nav-toggle .nav-label,
+.sidebar.collapsed > nav > .nav-tree > .nav-item > .nav-toggle .nav-caret {
+  display: none;
+}
+.sidebar.collapsed > nav > .nav-tree > .nav-item.has-children { position: relative; }
+.sidebar.collapsed > nav > .nav-tree > .nav-item.has-children > .nav-children {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: -6px;
+  margin-left: 8px;
+  min-width: 210px;
+  background: #1b1e2b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius);
+  padding: 6px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  z-index: 30;
+}
+.sidebar.collapsed > nav > .nav-tree > .nav-item.has-children:hover > .nav-children,
+.sidebar.collapsed > nav > .nav-tree > .nav-item.has-children:focus-within > .nav-children {
+  display: block;
+}
+.sidebar.collapsed > nav > .nav-tree > .nav-item.has-children > .nav-children > .nav-flyout-heading {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sidebar-text-dim);
+  padding: 5px 8px 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+/* Inside a flyout, nested branches behave normally again (accordion, not a
+   second flyout) -- only the top-level sidebar goes icon-only. */
+.sidebar.collapsed > nav > .nav-tree > .nav-item.has-children > .nav-children .nav-children {
+  position: static;
+  box-shadow: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin-left: 0;
+}
+.nav-open-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.nav-open-btn:hover { color: var(--text); }
+.nav-open-btn .nav-icon { width: 18px; height: 18px; color: inherit; }
 
 /* ---------- buttons & forms ---------- */
 .btn {
@@ -148,6 +278,23 @@ input[type=checkbox] { width: auto; margin-right: 6px; }
 .form-row { display: flex; gap: 16px; }
 .form-row > .field { flex: 1; }
 form.inline { display: inline; }
+
+/* ---------- tabs (list / create pairs on the same screen) ---------- */
+.tab-buttons { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.tab-btn {
+  all: unset;
+  cursor: pointer;
+  padding: 9px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
 
 /* ---------- cards / panels ---------- */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
@@ -223,7 +370,7 @@ td.actions { text-align: right; white-space: nowrap; }
 .auth-card .brand { justify-content: center; padding-bottom: 24px; }
 
 @media (max-width: 860px) {
-  .sidebar { position: fixed; inset: 0 auto 0 0; transform: translateX(-100%); transition: transform 0.2s ease; z-index: 20; }
+  .sidebar { position: fixed; inset: 0 auto 0 0; transform: translateX(-100%); transition: transform 0.2s ease, width 0.15s ease; z-index: 20; }
   body.nav-open .sidebar { transform: translateX(0); }
   .content { padding: 16px; }
 }

@@ -7,6 +7,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from rain.core.config_store import config_store
 from rain.core.crypto import encrypt_json
@@ -123,7 +124,8 @@ async def users_list(
 ):
     nav = await build_nav_context(ctx)
     async with control_session() as session:
-        users = list((await session.execute(select(User).order_by(User.email))).scalars())
+        stmt = select(User).options(selectinload(User.tenant)).order_by(User.email)
+        users = list((await session.execute(stmt)).scalars())
         tenants = list((await session.execute(select(Tenant).order_by(Tenant.name))).scalars())
     return templates.TemplateResponse(
         request, "admin/users.html", {**nav, "ctx": ctx, "users": users, "tenants": tenants, "error": None}
@@ -208,9 +210,12 @@ async def syslog_sources_list(
 ):
     nav = await build_nav_context(ctx)
     async with control_session() as session:
-        sources = list(
-            (await session.execute(select(SyslogSourceMap).order_by(SyslogSourceMap.sort_order))).scalars()
+        stmt = (
+            select(SyslogSourceMap)
+            .options(selectinload(SyslogSourceMap.tenant))
+            .order_by(SyslogSourceMap.sort_order)
         )
+        sources = list((await session.execute(stmt)).scalars())
         tenants = list((await session.execute(select(Tenant).order_by(Tenant.name))).scalars())
     return templates.TemplateResponse(
         request,

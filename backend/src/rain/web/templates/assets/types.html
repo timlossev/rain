@@ -3,8 +3,14 @@
 {% block content %}
 <h1>Asset Types &amp; Custom Fields</h1>
 
+<div class="tabs" data-tabs>
+  <div class="tab-buttons">
+    <button type="button" class="tab-btn active" data-tab-btn="list">Asset types</button>
+    <button type="button" class="tab-btn" data-tab-btn="new">New asset type</button>
+  </div>
+
+<div class="tab-panel active" data-tab-panel="list">
 <div class="card">
-  <div class="card-title">Asset types</div>
   <table>
     <thead><tr><th>Key</th><th>Name</th><th>Custom fields</th><th>Status</th><th></th></tr></thead>
     <tbody>
@@ -26,9 +32,10 @@
     </tbody>
   </table>
 </div>
+</div>
 
+<div class="tab-panel" data-tab-panel="new">
 <div class="card">
-  <div class="card-title">New asset type</div>
   <form method="post" action="/assets/types">
     <div class="form-row">
       <div class="field"><label for="key">Key</label><input type="text" id="key" name="key" placeholder="server" pattern="[a-z][a-z0-9_]*" required></div>
@@ -39,9 +46,17 @@
     <button class="btn btn-primary" type="submit">Create type</button>
   </form>
 </div>
+</div>
+</div>
 
+<div class="tabs" data-tabs>
+  <div class="tab-buttons">
+    <button type="button" class="tab-btn active" data-tab-btn="list">Custom fields</button>
+    <button type="button" class="tab-btn" data-tab-btn="new">New custom field</button>
+  </div>
+
+<div class="tab-panel active" data-tab-panel="list">
 <div class="card">
-  <div class="card-title">Custom fields</div>
   <table>
     <thead><tr><th>Applies to</th><th>Key</th><th>Label</th><th>Type</th><th>Required</th><th></th></tr></thead>
     <tbody>
@@ -78,9 +93,10 @@
     </tbody>
   </table>
 </div>
+</div>
 
+<div class="tab-panel" data-tab-panel="new">
 <div class="card">
-  <div class="card-title">New custom field</div>
   <form method="post" action="/assets/fields">
     <div class="form-row">
       <div class="field">
@@ -118,5 +134,7 @@
     </div>
     <button class="btn btn-primary" type="submit">Add field</button>
   </form>
+</div>
+</div>
 </div>
 {% endblock %}

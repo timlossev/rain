@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import io
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from rain.core.rbac import require_login
@@ -11,6 +12,7 @@ from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, 
 from rain.modules.documents import service, storage
 from rain.modules.documents.schemas import LINKED_TYPES, MAX_UPLOAD_BYTES
 from rain.web.nav import build_nav_context
+from rain.web.pdf import render_pdf
 from rain.web.templating import templates
 
 router = APIRouter(prefix="/documents")
@@ -104,6 +106,30 @@ async def document_detail(
         return RedirectResponse("/documents", status_code=status.HTTP_303_SEE_OTHER)
     return templates.TemplateResponse(
         request, "documents/detail.html", {**nav, "ctx": ctx, "doc": doc, "linked_types": LINKED_TYPES}
+    )
+
+
+@router.get("/{document_id:int}/pdf")
+async def document_pdf(
+    document_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is None:
+        return RedirectResponse("/documents", status_code=status.HTTP_303_SEE_OTHER)
+    pdf_bytes = render_pdf(
+        "pdf/document.html",
+        {
+            "doc": doc,
+            "doc_kind": "Document",
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        },
+    )
+    return Response(
+        pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{doc.doc_number}.pdf"'},
     )
 
 

@@ -6,6 +6,7 @@
   <div>
     <span class="badge severity-{{ ticket.severity }}">{{ ticket.severity }}</span>
     <span class="badge badge-accent">{{ ticket.ticket_type }}</span>
+    <a class="btn btn-sm" href="/tickets/{{ ticket.id }}/pdf">Export to PDF</a>
   </div>
 </div>
 

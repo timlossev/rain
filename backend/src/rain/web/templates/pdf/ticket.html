@@ -1,0 +1,46 @@
+{% extends "pdf/_base_pdf.html" %}
+{% block pdf_content %}
+<div class="pdf-title">{{ ticket.ticket_number }}: {{ ticket.title }}</div>
+<div class="pdf-subtitle">
+  <span class="pdf-badge">{{ ticket.ticket_type }}</span>
+  <span class="pdf-badge">severity: {{ ticket.severity }}</span>
+  <span class="pdf-badge">status: {{ ticket.status }}</span>
+</div>
+
+<table class="pdf-kv">
+  <tr><th>Ticket number</th><td>{{ ticket.ticket_number }}</td></tr>
+  <tr><th>Type</th><td>{{ ticket.ticket_type }}</td></tr>
+  <tr><th>Status</th><td>{{ ticket.status }}</td></tr>
+  <tr><th>Severity</th><td>{{ ticket.severity }}</td></tr>
+  <tr><th>Asset</th><td>{{ ticket.asset.name if ticket.asset else "-" }}</td></tr>
+  <tr><th>Source event</th><td>{% if ticket.source_event_id %}Event #{{ ticket.source_event_id }}{% else %}Manually created{% endif %}</td></tr>
+  <tr><th>Created</th><td>{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td></tr>
+</table>
+
+<h2 class="pdf-section">Description</h2>
+<p>{{ ticket.description or "No description." }}</p>
+
+<h2 class="pdf-section">Linked documents</h2>
+{% if document_links %}
+<table class="pdf-list">
+  <tr><th>Document</th><th>Title</th></tr>
+  {% for link in document_links %}
+  <tr><td>{{ link.document.doc_number }}</td><td>{{ link.document.title }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="pdf-muted">No documents linked.</p>
+{% endif %}
+
+<h2 class="pdf-section">Comments ({{ ticket.comments | length }})</h2>
+{% if ticket.comments %}
+  {% for c in ticket.comments %}
+  <div class="pdf-comment">
+    <div class="pdf-comment-meta">{{ c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "" }}</div>
+    <div>{{ c.body }}</div>
+  </div>
+  {% endfor %}
+{% else %}
+<p class="pdf-muted">No comments.</p>
+{% endif %}
+{% endblock %}

@@ -50,7 +50,9 @@ async def handle_raw_line(raw_line: str) -> None:
         parsed = parse_line(raw_line)
 
         async with control_session() as control_db:
-            tenant = await resolve_tenant_for_event(control_db, host=parsed.host, program=parsed.program)
+            tenant = await resolve_tenant_for_event(
+                control_db, host=parsed.host, program=parsed.program, message=parsed.message
+            )
         if tenant is None:
             logger.debug("no tenant matched host=%s program=%s; dropping event", parsed.host, parsed.program)
             return

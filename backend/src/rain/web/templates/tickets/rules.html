@@ -5,8 +5,14 @@
 <p class="muted">A syslog event whose <code>match_field</code> matches <code>pattern</code> (regex) is automatically
   promoted into a ticket of the selected type. Rules are evaluated in order; the first match wins.</p>
 
+<div class="tabs" data-tabs>
+  <div class="tab-buttons">
+    <button type="button" class="tab-btn active" data-tab-btn="list">Active rules</button>
+    <button type="button" class="tab-btn" data-tab-btn="new">New rule</button>
+  </div>
+
+<div class="tab-panel active" data-tab-panel="list">
 <div class="card">
-  <div class="card-title">Active rules</div>
   <table>
     <thead><tr><th>Order</th><th>Name</th><th>Type</th><th>Match on</th><th>Pattern</th><th>Severity</th><th></th></tr></thead>
     <tbody>
@@ -51,9 +57,10 @@
     </tbody>
   </table>
 </div>
+</div>
 
+<div class="tab-panel" data-tab-panel="new">
 <div class="card">
-  <div class="card-title">New rule</div>
   <form method="post" action="/tickets/rules/all">
     <div class="form-row">
       <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" placeholder="Failed su attempts" required></div>
@@ -95,5 +102,7 @@
     </div>
     <button class="btn btn-primary" type="submit">Add rule</button>
   </form>
+</div>
+</div>
 </div>
 {% endblock %}

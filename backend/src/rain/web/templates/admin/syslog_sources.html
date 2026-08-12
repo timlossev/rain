@@ -11,8 +11,14 @@
 log { source(s_src); destination(d_rain); };</code></pre>
 </div>
 
+<div class="tabs" data-tabs>
+  <div class="tab-buttons">
+    <button type="button" class="tab-btn active" data-tab-btn="list">Routing rules</button>
+    <button type="button" class="tab-btn" data-tab-btn="new">New routing rule</button>
+  </div>
+
+<div class="tab-panel active" data-tab-panel="list">
 <div class="card">
-  <div class="card-title">Routing rules</div>
   <p class="muted">Each incoming event is matched against these rules, in order, to decide which tenant it belongs to.
     The first match wins; unmatched events are dropped. Use pattern <code>.*</code> with Regex checked as a catch-all.</p>
   <table>
@@ -37,9 +43,10 @@ log { source(s_src); destination(d_rain); };</code></pre>
     </tbody>
   </table>
 </div>
+</div>
 
+<div class="tab-panel" data-tab-panel="new">
 <div class="card">
-  <div class="card-title">New routing rule</div>
   <form method="post" action="/admin/syslog-sources">
     <div class="form-row">
       <div class="field">
@@ -53,6 +60,7 @@ log { source(s_src); destination(d_rain); };</code></pre>
         <select id="match_field" name="match_field">
           <option value="host">host</option>
           <option value="program">program</option>
+          <option value="message">message (event body)</option>
         </select>
       </div>
       <div class="field"><label for="pattern">Pattern</label><input type="text" id="pattern" name="pattern" placeholder="web-.* or .* for catch-all" required></div>
@@ -61,5 +69,7 @@ log { source(s_src); destination(d_rain); };</code></pre>
     </div>
     <button class="btn btn-primary" type="submit">Add rule</button>
   </form>
+</div>
+</div>
 </div>
 {% endblock %}

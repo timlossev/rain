@@ -5,8 +5,14 @@
 <p class="muted">Who gets notified when a ticket is created, for this tenant. The outbound mail relay itself is
   configured once, instance-wide, in <a href="/admin/smtp">Admin &gt; SMTP Relay</a>.</p>
 
+<div class="tabs" data-tabs>
+  <div class="tab-buttons">
+    <button type="button" class="tab-btn active" data-tab-btn="list">Channels</button>
+    <button type="button" class="tab-btn" data-tab-btn="new">New channel</button>
+  </div>
+
+<div class="tab-panel active" data-tab-panel="list">
 <div class="card">
-  <div class="card-title">Channels</div>
   <table>
     <thead><tr><th>Name</th><th>Type</th><th>Incidents</th><th>Vulnerabilities</th><th></th></tr></thead>
     <tbody>
@@ -28,9 +34,10 @@
     </tbody>
   </table>
 </div>
+</div>
 
+<div class="tab-panel" data-tab-panel="new">
 <div class="card">
-  <div class="card-title">New channel</div>
   <form method="post" action="/tickets/notifications/all">
     <div class="form-row">
       <div class="field">
@@ -55,5 +62,7 @@
     </div>
     <button class="btn btn-primary" type="submit">Add channel</button>
   </form>
+</div>
+</div>
 </div>
 {% endblock %}

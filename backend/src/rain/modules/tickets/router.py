@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import io
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +17,7 @@ from rain.modules.documents import service as document_service
 from rain.modules.tickets import exporter, service
 from rain.modules.tickets.schemas import CHANNEL_TYPES, MATCH_FIELDS, SEVERITIES, TICKET_STATUSES, TICKET_TYPES
 from rain.web.nav import build_nav_context
+from rain.web.pdf import render_pdf
 from rain.web.templating import templates
 
 router = APIRouter(prefix="/tickets")
@@ -135,6 +137,32 @@ async def ticket_detail(
         request,
         "tickets/detail.html",
         {**nav, "ctx": ctx, "ticket": ticket, "statuses": TICKET_STATUSES, "document_links": document_links},
+    )
+
+
+@router.get("/{ticket_id:int}/pdf")
+async def ticket_pdf(
+    ticket_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    ticket = await service.get_ticket(tenant_db, ticket_id)
+    if ticket is None:
+        return RedirectResponse("/tickets", status_code=status.HTTP_303_SEE_OTHER)
+    document_links = await document_service.links_for(tenant_db, "ticket", ticket_id)
+    pdf_bytes = render_pdf(
+        "pdf/ticket.html",
+        {
+            "ticket": ticket,
+            "document_links": document_links,
+            "doc_kind": "Ticket",
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        },
+    )
+    return Response(
+        pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{ticket.ticket_number}.pdf"'},
     )
 
 

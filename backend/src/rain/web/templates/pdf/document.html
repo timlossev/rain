@@ -1,0 +1,30 @@
+{% extends "pdf/_base_pdf.html" %}
+{% block pdf_content %}
+<div class="pdf-title">{{ doc.doc_number }}: {{ doc.title }}</div>
+<div class="pdf-subtitle"><span class="pdf-badge">{{ doc.filename }}</span></div>
+
+<table class="pdf-kv">
+  <tr><th>Document number</th><td>{{ doc.doc_number }}</td></tr>
+  <tr><th>Title</th><td>{{ doc.title }}</td></tr>
+  <tr><th>File</th><td>{{ doc.filename }} ({{ (doc.size_bytes / 1024) | round(1) }} KB)</td></tr>
+  <tr><th>Uploaded</th><td>{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</td></tr>
+</table>
+
+<h2 class="pdf-section">Description</h2>
+<p>{{ doc.description or "No description." }}</p>
+
+<h2 class="pdf-section">Linked to</h2>
+{% if doc.links %}
+<table class="pdf-list">
+  <tr><th>Type</th><th>ID</th></tr>
+  {% for link in doc.links %}
+  <tr><td>{{ link.linked_type }}</td><td>#{{ link.linked_id }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="pdf-muted">Not linked to anything.</p>
+{% endif %}
+
+<p class="pdf-muted">The underlying file itself is not embedded in this report -- download it from the Documents
+  screen for the original attachment.</p>
+{% endblock %}
