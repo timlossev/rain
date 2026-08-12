@@ -18,8 +18,17 @@ if (-not (Test-Path $examplePath)) {
 }
 
 function New-Secret([int]$Bytes) {
+    # RandomNumberGenerator.Fill() is .NET Core/.NET 5+ only. Windows
+    # PowerShell 5.1 runs on .NET Framework, where RandomNumberGenerator
+    # is abstract -- Create() + the instance method GetBytes() is the
+    # API that works on both .NET Framework and .NET Core/PowerShell 7.
     $buffer = New-Object byte[] $Bytes
-    [System.Security.Cryptography.RandomNumberGenerator]::Fill($buffer)
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($buffer)
+    } finally {
+        $rng.Dispose()
+    }
     return [Convert]::ToBase64String($buffer) -replace '\+', '-' -replace '/', '_' -replace '=', ''
 }
 
