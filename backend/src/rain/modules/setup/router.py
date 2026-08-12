@@ -6,6 +6,7 @@ at runtime afterwards."""
 from __future__ import annotations
 
 import datetime as dt
+import logging
 
 from fastapi import APIRouter, Form, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -27,6 +28,7 @@ from rain.web.templating import templates
 from rain.web.uploads import UploadError, save_logo_upload
 
 router = APIRouter()
+logger = logging.getLogger("rain.setup")
 
 
 async def setup_already_done() -> bool:
@@ -69,43 +71,47 @@ async def setup_submit(
     except InvalidSlugError as exc:
         return templates.TemplateResponse(request, "setup.html", {"error": str(exc)}, status_code=400)
 
-    async with control_session() as session:
-        admin = User(
-            tenant_id=None,
-            email=admin_email.strip().lower(),
-            password_hash=hash_password(admin_password),
-            role_key="internal_admin",
-            display_name=admin_name.strip(),
-        )
-        session.add(admin)
-        await session.flush()
-
-        token = new_session_token()
-        session.add(
-            SessionRow(
-                token_hash=hash_session_token(token),
-                user_id=admin.id,
-                active_tenant_id=tenant.id,
-                expires_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=SESSION_TTL_SECONDS),
+    try:
+        async with control_session() as session:
+            admin = User(
+                tenant_id=None,
+                email=admin_email.strip().lower(),
+                password_hash=hash_password(admin_password),
+                role_key="internal_admin",
+                display_name=admin_name.strip(),
             )
+            session.add(admin)
+            await session.flush()
+
+            token = new_session_token()
+            session.add(
+                SessionRow(
+                    token_hash=hash_session_token(token),
+                    user_id=admin.id,
+                    active_tenant_id=tenant.id,
+                    expires_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=SESSION_TTL_SECONDS),
+                )
+            )
+            await session.commit()
+
+        logo_path = None
+        if logo is not None and logo.filename:
+            try:
+                logo_path = await save_logo_upload(logo)
+            except UploadError:
+                logo_path = None  # branding can always be fixed later in Admin
+
+        await config_store.set("instance_name", instance_name.strip())
+        await config_store.set("accent_color", accent_color)
+        if logo_path:
+            await config_store.set("logo_path", logo_path)
+        await config_store.set("setup_complete", True)
+
+        response = RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
+        response.set_cookie(
+            SESSION_COOKIE_NAME, token, max_age=SESSION_TTL_SECONDS, httponly=True, samesite="lax", secure=True
         )
-        await session.commit()
-
-    logo_path = None
-    if logo is not None and logo.filename:
-        try:
-            logo_path = await save_logo_upload(logo)
-        except UploadError:
-            logo_path = None  # branding can always be fixed later in Admin
-
-    await config_store.set("instance_name", instance_name.strip())
-    await config_store.set("accent_color", accent_color)
-    if logo_path:
-        await config_store.set("logo_path", logo_path)
-    await config_store.set("setup_complete", True)
-
-    response = RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
-    response.set_cookie(
-        SESSION_COOKIE_NAME, token, max_age=SESSION_TTL_SECONDS, httponly=True, samesite="lax", secure=True
-    )
-    return response
+        return response
+    except Exception:
+        logger.exception("setup_submit failed after provisioning tenant %r", tenant.slug)
+        raise

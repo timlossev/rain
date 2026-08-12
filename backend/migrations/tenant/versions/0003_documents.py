@@ -11,6 +11,8 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.schema import CreateSequence, DropSequence
+from sqlalchemy.schema import Sequence as SASequence
 
 revision: str = "0003"
 down_revision: Union[str, None] = "0002"
@@ -48,10 +50,13 @@ def upgrade() -> None:
     op.create_index("ix_document_links_document_id", "document_links", ["document_id"])
     op.create_index("ix_document_links_target", "document_links", ["linked_type", "linked_id"])
 
-    op.create_sequence("doc_number_seq")
+    # See migrations/tenant/versions/0002_ticketing.py for why this uses
+    # op.execute(CreateSequence(...)) rather than op.create_sequence()
+    # (which doesn't exist on the installed Alembic version).
+    op.execute(CreateSequence(SASequence("doc_number_seq")))
 
 
 def downgrade() -> None:
-    op.drop_sequence("doc_number_seq")
+    op.execute(DropSequence(SASequence("doc_number_seq")))
     op.drop_table("document_links")
     op.drop_table("documents")

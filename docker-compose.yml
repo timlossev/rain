@@ -27,6 +27,9 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rain}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rain}
       APP_SECRET_KEY: ${APP_SECRET_KEY}
+      # Never true against a real deployment -- puts full tracebacks
+      # (source paths, local variables, SQL text) in 500 responses.
+      DEBUG: ${DEBUG:-false}
     volumes:
       - rain_uploads:/data/uploads
     depends_on:

@@ -60,7 +60,15 @@ async def get_asset(db: AsyncSession, asset_id: int) -> Asset | None:
 
 
 async def set_field_values(db: AsyncSession, asset: Asset, values: dict[int, Any]) -> None:
-    existing = {fv.field_id: fv for fv in asset.field_values}
+    # Queried explicitly rather than via `asset.field_values` -- that's a
+    # lazy relationship, and plain attribute access on it isn't safe under
+    # AsyncSession unless it's already been eagerly loaded (get_asset()
+    # does via selectinload; a just-constructed Asset in the create path
+    # hasn't been, and touching it raised sqlalchemy.exc.MissingGreenlet:
+    # "greenlet_spawn has not been called" -- confirmed against a real
+    # request, traceback returned inline via DEBUG=true).
+    result = await db.execute(select(AssetFieldValue).where(AssetFieldValue.asset_id == asset.id))
+    existing = {fv.field_id: fv for fv in result.scalars()}
     for field_id, value in values.items():
         if field_id in existing:
             existing[field_id].value = value

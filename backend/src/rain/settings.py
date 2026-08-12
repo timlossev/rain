@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     uploads_dir: str = "/data/uploads"
     log_level: str = "info"
     syslog_port: int = 5514
+    # Never enable on a real deployment: includes full tracebacks (source
+    # paths, local variables, SQL text) in 500 responses. Off by default;
+    # set DEBUG=true in .env for local development only.
+    debug: bool = False
 
 
 @lru_cache

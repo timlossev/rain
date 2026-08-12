@@ -50,9 +50,23 @@ async def control_session() -> AsyncIterator[AsyncSession]:
 
 @asynccontextmanager
 async def tenant_session(schema_name: str) -> AsyncIterator[AsyncSession]:
-    async with get_sessionmaker()() as session:
-        # Forces the connection to begin so the execution option actually
-        # applies; this is the documented recipe for per-session schema
-        # translation (see SQLAlchemy's "Schema Translate Map" docs).
-        await session.connection(execution_options={"schema_translate_map": {None: schema_name}})
+    # schema_translate_map is applied at the *engine* level (a lightweight
+    # OptionEngine proxy over the same pool, not a new pool) rather than to
+    # one Connection checkout: a session that commits mid-request releases
+    # its connection back to the pool, and the next statement checks out a
+    # fresh one -- if the translate map were only set on the original
+    # checkout (session.connection(execution_options=...), the previous,
+    # seemingly-more-obvious approach here), that fresh connection has no
+    # translate map at all, and an unqualified "FROM tickets" or "FROM
+    # notification_channels" query silently lands in the wrong schema
+    # (asyncpg.exceptions.UndefinedTableError). Confirmed via real
+    # requests with DEBUG=true: this broke any tenant-scoped code that
+    # queries again after an earlier commit in the same session, which
+    # turned out to be common (ticket/document creation followed by a
+    # notification lookup, refresh() after commit, ...). Binding the
+    # translate map to the engine instead means every connection this
+    # session ever checks out, no matter how many commits happen first,
+    # carries it.
+    tenant_engine = get_engine().execution_options(schema_translate_map={None: schema_name})
+    async with AsyncSession(tenant_engine, expire_on_commit=False) as session:
         yield session

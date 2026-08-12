@@ -16,6 +16,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.schema import CreateSequence, DropSequence
+from sqlalchemy.schema import Sequence as SASequence
 
 revision: str = "0002"
 down_revision: Union[str, None] = "0001"
@@ -114,13 +116,21 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
 
-    op.create_sequence("inc_number_seq")
-    op.create_sequence("vuln_number_seq")
+    # op.create_sequence() doesn't exist on the installed Alembic version
+    # (confirmed against a real run: AttributeError). Using the SQLAlchemy
+    # DDL construct directly through op.execute() instead -- unlike a raw
+    # SQL string, this compiles through the dialect with the connection's
+    # execution_options applied, so schema_translate_map still correctly
+    # redirects it to the target tenant schema (see rain.db.tenant_models'
+    # module docstring / rain.modules.tickets.service._next_ticket_number
+    # for the same Sequence(...).next_value() pattern at read time).
+    op.execute(CreateSequence(SASequence("inc_number_seq")))
+    op.execute(CreateSequence(SASequence("vuln_number_seq")))
 
 
 def downgrade() -> None:
-    op.drop_sequence("vuln_number_seq")
-    op.drop_sequence("inc_number_seq")
+    op.execute(DropSequence(SASequence("vuln_number_seq")))
+    op.execute(DropSequence(SASequence("inc_number_seq")))
     op.drop_table("notification_channels")
     op.drop_table("ticket_comments")
     op.drop_constraint("fk_syslog_events_promoted_ticket_id", "syslog_events", type_="foreignkey")

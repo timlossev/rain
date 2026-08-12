@@ -66,7 +66,11 @@ async def handle_raw_line(raw_line: str) -> None:
             )
             db.add(event)
             await db.commit()
-            await db.refresh(event)
+            # No db.refresh(event) -- see rain.modules.tickets.service.
+            # create_ticket for why a refresh after commit is both
+            # unnecessary (expire_on_commit=False) and actively broken
+            # (loses this session's tenant schema_translate_map on the
+            # fresh connection checkout).
 
             await live_bus.publish(
                 tenant.schema_name,

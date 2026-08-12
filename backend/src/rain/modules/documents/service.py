@@ -36,7 +36,10 @@ async def create_document(
     )
     db.add(doc)
     await db.commit()
-    await db.refresh(doc)
+    # No db.refresh(doc) -- see rain.modules.tickets.service.create_ticket
+    # for why a refresh after commit is both unnecessary
+    # (expire_on_commit=False) and actively broken (loses this session's
+    # tenant schema_translate_map on the fresh connection checkout).
     return doc
 
 

@@ -17,7 +17,16 @@ logger = logging.getLogger("rain.cli")
 
 
 def run_web() -> None:
-    uvicorn.run("rain.main:app", host="0.0.0.0", port=8000, log_level="info", ws="wsproto")
+    # log_config=None: skip uvicorn's own logging.config.dictConfig() call
+    # entirely and leave logging up to rain.main's logging.basicConfig().
+    # The actual bug that made this app's logging go silent turned out to
+    # be elsewhere -- migrations/*/env.py's fileConfig() call defaults to
+    # disable_existing_loggers=True and was permanently disabling every
+    # "rain.*" logger the moment the first migration ran at startup (fixed
+    # there, with disable_existing_loggers=False) -- but dictConfig has
+    # the exact same default-True footgun, so this stays as defense in
+    # depth against the same class of bug recurring from uvicorn's side.
+    uvicorn.run("rain.main:app", host="0.0.0.0", port=8000, log_level="info", ws="wsproto", log_config=None)
 
 
 async def _worker_main() -> None:

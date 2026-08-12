@@ -7,7 +7,9 @@ tries to render the tree.
 """
 from __future__ import annotations
 
+import html
 import logging
+import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -55,9 +57,9 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="RAIN", lifespan=lifespan)
-
     settings = get_settings()
+    app = FastAPI(title="RAIN", lifespan=lifespan, debug=settings.debug)
+
     uploads_dir = Path(settings.uploads_dir)
     uploads_dir.mkdir(parents=True, exist_ok=True)
 
@@ -134,6 +136,20 @@ def create_app() -> FastAPI:
             template = "errors/403.html" if exc.status_code == 403 else "errors/404.html"
             return templates.TemplateResponse(request, template, {}, status_code=exc.status_code)
         return HTMLResponse(f"<h1>{exc.status_code}</h1><p>{exc.detail}</p>", status_code=exc.status_code)
+
+    # Catch-all so an unhandled exception is never silently a bare 500 --
+    # this is what surfaced the log_config=None fix in run_web() (see
+    # rain.cli): without it, a route handler's unhandled exception showed
+    # nothing anywhere, in any logger, for reasons that traced back to
+    # uvicorn's own logging setup interfering with this app's loggers.
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception):
+        logger.exception("unhandled exception in %s %s", request.method, request.url.path)
+        if settings.debug:
+            tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+            body = f"<h1>500 Internal Server Error</h1><pre>{html.escape(tb)}</pre>"
+            return HTMLResponse(body, status_code=500)
+        return HTMLResponse("Internal Server Error", status_code=500)
 
     return app
 

@@ -52,7 +52,16 @@ async def create_ticket(
             event.promoted_ticket_id = ticket.id
 
     await db.commit()
-    await db.refresh(ticket)
+    # No db.refresh(ticket) here: this session's connection carries a
+    # schema_translate_map set once at checkout (see rain.db.base.
+    # tenant_session), and a refresh *after* commit checks out a fresh
+    # connection from the pool that doesn't have it -- the resulting
+    # unqualified "FROM tickets" query landed in the wrong schema
+    # entirely (asyncpg.exceptions.UndefinedTableError, confirmed via a
+    # real request with DEBUG=true). Not needed anyway: the session was
+    # created with expire_on_commit=False, so ticket's attributes
+    # (including server-generated ones from the INSERT) are still
+    # populated in memory after commit.
     return ticket
 
 

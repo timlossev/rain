@@ -8,7 +8,6 @@ from the backend/ directory.
 from __future__ import annotations
 
 import asyncio
-from logging.config import fileConfig
 
 import sqlalchemy as sa
 from alembic import context
@@ -17,8 +16,19 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from rain.db.control_models import CONTROL_SCHEMA, ControlBase
 
 config = context.config
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# Deliberately not calling logging.config.fileConfig(config.config_file_name)
+# here (the usual Alembic env.py boilerplate): it applies alembic.ini's
+# [logger_root] level = WARN globally, which -- even with
+# disable_existing_loggers=False -- silently filters out every INFO-level
+# rain.* log call for the rest of the process's life, since they don't set
+# their own explicit level and so inherit root's. Confirmed via a real
+# run: the very first migration at app/worker startup made this app's
+# entire logging output disappear, which is what made every subsequent
+# bug look like it was raising with nothing logged anywhere. Alembic's own
+# migration-progress messages ("Running upgrade ...") still show up fine
+# without this -- they're plain logger.info() calls on "alembic.runtime.
+# migration" that propagate through rain.main's own logging.basicConfig()
+# same as everything else.
 
 target_metadata = ControlBase.metadata
 

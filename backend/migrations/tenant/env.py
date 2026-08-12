@@ -13,7 +13,6 @@ each schema tracks its own alembic_version via version_table_schema.
 from __future__ import annotations
 
 import asyncio
-from logging.config import fileConfig
 
 import sqlalchemy as sa
 from alembic import context
@@ -22,8 +21,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from rain.db.tenant_models import TenantBase
 
 config = context.config
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# See migrations/control/env.py for why this deliberately does not call
+# logging.config.fileConfig(config.config_file_name).
 
 target_metadata = TenantBase.metadata
 
