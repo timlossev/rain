@@ -11,7 +11,7 @@ the same foundation rather than re-deriving it. See the repo root
 | `caddy` | `caddy:2-alpine` | Reverse proxy + automatic HTTPS. Only container exposing 80/443. |
 | `app` | `python:3.12-alpine`, multi-stage | FastAPI web app (Uvicorn), server-rendered UI. |
 | `worker` | same image as `app`, different command | The syslog listener (TCP+UDP), rule engine, notifier, and retention sweeper -- see Ticketing below. Publishes its own port (`SYSLOG_PORT`, default 5514) directly, bypassing Caddy since this is raw syslog, not HTTP. |
-| `db` | `postgres:16-alpine` + pgvector compiled in | One Postgres instance; `control` schema plus one `tenant_<slug>` schema per tenant. |
+| `db` | `pgvector/pgvector:pg17-trixie` (official image) | One Postgres instance; `control` schema plus one `tenant_<slug>` schema per tenant. |
 
 Only two inputs are needed outside the database: `POSTGRES_PASSWORD` and
 `APP_SECRET_KEY` (session-cookie signing + the Fernet key that encrypts

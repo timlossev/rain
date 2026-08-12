@@ -43,14 +43,17 @@ the exact destination snippet and lets you map hosts/programs to tenants.
 |---|---|---|
 | Frontend edge | Caddy (alpine) | Automatic HTTPS, reverse proxy, nothing else to configure |
 | App | FastAPI + Jinja2, server-rendered | No Node/SPA build; the entire client-side footprint is one hand-written CSS file and a couple of small vanilla-JS files (nav expand/collapse, a live WebSocket feed) -- no htmx/Alpine/Tailwind dependency to track for CVEs |
-| DB | Postgres 16 (alpine) + pgvector compiled in | pgvector installed now, unused until the future LLM search hook |
+| DB | `pgvector/pgvector:pg17-trixie` (official image, pgvector pre-installed) | pgvector installed now, unused until the future LLM search hook; official image avoids maintaining our own pgvector build |
 | Multi-tenancy | Schema-per-tenant | One Postgres instance, `control` schema for platform data, `tenant_<slug>` per tenant |
 | Auth | Local email/password (Argon2, DB-backed sessions) | `control.auth_providers` already has disabled OIDC/SAML/LDAP rows, ready for a future release |
 | Ticketing bus | Hand-written syslog listener (TCP+UDP) in `worker` | No third-party syslog library; syslog-ng pushes to it as a `network()` destination |
 | Document storage | Local volume behind a `StorageBackend` abstraction | Swappable for S3 later without touching callers; served only through an authenticated download route, never the static file mount |
 
-Images are multi-stage and Alpine-based throughout; only Caddy's ports are
-published to the host.
+`caddy`/`app`/`worker` are multi-stage, Alpine-based builds; `db` uses
+pgvector's official image (Debian-based -- pgvector doesn't publish an
+Alpine variant, and compiling it ourselves wasn't worth the maintenance
+burden, see `db/Dockerfile`). Only Caddy's ports (and the worker's syslog
+port) are published to the host.
 
 ## Repository layout
 
