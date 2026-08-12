@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Cloud Sync - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Cloud Sync</h1>
+<p class="muted">Connection management is available now. Automated asset discovery for AWS and Azure ships in the next release.</p>
+
+<div class="card">
+  <div class="card-title">Connections</div>
+  <table>
+    <thead><tr><th>Name</th><th>Provider</th><th>Status</th><th>Last synced</th><th></th></tr></thead>
+    <tbody>
+      {% for c in connections %}
+      <tr>
+        <td>{{ c.name }}</td>
+        <td><span class="badge">{{ c.provider }}</span></td>
+        <td>{% if c.is_enabled %}<span class="badge badge-accent">enabled</span>{% else %}<span class="badge">disabled</span>{% endif %}</td>
+        <td class="muted">{{ c.last_synced_at or "never" }}</td>
+        <td class="actions">
+          <form class="inline" method="post" action="/assets/sync/{{ c.id }}/test">
+            <button class="btn btn-sm" type="submit">Test connection</button>
+          </form>
+          <form class="inline" method="post" action="/assets/sync/{{ c.id }}/delete" data-confirm="Delete connection '{{ c.name }}'?">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No cloud sync connections yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">New connection</div>
+  <form method="post" action="/assets/sync">
+    <div class="form-row">
+      <div class="field">
+        <label for="provider">Provider</label>
+        <select id="provider" name="provider">
+          <option value="aws">AWS</option>
+          <option value="azure">Azure</option>
+        </select>
+      </div>
+      <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" placeholder="Production AWS account" required></div>
+    </div>
+    <p class="field-hint">AWS: <code>role_arn</code>, <code>region</code>. Azure: <code>tenant_id</code>, <code>client_id</code>, <code>client_secret</code>, <code>subscription_id</code>.</p>
+    <div class="form-row">
+      <div class="field"><label for="cfg_role_arn">cfg: role_arn / tenant_id</label><input type="text" id="cfg_role_arn" name="cfg_role_arn"></div>
+      <div class="field"><label for="cfg_region">cfg: region / client_id</label><input type="text" id="cfg_region" name="cfg_region"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="cfg_client_secret">cfg: client_secret (Azure only)</label><input type="text" id="cfg_client_secret" name="cfg_client_secret"></div>
+      <div class="field"><label for="cfg_subscription_id">cfg: subscription_id (Azure only)</label><input type="text" id="cfg_subscription_id" name="cfg_subscription_id"></div>
+    </div>
+    <button class="btn btn-primary" type="submit">Add connection</button>
+  </form>
+</div>
+{% endblock %}

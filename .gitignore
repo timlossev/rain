@@ -1,0 +1,30 @@
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node (Tailwind CLI download cache, if any)
+node_modules/
+
+# Data / runtime volumes if ever bind-mounted locally
+/data/
+/backend/src/rain/web/static/tailwind/*.css
+!/backend/src/rain/web/static/tailwind/input.css
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Caddy local state if bind-mounted
+/caddy_data/
+/caddy_config/

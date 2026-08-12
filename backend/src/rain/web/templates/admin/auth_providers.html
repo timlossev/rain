@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Auth Providers - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Auth Providers</h1>
+<p class="muted">Local sign-in is the only functional provider today. OIDC, SAML, and LDAP are wired up as
+  placeholders and will become configurable here in a future release.</p>
+<div class="card">
+  <table>
+    <thead><tr><th>Provider</th><th>Name</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for p in providers %}
+      <tr>
+        <td><span class="badge">{{ p.provider_type }}</span></td>
+        <td>{{ p.name }}</td>
+        <td>
+          {% if p.is_enabled %}<span class="badge badge-accent">enabled</span>
+          {% else %}<span class="badge">coming soon</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Sign in - {{ branding.instance_name }}{% endblock %}
+{% block content_alone %}
+<div class="card auth-card">
+  <div class="brand">
+    {% if branding.logo_path %}<img class="brand-logo" src="{{ branding.logo_path }}" alt="">{% endif %}
+    <span class="brand-name">{{ branding.instance_name }}</span>
+  </div>
+  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+  <form method="post" action="/login">
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" required autofocus>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required>
+    </div>
+    <button class="btn btn-primary" type="submit" style="width:100%;">Sign in</button>
+  </form>
+</div>
+{% endblock %}

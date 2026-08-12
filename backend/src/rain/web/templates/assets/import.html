@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Import Assets - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Import Assets</h1>
+<p class="muted">Upload a CSV or JSON file, then map its columns to asset fields on the next screen.</p>
+
+<div class="card" style="max-width:560px;">
+  {% if not asset_types %}
+  <p class="muted">No asset types exist yet. <a href="/assets/types">Create one first</a>.</p>
+  {% else %}
+  <form method="post" action="/assets/import/preview" enctype="multipart/form-data">
+    <div class="field">
+      <label for="asset_type_id">Asset type</label>
+      <select id="asset_type_id" name="asset_type_id">
+        {% for t in asset_types %}
+        <option value="{{ t.id }}">{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="fmt">Format</label>
+      <select id="fmt" name="fmt">
+        <option value="csv">CSV</option>
+        <option value="json">JSON (array of objects)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="file">File</label>
+      <input type="file" id="file" name="file" accept=".csv,.json,application/json,text/csv" required>
+    </div>
+    <button class="btn btn-primary" type="submit">Continue</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

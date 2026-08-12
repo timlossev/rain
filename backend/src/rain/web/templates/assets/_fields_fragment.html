@@ -1,0 +1,28 @@
+{% for f in fields %}
+{% set val = values.get(f.id) %}
+<div class="field">
+  <label for="field_{{ f.id }}">{{ f.label }}{% if f.is_required %} *{% endif %}</label>
+  {% if f.field_type == "boolean" %}
+    <label class="checkbox-row"><input type="checkbox" id="field_{{ f.id }}" name="field_{{ f.id }}" {% if val %}checked{% endif %}> Yes</label>
+  {% elif f.field_type == "select" %}
+    <select id="field_{{ f.id }}" name="field_{{ f.id }}">
+      <option value="">-</option>
+      {% for opt in (f.select_options or []) %}
+      <option value="{{ opt }}" {% if val == opt %}selected{% endif %}>{{ opt }}</option>
+      {% endfor %}
+    </select>
+  {% elif f.field_type == "date" %}
+    <input type="date" id="field_{{ f.id }}" name="field_{{ f.id }}" value="{{ val or '' }}" {% if f.is_required %}required{% endif %}>
+  {% elif f.field_type == "number" %}
+    <input type="number" step="any" id="field_{{ f.id }}" name="field_{{ f.id }}" value="{{ val if val is not none else '' }}" {% if f.is_required %}required{% endif %}>
+  {% elif f.field_type == "url" %}
+    <input type="url" id="field_{{ f.id }}" name="field_{{ f.id }}" value="{{ val or '' }}" {% if f.is_required %}required{% endif %}>
+  {% elif f.field_type == "email" %}
+    <input type="email" id="field_{{ f.id }}" name="field_{{ f.id }}" value="{{ val or '' }}" {% if f.is_required %}required{% endif %}>
+  {% else %}
+    <input type="text" id="field_{{ f.id }}" name="field_{{ f.id }}" value="{{ val or '' }}" {% if f.is_required %}required{% endif %}>
+  {% endif %}
+</div>
+{% else %}
+<p class="muted">This asset type has no custom fields yet. <a href="/assets/types">Add some</a>.</p>
+{% endfor %}

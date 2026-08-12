@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Tenants - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Tenants</h1>
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <div class="card-title">All tenants</div>
+  <table>
+    <thead><tr><th>Name</th><th>Slug</th><th>Schema</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for tenant in tenants %}
+      <tr>
+        <td>{{ tenant.name }}</td>
+        <td>{{ tenant.slug }}</td>
+        <td class="muted">{{ tenant.schema_name }}</td>
+        <td>{% if tenant.is_active %}<span class="badge badge-accent">active</span>{% else %}<span class="badge">inactive</span>{% endif %}</td>
+        <td class="actions">
+          {% if ctx.user.is_internal_admin %}
+          <form class="inline" method="post" action="/admin/tenants/switch">
+            <input type="hidden" name="tenant_id" value="{{ tenant.id }}">
+            <button class="btn btn-sm" type="submit">Switch to</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No tenants yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">New tenant</div>
+  <form method="post" action="/admin/tenants">
+    <div class="form-row">
+      <div class="field">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" placeholder="Acme Corp" required>
+      </div>
+      <div class="field">
+        <label for="slug">Slug</label>
+        <input type="text" id="slug" name="slug" placeholder="acme" pattern="[a-z][a-z0-9_]*" required>
+      </div>
+    </div>
+    <button class="btn btn-primary" type="submit">Create tenant</button>
+  </form>
+</div>
+{% endblock %}

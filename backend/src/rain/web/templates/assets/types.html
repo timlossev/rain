@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Asset Types & Fields - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Asset Types &amp; Custom Fields</h1>
+
+<div class="card">
+  <div class="card-title">Asset types</div>
+  <table>
+    <thead><tr><th>Key</th><th>Name</th><th>Custom fields</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for t in asset_types %}
+      <tr>
+        <td class="muted">{{ t.key }}</td>
+        <td>{{ t.name }}</td>
+        <td class="muted">{{ (fields_by_type.get(t.id) or []) | length }}</td>
+        <td>{% if t.is_active %}<span class="badge badge-accent">active</span>{% else %}<span class="badge">inactive</span>{% endif %}</td>
+        <td class="actions">
+          <form class="inline" method="post" action="/assets/types/{{ t.id }}/delete" data-confirm="Delete asset type '{{ t.name }}'? This also deletes its assets.">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No asset types yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">New asset type</div>
+  <form method="post" action="/assets/types">
+    <div class="form-row">
+      <div class="field"><label for="key">Key</label><input type="text" id="key" name="key" placeholder="server" pattern="[a-z][a-z0-9_]*" required></div>
+      <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" placeholder="Server" required></div>
+      <div class="field"><label for="icon">Icon (optional)</label><input type="text" id="icon" name="icon" placeholder="server"></div>
+    </div>
+    <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="2"></textarea></div>
+    <button class="btn btn-primary" type="submit">Create type</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-title">Custom fields</div>
+  <table>
+    <thead><tr><th>Applies to</th><th>Key</th><th>Label</th><th>Type</th><th>Required</th><th></th></tr></thead>
+    <tbody>
+      {% for t in asset_types %}
+        {% for f in fields_by_type.get(t.id, []) %}
+        <tr>
+          <td class="muted">{{ t.name }}</td>
+          <td class="muted">{{ f.field_key }}</td>
+          <td>{{ f.label }}</td>
+          <td><span class="badge">{{ f.field_type }}</span></td>
+          <td>{{ "yes" if f.is_required else "-" }}</td>
+          <td class="actions">
+            <form class="inline" method="post" action="/assets/fields/{{ f.id }}/delete" data-confirm="Delete field '{{ f.label }}'?">
+              <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      {% endfor %}
+      {% for f in fields_by_type.get(none, []) %}
+      <tr>
+        <td class="muted">All types</td>
+        <td class="muted">{{ f.field_key }}</td>
+        <td>{{ f.label }}</td>
+        <td><span class="badge">{{ f.field_type }}</span></td>
+        <td>{{ "yes" if f.is_required else "-" }}</td>
+        <td class="actions">
+          <form class="inline" method="post" action="/assets/fields/{{ f.id }}/delete" data-confirm="Delete field '{{ f.label }}'?">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">New custom field</div>
+  <form method="post" action="/assets/fields">
+    <div class="form-row">
+      <div class="field">
+        <label for="asset_type_id">Applies to</label>
+        <select id="asset_type_id" name="asset_type_id">
+          <option value="">All types</option>
+          {% for t in asset_types %}
+          <option value="{{ t.id }}">{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="field_key">Key</label><input type="text" id="field_key" name="field_key" placeholder="warranty_expiry" pattern="[a-z][a-z0-9_]*" required></div>
+      <div class="field"><label for="label">Label</label><input type="text" id="label" name="label" placeholder="Warranty Expiry" required></div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label for="field_type">Field type</label>
+        <select id="field_type" name="field_type">
+          <option value="text">Text</option>
+          <option value="number">Number</option>
+          <option value="boolean">Yes / No</option>
+          <option value="date">Date</option>
+          <option value="url">URL</option>
+          <option value="email">Email</option>
+          <option value="select">Select</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="select_options">Select options (comma-separated, if type = Select)</label>
+        <input type="text" id="select_options" name="select_options" placeholder="prod, staging, dev">
+      </div>
+      <div class="field" style="flex:0 0 120px;">
+        <label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_required"> Required</label>
+      </div>
+    </div>
+    <button class="btn btn-primary" type="submit">Add field</button>
+  </form>
+</div>
+{% endblock %}

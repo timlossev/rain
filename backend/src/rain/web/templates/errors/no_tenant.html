@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}No tenant assigned - {{ branding.instance_name }}{% endblock %}
+{% block content_alone %}
+<div class="card auth-card" style="text-align:center;">
+  <h1>No tenant assigned</h1>
+  <p class="muted">Your account isn't assigned to a tenant yet. Contact your administrator.</p>
+  <form method="post" action="/logout"><button class="btn" type="submit">Sign out</button></form>
+</div>
+{% endblock %}

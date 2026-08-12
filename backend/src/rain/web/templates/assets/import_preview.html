@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Map Columns - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Map Columns</h1>
+<p class="muted">Detected {{ headers | length }} column(s) in your file. Pick which column feeds each field; leave a field on "-" to skip it.</p>
+
+<div class="card" style="max-width:640px;">
+  <form method="post" action="/assets/import/commit">
+    <input type="hidden" name="token" value="{{ token }}">
+    <input type="hidden" name="fmt" value="{{ fmt }}">
+    <input type="hidden" name="asset_type_id" value="{{ asset_type_id }}">
+
+    <table>
+      <thead><tr><th>Target field</th><th>Source column</th></tr></thead>
+      <tbody>
+        {% for target_key, target_label in targets %}
+        <tr>
+          <td>{{ target_label }}{% if target_key == "name" %} *{% endif %}</td>
+          <td>
+            <select name="map_{{ target_key }}">
+              <option value="">-</option>
+              {% for h in headers %}
+              <option value="{{ h }}" {% if suggestions.get(target_key) == h %}selected{% endif %}>{{ h }}</option>
+              {% endfor %}
+            </select>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <button class="btn btn-primary" type="submit" style="margin-top:16px;">Import</button>
+    <a class="btn" href="/assets/import">Start over</a>
+  </form>
+</div>
+{% endblock %}

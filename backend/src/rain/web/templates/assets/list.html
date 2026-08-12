@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Assets - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<div class="panel-row">
+  <h1 style="margin:0;">Assets</h1>
+  <a class="btn btn-primary" href="/assets/new">+ New asset</a>
+</div>
+
+<div class="card">
+  <div class="panel-row">
+    <form method="get" action="/assets" class="form-row" style="align-items:end;">
+      <div class="field" style="margin-bottom:0;">
+        <label for="asset_type_id">Filter by type</label>
+        <select id="asset_type_id" name="asset_type_id" onchange="this.form.submit()">
+          <option value="">All types</option>
+          {% for t in asset_types %}
+          <option value="{{ t.id }}" {% if selected_type == t.id %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+
+  <table>
+    <thead><tr><th>Name</th><th>Type</th><th>External ID</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for asset in assets %}
+      <tr>
+        <td><a href="/assets/{{ asset.id }}/edit">{{ asset.name }}</a></td>
+        <td class="muted">{{ asset.asset_type.name if asset.asset_type else "-" }}</td>
+        <td class="muted">{{ asset.external_id or "-" }}</td>
+        <td><span class="badge">{{ asset.status }}</span></td>
+        <td class="actions">
+          <a class="btn btn-sm" href="/assets/{{ asset.id }}/edit">Edit</a>
+          <form class="inline" method="post" action="/assets/{{ asset.id }}/delete" data-confirm="Delete {{ asset.name }}?">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No assets yet. <a href="/assets/new">Add the first one</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+# Automatic HTTPS reverse proxy in front of the RAIN web app.
+#
+# {$RAIN_DOMAIN} is substituted from the environment. When it's a real,
+# publicly-resolvable FQDN, Caddy obtains a certificate via ACME
+# (Let's Encrypt) automatically. When it's "localhost" (the default) or
+# any other non-public address, Caddy automatically falls back to its
+# internal CA -- so this works out of the box with zero configuration.
+
+{$RAIN_DOMAIN:localhost} {
+	encode zstd gzip
+
+	# Guard against oversized uploads (logo, CSV/JSON import) hitting the app.
+	request_body {
+		max_size 25MB
+	}
+
+	# WebSocket upgrades (live syslog viewer, Milestone 2) pass through
+	# reverse_proxy transparently -- no extra config needed.
+	reverse_proxy app:8000
+}

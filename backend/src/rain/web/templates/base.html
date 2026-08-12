@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ branding.instance_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <style>:root { --accent: {{ branding.accent_color }}; }</style>
+</head>
+<body>
+{% macro render_nav(nodes) %}
+  <ul class="nav-tree">
+    {% for node in nodes %}
+      <li class="nav-item{% if node.children %} has-children{% endif %}" data-nav-key="{{ node.key }}">
+        {% if node.children %}
+          <button type="button" class="nav-toggle" data-nav-toggle>
+            <span class="nav-caret">&#9656;</span>
+            <span class="nav-label">{{ node.label }}</span>
+          </button>
+          <div class="nav-children">{{ render_nav(node.children) }}</div>
+        {% else %}
+          <a class="nav-link" href="{{ node.href }}">{{ node.label }}</a>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+{% endmacro %}
+
+{% if ctx %}
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      {% if branding.logo_path %}<img class="brand-logo" src="{{ branding.logo_path }}" alt="">{% endif %}
+      <span class="brand-name">{{ branding.instance_name }}</span>
+    </div>
+    <nav>{{ render_nav(nav_tree) }}</nav>
+    <div class="sidebar-footer">
+      {% if ctx.user.is_internal_admin and ctx.active_tenant %}
+        <div class="active-tenant">Tenant: <strong>{{ ctx.active_tenant.name }}</strong></div>
+      {% endif %}
+      <form method="post" action="/logout"><button class="btn-link" type="submit">Sign out</button></form>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <button type="button" class="btn-link" data-nav-open style="margin-right:auto;">&#9776; Menu</button>
+      <div class="topbar-user">{{ ctx.user.display_name }} <span class="badge badge-accent">{{ ctx.user.role_key }}</span></div>
+    </header>
+    <main class="content">
+      {% if request.query_params.get('ok') %}<div class="flash flash-ok">Saved.</div>{% endif %}
+      {% if request.query_params.get('error') %}<div class="flash flash-error">{{ request.query_params.get('error') }}</div>{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% else %}
+<main class="content-standalone">
+  {% block content_alone %}{% endblock %}
+</main>
+{% endif %}
+<script src="/static/js/app.js"></script>
+</body>
+</html>

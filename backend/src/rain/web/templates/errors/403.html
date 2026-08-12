@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Not permitted - {{ branding.instance_name }}{% endblock %}
+{% block content_alone %}
+<div class="card auth-card" style="text-align:center;">
+  <h1>403</h1>
+  <p class="muted">You don't have permission to view this page.</p>
+  <a class="btn btn-primary" href="/">Go home</a>
+</div>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if asset else "New" }} asset - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>{{ "Edit asset" if asset else "New asset" }}</h1>
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+<div class="card" style="max-width:640px;">
+  {% if not asset_types %}
+  <p class="muted">No asset types exist yet. <a href="/assets/types">Create one first</a>.</p>
+  {% else %}
+  <form method="post" action="{{ '/assets/' ~ asset.id if asset else '/assets' }}">
+    <div class="form-row">
+      <div class="field">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" value="{{ asset.name if asset else '' }}" required autofocus>
+      </div>
+      <div class="field">
+        <label for="asset_type_id">Asset type</label>
+        <select id="asset_type_id" name="asset_type_id" data-asset-type-select>
+          {% for t in asset_types %}
+          <option value="{{ t.id }}" {% if asset and asset.asset_type_id == t.id or (not asset and loop.first) %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label for="external_id">External ID</label>
+        <input type="text" id="external_id" name="external_id" value="{{ asset.external_id if asset else '' }}" placeholder="serial / asset tag / cloud resource id">
+      </div>
+      <div class="field">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          {% for s in ["active", "in_repair", "retired", "decommissioned"] %}
+          <option value="{{ s }}" {% if asset and asset.status == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <h3>Custom fields</h3>
+    <div data-fields-container>
+      {% include "assets/_fields_fragment.html" %}
+    </div>
+
+    <button class="btn btn-primary" type="submit">{{ "Save changes" if asset else "Create asset" }}</button>
+    <a class="btn" href="/assets">Cancel</a>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

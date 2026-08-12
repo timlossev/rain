@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Export Assets - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Export Assets</h1>
+
+<div class="card" style="max-width:720px;">
+  <form method="get" action="/assets/export">
+    <div class="field">
+      <label for="asset_type_id">Asset type (columns update to match)</label>
+      <select id="asset_type_id" name="asset_type_id" onchange="this.form.submit()">
+        <option value="">All types (built-in columns only)</option>
+        {% for t in asset_types %}
+        <option value="{{ t.id }}" {% if selected_type == t.id %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+
+  <form method="post" action="/assets/export">
+    <input type="hidden" name="asset_type_id" value="{{ selected_type or '' }}">
+    <h3>Columns</h3>
+    <table data-export-columns>
+      <thead><tr><th>Include</th><th>Source</th><th>Header</th><th>Order</th></tr></thead>
+      <tbody>
+        {% for source, label in columns %}
+        <tr>
+          <td><input type="checkbox" id="use_{{ source }}" name="use_{{ source }}" value="{{ source }}" checked></td>
+          <td class="muted">{{ source }}</td>
+          <td><input type="text" name="header_{{ source }}" value="{{ label }}"></td>
+          <td><input type="number" name="order_{{ source }}" style="width:70px;" value="{{ loop.index0 }}"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="form-row" style="margin-top:16px;">
+      <div class="field" style="flex:0 0 160px;">
+        <label for="fmt">Format</label>
+        <select id="fmt" name="fmt">
+          <option value="csv">CSV</option>
+          <option value="json">JSON</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="save_as">Save as a reusable profile (optional)</label>
+        <input type="text" id="save_as" name="save_as" placeholder="e.g. Servers - quarterly audit">
+      </div>
+    </div>
+    <button class="btn btn-primary" type="submit">Export</button>
+  </form>
+</div>
+
+{% if profiles %}
+<div class="card">
+  <div class="card-title">Saved export profiles</div>
+  <table>
+    <thead><tr><th>Name</th><th>Format</th><th>Columns</th></tr></thead>
+    <tbody>
+      {% for p in profiles %}
+      <tr><td>{{ p.name }}</td><td class="muted">{{ p.format }}</td><td class="muted">{{ p.columns | length }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

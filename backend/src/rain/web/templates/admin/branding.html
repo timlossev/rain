@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Branding - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Branding</h1>
+<p class="muted">Instance-wide look & feel. Changes apply immediately across every tenant.</p>
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+<div class="card" style="max-width:520px;">
+  <form method="post" action="/admin/branding" enctype="multipart/form-data">
+    <div class="form-row">
+      <div class="field">
+        <label for="instance_name">Instance name</label>
+        <input type="text" id="instance_name" name="instance_name" value="{{ branding.instance_name }}" required>
+      </div>
+      <div class="field" style="flex:0 0 100px;">
+        <label for="accent_color">Accent color</label>
+        <input type="color" id="accent_color" name="accent_color" value="{{ branding.accent_color }}">
+      </div>
+    </div>
+    <div class="field">
+      <label for="logo">Product logo</label>
+      {% if branding.logo_path %}<p><img src="{{ branding.logo_path }}" alt="" style="height:36px;"></p>{% endif %}
+      <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
+      <div class="field-hint">PNG, JPEG, SVG or WebP, up to 5MB. Leave empty to keep the current logo.</div>
+    </div>
+    <button class="btn btn-primary" type="submit">Save</button>
+  </form>
+</div>
+{% endblock %}

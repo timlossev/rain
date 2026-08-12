@@ -1,0 +1,114 @@
+"""FastAPI application factory.
+
+Startup order matters: migrations must run before anything touches the
+DB, config must be cached before the first request, and nav modules must
+be imported (for their registration side effects) before any template
+tries to render the tree.
+"""
+from __future__ import annotations
+
+import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from rain.core.config_store import config_store
+from rain.core.tenancy import AuthRequiredError, CurrentUser, TenantRequiredError, get_current_user_optional
+from rain.db import migrate, provisioning
+from rain.db.base import dispose_engine
+from rain.settings import get_settings
+from rain.web.templating import templates
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("rain")
+
+SETUP_EXEMPT_PREFIXES = ("/setup", "/media", "/static", "/healthz")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await migrate.upgrade_control_async()
+    await provisioning.reconcile_all_tenant_schemas()
+    await config_store.load_all()
+    await config_store.start_listener()
+    logger.info("RAIN startup complete")
+    try:
+        yield
+    finally:
+        await config_store.stop_listener()
+        await dispose_engine()
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(title="RAIN", lifespan=lifespan)
+
+    settings = get_settings()
+    uploads_dir = Path(settings.uploads_dir)
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/media", StaticFiles(directory=str(uploads_dir)), name="media")
+
+    static_dir = Path(__file__).resolve().parent / "web" / "static"
+    static_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+    # Import module nav registrations for their side effects (adding nodes
+    # to rain.core.nav_registry) before any router that renders the tree.
+    from rain.modules.admin import nav as _admin_nav  # noqa: F401
+    from rain.modules.assets import nav as _assets_nav  # noqa: F401
+
+    from rain.modules.admin.router import router as admin_router
+    from rain.modules.assets.router import router as assets_router
+    from rain.modules.auth.router import router as auth_router
+    from rain.modules.setup.router import router as setup_router
+
+    app.include_router(setup_router)
+    app.include_router(auth_router)
+    app.include_router(admin_router)
+    app.include_router(assets_router)
+
+    @app.get("/healthz", include_in_schema=False)
+    async def healthz():
+        return {"status": "ok"}
+
+    @app.get("/", include_in_schema=False)
+    async def index(user: CurrentUser | None = Depends(get_current_user_optional)):
+        if user is None:
+            return RedirectResponse("/login")
+        return RedirectResponse("/assets")
+
+    @app.middleware("http")
+    async def enforce_setup_wizard(request: Request, call_next):
+        path = request.url.path
+        if not any(path.startswith(p) for p in SETUP_EXEMPT_PREFIXES):
+            from rain.modules.setup.router import setup_already_done
+
+            if not await setup_already_done():
+                return RedirectResponse("/setup", status_code=303)
+        return await call_next(request)
+
+    @app.exception_handler(AuthRequiredError)
+    async def auth_required_handler(request: Request, exc: AuthRequiredError):
+        return RedirectResponse(f"/login?next={request.url.path}", status_code=303)
+
+    @app.exception_handler(TenantRequiredError)
+    async def tenant_required_handler(request: Request, exc: TenantRequiredError):
+        user = getattr(request.state, "current_user", None)
+        if user is not None and getattr(user, "is_internal_admin", False):
+            return RedirectResponse("/admin/tenants", status_code=303)
+        return templates.TemplateResponse(request, "errors/no_tenant.html", {}, status_code=409)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+        if exc.status_code in (403, 404) and "text/html" in request.headers.get("accept", ""):
+            template = "errors/403.html" if exc.status_code == 403 else "errors/404.html"
+            return templates.TemplateResponse(request, template, {}, status_code=exc.status_code)
+        return HTMLResponse(f"<h1>{exc.status_code}</h1><p>{exc.detail}</p>", status_code=exc.status_code)
+
+    return app
+
+
+app = create_app()

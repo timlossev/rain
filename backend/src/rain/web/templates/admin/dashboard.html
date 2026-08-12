@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Admin - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Admin</h1>
+<p class="muted">Platform-wide settings. Only visible to internal admins.</p>
+<div class="card">
+  <div class="card-title">Quick links</div>
+  <ul>
+    <li><a href="/admin/branding">Branding</a> &mdash; instance name, accent color, logo</li>
+    <li><a href="/admin/tenants">Tenants</a> &mdash; create and switch between tenants</li>
+    <li><a href="/admin/users">Users</a> &mdash; internal admins and client accounts</li>
+    <li><a href="/admin/auth-providers">Auth Providers</a> &mdash; local, OIDC, SAML, LDAP</li>
+  </ul>
+</div>
+{% endblock %}
