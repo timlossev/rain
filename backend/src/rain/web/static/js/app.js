@@ -25,6 +25,87 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Nav search: typeahead over the already-rendered nav tree -- reads the
+  // sidebar's own DOM as its index rather than hitting a search endpoint,
+  // so it automatically only ever finds pages this user's role/tenant
+  // context actually rendered a link for.
+  const navSearchInput = document.querySelector("#nav-search-input");
+  const navSearchResults = document.querySelector("#nav-search-results");
+  if (navSearchInput && navSearchResults) {
+    const searchIndex = Array.from(document.querySelectorAll(".nav-tree .nav-link"))
+      .map((link) => {
+        const item = link.closest(".nav-item");
+        const parentItem = item && item.parentElement ? item.parentElement.closest(".nav-item") : null;
+        const parentLabel = parentItem ? parentItem.querySelector(":scope > .nav-toggle .nav-label") : null;
+        return {
+          label: (link.querySelector(".nav-label") || link).textContent.trim(),
+          path: parentLabel ? parentLabel.textContent.trim() : "",
+          href: link.getAttribute("href"),
+        };
+      })
+      .filter((entry) => entry.label && entry.href);
+
+    let activeIndex = -1;
+
+    const currentMatches = () => {
+      const q = navSearchInput.value.trim().toLowerCase();
+      if (!q) return [];
+      return searchIndex.filter((entry) => entry.label.toLowerCase().includes(q)).slice(0, 8);
+    };
+
+    const renderResults = (matches) => {
+      navSearchResults.innerHTML = "";
+      matches.forEach((entry, idx) => {
+        const a = document.createElement("a");
+        a.className = "nav-search-result" + (idx === activeIndex ? " active" : "");
+        a.href = entry.href;
+        a.textContent = entry.label;
+        if (entry.path) {
+          const path = document.createElement("span");
+          path.className = "nav-search-path";
+          path.textContent = entry.path;
+          a.appendChild(path);
+        }
+        navSearchResults.appendChild(a);
+      });
+      navSearchResults.hidden = matches.length === 0;
+    };
+
+    navSearchInput.addEventListener("input", () => {
+      activeIndex = -1;
+      renderResults(currentMatches());
+    });
+    navSearchInput.addEventListener("focus", () => {
+      if (navSearchInput.value.trim()) renderResults(currentMatches());
+    });
+    navSearchInput.addEventListener("keydown", (evt) => {
+      const matches = currentMatches();
+      if (evt.key === "ArrowDown" && matches.length) {
+        evt.preventDefault();
+        activeIndex = Math.min(activeIndex + 1, matches.length - 1);
+        renderResults(matches);
+      } else if (evt.key === "ArrowUp" && matches.length) {
+        evt.preventDefault();
+        activeIndex = Math.max(activeIndex - 1, 0);
+        renderResults(matches);
+      } else if (evt.key === "Enter") {
+        const target = matches[activeIndex] || matches[0];
+        if (target) {
+          evt.preventDefault();
+          window.location.href = target.href;
+        }
+      } else if (evt.key === "Escape") {
+        navSearchInput.value = "";
+        navSearchResults.hidden = true;
+      }
+    });
+    document.addEventListener("click", (evt) => {
+      if (!navSearchInput.contains(evt.target) && !navSearchResults.contains(evt.target)) {
+        navSearchResults.hidden = true;
+      }
+    });
+  }
+
   // List/create tab pairs (and any other same-page tab group).
   document.querySelectorAll("[data-tabs]").forEach((container) => {
     const buttons = container.querySelectorAll("[data-tab-btn]");
