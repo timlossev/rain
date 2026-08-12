@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Ticket Rules - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Rules</h1>
+<p class="muted">A syslog event whose <code>match_field</code> matches <code>pattern</code> (regex) is automatically
+  promoted into a ticket of the selected type. Rules are evaluated in order; the first match wins.</p>
+
+<div class="card">
+  <div class="card-title">Active rules</div>
+  <table>
+    <thead><tr><th>Order</th><th>Name</th><th>Type</th><th>Match on</th><th>Pattern</th><th>Severity</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rules %}
+      <tr>
+        <td class="muted">{{ r.sort_order }}</td>
+        <td>{{ r.name }}</td>
+        <td><span class="badge">{{ r.ticket_type }}</span></td>
+        <td class="muted">{{ r.match_field }}</td>
+        <td><code>{{ r.pattern }}</code></td>
+        <td><span class="badge severity-{{ r.severity }}">{{ r.severity }}</span></td>
+        <td class="actions">
+          <form class="inline" method="post" action="/tickets/rules/{{ r.id }}/delete" data-confirm="Delete rule '{{ r.name }}'?">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% if test_result and test_result.rule_id == r.id %}
+      <tr>
+        <td></td>
+        <td colspan="6">
+          {% if test_result.matched %}
+          <span class="flash flash-ok" style="display:inline-block;">Matches: "{{ test_result.sample }}"</span>
+          {% else %}
+          <span class="flash flash-error" style="display:inline-block;">No match: "{{ test_result.sample }}"</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      <tr>
+        <td></td>
+        <td colspan="6">
+          <form method="post" action="/tickets/rules/{{ r.id }}/test" class="form-row" style="margin:0;">
+            <input type="text" name="sample" placeholder="Paste a sample message to test this rule's pattern against" style="flex:1;">
+            <button class="btn btn-sm" type="submit">Test</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="muted">No rules yet -- every event just shows up in the live viewer.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">New rule</div>
+  <form method="post" action="/tickets/rules/all">
+    <div class="form-row">
+      <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" placeholder="Failed su attempts" required></div>
+      <div class="field">
+        <label for="ticket_type">Ticket type</label>
+        <select id="ticket_type" name="ticket_type">
+          {% for t in ticket_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="severity">Severity</label>
+        <select id="severity" name="severity">
+          {% for s in severities %}<option value="{{ s }}" {% if s == "medium" %}selected{% endif %}>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label for="match_field">Match on</label>
+        <select id="match_field" name="match_field">
+          {% for f in match_fields %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="pattern">Pattern (regex)</label><input type="text" id="pattern" name="pattern" placeholder="failed password" required></div>
+      <div class="field" style="flex:0 0 100px;"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="0"></div>
+    </div>
+    <div class="field">
+      <label for="title_template">Title template</label>
+      <input type="text" id="title_template" name="title_template" value="{message}" placeholder="{message}">
+      <div class="field-hint">Available placeholders: <code>{message}</code>, <code>{host}</code>, <code>{program}</code>.</div>
+    </div>
+    <div class="field">
+      <label for="asset_match_field">Auto-link asset by</label>
+      <select id="asset_match_field" name="asset_match_field">
+        <option value="">Don't auto-link</option>
+        <option value="host">Event host = asset External ID</option>
+        <option value="program">Event program = asset External ID</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Add rule</button>
+  </form>
+</div>
+{% endblock %}

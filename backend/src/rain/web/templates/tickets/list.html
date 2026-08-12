@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Tickets - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<div class="panel-row">
+  <h1 style="margin:0;">Tickets</h1>
+  <a class="btn btn-primary" href="/tickets/new">+ New ticket</a>
+</div>
+
+<div class="card">
+  <form method="get" action="/tickets" class="form-row" style="align-items:end;">
+    <div class="field" style="margin-bottom:0;">
+      <label for="ticket_type">Type</label>
+      <select id="ticket_type" name="ticket_type" onchange="this.form.submit()">
+        <option value="">All types</option>
+        {% for t in ticket_types %}
+        <option value="{{ t }}" {% if selected_type == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label for="ticket_status">Status</label>
+      <select id="ticket_status" name="ticket_status" onchange="this.form.submit()">
+        <option value="">All statuses</option>
+        {% for s in statuses %}
+        <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+
+  <table>
+    <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th><th>Asset</th><th>Created</th></tr></thead>
+    <tbody>
+      {% for t in tickets %}
+      <tr>
+        <td><a href="/tickets/{{ t.id }}">{{ t.ticket_number }}</a></td>
+        <td>{{ t.title }}</td>
+        <td><span class="badge severity-{{ t.severity }}">{{ t.severity }}</span></td>
+        <td><span class="badge">{{ t.status }}</span></td>
+        <td class="muted">{{ t.asset.name if t.asset else "-" }}</td>
+        <td class="muted">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "-" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">No tickets yet. <a href="/tickets/new">Create one</a> or watch the <a href="/tickets/live">live viewer</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

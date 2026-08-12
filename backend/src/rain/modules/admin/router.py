@@ -9,12 +9,14 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
 from rain.core.config_store import config_store
+from rain.core.crypto import encrypt_json
 from rain.core.rbac import require_internal_admin, require_login
 from rain.core.security import hash_password
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context
 from rain.db.base import control_session
-from rain.db.control_models import AuthProviderConfig, Session as SessionRow, Tenant, User
+from rain.db.control_models import AuthProviderConfig, Session as SessionRow, SyslogSourceMap, Tenant, User
 from rain.db.provisioning import InvalidSlugError, provision_tenant
+from rain.settings import get_settings
 from rain.web.nav import build_nav_context
 from rain.web.templating import templates
 from rain.web.uploads import UploadError, save_logo_upload
@@ -156,7 +158,7 @@ async def users_create(
     return RedirectResponse("/admin/users", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/users/{user_id}/deactivate")
+@router.post("/users/{user_id:int}/deactivate")
 async def deactivate_user(user_id: int, _: CurrentUser = Depends(require_internal_admin)):
     async with control_session() as session:
         user = await session.get(User, user_id)
@@ -164,6 +166,90 @@ async def deactivate_user(user_id: int, _: CurrentUser = Depends(require_interna
             user.is_active = False
             await session.commit()
     return RedirectResponse("/admin/users", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/smtp", response_class=HTMLResponse)
+async def smtp_form(
+    request: Request,
+    ctx: RequestContext = Depends(get_request_context),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    nav = await build_nav_context(ctx)
+    return templates.TemplateResponse(request, "admin/smtp.html", {**nav, "ctx": ctx})
+
+
+@router.post("/smtp")
+async def smtp_submit(
+    smtp_host: str = Form(""),
+    smtp_port: int = Form(587),
+    smtp_username: str = Form(""),
+    smtp_password: str = Form(""),
+    smtp_from_address: str = Form(""),
+    smtp_use_tls: bool = Form(False),
+    user: CurrentUser = Depends(require_internal_admin),
+):
+    await config_store.set("smtp_host", smtp_host.strip(), updated_by=user.id)
+    await config_store.set("smtp_port", smtp_port, updated_by=user.id)
+    await config_store.set("smtp_username", smtp_username.strip(), updated_by=user.id)
+    await config_store.set("smtp_from_address", smtp_from_address.strip(), updated_by=user.id)
+    await config_store.set("smtp_use_tls", smtp_use_tls, updated_by=user.id)
+    if smtp_password:
+        # Only overwritten when a new password is actually typed in --
+        # the form never shows the existing one back.
+        await config_store.set("smtp_password_encrypted", encrypt_json(smtp_password).hex(), updated_by=user.id)
+    return RedirectResponse("/admin/smtp?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/syslog-sources", response_class=HTMLResponse)
+async def syslog_sources_list(
+    request: Request,
+    ctx: RequestContext = Depends(get_request_context),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    nav = await build_nav_context(ctx)
+    async with control_session() as session:
+        sources = list(
+            (await session.execute(select(SyslogSourceMap).order_by(SyslogSourceMap.sort_order))).scalars()
+        )
+        tenants = list((await session.execute(select(Tenant).order_by(Tenant.name))).scalars())
+    return templates.TemplateResponse(
+        request,
+        "admin/syslog_sources.html",
+        {**nav, "ctx": ctx, "sources": sources, "tenants": tenants, "listener_port": get_settings().syslog_port},
+    )
+
+
+@router.post("/syslog-sources")
+async def syslog_sources_create(
+    tenant_id: int = Form(...),
+    match_field: str = Form(...),
+    pattern: str = Form(...),
+    is_regex: bool = Form(False),
+    sort_order: int = Form(0),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    async with control_session() as session:
+        session.add(
+            SyslogSourceMap(
+                tenant_id=tenant_id,
+                match_field=match_field,
+                pattern=pattern.strip(),
+                is_regex=is_regex,
+                sort_order=sort_order,
+            )
+        )
+        await session.commit()
+    return RedirectResponse("/admin/syslog-sources", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/syslog-sources/{source_id:int}/delete")
+async def syslog_sources_delete(source_id: int, _: CurrentUser = Depends(require_internal_admin)):
+    async with control_session() as session:
+        row = await session.get(SyslogSourceMap, source_id)
+        if row is not None:
+            await session.delete(row)
+            await session.commit()
+    return RedirectResponse("/admin/syslog-sources", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/auth-providers", response_class=HTMLResponse)

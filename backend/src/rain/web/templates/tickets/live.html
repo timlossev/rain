@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Live Viewer - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<div class="panel-row">
+  <h1 style="margin:0;">Live Syslog Viewer</h1>
+  <div class="live-controls">
+    <span id="live-status" class="badge">connecting&hellip;</span>
+    <button type="button" class="btn btn-sm" id="live-pause">Pause</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="form-row" style="margin-bottom:12px;">
+    <div class="field" style="margin-bottom:0;">
+      <label for="live-filter-text">Filter (host / program / message contains)</label>
+      <input type="text" id="live-filter-text" placeholder="e.g. sshd">
+    </div>
+    <div class="field" style="margin-bottom:0; flex:0 0 200px;">
+      <label for="live-filter-severity">Minimum severity</label>
+      <select id="live-filter-severity">
+        <option value="7">All (debug and up)</option>
+        <option value="6" selected>Info and up</option>
+        <option value="4">Warning and up</option>
+        <option value="3">Error and up</option>
+        <option value="1">Alert and up</option>
+      </select>
+    </div>
+  </div>
+  <div id="live-feed" class="live-feed" aria-live="polite"></div>
+</div>
+{% endblock %}
+{% block extra_scripts %}<script src="/static/js/live.js"></script>{% endblock %}

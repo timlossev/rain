@@ -148,6 +148,117 @@ class SyncRun(TenantBase):
     connection: Mapped[SyncConnection] = relationship(back_populates="runs")
 
 
+class TenantConfig(TenantBase):
+    """Per-tenant runtime settings (event retention, etc.) -- the same
+    key/value pattern as control.global_config, scoped to one tenant
+    instead of the whole instance."""
+
+    __tablename__ = "tenant_config"
+
+    key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    value: Mapped[object | None] = mapped_column(JSONB, nullable=True)
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    updated_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class SyslogEvent(TenantBase):
+    """A syslog line received by the worker and routed to this tenant (see
+    control.SyslogSourceMap). Trimmed on a retention schedule -- this is a
+    rolling window, not permanent storage; promote anything worth keeping
+    into a Ticket."""
+
+    __tablename__ = "syslog_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    received_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    host: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    program: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    facility: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    severity: Mapped[int | None] = mapped_column(Integer, nullable=True)  # syslog severity 0 (emerg) - 7 (debug)
+    message: Mapped[str] = mapped_column(Text)
+    raw: Mapped[str] = mapped_column(Text)
+    promoted_ticket_id: Mapped[int | None] = mapped_column(ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True)
+
+
+class TicketRule(TenantBase):
+    """Regex-based auto-promotion: an active syslog event matching `pattern`
+    against `match_field` becomes a ticket of `ticket_type`. Evaluated in
+    `sort_order`; first match wins (a message doesn't spawn two tickets)."""
+
+    __tablename__ = "ticket_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    ticket_type: Mapped[str] = mapped_column(String(15))  # incident | vulnerability
+    match_field: Mapped[str] = mapped_column(String(15), default="message", server_default="message")  # message|host|program
+    pattern: Mapped[str] = mapped_column(String(500))
+    title_template: Mapped[str] = mapped_column(String(255), default="{message}", server_default="{message}")
+    severity: Mapped[str] = mapped_column(String(15), default="medium", server_default="medium")
+    asset_match_field: Mapped[str | None] = mapped_column(String(15), nullable=True)  # host|program, matched to Asset.external_id
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Ticket(TenantBase):
+    __tablename__ = "tickets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticket_number: Mapped[str] = mapped_column(String(31), unique=True, index=True)  # INC-000123 / VULN-000045
+    ticket_type: Mapped[str] = mapped_column(String(15))  # incident | vulnerability
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(15), default="open", server_default="open")
+    severity: Mapped[str] = mapped_column(String(15), default="medium", server_default="medium")
+    asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"), nullable=True)
+    source_event_id: Mapped[int | None] = mapped_column(ForeignKey("syslog_events.id", ondelete="SET NULL"), nullable=True)
+    source_rule_id: Mapped[int | None] = mapped_column(ForeignKey("ticket_rules.id", ondelete="SET NULL"), nullable=True)
+    assignee_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reporter_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    closed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    asset: Mapped[Asset | None] = relationship()
+    comments: Mapped[list["TicketComment"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")
+
+
+class TicketComment(TenantBase):
+    __tablename__ = "ticket_comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True)
+    author_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    ticket: Mapped[Ticket] = relationship(back_populates="comments")
+
+
+class NotificationChannel(TenantBase):
+    """email | slack. Config is Fernet-encrypted at rest (recipient list /
+    webhook URL), same helper as SyncConnection.config_encrypted. The SMTP
+    relay itself is instance-wide (control.global_config, set by
+    internal_admin) -- this table only holds who gets notified for this
+    tenant and through which channel."""
+
+    __tablename__ = "notification_channels"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel_type: Mapped[str] = mapped_column(String(15))  # email | slack
+    name: Mapped[str] = mapped_column(String(255))
+    config_encrypted: Mapped[bytes] = mapped_column(LargeBinary)
+    notify_on_incident: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    notify_on_vulnerability: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class AuditLog(TenantBase):
     """Per-tenant change history for asset registry entities."""
 

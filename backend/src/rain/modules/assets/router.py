@@ -57,7 +57,7 @@ async def new_asset_form(
     )
 
 
-@router.get("/fields-for-type/{asset_type_id}", response_class=HTMLResponse)
+@router.get("/fields-for-type/{asset_type_id:int}", response_class=HTMLResponse)
 async def fields_for_type_fragment(
     request: Request,
     asset_type_id: int,
@@ -102,7 +102,7 @@ async def create_asset(
     return RedirectResponse("/assets", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.get("/{asset_id}/edit", response_class=HTMLResponse)
+@router.get("/{asset_id:int}/edit", response_class=HTMLResponse)
 async def edit_asset_form(
     request: Request,
     asset_id: int,
@@ -124,7 +124,7 @@ async def edit_asset_form(
     )
 
 
-@router.post("/{asset_id}")
+@router.post("/{asset_id:int}")
 async def update_asset(
     request: Request,
     asset_id: int,
@@ -158,7 +158,7 @@ async def update_asset(
     return RedirectResponse("/assets", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/{asset_id}/delete")
+@router.post("/{asset_id:int}/delete")
 async def delete_asset(
     asset_id: int,
     tenant_db: AsyncSession = Depends(get_tenant_db),
@@ -207,7 +207,7 @@ async def create_type(
     return RedirectResponse("/assets/types", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/types/{asset_type_id}/delete")
+@router.post("/types/{asset_type_id:int}/delete")
 async def delete_type(
     asset_type_id: int,
     tenant_db: AsyncSession = Depends(get_tenant_db),
@@ -246,7 +246,7 @@ async def create_field(
     return RedirectResponse("/assets/types", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/fields/{field_id}/delete")
+@router.post("/fields/{field_id:int}/delete")
 async def delete_field(
     field_id: int,
     tenant_db: AsyncSession = Depends(get_tenant_db),
@@ -432,7 +432,7 @@ async def sync_create(
     return RedirectResponse("/assets/sync", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/sync/{connection_id}/test")
+@router.post("/sync/{connection_id:int}/test")
 async def sync_test(
     connection_id: int,
     tenant_db: AsyncSession = Depends(get_tenant_db),
@@ -447,7 +447,7 @@ async def sync_test(
     return RedirectResponse(f"/assets/sync?tested={connection_id}&message={message}", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/sync/{connection_id}/delete")
+@router.post("/sync/{connection_id:int}/delete")
 async def sync_delete(
     connection_id: int,
     tenant_db: AsyncSession = Depends(get_tenant_db),

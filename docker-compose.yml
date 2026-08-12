@@ -43,6 +43,13 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rain}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rain}
       APP_SECRET_KEY: ${APP_SECRET_KEY}
+      SYSLOG_PORT: ${SYSLOG_PORT:-5514}
+    # Published directly (not through Caddy -- this is raw syslog, not
+    # HTTP): point your syslog-ng destination at this host on this port.
+    # See docs/architecture.md for the syslog-ng destination snippet.
+    ports:
+      - "${SYSLOG_PORT:-5514}:${SYSLOG_PORT:-5514}/tcp"
+      - "${SYSLOG_PORT:-5514}:${SYSLOG_PORT:-5514}/udp"
     volumes:
       - rain_uploads:/data/uploads
     depends_on:

@@ -80,3 +80,63 @@ async def test_reconcile_all_tenant_schemas_is_idempotent():
 
     await reconcile_all_tenant_schemas()
     await reconcile_all_tenant_schemas()  # a second pass must not raise
+
+
+async def test_ticket_numbering_and_rule_promotion():
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import SyslogEvent, TicketRule
+    from rain.modules.tickets import rules, service
+
+    tenant = await provision_tenant(slug="beta", name="Beta Inc")
+
+    async with tenant_session(tenant.schema_name) as session:
+        t1 = await service.create_ticket(session, ticket_type="incident", title="first", description=None)
+        t2 = await service.create_ticket(session, ticket_type="incident", title="second", description=None)
+        v1 = await service.create_ticket(session, ticket_type="vulnerability", title="vuln", description=None)
+
+        assert t1.ticket_number == "INC-000001"
+        assert t2.ticket_number == "INC-000002"
+        assert v1.ticket_number == "VULN-000001"
+
+        session.add(
+            TicketRule(name="su fail", ticket_type="incident", match_field="message", pattern="failed", severity="high")
+        )
+        await session.commit()
+
+        event = SyslogEvent(
+            host="web-01", program="su", facility=4, severity=2, message="failed password", raw="raw line"
+        )
+        session.add(event)
+        await session.commit()
+        await session.refresh(event)
+
+        matched = await rules.find_matching_rule(session, event)
+        assert matched is not None
+
+        ticket = await rules.apply_rule(session, matched, event)
+        assert ticket.ticket_number == "INC-000003"
+        assert ticket.source_event_id == event.id
+
+        await session.refresh(event)
+        assert event.promoted_ticket_id == ticket.id
+
+
+async def test_syslog_source_routing():
+    from rain.db.base import control_session
+    from rain.db.control_models import SyslogSourceMap, Tenant
+    from rain.modules.tickets.routing import resolve_tenant_for_event
+
+    async with control_session() as session:
+        result = await session.execute(select(Tenant).where(Tenant.slug == "beta"))
+        tenant = result.scalar_one()
+        session.add(SyslogSourceMap(tenant_id=tenant.id, match_field="host", pattern=r"^web-\d+$", is_regex=True))
+        await session.commit()
+
+    async with control_session() as session:
+        resolved = await resolve_tenant_for_event(session, host="web-42", program=None)
+        assert resolved is not None
+        assert resolved.slug == "beta"
+
+        resolved_none = await resolve_tenant_for_event(session, host="db-01", program=None)
+        assert resolved_none is None

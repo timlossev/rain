@@ -21,6 +21,14 @@ nav_registry.register(
                 order=4,
                 roles=("internal_admin",),
             ),
+            NavNode(key="admin-smtp", label="SMTP Relay", href="/admin/smtp", order=5, roles=("internal_admin",)),
+            NavNode(
+                key="admin-syslog-sources",
+                label="Syslog Sources",
+                href="/admin/syslog-sources",
+                order=6,
+                roles=("internal_admin",),
+            ),
         ],
     )
 )

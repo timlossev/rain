@@ -121,6 +121,28 @@ class AuthProviderConfig(ControlBase):
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
+class SyslogSourceMap(ControlBase):
+    """Routes an incoming syslog event to a tenant, matched against `host`
+    or `program` before the event is written into any tenant schema (the
+    tenant isn't known yet at that point, so this table has to live in
+    `control`). Evaluated in `sort_order`; first match wins. A pattern of
+    `.*` with is_regex=true acts as a catch-all / default tenant."""
+
+    __tablename__ = "syslog_source_map"
+    __table_args__ = {"schema": CONTROL_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey(f"{CONTROL_SCHEMA}.tenants.id", ondelete="CASCADE"))
+    match_field: Mapped[str] = mapped_column(String(15))  # host | program
+    pattern: Mapped[str] = mapped_column(String(255))
+    is_regex: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    tenant: Mapped[Tenant] = relationship()
+
+
 class AuditLog(ControlBase):
     """Platform-level events: tenant/user/role/branding changes. Per-tenant
     asset changes are logged in each tenant schema's own audit_log instead

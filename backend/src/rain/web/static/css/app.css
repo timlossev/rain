@@ -181,6 +181,41 @@ td.actions { text-align: right; white-space: nowrap; }
 .flash-ok { background: var(--ok-bg); color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 30%, white); }
 .flash-error { background: var(--danger-bg); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 30%, white); }
 
+/* ---------- ticket severity ---------- */
+.severity-low, .sev-debug, .sev-info { color: var(--text-muted); }
+.severity-medium, .sev-notice, .sev-warning { background: #fef9c3; color: #854d0e; border-color: transparent; }
+.severity-high, .sev-err { background: #ffedd5; color: #9a3412; border-color: transparent; }
+.severity-critical, .sev-crit, .sev-alert, .sev-emerg { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
+
+/* ---------- live syslog viewer ---------- */
+.live-controls { display: flex; align-items: center; gap: 10px; }
+.live-feed {
+  font-family: "Cascadia Mono", "SF Mono", Consolas, monospace;
+  font-size: 0.82rem;
+  max-height: 65vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.live-row {
+  display: grid;
+  grid-template-columns: 90px 74px 140px 140px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.live-row:last-child { border-bottom: none; }
+.live-time { color: var(--text-muted); }
+.live-host, .live-program { overflow: hidden; text-overflow: ellipsis; }
+.live-message { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-actions { display: flex; gap: 6px; }
+.live-sev.sev-emerg, .live-sev.sev-alert, .live-sev.sev-crit { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
+.live-sev.sev-err { background: #ffedd5; color: #9a3412; border-color: transparent; }
+.live-sev.sev-warning { background: #fef9c3; color: #854d0e; border-color: transparent; }
+
 /* ---------- standalone (login / setup) ---------- */
 .auth-card { width: 100%; max-width: 420px; }
 .auth-card.wide { max-width: 560px; }

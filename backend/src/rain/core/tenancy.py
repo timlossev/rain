@@ -58,23 +58,46 @@ async def get_control_db() -> AsyncSession:
         yield session
 
 
-async def get_current_user(request: Request, control_db: AsyncSession = Depends(get_control_db)) -> CurrentUser:
-    token = request.cookies.get(SESSION_COOKIE_NAME)
-    if not token:
-        raise AuthRequiredError()
-
+async def _load_session_and_user(control_db: AsyncSession, token: str) -> tuple[SessionRow, User] | None:
+    """Shared by the Request-based dependency chain below and the
+    WebSocket live-viewer (rain.modules.tickets.live), which can't use
+    FastAPI's Depends() chain since it's typed against Request, not
+    WebSocket -- both are Starlette HTTPConnection subclasses with the
+    same .cookies, but FastAPI's DI only special-cases an exact match."""
     token_hash = hash_session_token(token)
     result = await control_db.execute(select(SessionRow).where(SessionRow.token_hash == token_hash))
     session_row = result.scalar_one_or_none()
     if session_row is None or session_row.expires_at < dt.datetime.now(dt.timezone.utc):
-        raise AuthRequiredError()
+        return None
 
     user_result = await control_db.execute(
         select(User).where(User.id == session_row.user_id, User.is_active.is_(True))
     )
     user = user_result.scalar_one_or_none()
     if user is None:
+        return None
+    return session_row, user
+
+
+def _to_current_user(user: User) -> CurrentUser:
+    return CurrentUser(
+        id=user.id,
+        email=user.email,
+        display_name=user.display_name,
+        role_key=user.role_key,
+        home_tenant_id=user.tenant_id,
+    )
+
+
+async def get_current_user(request: Request, control_db: AsyncSession = Depends(get_control_db)) -> CurrentUser:
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not token:
         raise AuthRequiredError()
+
+    loaded = await _load_session_and_user(control_db, token)
+    if loaded is None:
+        raise AuthRequiredError()
+    session_row, user = loaded
 
     # Stashed so get_active_tenant / logout / tenant-switch routes can reuse
     # the row already fetched here without a second query, and so exception
@@ -82,13 +105,7 @@ async def get_current_user(request: Request, control_db: AsyncSession = Depends(
     # was asking.
     request.state.session_row = session_row
 
-    current_user = CurrentUser(
-        id=user.id,
-        email=user.email,
-        display_name=user.display_name,
-        role_key=user.role_key,
-        home_tenant_id=user.tenant_id,
-    )
+    current_user = _to_current_user(user)
     request.state.current_user = current_user
     return current_user
 
@@ -138,3 +155,29 @@ async def get_request_context(
     tenant: Tenant | None = Depends(get_active_tenant),
 ) -> RequestContext:
     return RequestContext(user=user, control_db=control_db, active_tenant=tenant)
+
+
+async def resolve_ws_tenant_schema(cookie_token: str | None) -> tuple[CurrentUser, str] | None:
+    """Manual (non-Depends) session -> active tenant schema resolution for
+    WebSocket routes -- see the module docstring on _load_session_and_user
+    for why this doesn't go through the same Depends() chain as HTTP
+    routes. Returns None on any auth/tenant failure; callers close the
+    socket rather than render a redirect."""
+    if not cookie_token:
+        return None
+
+    async with control_session() as control_db:
+        loaded = await _load_session_and_user(control_db, cookie_token)
+        if loaded is None:
+            return None
+        session_row, user = loaded
+        current_user = _to_current_user(user)
+
+        tenant_id = user.tenant_id if not current_user.is_internal_admin else session_row.active_tenant_id
+        if tenant_id is None:
+            return None
+        tenant = await control_db.get(Tenant, tenant_id)
+        if tenant is None:
+            return None
+
+        return current_user, tenant.schema_name

@@ -11,6 +11,7 @@ import uvicorn
 from rain.core.config_store import config_store
 from rain.db import migrate, provisioning
 from rain.db.base import dispose_engine
+from rain.settings import get_settings
 
 logger = logging.getLogger("rain.cli")
 
@@ -27,11 +28,23 @@ async def _worker_main() -> None:
     await provisioning.reconcile_all_tenant_schemas()
     await config_store.load_all()
     await config_store.start_listener()
-    logger.info("rain-worker up (Milestone 1 placeholder -- becomes the syslog listener / rule engine / notifier in Milestone 2)")
+
+    from rain.modules.tickets.listener import retention_loop, start_listener
+    from rain.modules.tickets.live_bus import live_bus
+
+    await live_bus.start()
+    settings = get_settings()
+    tcp_server, udp_transport = await start_listener(port=settings.syslog_port)
+    retention_task = asyncio.create_task(retention_loop())
+
+    logger.info("rain-worker up: syslog listener + rule engine + notifications")
     try:
-        while True:
-            await asyncio.sleep(3600)
+        async with tcp_server:
+            await tcp_server.serve_forever()
     finally:
+        retention_task.cancel()
+        udp_transport.close()
+        await live_bus.stop()
         await config_store.stop_listener()
         await dispose_engine()
 

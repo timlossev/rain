@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     rain_domain: str = "localhost"
     uploads_dir: str = "/data/uploads"
     log_level: str = "info"
+    syslog_port: int = 5514
 
 
 @lru_cache

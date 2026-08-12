@@ -59,16 +59,21 @@ def create_app() -> FastAPI:
     # to rain.core.nav_registry) before any router that renders the tree.
     from rain.modules.admin import nav as _admin_nav  # noqa: F401
     from rain.modules.assets import nav as _assets_nav  # noqa: F401
+    from rain.modules.tickets import nav as _tickets_nav  # noqa: F401
 
     from rain.modules.admin.router import router as admin_router
     from rain.modules.assets.router import router as assets_router
     from rain.modules.auth.router import router as auth_router
     from rain.modules.setup.router import router as setup_router
+    from rain.modules.tickets.live import router as tickets_live_router
+    from rain.modules.tickets.router import router as tickets_router
 
     app.include_router(setup_router)
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(assets_router)
+    app.include_router(tickets_router)
+    app.include_router(tickets_live_router)
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz():
@@ -78,7 +83,7 @@ def create_app() -> FastAPI:
     async def index(user: CurrentUser | None = Depends(get_current_user_optional)):
         if user is None:
             return RedirectResponse("/login")
-        return RedirectResponse("/assets")
+        return RedirectResponse("/tickets")
 
     @app.middleware("http")
     async def enforce_setup_wizard(request: Request, call_next):

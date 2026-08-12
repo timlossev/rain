@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Syslog Sources - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Syslog Sources</h1>
+<div class="card">
+  <p>Point your syslog-ng destination at this host, port <strong>{{ listener_port }}</strong> (TCP or UDP, newline-delimited).
+  Example syslog-ng destination:</p>
+  <pre style="background:var(--surface-sunken); padding:12px; border-radius:var(--radius-sm); overflow-x:auto;"><code>destination d_rain {
+    network("&lt;rain-host&gt;" port({{ listener_port }}) transport("tcp"));
+};
+log { source(s_src); destination(d_rain); };</code></pre>
+</div>
+
+<div class="card">
+  <div class="card-title">Routing rules</div>
+  <p class="muted">Each incoming event is matched against these rules, in order, to decide which tenant it belongs to.
+    The first match wins; unmatched events are dropped. Use pattern <code>.*</code> with Regex checked as a catch-all.</p>
+  <table>
+    <thead><tr><th>Order</th><th>Tenant</th><th>Match on</th><th>Pattern</th><th>Regex</th><th></th></tr></thead>
+    <tbody>
+      {% for s in sources %}
+      <tr>
+        <td class="muted">{{ s.sort_order }}</td>
+        <td>{{ s.tenant.name }}</td>
+        <td class="muted">{{ s.match_field }}</td>
+        <td><code>{{ s.pattern }}</code></td>
+        <td>{{ "yes" if s.is_regex else "-" }}</td>
+        <td class="actions">
+          <form class="inline" method="post" action="/admin/syslog-sources/{{ s.id }}/delete" data-confirm="Delete this routing rule?">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">No routing rules yet -- every event will be dropped until one is added.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">New routing rule</div>
+  <form method="post" action="/admin/syslog-sources">
+    <div class="form-row">
+      <div class="field">
+        <label for="tenant_id">Tenant</label>
+        <select id="tenant_id" name="tenant_id">
+          {% for t in tenants %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="match_field">Match on</label>
+        <select id="match_field" name="match_field">
+          <option value="host">host</option>
+          <option value="program">program</option>
+        </select>
+      </div>
+      <div class="field"><label for="pattern">Pattern</label><input type="text" id="pattern" name="pattern" placeholder="web-.* or .* for catch-all" required></div>
+      <div class="field" style="flex:0 0 90px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_regex"> Regex</label></div>
+      <div class="field" style="flex:0 0 90px;"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="0"></div>
+    </div>
+    <button class="btn btn-primary" type="submit">Add rule</button>
+  </form>
+</div>
+{% endblock %}

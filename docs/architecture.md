@@ -1,7 +1,7 @@
 # RAIN architecture
 
-This is the living design doc for RAIN, kept in-repo so Milestones 2 and 3
-extend the same foundation rather than re-deriving it. See the repo root
+This is the living design doc for RAIN, kept in-repo so Milestone 3 extends
+the same foundation rather than re-deriving it. See the repo root
 [`README.md`](../README.md) for the quickstart.
 
 ## Containers
@@ -10,7 +10,7 @@ extend the same foundation rather than re-deriving it. See the repo root
 |---|---|---|
 | `caddy` | `caddy:2-alpine` | Reverse proxy + automatic HTTPS. Only container exposing 80/443. |
 | `app` | `python:3.12-alpine`, multi-stage | FastAPI web app (Uvicorn), server-rendered UI. |
-| `worker` | same image as `app`, different command | Background process -- a placeholder in Milestone 1, becomes the syslog listener/rule engine/notifier in Milestone 2. |
+| `worker` | same image as `app`, different command | The syslog listener (TCP+UDP), rule engine, notifier, and retention sweeper -- see Ticketing below. Publishes its own port (`SYSLOG_PORT`, default 5514) directly, bypassing Caddy since this is raw syslog, not HTTP. |
 | `db` | `postgres:16-alpine` + pgvector compiled in | One Postgres instance; `control` schema plus one `tenant_<slug>` schema per tenant. |
 
 Only two inputs are needed outside the database: `POSTGRES_PASSWORD` and
@@ -24,10 +24,13 @@ setup wizard and Admin UI.
 ## Multi-tenancy: schema-per-tenant
 
 - `control` schema (always present): `tenants`, `users`, `sessions`,
-  `roles`, `global_config`, `auth_providers`, `audit_log`.
+  `roles`, `global_config`, `auth_providers`, `syslog_source_map`,
+  `audit_log`.
 - `tenant_<slug>` schema per tenant: `asset_types`, `custom_fields`,
   `assets`, `asset_field_values`, `export_profiles`, `sync_connections`,
-  `sync_runs`, `audit_log`. Future milestones add their tables here too.
+  `sync_runs`, `tenant_config`, `syslog_events`, `ticket_rules`, `tickets`,
+  `ticket_comments`, `notification_channels`, `audit_log`. Milestone 3
+  adds its tables here too.
 - Postgres can't enforce foreign keys across schemas, so references back
   into `control` (e.g. `assets.owner_user_id`) are plain integers,
   validated at the application layer instead of the DB.
@@ -107,7 +110,10 @@ libraries removes an entire JS supply chain (nothing to download at image
 build time, nothing to patch for CVEs, no version pinning to maintain) at
 no real cost to the UI. If a future milestone's interactions outgrow plain
 `fetch()` calls, htmx is a single `<script>` tag away and nothing here
-would need to change to adopt it.
+would need to change to adopt it. Milestone 2's one addition,
+`static/js/live.js`, follows the same rule: a plain `WebSocket` client with
+no library, kept in its own file (loaded only on the live-viewer page via
+`{% block extra_scripts %}`) rather than bloating the shared `app.js`.
 
 ## Asset Registry (Milestone 1, full scope)
 
@@ -124,16 +130,100 @@ would need to change to adopt it.
   next release" until implemented. Credentials are Fernet-encrypted at
   rest, keyed from `APP_SECRET_KEY`.
 
+## Ticketing (Milestone 2, full scope)
+
+**Ingestion.** `worker` runs a hand-written RFC 3164 / RFC 5424 syslog
+parser (`rain.modules.tickets.syslog_parser` -- no third-party syslog
+library, to keep the image's dependency surface small) behind a TCP server
+and a UDP `DatagramProtocol` on the same port, both newline-delimited
+(RFC 6587 non-transparent framing; octet-counted TCP framing isn't
+supported). This is a **push** model: syslog-ng is configured with a
+`network()` destination pointed at the worker, e.g.:
+
+```
+destination d_rain {
+    network("<rain-host>" port(5514) transport("tcp"));
+};
+log { source(s_src); destination(d_rain); };
+```
+
+**Tenant routing.** The tenant isn't known yet at the point an event
+arrives, so `control.syslog_source_map` (host/program pattern → tenant,
+evaluated in order, first match wins) has to live in `control`, not a
+tenant schema -- see `rain.modules.tickets.routing`. Unmatched events are
+dropped; Admin > Syslog Sources shows the listener port and lets
+`internal_admin` add mapping rules (a pattern of `.*` + regex acts as a
+catch-all).
+
+**Persistence + live viewer.** Every routed event is written to that
+tenant's `syslog_events` (a rolling window, trimmed by a retention sweep --
+`rain.core.tenant_config` holds the per-tenant `event_retention_days`,
+default 14; promoted events are never deleted) and published to a
+per-tenant Postgres `NOTIFY` channel (`rain.modules.tickets.live_bus`,
+channel `rain_syslog_<schema>`). The live viewer
+(`GET /tickets/live` + `WS /tickets/live/ws`) sends the last 50 buffered
+events on connect, then forwards new ones as they're published; filtering
+(by severity threshold and free-text) happens client-side in
+`static/js/live.js` so the WebSocket protocol stays a plain one-way
+server→client push. The WebSocket route resolves its session manually
+(`rain.core.tenancy.resolve_ws_tenant_schema`) rather than through
+FastAPI's `Depends()` chain -- that chain is typed against `Request`, and
+FastAPI only special-cases an exact `Request`/`WebSocket` match even
+though both are Starlette `HTTPConnection` subclasses with the same
+`.cookies`.
+
+**Rule engine + tickets.** Each persisted event is checked against that
+tenant's active `ticket_rules` (regex on `message`/`host`/`program`,
+evaluated in `sort_order`, first match wins --
+`rain.modules.tickets.rules`). A match creates a `Ticket` via
+`rain.modules.tickets.service.create_ticket`, which numbers it
+`INC-000123` / `VULN-000045` from a real Postgres sequence
+(`inc_number_seq` / `vuln_number_seq`, one pair per tenant schema, allocated
+through SQLAlchemy's `Sequence(...).next_value()` so `schema_translate_map`
+resolves it to the right schema -- raw `nextval('name')` SQL text would
+not, since translation only applies to compiled schema-item constructs,
+not textual SQL). The same manual "Promote to Incident/Vulnerability"
+buttons in the live viewer hit `GET /tickets/new?source_event_id=...`,
+which pre-fills the form and suggests an asset match by `external_id`.
+
+**Notifications.** `rain.modules.tickets.notifications` sends email
+(`aiosmtplib`) and Slack (`httpx` POST to an incoming webhook) on ticket
+creation. The outbound SMTP relay is instance-wide
+(`control.global_config`, set once in Admin > SMTP Relay, password
+Fernet-encrypted); *who* gets notified is per-tenant
+(`notification_channels`, config Fernet-encrypted same as
+`sync_connections`).
+
+**Export.** `GET/POST /tickets/export/run` -- fixed-column CSV/JSON
+(tickets don't carry custom fields the way assets do, so this skips the
+Asset Registry exporter's configurable-column picker).
+
+**Document linking** (the ticketing spec's "link to a document repository
+as a knowledge base") is a placeholder in the ticket detail template until
+Milestone 3 adds the `documents` table to link against.
+
+### A routing bug worth knowing about
+
+While wiring `/tickets/live` in next to `/tickets/{ticket_id}`, a
+pre-existing bug from Milestone 1 surfaced: FastAPI/Starlette match routes
+by trying each registered pattern in order, and a bare `{param}` segment
+(default `str` converter) matches *any* single path segment -- including
+ones meant for a different, later-registered literal route. `POST
+/assets/types`, `/assets/fields`, `/assets/export`, and `/assets/sync` were
+all silently unreachable, shadowed by `POST /assets/{asset_id}` registered
+earlier in the same file: FastAPI would try to parse `"types"` as
+`asset_id: int`, fail, and return 422 rather than ever falling through to
+the intended handler. Fixed throughout both routers by giving every
+numeric path parameter an explicit converter (`{asset_id:int}`,
+`{ticket_id:int}`, ...), which makes the *route pattern itself* only match
+digits, so Starlette correctly skips it for non-numeric segments regardless
+of registration order. `backend/.stub_check` (not committed) had a small
+script that instantiates the app and asserts no literal path incorrectly
+matches a dynamic sibling pattern -- worth re-running by hand after adding
+routes in future milestones.
+
 ## Roadmap
 
-- **Milestone 2 -- Ticketing**: `worker` becomes a syslog listener (syslog-ng
-  pushes to it as a destination) → per-tenant routing via a
-  `control.syslog_source_map` (host/program → tenant) → live viewer over
-  WebSocket using Postgres `LISTEN`/`NOTIFY` for fan-out → regex rule
-  editor (`ticket_rules`) auto-promoting events into `INC-xxxx`/`VULN-xxxx`
-  tickets (per-tenant Postgres sequences) → email (`aiosmtplib`)/Slack
-  webhook notifications → CSV/JSON export reusing the Asset Registry's
-  export-profile mechanism.
 - **Milestone 3 -- Documents**: `DOC-xxxx` entries, local-volume storage
   behind a small swappable-for-S3 storage abstraction, polymorphic
   `document_links(document_id, linked_type[asset|ticket], linked_id)`.

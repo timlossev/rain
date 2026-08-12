@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Export Tickets - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Export Tickets</h1>
+<div class="card" style="max-width:520px;">
+  <form method="post" action="/tickets/export/run">
+    <div class="form-row">
+      <div class="field">
+        <label for="ticket_type">Type</label>
+        <select id="ticket_type" name="ticket_type">
+          <option value="">All types</option>
+          {% for t in ticket_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="ticket_status">Status</label>
+        <select id="ticket_status" name="ticket_status">
+          <option value="">All statuses</option>
+          {% for s in statuses %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="fmt">Format</label>
+        <select id="fmt" name="fmt">
+          <option value="csv">CSV</option>
+          <option value="json">JSON</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" type="submit">Export</button>
+  </form>
+</div>
+{% endblock %}

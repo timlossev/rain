@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Notifications - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Notifications</h1>
+<p class="muted">Who gets notified when a ticket is created, for this tenant. The outbound mail relay itself is
+  configured once, instance-wide, in <a href="/admin/smtp">Admin &gt; SMTP Relay</a>.</p>
+
+<div class="card">
+  <div class="card-title">Channels</div>
+  <table>
+    <thead><tr><th>Name</th><th>Type</th><th>Incidents</th><th>Vulnerabilities</th><th></th></tr></thead>
+    <tbody>
+      {% for c in channels %}
+      <tr>
+        <td>{{ c.name }}</td>
+        <td><span class="badge">{{ c.channel_type }}</span></td>
+        <td>{{ "yes" if c.notify_on_incident else "-" }}</td>
+        <td>{{ "yes" if c.notify_on_vulnerability else "-" }}</td>
+        <td class="actions">
+          <form class="inline" method="post" action="/tickets/notifications/{{ c.id }}/delete" data-confirm="Delete channel '{{ c.name }}'?">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No notification channels yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">New channel</div>
+  <form method="post" action="/tickets/notifications/all">
+    <div class="form-row">
+      <div class="field">
+        <label for="channel_type">Type</label>
+        <select id="channel_type" name="channel_type">
+          {% for t in channel_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" placeholder="On-call Slack" required></div>
+    </div>
+    <div class="field">
+      <label for="recipients">Email recipients (comma-separated, if type = email)</label>
+      <input type="text" id="recipients" name="recipients" placeholder="ops@example.com, oncall@example.com">
+    </div>
+    <div class="field">
+      <label for="webhook_url">Slack incoming webhook URL (if type = slack)</label>
+      <input type="text" id="webhook_url" name="webhook_url" placeholder="https://hooks.slack.com/services/...">
+    </div>
+    <div class="form-row">
+      <div class="field"><label class="checkbox-row"><input type="checkbox" name="notify_on_incident" checked> Notify on incident</label></div>
+      <div class="field"><label class="checkbox-row"><input type="checkbox" name="notify_on_vulnerability" checked> Notify on vulnerability</label></div>
+    </div>
+    <button class="btn btn-primary" type="submit">Add channel</button>
+  </form>
+</div>
+{% endblock %}

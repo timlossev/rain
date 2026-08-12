@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}New ticket - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>New ticket</h1>
+{% if source_event_id %}<p class="muted">Promoting syslog event #{{ source_event_id }}.</p>{% endif %}
+
+<div class="card" style="max-width:640px;">
+  <form method="post" action="/tickets">
+    {% if source_event_id %}<input type="hidden" name="source_event_id" value="{{ source_event_id }}">{% endif %}
+    <div class="form-row">
+      <div class="field">
+        <label for="ticket_type">Type</label>
+        <select id="ticket_type" name="ticket_type">
+          {% for t in ticket_types %}
+          <option value="{{ t }}" {% if selected_type == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="severity">Severity</label>
+        <select id="severity" name="severity">
+          {% for s in severities %}
+          <option value="{{ s }}" {% if s == "medium" %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="title">Title</label>
+      <input type="text" id="title" name="title" value="{{ prefill_title }}" required autofocus>
+    </div>
+    <div class="field">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" rows="4">{{ prefill_description }}</textarea>
+    </div>
+    <div class="field">
+      <label for="asset_id">Affected asset</label>
+      <select id="asset_id" name="asset_id">
+        <option value="">-</option>
+        {% for a in assets %}
+        <option value="{{ a.id }}" {% if suggested_asset_id == a.id %}selected{% endif %}>{{ a.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Create ticket</button>
+    <a class="btn" href="/tickets">Cancel</a>
+  </form>
+</div>
+{% endblock %}

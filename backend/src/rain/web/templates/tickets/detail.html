@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ ticket.ticket_number }} - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<div class="panel-row">
+  <h1 style="margin:0;">{{ ticket.ticket_number }}: {{ ticket.title }}</h1>
+  <div>
+    <span class="badge severity-{{ ticket.severity }}">{{ ticket.severity }}</span>
+    <span class="badge badge-accent">{{ ticket.ticket_type }}</span>
+  </div>
+</div>
+
+<div class="card">
+  <p>{{ ticket.description or "No description." }}</p>
+  <table>
+    <tbody>
+      <tr><th>Status</th><td>
+        <form method="post" action="/tickets/{{ ticket.id }}/status" class="inline">
+          <select name="new_status" onchange="this.form.submit()">
+            {% for s in statuses %}
+            <option value="{{ s }}" {% if ticket.status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </td></tr>
+      <tr><th>Asset</th><td class="muted">{{ ticket.asset.name if ticket.asset else "-" }}</td></tr>
+      <tr><th>Source event</th><td class="muted">{% if ticket.source_event_id %}#{{ ticket.source_event_id }}{% else %}manually created{% endif %}</td></tr>
+      <tr><th>Created</th><td class="muted">{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td></tr>
+      <tr><th>Linked documents</th><td class="muted">Coming in Milestone 3 (Document repository).</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">Comments</div>
+  {% for c in ticket.comments %}
+  <p style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px;">
+    <span class="muted">{{ c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "" }}</span><br>
+    {{ c.body }}
+  </p>
+  {% else %}
+  <p class="muted">No comments yet.</p>
+  {% endfor %}
+  <form method="post" action="/tickets/{{ ticket.id }}/comment">
+    <div class="field">
+      <textarea name="body" rows="3" placeholder="Add a comment..." required></textarea>
+    </div>
+    <button class="btn btn-primary" type="submit">Add comment</button>
+  </form>
+</div>
+{% endblock %}
