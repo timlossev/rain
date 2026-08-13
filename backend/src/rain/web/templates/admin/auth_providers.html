@@ -1,9 +1,8 @@
 {% extends "base.html" %}
+{% import "_help.html" as help %}
 {% block title %}Auth Providers - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>Auth Providers</h1>
-<p class="muted">Local sign-in is the only functional provider today. OIDC, SAML, and LDAP are wired up as
-  placeholders and will become configurable here in a future release.</p>
+<h1>Auth Providers{{ help.help_icon("Local sign-in is the only functional provider today. OIDC, SAML, and LDAP are wired up as placeholders and will become configurable here in a future release.") }}</h1>
 <div class="card">
   <table>
     <thead><tr><th>Provider</th><th>Name</th><th>Status</th></tr></thead>

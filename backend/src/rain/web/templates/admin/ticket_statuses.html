@@ -1,11 +1,10 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
+{% import "_help.html" as help %}
 {% block title %}Ticket Statuses - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>Ticket Statuses</h1>
-<p class="muted">Customize the set of statuses tickets can move through, for the active tenant ({{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}).
-  Statuses flagged "closed" stamp a ticket's closed date when it's moved there. Deactivating a status hides it from
-  new selections without breaking tickets already set to it.</p>
+<h1>Ticket Statuses{{ help.help_icon("Customize the set of statuses tickets can move through, for the active tenant. Statuses flagged \"closed\" stamp a ticket's closed date when it's moved there. Deactivating a status hides it from new selections without breaking tickets already set to it.") }}</h1>
+<p class="muted">Active tenant: {{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}</p>
 
 <div class="tabs" data-tabs>
   <div class="tab-buttons">

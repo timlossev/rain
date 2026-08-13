@@ -1,8 +1,8 @@
 {% extends "base.html" %}
+{% import "_help.html" as help %}
 {% block title %}Import Assets - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>Import Assets</h1>
-<p class="muted">Upload a CSV or JSON file, then map its columns to asset fields on the next screen.</p>
+<h1>Import Assets{{ help.help_icon("Upload a CSV or JSON file, then map its columns to asset fields on the next screen.") }}</h1>
 
 <div class="card" style="max-width:560px;">
   {% if not asset_types %}

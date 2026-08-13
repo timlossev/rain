@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% import "_help.html" as help %}
 {% block title %}{{ rule.name }} - {{ branding.instance_name }}{% endblock %}
 {% block content %}
 <div class="panel-row">
-  <h1 style="margin:0;">{{ rule.name }}</h1>
+  <h1 style="margin:0;">{{ rule.name }}{{ help.help_icon("Manage this Platform Response Rule's actions -- notify Slack/email, call a webhook, attach a document, or attach an asset. All actions run when the rule's pattern matches a new ticket.") }}</h1>
   <div>
     <a class="btn btn-sm" href="/tickets/platform-events">&larr; All rules</a>
     <form class="inline" method="post" action="/tickets/platform-events/{{ rule.id }}/delete" data-confirm="Delete rule '{{ rule.name }}' and all its actions?">

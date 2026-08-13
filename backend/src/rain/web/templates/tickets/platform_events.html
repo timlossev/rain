@@ -1,10 +1,9 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
+{% import "_help.html" as help %}
 {% block title %}Platform Response Rules - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>Platform Response Rules</h1>
-<p class="muted">React to tickets as they're created -- every active rule whose pattern matches fires (not just the
-  first), each running one or more actions. Open a rule to add actions. Every firing is logged on the ticket itself.</p>
+<h1>Platform Response Rules{{ help.help_icon("React to tickets as they're created -- every active rule whose pattern matches fires (not just the first), each running one or more actions. Open a rule to add actions. Every firing is logged on the ticket itself.") }}</h1>
 
 <div class="tabs" data-tabs>
   <div class="tab-buttons">

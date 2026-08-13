@@ -1,10 +1,9 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
+{% import "_help.html" as help %}
 {% block title %}Event Policies - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>Event Policies</h1>
-<p class="muted">A syslog event whose <code>match_field</code> matches <code>pattern</code> (regex) is automatically
-  promoted into a ticket of the selected type. Policies are evaluated in order; the first match wins.</p>
+<h1>Event Policies{{ help.help_icon("A syslog event whose match_field matches pattern (regex) is automatically promoted into a ticket of the selected type. Policies are evaluated in order; the first match wins.") }}</h1>
 
 <div class="tabs" data-tabs>
   <div class="tab-buttons">

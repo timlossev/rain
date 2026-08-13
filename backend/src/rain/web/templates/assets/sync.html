@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
+{% import "_help.html" as help %}
 {% block title %}Cloud Sync - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>Cloud Sync</h1>
-<p class="muted">Connection management is available now. Automated asset discovery for AWS and Azure ships in the next release.</p>
+<h1>Cloud Sync{{ help.help_icon("Connection management is available now. Automated asset discovery for AWS and Azure ships in the next release.") }}</h1>
 
 <div class="tabs" data-tabs>
   <div class="tab-buttons">

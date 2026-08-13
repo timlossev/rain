@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% import "_help.html" as help %}
 {% block title %}Events - {{ branding.instance_name }}{% endblock %}
 {% block content %}
 <div class="panel-row">
-  <h1 style="margin:0;">Events</h1>
+  <h1 style="margin:0;">Events{{ help.help_icon("A live feed of incoming syslog events. Filter by text or minimum severity. Matching events get promoted to tickets by Event Policies and Correlation Rules.") }}</h1>
   <div class="live-controls">
     <span id="live-status" class="badge">connecting&hellip;</span>
     <button type="button" class="btn btn-sm" id="live-pause">Pause</button>
@@ -29,4 +30,4 @@
   <div id="live-feed" class="live-feed" aria-live="polite"></div>
 </div>
 {% endblock %}
-{% block extra_scripts %}<script src="/static/js/live.js"></script>{% endblock %}
+{% block extra_scripts %}<script src="/static/js/live.js?v={{ asset_version }}"></script>{% endblock %}

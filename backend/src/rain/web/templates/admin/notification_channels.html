@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
+{% import "_help.html" as help %}
 {% block title %}Notification Channels - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>Notification Channels</h1>
-<p class="muted">Slack/email destinations for the active tenant ({{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}).
-  These don't fire on their own -- point a <a href="/tickets/platform-events">Platform Response Rule</a>'s action at
-  one to decide when it actually gets used. The outbound mail relay itself is configured once, instance-wide, in
-  <a href="/admin/smtp">Admin &gt; SMTP Relay</a>.</p>
+<h1>Notification Channels{{ help.help_icon("Slack/email destinations for the active tenant. These don't fire on their own -- point a Platform Response Rule's action at one to decide when it actually gets used. The outbound mail relay itself is configured once, instance-wide, in Admin > SMTP Relay.") }}</h1>
+<p class="muted">Active tenant: {{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}</p>
 
 <div class="tabs" data-tabs>
   <div class="tab-buttons">

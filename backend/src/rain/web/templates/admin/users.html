@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
+{% import "_help.html" as help %}
 {% block title %}Users - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>Users</h1>
+<h1>Users{{ help.help_icon("Manage user accounts, roles, and tenant assignment. Internal Admin users can see the Admin menu and manage every tenant; Client users are scoped to one tenant.") }}</h1>
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
 <div class="tabs" data-tabs>

@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
+{% import "_help.html" as help %}
 {% block title %}Syslog Sources - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>Syslog Sources</h1>
+<h1>Syslog Sources{{ help.help_icon("Point your syslog-ng destination at this host and route incoming events to the correct tenant by matching host or program against a pattern -- the first matching rule wins; unmatched events are dropped.") }}</h1>
 <div class="card">
   <p>Point your syslog-ng destination at this host, port <strong>{{ listener_port }}</strong> (TCP or UDP, newline-delimited).
   Example syslog-ng destination:</p>

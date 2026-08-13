@@ -1,9 +1,8 @@
 {% extends "base.html" %}
+{% import "_help.html" as help %}
 {% block title %}SMTP Relay - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>SMTP Relay</h1>
-<p class="muted">One outbound mail relay for the whole instance. Who actually receives ticket notifications is
-  configured per-tenant under Admin &gt; Notification Channels, and used by Tickets &gt; Platform Response Rules.</p>
+<h1>SMTP Relay{{ help.help_icon("One outbound mail relay for the whole instance. Who actually receives ticket notifications is configured per-tenant under Admin > Notification Channels, and used by Tickets > Platform Response Rules.") }}</h1>
 
 <div class="card" style="max-width:480px;">
   <form method="post" action="/admin/smtp">
