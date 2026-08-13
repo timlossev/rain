@@ -13,6 +13,7 @@
   <tr><th>Status</th><td>{{ status_labels.get(ticket.status, ticket.status) }}</td></tr>
   <tr><th>Severity</th><td>{{ ticket.severity }}</td></tr>
   <tr><th>Asset</th><td>{{ ticket.asset.name if ticket.asset else "-" }}</td></tr>
+  <tr><th>Assignee</th><td>{{ user_names.get(ticket.assignee_user_id, "Unassigned") }}</td></tr>
   <tr><th>Reported by</th><td>{{ user_names.get(ticket.reporter_user_id, "-") }}</td></tr>
   <tr><th>Source event</th><td>{% if ticket.source_event_id %}Event #{{ ticket.source_event_id }}{% else %}Manually created{% endif %}</td></tr>
   <tr><th>Created</th><td>{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td></tr>
@@ -50,6 +51,12 @@
     {% if entry.kind == "comment" %}
     <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} &mdash; {{ user_names.get(entry.item.author_user_id, "Someone") }}</div>
     <div>{{ entry.item.body }}</div>
+    {% elif entry.kind == "assignment_change" %}
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} &mdash; {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
+    <div>
+      {% if entry.item.to_assignee_user_id %}Assigned this to {{ user_names.get(entry.item.to_assignee_user_id, "someone") }}{% if entry.item.from_assignee_user_id %} (previously {{ user_names.get(entry.item.from_assignee_user_id, "someone") }}){% endif %}
+      {% else %}Unassigned this{% if entry.item.from_assignee_user_id %} (previously {{ user_names.get(entry.item.from_assignee_user_id, "someone") }}){% endif %}{% endif %}
+    </div>
     {% else %}
     <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} &mdash; {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
     <div>Changed status{% if entry.item.from_status %} from {{ status_labels.get(entry.item.from_status, entry.item.from_status) }}{% endif %} to {{ status_labels.get(entry.item.to_status, entry.item.to_status) }}</div>

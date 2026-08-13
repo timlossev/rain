@@ -1,16 +1,22 @@
-{# expects: links (list of DocumentLink with .document loaded), linked_type, linked_id #}
-<div class="card">
-  <div class="card-title">Linked Documents</div>
+{# expects: links (list of DocumentLink with .document loaded), linked_type, linked_id.
+   Optional: wrap_card (default true) -- pass false to embed this section
+   inside a caller's own <div class="card">...</div> instead of rendering
+   its own, e.g. so it can sit under a ticket's metadata rather than as a
+   second separate widget. #}
+{% set _wrap = wrap_card if wrap_card is defined else true %}
+{% if _wrap %}<div class="card">{% endif %}
+  <div class="card-title"{% if not _wrap %} style="margin-top:18px;"{% endif %}>Linked Documents</div>
   <div class="doc-link-list">
     {% for link in links %}
     <div class="doc-link-row">
       <div class="doc-link-info">
-        <a href="/documents/{{ link.document.id }}">{{ link.document.doc_number }}</a>
+        <button type="button" class="doc-link-preview-btn" data-doc-preview="{{ link.document.id }}" data-doc-filename="{{ link.document.filename }}" data-doc-title="{{ link.document.doc_number }}: {{ link.document.title }}" title="Preview">{{ link.document.doc_number }}</button>
         <span class="doc-link-title">{{ link.document.title }}</span>
       </div>
       <div class="doc-link-actions">
-        <button type="button" class="btn btn-sm" data-doc-preview="{{ link.document.id }}" data-doc-filename="{{ link.document.filename }}" data-doc-title="{{ link.document.doc_number }}: {{ link.document.title }}" hidden>View</button>
-        <a class="btn btn-sm" href="/documents/{{ link.document.id }}/download">Download</a>
+        <a class="btn btn-sm doc-edit-btn" href="/documents/{{ link.document.id }}" title="Open document" aria-label="Open document">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5l5 5L8 21H3v-5Z"/><path d="M12.5 6.5l5 5"/></svg>
+        </a>
         <form class="inline" method="post" action="/documents/{{ link.document_id }}/unlink/{{ link.id }}" data-confirm="Unlink this document?">
           <button class="btn btn-sm btn-danger" type="submit">Unlink</button>
         </form>
@@ -21,4 +27,4 @@
     {% endfor %}
   </div>
   <a class="btn btn-sm" href="/documents/new?linked_type={{ linked_type }}&linked_id={{ linked_id }}" style="margin-top:10px;">+ Attach document</a>
-</div>
+{% if _wrap %}</div>{% endif %}

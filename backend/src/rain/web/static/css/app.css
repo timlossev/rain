@@ -121,6 +121,7 @@ p { margin: 0 0 1em; }
 .user-menu-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 6px; }
 .user-menu-divider { border-top: 1px solid var(--border); margin: 10px 0; }
 .content { padding: 24px; max-width: 1100px; width: 100%; }
+.content-full { max-width: none; }
 .content-standalone {
   min-height: 100vh;
   display: flex;
@@ -167,6 +168,26 @@ p { margin: 0 0 1em; }
 }
 .nav-search-result:hover, .nav-search-result.active { background: rgba(255, 255, 255, 0.08); color: #fff; text-decoration: none; }
 .nav-search-path { display: block; font-size: 0.7rem; color: var(--sidebar-text-dim); }
+
+.user-picker { position: relative; }
+.user-picker-results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  z-index: 70;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.user-picker-results[hidden] { display: none; }
+.user-picker-result { padding: 7px 10px; border-radius: var(--radius-sm); font-size: 0.85rem; cursor: pointer; }
+.user-picker-result:hover, .user-picker-result.active { background: var(--surface-sunken); }
 .sidebar.collapsed .nav-search { display: none; }
 
 /* ---------- nav tree ----------
@@ -325,13 +346,19 @@ p { margin: 0 0 1em; }
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
+  font-family: inherit;
   font-size: 0.88rem;
   font-weight: 600;
+  line-height: 1.3;
   cursor: pointer;
 }
 .btn:hover { border-color: var(--accent); text-decoration: none; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
 .btn-primary:hover { filter: brightness(1.05); }
+/* For a toggled/selected state (e.g. an active filter chip) -- distinct
+   from .btn-primary's solid accent fill, which is reserved for a page's one
+   major/primary action, so a filter toggle doesn't visually compete with it. */
+.btn.active { border-color: var(--accent); color: var(--accent); }
 .btn-danger { color: var(--danger); }
 .btn-danger:hover { border-color: var(--danger); }
 .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
@@ -561,9 +588,12 @@ td.actions { text-align: right; white-space: nowrap; }
   border-radius: var(--radius-sm);
 }
 .doc-link-info { display: flex; flex-direction: column; min-width: 140px; flex: 1 1 140px; }
-.doc-link-info a { font-weight: 600; }
+.doc-link-preview-btn { all: unset; cursor: pointer; font-weight: 600; color: var(--accent); align-self: flex-start; }
+.doc-link-preview-btn:hover { text-decoration: underline; }
 .doc-link-title { font-size: 0.82rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.doc-link-actions { display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
+.doc-link-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex-shrink: 0; }
+.doc-edit-btn { padding: 6px; }
+.doc-edit-btn svg { width: 15px; height: 15px; }
 
 /* ---------- badges / flash ---------- */
 .badge {
@@ -619,7 +649,6 @@ td.actions { text-align: right; white-space: nowrap; }
 }
 .status-step.current:hover { background: var(--step-color, #6b7280); }
 
-.ticket-top-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .activity-entry { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
 .activity-entry:last-of-type { border-bottom: none; }
 .activity-meta { display: flex; gap: 8px; align-items: baseline; margin-bottom: 3px; }

@@ -4,7 +4,7 @@
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <div>
-    <a class="btn btn-primary" href="/documents/{{ doc.id }}/download">Download</a>
+    <a class="btn" href="/documents/{{ doc.id }}/download">Download</a>
     <a class="btn" href="/documents/{{ doc.id }}/pdf">Export to PDF</a>
     <form class="inline" method="post" action="/documents/{{ doc.id }}/delete" data-confirm="Delete '{{ doc.title }}'? This cannot be undone.">
       <button class="btn btn-danger" type="submit">Delete</button>

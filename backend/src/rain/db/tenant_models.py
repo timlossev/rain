@@ -336,6 +336,12 @@ class Ticket(TenantBase):
     status_changes: Mapped[list["TicketStatusChange"]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan", order_by="TicketStatusChange.created_at"
     )
+    assignment_changes: Mapped[list["TicketAssignmentChange"]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan", order_by="TicketAssignmentChange.created_at"
+    )
+    asset_changes: Mapped[list["TicketAssetChange"]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan", order_by="TicketAssetChange.created_at"
+    )
     rule_triggers: Mapped[list["PlatformEventTrigger"]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan", order_by="PlatformEventTrigger.created_at"
     )
@@ -368,6 +374,42 @@ class TicketStatusChange(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     ticket: Mapped[Ticket] = relationship(back_populates="status_changes")
+
+
+class TicketAssignmentChange(TenantBase):
+    """Audit trail entry for an assignee change -- shown interleaved with
+    comments and status changes in the ticket detail activity feed.
+    `from_assignee_user_id` is null when the ticket had no assignee yet;
+    `to_assignee_user_id` is null when a ticket is unassigned."""
+
+    __tablename__ = "ticket_assignment_changes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True)
+    changed_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    from_assignee_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    to_assignee_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    ticket: Mapped[Ticket] = relationship(back_populates="assignment_changes")
+
+
+class TicketAssetChange(TenantBase):
+    """Audit trail entry for a change to a ticket's affected asset -- shown
+    interleaved with comments/status/assignment changes in the ticket detail
+    activity feed. `from_asset_id`/`to_asset_id` are null when the ticket had
+    no asset set / is being cleared, respectively."""
+
+    __tablename__ = "ticket_asset_changes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True)
+    changed_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    from_asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"), nullable=True)
+    to_asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    ticket: Mapped[Ticket] = relationship(back_populates="asset_changes")
 
 
 class NotificationChannel(TenantBase):

@@ -1,48 +1,56 @@
 {% extends "base.html" %}
+{% import "_search_picker.html" as picker %}
 {% block title %}{{ ticket.ticket_number }}: {{ ticket.title }} - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}A single ticket's status, metadata, linked documents, and full activity history (comments and status changes).{% endblock %}
+{% block help_text %}A single ticket's status, metadata, linked documents, and full activity history (comments, status/assignee/asset changes).{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <a class="btn btn-sm" href="/tickets/{{ ticket.id }}/pdf">Export to PDF</a>
 </div>
 
-<div class="ticket-top-row">
-  <div class="card" style="flex:2; min-width:280px;">
-    <div style="margin-bottom:10px;">
-      <span class="badge severity-{{ ticket.severity }}">{{ ticket.severity }}</span>
-      <span class="badge badge-accent">{{ ticket.ticket_type }}</span>
-    </div>
-    <p>{{ ticket.description or "No description." }}</p>
-    <table>
-      <tbody>
-        <tr><th>Status</th><td>
-          <div class="status-stepper">
-            {% for s in statuses %}
-            <form method="post" action="/tickets/{{ ticket.id }}/status">
-              <input type="hidden" name="new_status" value="{{ s.key }}">
-              <button type="submit" class="status-step{% if ticket.status == s.key %} current{% endif %}" style="--step-color: {{ s.color }};" {% if ticket.status == s.key %}disabled{% endif %} title="{% if ticket.status == s.key %}Current status{% else %}Move to {{ s.label }}{% endif %}">
-                {% if ticket.status == s.key %}<span aria-hidden="true">&check;</span> {% endif %}{{ s.label }}
-              </button>
-            </form>
-            {% endfor %}
-          </div>
-        </td></tr>
-        <tr><th>Asset</th><td class="muted">{{ ticket.asset.name if ticket.asset else "-" }}</td></tr>
-        <tr><th>Reported by</th><td class="muted">{{ user_names.get(ticket.reporter_user_id, "-") }}</td></tr>
-        <tr><th>Source event</th><td class="muted">{% if ticket.source_event_id %}#{{ ticket.source_event_id }}{% else %}manually created{% endif %}</td></tr>
-        {% if ticket.source_correlation_rule %}
-        <tr><th>Correlation rule</th><td class="muted"><a href="/tickets/correlation-rules">{{ ticket.source_correlation_rule.name }}</a></td></tr>
-        {% endif %}
-        <tr><th>Created</th><td class="muted">{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td></tr>
-      </tbody>
-    </table>
+<div class="card">
+  <div style="margin-bottom:10px;">
+    <span class="badge severity-{{ ticket.severity }}">{{ ticket.severity }}</span>
+    <span class="badge badge-accent">{{ ticket.ticket_type }}</span>
   </div>
+  <p>{{ ticket.description or "No description." }}</p>
+  <table>
+    <tbody>
+      <tr><th>Status</th><td>
+        <div class="status-stepper">
+          {% for s in statuses %}
+          <form method="post" action="/tickets/{{ ticket.id }}/status">
+            <input type="hidden" name="new_status" value="{{ s.key }}">
+            <button type="submit" class="status-step{% if ticket.status == s.key %} current{% endif %}" style="--step-color: {{ s.color }};" {% if ticket.status == s.key %}disabled{% endif %} title="{% if ticket.status == s.key %}Current status{% else %}Move to {{ s.label }}{% endif %}">
+              {% if ticket.status == s.key %}<span aria-hidden="true">&check;</span> {% endif %}{{ s.label }}
+            </button>
+          </form>
+          {% endfor %}
+        </div>
+      </td></tr>
+      <tr><th>Assignee</th><td>
+        <form method="post" action="/tickets/{{ ticket.id }}/assign" class="form-row" style="margin:0; align-items:center;">
+          {{ picker.search_picker("assignee_user_id", "/tickets/users/search", initial_value=ticket.assignee_user_id, initial_label=user_names.get(ticket.assignee_user_id, ""), placeholder="Unassigned -- search to assign") }}
+          <button class="btn btn-sm" type="submit">Save</button>
+        </form>
+      </td></tr>
+      <tr><th>Asset</th><td>
+        <form method="post" action="/tickets/{{ ticket.id }}/asset" class="form-row" style="margin:0; align-items:center;">
+          {{ picker.search_picker("asset_id", "/tickets/assets/search", initial_value=ticket.asset_id, initial_label=asset_names.get(ticket.asset_id, ""), placeholder="No asset -- search to link") }}
+          <button class="btn btn-sm" type="submit">Save</button>
+        </form>
+      </td></tr>
+      <tr><th>Reported by</th><td class="muted">{{ user_names.get(ticket.reporter_user_id, "-") }}</td></tr>
+      <tr><th>Source event</th><td class="muted">{% if ticket.source_event_id %}#{{ ticket.source_event_id }}{% else %}manually created{% endif %}</td></tr>
+      {% if ticket.source_correlation_rule %}
+      <tr><th>Correlation rule</th><td class="muted"><a href="/tickets/correlation-rules">{{ ticket.source_correlation_rule.name }}</a></td></tr>
+      {% endif %}
+      <tr><th>Created</th><td class="muted">{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td></tr>
+    </tbody>
+  </table>
 
-  <div style="flex:1; min-width:220px;">
-    {% with links = document_links, linked_type = "ticket", linked_id = ticket.id %}
-    {% include "documents/_links_fragment.html" %}
-    {% endwith %}
-  </div>
+  {% with links = document_links, linked_type = "ticket", linked_id = ticket.id, wrap_card = false %}
+  {% include "documents/_links_fragment.html" %}
+  {% endwith %}
 </div>
 
 {% if ticket.rule_triggers %}
@@ -68,6 +76,26 @@
         <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span>
       </div>
       <div>{{ entry.item.body }}</div>
+    </div>
+    {% elif entry.kind == "assignment_change" %}
+    <div class="activity-entry activity-status-change">
+      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span>
+      &mdash; <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong>
+      {% if entry.item.to_assignee_user_id %}
+      assigned this to <strong>{{ user_names.get(entry.item.to_assignee_user_id, "someone") }}</strong>{% if entry.item.from_assignee_user_id %} (previously <strong>{{ user_names.get(entry.item.from_assignee_user_id, "someone") }}</strong>){% endif %}
+      {% else %}
+      unassigned this{% if entry.item.from_assignee_user_id %} (previously <strong>{{ user_names.get(entry.item.from_assignee_user_id, "someone") }}</strong>){% endif %}
+      {% endif %}
+    </div>
+    {% elif entry.kind == "asset_change" %}
+    <div class="activity-entry activity-status-change">
+      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span>
+      &mdash; <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong>
+      {% if entry.item.to_asset_id %}
+      set the affected asset to <strong>{{ asset_names.get(entry.item.to_asset_id, "an asset") }}</strong>{% if entry.item.from_asset_id %} (previously <strong>{{ asset_names.get(entry.item.from_asset_id, "an asset") }}</strong>){% endif %}
+      {% else %}
+      cleared the affected asset{% if entry.item.from_asset_id %} (previously <strong>{{ asset_names.get(entry.item.from_asset_id, "an asset") }}</strong>){% endif %}
+      {% endif %}
     </div>
     {% else %}
     <div class="activity-entry activity-status-change">

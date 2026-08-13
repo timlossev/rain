@@ -104,6 +104,89 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Predictive user-search picker (ticket assignee fields) -- same
+  // interaction shape as Quick Navigation above, but backed by a live
+  // endpoint (data-user-picker-endpoint) since the full user list can't be
+  // pre-rendered into the page the way the small nav tree is. Keeps a text
+  // input (what's shown/typed) in sync with a hidden input (the real form
+  // value, a user id) -- typing clears the hidden value until a result is
+  // actually picked, so a half-typed search can't silently submit a stale id.
+  document.querySelectorAll("[data-user-picker]").forEach((picker) => {
+    const input = picker.querySelector("[data-user-picker-input]");
+    const hidden = picker.querySelector("[data-user-picker-value]");
+    const results = picker.querySelector("[data-user-picker-results]");
+    const endpoint = picker.dataset.userPickerEndpoint;
+    if (!input || !hidden || !results || !endpoint) return;
+
+    let matches = [];
+    let activeIndex = -1;
+    let debounceTimer = null;
+
+    const renderResults = () => {
+      results.innerHTML = "";
+      matches.forEach((entry, idx) => {
+        const item = document.createElement("div");
+        item.className = "user-picker-result" + (idx === activeIndex ? " active" : "");
+        item.textContent = entry.label;
+        item.addEventListener("mousedown", (evt) => {
+          evt.preventDefault();
+          select(entry);
+        });
+        results.appendChild(item);
+      });
+      results.hidden = matches.length === 0;
+    };
+
+    const select = (entry) => {
+      hidden.value = entry.id;
+      input.value = entry.label;
+      matches = [];
+      activeIndex = -1;
+      results.hidden = true;
+    };
+
+    input.addEventListener("input", () => {
+      hidden.value = "";
+      const q = input.value.trim();
+      clearTimeout(debounceTimer);
+      if (q.length < 2) {
+        matches = [];
+        renderResults();
+        return;
+      }
+      debounceTimer = setTimeout(async () => {
+        try {
+          const resp = await fetch(`${endpoint}?q=${encodeURIComponent(q)}`);
+          matches = resp.ok ? await resp.json() : [];
+        } catch (err) {
+          matches = [];
+        }
+        activeIndex = -1;
+        renderResults();
+      }, 200);
+    });
+    input.addEventListener("keydown", (evt) => {
+      if (evt.key === "ArrowDown" && matches.length) {
+        evt.preventDefault();
+        activeIndex = Math.min(activeIndex + 1, matches.length - 1);
+        renderResults();
+      } else if (evt.key === "ArrowUp" && matches.length) {
+        evt.preventDefault();
+        activeIndex = Math.max(activeIndex - 1, 0);
+        renderResults();
+      } else if (evt.key === "Enter" && matches.length) {
+        evt.preventDefault();
+        select(matches[activeIndex] || matches[0]);
+      } else if (evt.key === "Escape") {
+        matches = [];
+        renderResults();
+      }
+    });
+    document.addEventListener("click", (evt) => {
+      if (!picker.contains(evt.target)) results.hidden = true;
+    });
+  });
+
   // List/create tab pairs (and any other same-page tab group).
   document.querySelectorAll("[data-tabs]").forEach((container) => {
     const buttons = container.querySelectorAll("[data-tab-btn]");
@@ -142,26 +225,30 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Linked-document "View" modal, for inline-viewable (txt/md) documents
-  // only -- decided client-side off the filename extension so the
-  // Linked Documents fragment (shared by ticket/asset detail) doesn't
-  // need a server-side body_kind lookup per link. Fetches the same
-  // rendered-body fragment the inline editor's Preview tab uses.
-  const TEXT_PREVIEW_EXTENSIONS = [".txt", ".text", ".log", ".md", ".markdown"];
+  // Linked-document title click -> preview modal, for every linked document
+  // (clicking a document is meant for reading, not navigation -- the pencil
+  // icon next to it is the way to actually open/edit the full document).
+  // For inline-viewable (txt/md) documents this renders the same body-preview
+  // fragment the inline editor's Preview tab uses; the server 400s for any
+  // other file type (no renderer for it), so this falls back to opening the
+  // raw file in a new tab, letting the browser's own PDF/image viewer show it.
   const previewModal = document.querySelector("#doc-preview-modal");
   const previewBody = document.querySelector("#doc-preview-body");
   const previewTitle = document.querySelector("#doc-preview-title");
   document.querySelectorAll("[data-doc-preview]").forEach((btn) => {
-    const filename = (btn.dataset.docFilename || "").toLowerCase();
-    if (!TEXT_PREVIEW_EXTENSIONS.some((ext) => filename.endsWith(ext))) return;
-    btn.hidden = false;
     btn.addEventListener("click", async () => {
+      const docId = btn.dataset.docPreview;
       if (!previewModal) return;
       previewTitle.textContent = btn.dataset.docTitle || "";
       previewBody.innerHTML = "<p class=\"muted\">Loading...</p>";
       previewModal.hidden = false;
       try {
-        const resp = await fetch(`/documents/${btn.dataset.docPreview}/body-preview`);
+        const resp = await fetch(`/documents/${docId}/body-preview`);
+        if (resp.status === 400) {
+          previewModal.hidden = true;
+          window.open(`/documents/${docId}/download`, "_blank");
+          return;
+        }
         previewBody.innerHTML = resp.ok ? await resp.text() : "<p class=\"muted\">Couldn't load preview.</p>";
       } catch (err) {
         previewBody.innerHTML = "<p class=\"muted\">Couldn't load preview.</p>";

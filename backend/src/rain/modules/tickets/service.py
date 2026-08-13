@@ -6,7 +6,15 @@ from sqlalchemy import Sequence, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from rain.db.tenant_models import SyslogEvent, Ticket, TicketComment, TicketStatus, TicketStatusChange
+from rain.db.tenant_models import (
+    SyslogEvent,
+    Ticket,
+    TicketAssetChange,
+    TicketAssignmentChange,
+    TicketComment,
+    TicketStatus,
+    TicketStatusChange,
+)
 from rain.modules.tickets.schemas import TICKET_TYPE_PREFIX
 
 _SEQUENCE_NAMES = {"incident": "inc_number_seq", "vulnerability": "vuln_number_seq"}
@@ -79,14 +87,26 @@ async def create_ticket(
     return ticket
 
 
-def ticket_list_stmt(*, ticket_type: str | None = None, status: str | None = None):
+def ticket_list_stmt(
+    *,
+    ticket_type: str | None = None,
+    status: str | None = None,
+    assigned_to: int | None = None,
+    unassigned: bool = False,
+):
     """Shared statement builder -- used both by list_tickets() (full list,
-    for exports/etc) and the Tickets screen's paginated query."""
+    for exports/etc) and the Tickets screen's paginated query.
+    `assigned_to` (a user id, for "My Incidents") and `unassigned` (for
+    "Unassigned Incidents") are mutually exclusive; callers pick one."""
     stmt = select(Ticket).options(selectinload(Ticket.asset)).order_by(Ticket.created_at.desc())
     if ticket_type:
         stmt = stmt.where(Ticket.ticket_type == ticket_type)
     if status:
         stmt = stmt.where(Ticket.status == status)
+    if unassigned:
+        stmt = stmt.where(Ticket.assignee_user_id.is_(None))
+    elif assigned_to is not None:
+        stmt = stmt.where(Ticket.assignee_user_id == assigned_to)
     return stmt
 
 
@@ -106,6 +126,8 @@ async def get_ticket(db: AsyncSession, ticket_id: int) -> Ticket | None:
             selectinload(Ticket.source_correlation_rule),
             selectinload(Ticket.comments),
             selectinload(Ticket.status_changes),
+            selectinload(Ticket.assignment_changes),
+            selectinload(Ticket.asset_changes),
             selectinload(Ticket.rule_triggers),
         )
     )
@@ -155,6 +177,46 @@ async def update_status(
     )
     await db.commit()
     return True
+
+
+async def update_assignee(
+    db: AsyncSession, ticket: Ticket, new_assignee_user_id: int | None, *, changed_by_user_id: int | None = None
+) -> None:
+    """A no-op (no duplicate log entry) if new_assignee_user_id already
+    equals the current assignee -- mirrors update_status's same guard."""
+    if new_assignee_user_id == ticket.assignee_user_id:
+        return
+    old_assignee_user_id = ticket.assignee_user_id
+    ticket.assignee_user_id = new_assignee_user_id
+    db.add(
+        TicketAssignmentChange(
+            ticket_id=ticket.id,
+            changed_by_user_id=changed_by_user_id,
+            from_assignee_user_id=old_assignee_user_id,
+            to_assignee_user_id=new_assignee_user_id,
+        )
+    )
+    await db.commit()
+
+
+async def update_asset(
+    db: AsyncSession, ticket: Ticket, new_asset_id: int | None, *, changed_by_user_id: int | None = None
+) -> None:
+    """A no-op (no duplicate log entry) if new_asset_id already equals the
+    current asset -- mirrors update_assignee's same guard."""
+    if new_asset_id == ticket.asset_id:
+        return
+    old_asset_id = ticket.asset_id
+    ticket.asset_id = new_asset_id
+    db.add(
+        TicketAssetChange(
+            ticket_id=ticket.id,
+            changed_by_user_id=changed_by_user_id,
+            from_asset_id=old_asset_id,
+            to_asset_id=new_asset_id,
+        )
+    )
+    await db.commit()
 
 
 async def get_event(db: AsyncSession, event_id: int) -> SyslogEvent | None:

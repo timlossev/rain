@@ -116,7 +116,7 @@
         </div>
       </div>
     </header>
-    <main class="content">
+    <main class="content {% block content_class %}{% endblock %}">
       {% if request.query_params.get('ok') %}<div class="flash flash-ok">Saved.</div>{% endif %}
       {% if request.query_params.get('error') %}<div class="flash flash-error">{{ request.query_params.get('error') }}</div>{% endif %}
       {% block content %}{% endblock %}

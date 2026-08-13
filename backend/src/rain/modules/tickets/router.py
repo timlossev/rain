@@ -15,6 +15,7 @@ from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, 
 from rain.db.base import control_session
 from rain.db.control_models import User
 from rain.db.tenant_models import (
+    Asset,
     CorrelationRule,
     NotificationChannel,
     PlatformEventAction,
@@ -42,16 +43,23 @@ async def list_tickets(
     request: Request,
     ticket_type: str | None = None,
     ticket_status: str | None = None,
+    assigned: str | None = None,  # "me" | "unassigned" | None
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    stmt = service.ticket_list_stmt(ticket_type=ticket_type, status=ticket_status)
+    stmt = service.ticket_list_stmt(
+        ticket_type=ticket_type,
+        status=ticket_status,
+        assigned_to=ctx.user.id if assigned == "me" else None,
+        unassigned=assigned == "unassigned",
+    )
     ticket_page = await paginate(tenant_db, stmt, page=page)
     statuses = await service.list_statuses(tenant_db)
     status_colors = {s.key: s.color for s in statuses}
+    user_names = await _user_names({t.assignee_user_id for t in ticket_page.items})
     return templates.TemplateResponse(
         request,
         "tickets/list.html",
@@ -64,6 +72,8 @@ async def list_tickets(
             "status_colors": status_colors,
             "selected_type": ticket_type,
             "selected_status": ticket_status,
+            "selected_assigned": assigned,
+            "user_names": user_names,
         },
     )
 
@@ -79,16 +89,17 @@ async def new_ticket_form(
 ):
     nav = await build_nav_context(ctx)
     event = await service.get_event(tenant_db, source_event_id) if source_event_id else None
-    assets = await asset_service.list_assets(tenant_db)
 
     prefill_title = f"{event.program or event.host or 'Event'}: {event.message[:120]}" if event else ""
     prefill_description = event.message if event else ""
     suggested_asset_id = None
+    suggested_asset_name = ""
     if event is not None and event.host:
-        for asset in assets:
-            if asset.external_id == event.host:
-                suggested_asset_id = asset.id
-                break
+        result = await tenant_db.execute(select(Asset).where(Asset.external_id == event.host).limit(1))
+        suggested_asset = result.scalar_one_or_none()
+        if suggested_asset is not None:
+            suggested_asset_id = suggested_asset.id
+            suggested_asset_name = suggested_asset.name
 
     return templates.TemplateResponse(
         request,
@@ -98,12 +109,12 @@ async def new_ticket_form(
             "ctx": ctx,
             "ticket_types": TICKET_TYPES,
             "severities": SEVERITIES,
-            "assets": assets,
             "selected_type": ticket_type,
             "source_event_id": source_event_id,
             "prefill_title": prefill_title,
             "prefill_description": prefill_description,
             "suggested_asset_id": suggested_asset_id,
+            "suggested_asset_name": suggested_asset_name,
         },
     )
 
@@ -116,6 +127,7 @@ async def create_ticket(
     severity: str = Form("medium"),
     asset_id: str = Form(""),
     source_event_id: str = Form(""),
+    assignee_user_id: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
@@ -132,9 +144,99 @@ async def create_ticket(
         severity=severity,
         asset_id=int(asset_id) if asset_id else None,
         source_event_id=int(source_event_id) if source_event_id else None,
+        assignee_user_id=int(assignee_user_id) if assignee_user_id else None,
         reporter_user_id=ctx.user.id,
     )
     return RedirectResponse(f"/tickets/{ticket.id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/users/search")
+async def search_assignable_users(
+    q: str = "",
+    ctx: RequestContext = Depends(get_request_context),
+    _: CurrentUser = Depends(require_login),
+):
+    """Backs the assignee predictive-search field on the ticket form/detail
+    page (same interaction shape as Quick Navigation, but this list can't be
+    pre-rendered into the page like the nav tree is -- it's a live query
+    over every user who could plausibly be assigned: this tenant's client
+    users, plus internal admins, who aren't tenant-scoped)."""
+    q = q.strip()
+    if not ctx.active_tenant or len(q) < 2:
+        return []
+    async with control_session() as session:
+        stmt = (
+            select(User)
+            .where(
+                User.is_active.is_(True),
+                (User.tenant_id == ctx.active_tenant.id) | (User.role_key == "internal_admin"),
+                (User.display_name.ilike(f"%{q}%")) | (User.email.ilike(f"%{q}%")),
+            )
+            .order_by(User.display_name)
+            .limit(8)
+        )
+        result = await session.execute(stmt)
+        return [{"id": u.id, "label": f"{u.display_name} ({u.email})"} for u in result.scalars()]
+
+
+@router.post("/{ticket_id:int}/assign")
+async def assign_ticket(
+    ticket_id: int,
+    assignee_user_id: str = Form(""),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is not None:
+        await service.update_assignee(
+            tenant_db,
+            ticket,
+            int(assignee_user_id) if assignee_user_id else None,
+            changed_by_user_id=ctx.user.id,
+        )
+    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/assets/search")
+async def search_tickets_assets(
+    q: str = "",
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Backs the affected-asset predictive-search field on the ticket
+    form/detail page -- same shape as search_assignable_users above, but
+    assets are already tenant_db-scoped so there's no cross-schema query."""
+    q = q.strip()
+    if len(q) < 2:
+        return []
+    stmt = (
+        select(Asset)
+        .where((Asset.name.ilike(f"%{q}%")) | (Asset.external_id.ilike(f"%{q}%")))
+        .order_by(Asset.name)
+        .limit(8)
+    )
+    result = await tenant_db.execute(stmt)
+    return [{"id": a.id, "label": f"{a.name} ({a.external_id})" if a.external_id else a.name} for a in result.scalars()]
+
+
+@router.post("/{ticket_id:int}/asset")
+async def set_ticket_asset(
+    ticket_id: int,
+    asset_id: str = Form(""),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is not None:
+        await service.update_asset(
+            tenant_db,
+            ticket,
+            int(asset_id) if asset_id else None,
+            changed_by_user_id=ctx.user.id,
+        )
+    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 async def _user_names(user_ids: set[int | None]) -> dict[int, str]:
@@ -152,15 +254,44 @@ async def _user_names(user_ids: set[int | None]) -> dict[int, str]:
 
 
 def _build_activity(ticket: Ticket) -> list[dict]:
-    """Comments and status changes interleaved into one chronological feed
-    ("Activity"), each tagged with its kind so the caller (screen or PDF)
-    can render them differently. Shared so the PDF export shows the same
-    unified feed as the ticket detail screen instead of drifting apart."""
+    """Comments, status changes, assignment changes, and asset changes
+    interleaved into one chronological feed ("Activity"), each tagged with
+    its kind so the caller (screen or PDF) can render them differently.
+    Shared so the PDF export shows the same unified feed as the ticket
+    detail screen instead of drifting apart."""
     return sorted(
         [{"kind": "comment", "at": c.created_at, "item": c} for c in ticket.comments]
-        + [{"kind": "status_change", "at": sc.created_at, "item": sc} for sc in ticket.status_changes],
+        + [{"kind": "status_change", "at": sc.created_at, "item": sc} for sc in ticket.status_changes]
+        + [{"kind": "assignment_change", "at": ac.created_at, "item": ac} for ac in ticket.assignment_changes]
+        + [{"kind": "asset_change", "at": ac.created_at, "item": ac} for ac in ticket.asset_changes],
         key=lambda entry: entry["at"] or datetime.min.replace(tzinfo=timezone.utc),
     )
+
+
+def _assignment_change_ids(ticket: Ticket) -> set[int | None]:
+    ids: set[int | None] = set()
+    for ac in ticket.assignment_changes:
+        ids |= {ac.changed_by_user_id, ac.from_assignee_user_id, ac.to_assignee_user_id}
+    return ids
+
+
+async def _asset_names(tenant_db: AsyncSession, asset_ids: set[int | None]) -> dict[int, str]:
+    """Batched name lookup for the asset picker's initial label and the
+    activity feed's asset-change entries -- same shape as _user_names, but
+    assets live in this same tenant_db session (no cross-schema query
+    needed, unlike users)."""
+    ids = {i for i in asset_ids if i is not None}
+    if not ids:
+        return {}
+    result = await tenant_db.execute(select(Asset).where(Asset.id.in_(ids)))
+    return {a.id: a.name for a in result.scalars()}
+
+
+def _asset_change_ids(ticket: Ticket) -> set[int | None]:
+    ids: set[int | None] = set()
+    for ac in ticket.asset_changes:
+        ids |= {ac.from_asset_id, ac.to_asset_id}
+    return ids
 
 
 @router.get("/{ticket_id:int}", response_class=HTMLResponse)
@@ -186,7 +317,10 @@ async def ticket_detail(
         {ticket.reporter_user_id, ticket.assignee_user_id}
         | {c.author_user_id for c in ticket.comments}
         | {sc.changed_by_user_id for sc in ticket.status_changes}
+        | _assignment_change_ids(ticket)
+        | {ac.changed_by_user_id for ac in ticket.asset_changes}
     )
+    asset_names = await _asset_names(tenant_db, {ticket.asset_id} | _asset_change_ids(ticket))
 
     activity = _build_activity(ticket)
 
@@ -201,6 +335,7 @@ async def ticket_detail(
             "status_labels": status_labels,
             "document_links": document_links,
             "user_names": user_names,
+            "asset_names": asset_names,
             "activity": activity,
         },
     )
@@ -219,16 +354,20 @@ async def ticket_pdf(
     statuses = await service.list_statuses(tenant_db)
     status_labels = {s.key: s.label for s in statuses}
     user_names = await _user_names(
-        {ticket.reporter_user_id}
+        {ticket.reporter_user_id, ticket.assignee_user_id}
         | {c.author_user_id for c in ticket.comments}
         | {sc.changed_by_user_id for sc in ticket.status_changes}
+        | _assignment_change_ids(ticket)
+        | {ac.changed_by_user_id for ac in ticket.asset_changes}
     )
+    asset_names = await _asset_names(tenant_db, {ticket.asset_id} | _asset_change_ids(ticket))
     pdf_bytes = render_pdf(
         "pdf/ticket.html",
         {
             "ticket": ticket,
             "document_links": document_links,
             "user_names": user_names,
+            "asset_names": asset_names,
             "status_labels": status_labels,
             "activity": _build_activity(ticket),
             "doc_kind": "Ticket",

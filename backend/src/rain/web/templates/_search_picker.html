@@ -1,0 +1,23 @@
+{# Predictive search field for picking a related record by id -- same
+   interaction shape as the sidebar's Quick Navigation search, but backed by
+   a live endpoint (GET <endpoint>?q=...) instead of a pre-rendered index,
+   since the full list of candidates can't be baked into every page the way
+   the small nav tree is. The endpoint must return JSON: [{"id": ..., "label": ...}].
+   Renders a text input (what you type/see) + a hidden input (the actual
+   form value, the picked id) kept in sync by app.js's [data-user-picker]
+   handler (name kept from its first use, ticket assignee -- the behavior
+   is identical for any endpoint of this shape, e.g. the affected-asset
+   picker).
+
+   Usage:
+     {% import "_search_picker.html" as picker %}
+     {{ picker.search_picker("assignee_user_id", "/tickets/users/search", label="Assignee", initial_value=ticket.assignee_user_id, initial_label=user_names.get(ticket.assignee_user_id, "")) }}
+#}
+{% macro search_picker(name, endpoint, label=None, initial_value=None, initial_label="", placeholder="Search...") %}
+<div class="field user-picker" data-user-picker data-user-picker-endpoint="{{ endpoint }}" style="margin-bottom:0;">
+  {% if label %}<label for="up-{{ name }}">{{ label }}</label>{% endif %}
+  <input type="text" id="up-{{ name }}" class="user-picker-input" data-user-picker-input autocomplete="off" placeholder="{{ placeholder }}" value="{{ initial_label or '' }}">
+  <input type="hidden" name="{{ name }}" data-user-picker-value value="{{ initial_value or '' }}">
+  <div class="user-picker-results" data-user-picker-results hidden></div>
+</div>
+{% endmacro %}
