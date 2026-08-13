@@ -377,8 +377,6 @@ p { margin: 0 0 1em; }
 .btn-danger { color: var(--danger); }
 .btn-danger:hover { border-color: var(--danger); }
 .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
-.btn-link { all: unset; cursor: pointer; color: var(--sidebar-text-dim); font-size: 0.85rem; }
-.btn-link:hover { color: #fff; }
 
 label { display: block; font-size: 0.83rem; font-weight: 600; margin-bottom: 4px; color: var(--text-muted); }
 .field { margin-bottom: 16px; }
@@ -425,6 +423,28 @@ form.inline { display: inline; }
 .card + .card { margin-top: 16px; }
 .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; }
 .panel-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
+/* List-page filter toolbar (Type/Status selects + My/Unassigned/All quick
+   filters) -- was two plain, visually disconnected rows (a bare <form>,
+   then a bare <div> of buttons) with no shared alignment or grouping.
+   One tinted, bordered band reads as a single toolbar instead. */
+.filter-bar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.filter-bar-selects { display: flex; flex-wrap: wrap; gap: 14px; margin: 0; }
+.filter-bar-selects .field { min-width: 160px; }
+.filter-bar-divider { width: 1px; align-self: stretch; min-height: 34px; background: var(--border); }
+.filter-bar-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+@media (max-width: 720px) {
+  .filter-bar-divider { display: none; }
+}
 .muted { color: var(--text-muted); }
 
 /* ---------- calendar ---------- */

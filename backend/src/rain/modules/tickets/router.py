@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
+from rain.core.user_names import resolve_user_names
 from rain.db.base import control_session
 from rain.db.control_models import User
 from rain.db.tenant_models import (
@@ -60,7 +61,7 @@ async def list_tickets(
     ticket_page = await paginate(tenant_db, stmt, page=page)
     statuses = await service.list_statuses(tenant_db)
     status_colors = {s.key: s.color for s in statuses}
-    user_names = await _user_names({t.assignee_user_id for t in ticket_page.items})
+    user_names = await resolve_user_names({t.assignee_user_id for t in ticket_page.items})
     return templates.TemplateResponse(
         request,
         "tickets/list.html",
@@ -301,20 +302,6 @@ async def decide_approval(
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
-async def _user_names(user_ids: set[int | None]) -> dict[int, str]:
-    """Ticket comments/status changes/reporter fields store a plain
-    control.users id (cross-schema, app-validated -- see tenant_models'
-    module docstring), so resolving them to a display name takes a
-    separate control-schema query. Batched into one lookup per page render
-    rather than N+1 per activity-feed entry."""
-    ids = {i for i in user_ids if i is not None}
-    if not ids:
-        return {}
-    async with control_session() as session:
-        result = await session.execute(select(User).where(User.id.in_(ids)))
-        return {u.id: u.display_name for u in result.scalars()}
-
-
 def _build_activity(ticket: Ticket) -> list[dict]:
     """Comments, status changes, assignment changes, asset changes, and
     (change tickets only) approval decisions interleaved into one
@@ -346,9 +333,9 @@ def _assignment_change_ids(ticket: Ticket) -> set[int | None]:
 
 async def _asset_names(tenant_db: AsyncSession, asset_ids: set[int | None]) -> dict[int, str]:
     """Batched name lookup for the asset picker's initial label and the
-    activity feed's asset-change entries -- same shape as _user_names, but
-    assets live in this same tenant_db session (no cross-schema query
-    needed, unlike users)."""
+    activity feed's asset-change entries -- same shape as
+    rain.core.user_names.resolve_user_names, but assets live in this same
+    tenant_db session (no cross-schema query needed, unlike users)."""
     ids = {i for i in asset_ids if i is not None}
     if not ids:
         return {}
@@ -391,7 +378,7 @@ async def ticket_detail(
             groups_result = await tenant_db.execute(select(Group).where(Group.id.in_(group_ids)))
             group_names = {g.id: g.name for g in groups_result.scalars()}
 
-    user_names = await _user_names(
+    user_names = await resolve_user_names(
         {ticket.reporter_user_id, ticket.assignee_user_id}
         | {c.author_user_id for c in ticket.comments}
         | {sc.changed_by_user_id for sc in ticket.status_changes}
@@ -448,7 +435,7 @@ async def ticket_pdf(
     document_links = await document_service.links_for(tenant_db, "ticket", ticket_id)
     statuses = await service.list_statuses(tenant_db)
     status_labels = {s.key: s.label for s in statuses}
-    user_names = await _user_names(
+    user_names = await resolve_user_names(
         {ticket.reporter_user_id, ticket.assignee_user_id}
         | {c.author_user_id for c in ticket.comments}
         | {sc.changed_by_user_id for sc in ticket.status_changes}

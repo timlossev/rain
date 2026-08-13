@@ -1,16 +1,14 @@
-"""Auth providers. `authenticate_local` (password hash check) and
-`authenticate_ldap` (live directory bind) are the two functional providers;
-`authenticate_user` dispatches between them by the user's own
-`auth_source`, set once at creation and not meant to change afterwards.
-OIDC/SAML would each add a sibling `authenticate_<provider>()` here --
-those rows already exist too (seeded disabled by the initial migration),
-ready for a later release to implement.
-
-Local sign-in is unaffected by any of this: a "local" user still just
-gets their password checked, exactly as before LDAP existed. Only a
-user whose auth_source is "ldap" (created by the LDAP sync, see
-rain.modules.auth.ldap_sync) is routed to a live bind instead -- they
-never have a usable password_hash to check in the first place."""
+"""Auth providers. `authenticate_user` is the single entry point
+login_submit calls -- it looks the user up once, then dispatches on their
+own `auth_source` (set once at creation, not meant to change afterwards):
+a "local" user gets the same Argon2 password-hash check as before LDAP
+ever existed; a user whose auth_source is "ldap" (created by the LDAP
+sync, see rain.modules.auth.ldap_sync) is routed to `authenticate_ldap`,
+a live directory bind, instead -- they never have a usable password_hash
+to check in the first place. OIDC/SAML would each add a sibling
+`authenticate_<provider>()` here plus a branch in the dispatch -- those
+rows already exist too (seeded disabled by the initial migration), ready
+for a later release to implement."""
 from __future__ import annotations
 
 import asyncio
@@ -22,14 +20,6 @@ from rain.core import ldap_client
 from rain.core.security import verify_password
 from rain.db.control_models import User
 from rain.modules.auth.ldap_config import get_ldap_config
-
-
-async def authenticate_local(session: AsyncSession, email: str, password: str) -> User | None:
-    result = await session.execute(select(User).where(User.email == email.strip().lower(), User.is_active.is_(True)))
-    user = result.scalar_one_or_none()
-    if user is None or user.password_hash is None or not verify_password(password, user.password_hash):
-        return None
-    return user
 
 
 async def authenticate_ldap(session: AsyncSession, user: User, password: str) -> bool:

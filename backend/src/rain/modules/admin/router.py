@@ -20,6 +20,7 @@ from rain.core.pagination import paginate
 from rain.core.rbac import require_internal_admin, require_login
 from rain.core.security import hash_password
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
+from rain.core.user_names import resolve_user_names
 from rain.db.base import control_session
 from rain.db.control_models import AuthProviderConfig, Session as SessionRow, SyslogSourceMap, Tenant, User
 from rain.db.provisioning import InvalidSlugError, provision_tenant
@@ -583,17 +584,6 @@ async def notification_channels_delete(
 # assignment target for an approval flow step -- see approval-flows below.
 
 
-async def _group_member_names(user_ids: set[int]) -> dict[int, str]:
-    """Same batched cross-schema lookup as rain.modules.tickets.router's
-    _user_names -- kept as its own copy rather than importing a "_"-prefixed
-    name across modules."""
-    if not user_ids:
-        return {}
-    async with control_session() as session:
-        result = await session.execute(select(User).where(User.id.in_(user_ids)))
-        return {u.id: u.display_name for u in result.scalars()}
-
-
 @router.get("/groups", response_class=HTMLResponse)
 async def groups_list(
     request: Request,
@@ -655,7 +645,7 @@ async def group_detail(
     group = await tenant_db.get(Group, group_id, options=[selectinload(Group.members)])
     if group is None:
         return RedirectResponse("/admin/groups", status_code=status.HTTP_303_SEE_OTHER)
-    member_names = await _group_member_names({m.user_id for m in group.members})
+    member_names = await resolve_user_names({m.user_id for m in group.members})
     return templates.TemplateResponse(
         request,
         "admin/group_detail.html",
@@ -720,7 +710,7 @@ async def approval_flows_list(
     groups_result = await tenant_db.execute(select(Group).order_by(Group.name))
     group_names = {g.id: g.name for g in groups_result.scalars()}
     user_ids = {s.approver_user_id for f in flow_page.items for s in f.steps if s.approver_user_id}
-    step_user_names = await _group_member_names(user_ids)
+    step_user_names = await resolve_user_names(user_ids)
     return templates.TemplateResponse(
         request,
         "admin/approval_flows.html",
