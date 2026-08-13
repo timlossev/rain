@@ -16,7 +16,7 @@ from rain.core.security import (
 from rain.core.tenancy import CurrentUser, get_current_user_optional
 from rain.db.base import control_session
 from rain.db.control_models import Session as SessionRow, Tenant, User
-from rain.modules.auth.provider import authenticate_local
+from rain.modules.auth.provider import authenticate_user
 from rain.web.templating import templates
 
 router = APIRouter()
@@ -71,7 +71,7 @@ async def login_submit(
     next: str = Form("/"),
 ):
     async with control_session() as session:
-        user = await authenticate_local(session, email, password)
+        user = await authenticate_user(session, email, password)
         if user is None:
             return templates.TemplateResponse(
                 request, "login.html", {"error": "Invalid email or password.", "next": next}, status_code=400

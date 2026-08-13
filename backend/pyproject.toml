@@ -25,6 +25,7 @@ dependencies = [
     "xhtml2pdf>=0.2.16,<0.3",
     "openpyxl>=3.1,<4",
     "markdown>=3.7,<4",
+    "ldap3>=2.9,<3",
 ]
 
 [project.optional-dependencies]

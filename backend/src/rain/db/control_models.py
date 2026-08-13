@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -58,10 +58,22 @@ class User(ControlBase):
         ForeignKey(f"{CONTROL_SCHEMA}.tenants.id", ondelete="CASCADE"), nullable=True, index=True
     )
     email: Mapped[str] = mapped_column(String(320), index=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
+    # NULL for an LDAP-sourced user (auth_source == "ldap") -- that user
+    # never gets a local password at all; every login binds live against
+    # the directory instead (see rain.modules.auth.provider). Required for
+    # a "local" user, enforced at the app layer where such a user is
+    # created, same trade-off this codebase already makes elsewhere for
+    # conditionally-required columns.
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role_key: Mapped[str] = mapped_column(ForeignKey(f"{CONTROL_SCHEMA}.roles.key"))
     display_name: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # local | ldap. Set once at creation (by the admin "New user" form for
+    # local, by the LDAP sync for ldap) and not meant to change afterwards.
+    auth_source: Mapped[str] = mapped_column(String(15), default="local", server_default="local")
+    # The user's full distinguished name in the directory -- only set for
+    # auth_source == "ldap", used to bind-authenticate them at login.
+    ldap_dn: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     tenant: Mapped[Tenant | None] = relationship()
@@ -118,7 +130,15 @@ class AuthProviderConfig(ControlBase):
     provider_type: Mapped[str] = mapped_column(String(31))
     name: Mapped[str] = mapped_column(String(255))
     config: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    # Fernet-encrypted JSON (rain.core.crypto), same as
+    # tenant_models.SyncConnection.config_encrypted -- where an actual
+    # secret (the LDAP bind password) needs to live, unlike the plain
+    # `config` column above which predates having any provider with a
+    # real secret to store.
+    config_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    last_synced_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_sync_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class SyslogSourceMap(ControlBase):

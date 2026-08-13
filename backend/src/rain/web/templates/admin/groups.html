@@ -10,21 +10,22 @@
 
 <div class="card">
   <table>
-    <thead><tr><th>Name</th><th>Description</th><th>Members</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Description</th><th>Members</th><th>Source</th><th></th></tr></thead>
     <tbody>
       {% for g in page.items %}
       <tr>
         <td><a href="/admin/groups/{{ g.id }}">{{ g.name }}</a></td>
         <td class="muted">{{ g.description or "-" }}</td>
         <td class="muted">{{ member_counts.get(g.id, 0) }}</td>
+        <td>{% if g.source == "ldap" %}<span class="badge">LDAP</span>{% else %}<span class="muted">local</span>{% endif %}</td>
         <td class="actions">
-          <form class="inline" method="post" action="/admin/groups/{{ g.id }}/delete" data-confirm="Delete group '{{ g.name }}'? Any approval flow steps assigned to it will lose that assignment.">
+          <form class="inline" method="post" action="/admin/groups/{{ g.id }}/delete" data-confirm="Delete group '{{ g.name }}'? Any approval flow steps assigned to it will lose that assignment.{% if g.source == 'ldap' %} It will also come back on the next LDAP sync unless it's removed from the directory too.{% endif %}">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="4" class="muted">No groups yet.</td></tr>
+      <tr><td colspan="5" class="muted">No groups yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

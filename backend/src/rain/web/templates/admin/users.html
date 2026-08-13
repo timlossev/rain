@@ -11,7 +11,7 @@
 
 <div class="card">
   <table>
-    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Tenant</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Tenant</th><th>Auth</th><th>Status</th><th></th></tr></thead>
     <tbody>
       {% for u in page.items %}
       <tr>
@@ -19,6 +19,7 @@
         <td>{{ u.email }}</td>
         <td><span class="badge">{{ u.role_key }}</span></td>
         <td class="muted">{{ u.tenant.name if u.tenant else "-" }}</td>
+        <td>{% if u.auth_source == "ldap" %}<span class="badge">LDAP</span>{% else %}<span class="muted">local</span>{% endif %}</td>
         <td>{% if u.is_active %}<span class="badge badge-accent">active</span>{% else %}<span class="badge">disabled</span>{% endif %}</td>
         <td class="actions">
           <a class="btn btn-sm" href="/admin/users/{{ u.id }}/edit">Edit</a>
@@ -30,7 +31,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted">No users yet.</td></tr>
+      <tr><td colspan="7" class="muted">No users yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

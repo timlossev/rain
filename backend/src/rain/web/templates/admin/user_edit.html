@@ -14,6 +14,13 @@
       <input type="text" value="{{ edit_user.email }}" disabled>
       <div class="field-hint">Email is permanent -- deactivate and create a new account to change it.</div>
     </div>
+    {% if edit_user.auth_source == "ldap" %}
+    <div class="field">
+      <label>Sign-in</label>
+      <input type="text" value="LDAP ({{ edit_user.ldap_dn }})" disabled>
+      <div class="field-hint">Managed by the LDAP sync (Admin &gt; Auth Providers &gt; LDAP) -- name, tenant, and active status are overwritten on the next sync run if they still differ from the directory. Role isn't touched by sync, so a manual change here sticks.</div>
+    </div>
+    {% endif %}
     <div class="field">
       <label for="display_name">Full name</label>
       <input type="text" id="display_name" name="display_name" value="{{ edit_user.display_name }}" required>
@@ -36,10 +43,12 @@
         </select>
       </div>
     </div>
+    {% if edit_user.auth_source != "ldap" %}
     <div class="field">
       <label for="password">Reset password</label>
       <input type="password" id="password" name="password" minlength="10" placeholder="Leave blank to keep current password">
     </div>
+    {% endif %}
     <div class="field">
       <label class="checkbox-row"><input type="checkbox" name="is_active" {% if edit_user.is_active %}checked{% endif %}> Active (unchecked = deactivated, can't sign in)</label>
     </div>

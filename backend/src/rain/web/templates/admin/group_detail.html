@@ -10,6 +10,9 @@
 <div class="card">
   <div class="card-title">{{ group.name }}</div>
   {% if group.description %}<p class="muted">{{ group.description }}</p>{% endif %}
+  {% if group.source == "ldap" %}
+  <p class="muted">Synced from LDAP ({{ group.ldap_dn }}). Membership is overwritten on every sync run to match the directory -- a member added or removed here only sticks until the next one.</p>
+  {% endif %}
 
   <table>
     <thead><tr><th>Member</th><th></th></tr></thead>

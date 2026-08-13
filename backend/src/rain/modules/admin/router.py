@@ -1,8 +1,11 @@
-"""Platform-level administration: branding, tenants, users/roles, and a
-read-only view of auth provider placeholders. internal_admin only, except
-the tenant-switch action which any internal_admin uses to pick their
-active tenant (client users are pinned to one and never see this)."""
+"""Platform-level administration: branding, tenants, users/roles, and
+auth provider configuration. internal_admin only, except the
+tenant-switch action which any internal_admin uses to pick their active
+tenant (client users are pinned to one and never see this)."""
 from __future__ import annotations
+
+import asyncio
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -10,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from rain.core import ldap_client
 from rain.core.config_store import FONT_CHOICES, config_store
 from rain.core.crypto import encrypt_json
 from rain.core.pagination import paginate
@@ -20,6 +24,8 @@ from rain.db.base import control_session
 from rain.db.control_models import AuthProviderConfig, Session as SessionRow, SyslogSourceMap, Tenant, User
 from rain.db.provisioning import InvalidSlugError, provision_tenant
 from rain.db.tenant_models import ApprovalFlow, ApprovalFlowStep, Group, GroupMembership, NotificationChannel, TicketStatus
+from rain.modules.auth.ldap_config import get_provider_row, get_raw_config, save_ldap_config
+from rain.modules.auth.ldap_sync import run_ldap_sync
 from rain.modules.tickets.schemas import CHANNEL_TYPES
 from rain.settings import get_settings
 from rain.web.nav import build_nav_context
@@ -347,6 +353,104 @@ async def auth_providers_list(
             (await session.execute(select(AuthProviderConfig).order_by(AuthProviderConfig.id))).scalars()
         )
     return templates.TemplateResponse(request, "admin/auth_providers.html", {**nav, "ctx": ctx, "providers": providers})
+
+
+@router.get("/auth-providers/ldap", response_class=HTMLResponse)
+async def ldap_config_form(
+    request: Request,
+    ctx: RequestContext = Depends(get_request_context),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    nav = await build_nav_context(ctx)
+    async with control_session() as session:
+        row = await get_provider_row(session)
+        config = await get_raw_config(session)
+        tenants = list(
+            (await session.execute(select(Tenant).where(Tenant.is_active.is_(True)).order_by(Tenant.name))).scalars()
+        )
+    return templates.TemplateResponse(
+        request,
+        "admin/auth_provider_ldap.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "config": config,
+            "tenants": tenants,
+            "is_enabled": row.is_enabled if row else False,
+            "last_synced_at": row.last_synced_at if row else None,
+            "last_sync_summary": row.last_sync_summary if row else None,
+            "test_result": request.query_params.get("test_result"),
+        },
+    )
+
+
+@router.post("/auth-providers/ldap")
+async def ldap_config_save(
+    server_uri: str = Form(...),
+    use_starttls: bool = Form(False),
+    bind_dn: str = Form(...),
+    bind_password: str = Form(""),
+    user_base_dn: str = Form(...),
+    user_filter: str = Form(...),
+    user_email_attr: str = Form(...),
+    user_name_attr: str = Form(...),
+    group_base_dn: str = Form(...),
+    group_filter: str = Form(...),
+    group_name_attr: str = Form(...),
+    group_member_attr: str = Form(...),
+    target_tenant_id: str = Form(...),
+    sync_interval_minutes: int = Form(60),
+    is_enabled: bool = Form(False),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    async with control_session() as session:
+        # Blank bind_password on the form means "leave the saved one
+        # alone" -- the form never round-trips the real secret back into
+        # the page (see the template), so an empty submit isn't "clear it".
+        existing = await get_raw_config(session)
+        await save_ldap_config(
+            session,
+            is_enabled=is_enabled,
+            server_uri=server_uri.strip(),
+            use_starttls=use_starttls,
+            bind_dn=bind_dn.strip(),
+            bind_password=bind_password.strip() or existing.get("bind_password", ""),
+            user_base_dn=user_base_dn.strip(),
+            user_filter=user_filter.strip(),
+            user_email_attr=user_email_attr.strip(),
+            user_name_attr=user_name_attr.strip(),
+            group_base_dn=group_base_dn.strip(),
+            group_filter=group_filter.strip(),
+            group_name_attr=group_name_attr.strip(),
+            group_member_attr=group_member_attr.strip(),
+            target_tenant_id=int(target_tenant_id),
+            sync_interval_minutes=max(5, sync_interval_minutes),
+        )
+    return RedirectResponse("/admin/auth-providers/ldap?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/auth-providers/ldap/test")
+async def ldap_config_test(_: CurrentUser = Depends(require_internal_admin)):
+    async with control_session() as session:
+        config = await get_raw_config(session)
+    try:
+        await asyncio.to_thread(
+            ldap_client.test_bind,
+            config["server_uri"],
+            config["bind_dn"],
+            config["bind_password"],
+            config["use_starttls"],
+        )
+        msg = "ok:Connection and bind succeeded."
+    except Exception as exc:
+        msg = f"error:{exc}"
+    return RedirectResponse(f"/admin/auth-providers/ldap?test_result={quote(msg)}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/auth-providers/ldap/sync")
+async def ldap_config_sync_now(_: CurrentUser = Depends(require_internal_admin)):
+    await run_ldap_sync()
+    return RedirectResponse("/admin/auth-providers/ldap?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
 # --------------------------------------------------------- ticket statuses

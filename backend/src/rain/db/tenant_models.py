@@ -296,6 +296,12 @@ class Group(TenantBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # local | ldap -- an LDAP sync run only ever creates/updates/deletes
+    # groups it owns (source == "ldap" and matching ldap_dn), so a
+    # manually created group is never touched by it even if the names
+    # happen to collide.
+    source: Mapped[str] = mapped_column(String(15), default="local", server_default="local")
+    ldap_dn: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     members: Mapped[list["GroupMembership"]] = relationship(back_populates="group", cascade="all, delete-orphan")

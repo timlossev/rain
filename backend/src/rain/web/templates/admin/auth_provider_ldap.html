@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}LDAP - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Connect one LDAP/Active Directory server. On the configured interval (or on demand, below), RAIN searches it for users and groups and mirrors them into the target tenant you pick here -- synced users never get a local password; every one of their logins binds live against this server instead. Local sign-in for everyone else is unaffected.{% endblock %}
+{% block content_class %}content-full{% endblock %}
+{% block content %}
+<div class="panel-row" style="justify-content:flex-end;">
+  <a class="btn btn-sm" href="/admin/auth-providers">&larr; Auth Providers</a>
+</div>
+
+{% if request.query_params.get('ok') %}<div class="flash flash-ok">Saved.</div>{% endif %}
+{% if test_result %}
+  {% set result_kind, result_msg = test_result.split(':', 1) %}
+  <div class="flash {% if result_kind == 'ok' %}flash-ok{% else %}flash-error{% endif %}">{{ result_msg }}</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-title">Sync status</div>
+  {% if last_synced_at %}
+  <p class="muted">Last synced {{ last_synced_at.strftime("%Y-%m-%d %H:%M UTC") }} &mdash; {{ last_sync_summary }}</p>
+  {% else %}
+  <p class="muted">Never synced yet.</p>
+  {% endif %}
+  <form class="inline" method="post" action="/admin/auth-providers/ldap/test">
+    <button class="btn btn-sm" type="submit">Test connection</button>
+  </form>
+  <form class="inline" method="post" action="/admin/auth-providers/ldap/sync">
+    <button class="btn btn-sm" type="submit">Sync now</button>
+  </form>
+</div>
+
+<div class="card">
+  <form method="post" action="/admin/auth-providers/ldap">
+    <div class="field"><label class="checkbox-row"><input type="checkbox" name="is_enabled" {% if is_enabled %}checked{% endif %}> Enabled -- required for both login binds and the periodic sync to actually run</label></div>
+
+    <h3>Connection</h3>
+    <div class="form-row">
+      <div class="field"><label for="server_uri">Server URI</label><input type="text" id="server_uri" name="server_uri" value="{{ config.server_uri }}" placeholder="ldaps://ldap.example.com:636" required></div>
+      <div class="field" style="flex:0 0 160px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="use_starttls" {% if config.use_starttls %}checked{% endif %}> Use StartTLS</label></div>
+    </div>
+    <div class="field-hint" style="margin:-8px 0 14px;">StartTLS applies to a plain <code>ldap://</code> URI; an <code>ldaps://</code> URI is already encrypted and doesn't need it.</div>
+    <div class="form-row">
+      <div class="field"><label for="bind_dn">Bind DN</label><input type="text" id="bind_dn" name="bind_dn" value="{{ config.bind_dn }}" placeholder="cn=svc-rain,ou=service,dc=example,dc=com" required></div>
+      <div class="field"><label for="bind_password">Bind password</label><input type="password" id="bind_password" name="bind_password" placeholder="{% if config.bind_password %}leave blank to keep current{% else %}required{% endif %}"></div>
+    </div>
+
+    <h3>User sync</h3>
+    <div class="form-row">
+      <div class="field"><label for="user_base_dn">User base DN</label><input type="text" id="user_base_dn" name="user_base_dn" value="{{ config.user_base_dn }}" placeholder="ou=people,dc=example,dc=com" required></div>
+      <div class="field"><label for="user_filter">User filter</label><input type="text" id="user_filter" name="user_filter" value="{{ config.user_filter }}" placeholder="(objectClass=inetOrgPerson)" required></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="user_email_attr">Email attribute</label><input type="text" id="user_email_attr" name="user_email_attr" value="{{ config.user_email_attr }}" required></div>
+      <div class="field"><label for="user_name_attr">Display name attribute</label><input type="text" id="user_name_attr" name="user_name_attr" value="{{ config.user_name_attr }}" required></div>
+    </div>
+
+    <h3>Group sync</h3>
+    <div class="form-row">
+      <div class="field"><label for="group_base_dn">Group base DN</label><input type="text" id="group_base_dn" name="group_base_dn" value="{{ config.group_base_dn }}" placeholder="ou=groups,dc=example,dc=com" required></div>
+      <div class="field"><label for="group_filter">Group filter</label><input type="text" id="group_filter" name="group_filter" value="{{ config.group_filter }}" placeholder="(objectClass=groupOfNames)" required></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="group_name_attr">Group name attribute</label><input type="text" id="group_name_attr" name="group_name_attr" value="{{ config.group_name_attr }}" required></div>
+      <div class="field"><label for="group_member_attr">Group member attribute</label><input type="text" id="group_member_attr" name="group_member_attr" value="{{ config.group_member_attr }}" placeholder="member" required></div>
+      <div class="field-hint" style="flex-basis:100%; margin-top:-8px;">Expected to hold each member's full DN (e.g. <code>groupOfNames</code>'s <code>member</code>, or Active Directory's <code>member</code>) -- a UID-list attribute like <code>memberUid</code> isn't supported.</div>
+    </div>
+
+    <h3>Target &amp; schedule</h3>
+    <div class="form-row">
+      <div class="field">
+        <label for="target_tenant_id">Sync into tenant</label>
+        <select id="target_tenant_id" name="target_tenant_id" required>
+          <option value="">-</option>
+          {% for t in tenants %}
+          <option value="{{ t.id }}" {% if t.id == config.target_tenant_id %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+        <div class="field-hint">Every synced user and group lands in this one tenant, as role "Client". One directory, one tenant -- if you need more than one LDAP-backed tenant, that's a bigger change this page doesn't support yet.</div>
+      </div>
+      <div class="field" style="flex:0 0 160px;"><label for="sync_interval_minutes">Sync every (minutes)</label><input type="number" id="sync_interval_minutes" name="sync_interval_minutes" value="{{ config.sync_interval_minutes }}" min="5"></div>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Save</button>
+  </form>
+</div>
+{% endblock %}
