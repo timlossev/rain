@@ -3,7 +3,7 @@
 **RAIN is a self-hosted IT system of record built for environments that
 can't (or won't) depend on a SaaS vendor** -- air-gapped networks,
 classified or controlled-unclassified enclaves, and any organization that
-needs its asset inventory, incident/vulnerability tickets, and
+needs its asset inventory, incident/vulnerability/change tickets, and
 compliance documentation to live entirely on infrastructure it controls.
 One `docker compose up` stands up the whole stack -- reverse proxy with
 automatic HTTPS, application, background worker, and database -- with no
@@ -27,35 +27,68 @@ JS framework in the browser.
   for a future release)
 
 **Ticketing** -- the primary focus of the platform
+- Three ticket types -- incident, vulnerability, and change -- sharing
+  one record, one activity feed, and one export pipeline
 - A hand-written syslog listener (TCP + UDP, no third-party library)
   turns any syslog-ng-fed event stream into a live event feed
 - **Event Policies**: regex rules that auto-promote a matching syslog
   event into an `INC-xxxxxx` (incident) or `VULN-xxxxxx` (vulnerability)
   ticket, first match wins
-- **Platform Events**: a second, independent reaction layer -- rules
-  that match on ticket creation (title/description regex) and fire one
-  or more actions: notify Slack, notify email, call a webhook with a
-  custom JSON payload, attach a document, or attach an asset. Every
-  active matching rule fires, and every firing is logged to the ticket's
-  activity feed
+- **Correlation Rules**: multi-event, threshold-based promotion --
+  count events matching a pattern within a trailing time window,
+  optionally grouped by host/program (a separate correlation "instance"
+  and ticket per group value), and fire once the count is reached.
+  Evaluated alongside Event Policies, not instead of them
+- **Platform Response Rules**: a third, independent reaction layer --
+  rules that match on ticket creation (title/description regex) and
+  fire one or more actions: notify Slack, notify email, call a webhook
+  with a custom JSON payload, attach a document, or attach an asset.
+  Every active matching rule fires, and every firing is logged to the
+  ticket's activity feed
+- **Change tickets** (`CHG-xxxxxx`): reported directly, or promoted
+  from an existing incident/vulnerability (pre-fills title, description,
+  and asset, and links back to the source). Carries a start/end date
+  window -- shown on the ticket, its PDF export, and as a chip on every
+  day it spans on the tenant calendar -- plus its own approval
+  lifecycle, independent of the generic status stepper: an ordered
+  sequence of steps, each assigned to a group (any one member's
+  approval clears it) or an individual user, enforced server-side, not
+  just hidden in the UI. Flows are fully tenant-defined (Admin >
+  Approval Flows), with one markable as the default applied to new
+  changes
+- **Groups** (Admin > Groups): named, tenant-scoped sets of users --
+  the assignment target for an approval flow step, so a step can name
+  "the CAB" once instead of every current member individually
+- Ticket assignee and affected asset are both editable after creation
+  via a predictive type-ahead search (not a `<select>` that doesn't
+  scale), with every change logged to the activity feed ("user X
+  assigned this to Y", "user X set the affected asset to Z") -- same
+  treatment as status changes
+- "My {Incidents,Vulnerabilities,Changes}" and "Unassigned ..."
+  quick-filter chips on every ticket list view
 - **Tenant-customizable ticket statuses** -- define your own workflow
   (labels, colors, which statuses count as "closed") instead of a fixed
   open/closed enum
-- A merged, chronological activity feed per ticket: comments and status
-  changes, with resolved commenter names, not raw user IDs
+- A merged, chronological activity feed per ticket: comments, status
+  changes, assignee/asset changes, and approval decisions, with
+  resolved names throughout -- including "Event Policy: X" / "Correlation
+  Rule: X" as the reporter on a ticket no human filed
 - Branded PDF export of any ticket, including its full activity history
 - Email/Slack notification channels, configured once and reused by any
-  number of Platform Event rules
+  number of Platform Response Rules
 
 **Calendar**
 - Per-tenant calendar with a server-rendered month-grid visual editor
   (no client-side calendar library)
 - Recurring-entry presets: quarterly, every 6 months, annually, or a
   one-time entry, with an optional end date
+- Change tickets with a start/end window show up automatically as a
+  highlighted chip across every day they span, alongside manual entries
 - **Syslog bridge**: flag an entry to synthesize a syslog event on each
-  due occurrence, so the same Event Policy / Platform Event rule engine
-  that reacts to real syslog traffic can also react to a recurring
-  calendar entry (e.g. auto-file a ticket for a quarterly access review)
+  due occurrence, so the same Event Policy / Platform Response Rule
+  engine that reacts to real syslog traffic can also react to a
+  recurring calendar entry (e.g. auto-file a ticket for a quarterly
+  access review)
 - Standard iCalendar (.ics) export/import, interoperable with Outlook,
   Google Calendar, and Apple Calendar
 - A forward-looking, already-round-tripping hook for attaching a
@@ -77,7 +110,12 @@ JS framework in the browser.
   Admin console for platform- and tenant-level configuration
 - Runtime branding: instance name, accent color, logo upload, and a
   curated, dependency-free font picker -- no CDN font download
-- A resizable, searchable, collapsible tree navigation sidebar
+- A resizable, searchable, collapsible tree navigation sidebar, with a
+  breadcrumb (Menu > Category > Page) and an always-visible "Session
+  for `<tenant>`" indicator in the topbar so which tenant's data is on
+  screen is never a guess
+- A "?" next to every page's heading with a short explanation of what
+  that screen is for, on hover/focus
 - Pagination on every list screen in the app
 
 See [`docs/architecture.md`](docs/architecture.md) for the detailed
