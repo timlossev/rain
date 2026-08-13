@@ -98,18 +98,38 @@ async def create_ticket(
     return ticket
 
 
+#: Column headers a list view is allowed to sort by, keyed by the query
+#: string value the template's links use. Deliberately just real Ticket
+#: columns -- Assignee/Asset would need a name-resolving join to sort
+#: usefully (sorting by the raw id isn't), not built here.
+SORTABLE_COLUMNS = {
+    "ticket_number": Ticket.ticket_number,
+    "title": Ticket.title,
+    "severity": Ticket.severity,
+    "status": Ticket.status,
+    "created_at": Ticket.created_at,
+}
+
+
 def ticket_list_stmt(
     *,
     ticket_type: str | None = None,
     status: str | None = None,
     assigned_to: int | None = None,
     unassigned: bool = False,
+    sort: str | None = None,
+    direction: str = "desc",
 ):
     """Shared statement builder -- used both by list_tickets() (full list,
     for exports/etc) and the Tickets screen's paginated query.
     `assigned_to` (a user id, for "My Incidents") and `unassigned` (for
-    "Unassigned Incidents") are mutually exclusive; callers pick one."""
-    stmt = select(Ticket).options(selectinload(Ticket.asset)).order_by(Ticket.created_at.desc())
+    "Unassigned Incidents") are mutually exclusive; callers pick one.
+    `sort` falls back to created_at (the pre-sorting default) for None or
+    anything not in SORTABLE_COLUMNS, rather than erroring on a stale or
+    hand-edited query string."""
+    stmt = select(Ticket).options(selectinload(Ticket.asset))
+    column = SORTABLE_COLUMNS.get(sort, Ticket.created_at)
+    stmt = stmt.order_by(column.desc() if direction != "asc" else column.asc())
     if ticket_type:
         stmt = stmt.where(Ticket.ticket_type == ticket_type)
     if status:

@@ -46,17 +46,22 @@ async def list_tickets(
     ticket_type: str | None = None,
     ticket_status: str | None = None,
     assigned: str | None = None,  # "me" | "unassigned" | None
+    sort: str | None = None,
+    dir: str = "desc",
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
+    dir = "asc" if dir == "asc" else "desc"
     stmt = service.ticket_list_stmt(
         ticket_type=ticket_type,
         status=ticket_status,
         assigned_to=ctx.user.id if assigned == "me" else None,
         unassigned=assigned == "unassigned",
+        sort=sort,
+        direction=dir,
     )
     ticket_page = await paginate(tenant_db, stmt, page=page)
     statuses = await service.list_statuses(tenant_db)
@@ -75,6 +80,8 @@ async def list_tickets(
             "selected_type": ticket_type,
             "selected_status": ticket_status,
             "selected_assigned": assigned,
+            "selected_sort": sort if sort in service.SORTABLE_COLUMNS else "created_at",
+            "selected_dir": dir,
             "user_names": user_names,
         },
     )

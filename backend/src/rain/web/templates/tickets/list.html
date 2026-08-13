@@ -1,28 +1,56 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
 {% block title %}Tickets - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Browse and filter tickets (incidents, vulnerabilities, and changes) by type and status. Click a ticket to view its full detail and activity.{% endblock %}
+{% block help_text %}Browse and filter tickets (incidents, vulnerabilities, and changes) by type and status. Click a column header to sort by it. Click a ticket to view its full detail and activity.{% endblock %}
+{% block content_class %}content-full{% endblock %}
 {% block content %}
 {% set type_label = "Incidents" if selected_type == "incident" else ("Vulnerabilities" if selected_type == "vulnerability" else ("Changes" if selected_type == "change" else "Tickets")) %}
-{% set base_qs = "ticket_type=" ~ selected_type if selected_type else "" %}
-{% if selected_status %}{% set base_qs = base_qs ~ ("&" if base_qs else "") ~ "ticket_status=" ~ selected_status %}{% endif %}
+
+{# Builds a /tickets query string, keeping every filter/sort dimension at
+   its current value except the one(s) passed in -- None means "keep
+   current", "" means "explicitly clear". Used by every link in this page
+   so clicking one filter/sort control never silently drops another. #}
+{% macro qs(type=none, status=none, assigned=none, sort=none, dir=none) %}
+{%- set parts = [] -%}
+{%- set t = type if type is not none else selected_type -%}
+{%- set s = status if status is not none else selected_status -%}
+{%- set a = assigned if assigned is not none else selected_assigned -%}
+{%- set so = sort if sort is not none else selected_sort -%}
+{%- set d = dir if dir is not none else selected_dir -%}
+{%- if t %}{% set _ = parts.append("ticket_type=" ~ t) %}{% endif -%}
+{%- if s %}{% set _ = parts.append("ticket_status=" ~ s) %}{% endif -%}
+{%- if a %}{% set _ = parts.append("assigned=" ~ a) %}{% endif -%}
+{%- if so and so != "created_at" %}{% set _ = parts.append("sort=" ~ so) %}{% endif -%}
+{%- if d and d != "desc" %}{% set _ = parts.append("dir=" ~ d) %}{% endif -%}
+{{- parts | join("&") -}}
+{% endmacro %}
+
+{% macro sort_link(key, label) %}
+{%- set next_dir = "asc" if selected_sort == key and selected_dir == "desc" else "desc" -%}
+<a class="sort-th" href="/tickets?{{ qs(sort=key, dir=next_dir) }}">{{ label }}{% if selected_sort == key %}<span class="sort-arrow" aria-hidden="true">{{ "&uarr;" | safe if selected_dir == "asc" else "&darr;" | safe }}</span>{% endif %}</a>
+{% endmacro %}
+
 <div class="panel-row" style="justify-content:flex-end;">
   <a class="btn btn-primary" href="/tickets/new{{ '?ticket_type=' ~ selected_type if selected_type else '' }}">+ New ticket</a>
 </div>
 
 <div class="card">
   <div class="filter-bar">
-    <form method="get" action="/tickets" class="filter-bar-selects">
-      <div class="field" style="margin-bottom:0;">
-        <label for="ticket_type">Type</label>
-        <select id="ticket_type" name="ticket_type" onchange="this.form.submit()">
-          <option value="">All types</option>
-          {% for t in ticket_types %}
-          <option value="{{ t }}" {% if selected_type == t %}selected{% endif %}>{{ t }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="field" style="margin-bottom:0;">
+    <div class="filter-bar-types">
+      <a class="type-pill {% if not selected_type %}active{% endif %}" href="/tickets?{{ qs(type='') }}">All</a>
+      <a class="type-pill type-pill-incident {% if selected_type == 'incident' %}active{% endif %}" href="/tickets?{{ qs(type='incident') }}">Incidents</a>
+      <a class="type-pill type-pill-vulnerability {% if selected_type == 'vulnerability' %}active{% endif %}" href="/tickets?{{ qs(type='vulnerability') }}">Vulnerabilities</a>
+      <a class="type-pill type-pill-change {% if selected_type == 'change' %}active{% endif %}" href="/tickets?{{ qs(type='change') }}">Changes</a>
+    </div>
+
+    <div class="filter-bar-divider"></div>
+
+    <div class="filter-bar-refine">
+      <form method="get" action="/tickets" class="field" style="margin-bottom:0;">
+        <input type="hidden" name="ticket_type" value="{{ selected_type }}">
+        {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
+        {% if selected_sort and selected_sort != "created_at" %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
+        {% if selected_dir != "desc" %}<input type="hidden" name="dir" value="{{ selected_dir }}">{% endif %}
         <label for="ticket_status">Status</label>
         <select id="ticket_status" name="ticket_status" onchange="this.form.submit()">
           <option value="">All statuses</option>
@@ -30,18 +58,27 @@
           <option value="{{ s.key }}" {% if selected_status == s.key %}selected{% endif %}>{{ s.label }}</option>
           {% endfor %}
         </select>
+      </form>
+      <div class="filter-bar-chips">
+        <a class="btn btn-sm {% if selected_assigned == 'me' %}active{% endif %}" href="/tickets?{{ qs(assigned='me') }}">My {{ type_label }}</a>
+        <a class="btn btn-sm {% if selected_assigned == 'unassigned' %}active{% endif %}" href="/tickets?{{ qs(assigned='unassigned') }}">Unassigned {{ type_label }}</a>
+        {% if selected_assigned %}<a class="btn btn-sm" href="/tickets?{{ qs(assigned='') }}">All {{ type_label }}</a>{% endif %}
       </div>
-    </form>
-    <div class="filter-bar-divider"></div>
-    <div class="filter-bar-chips">
-      <a class="btn btn-sm {% if selected_assigned == 'me' %}active{% endif %}" href="/tickets?{{ base_qs }}{{ '&' if base_qs }}assigned=me">My {{ type_label }}</a>
-      <a class="btn btn-sm {% if selected_assigned == 'unassigned' %}active{% endif %}" href="/tickets?{{ base_qs }}{{ '&' if base_qs }}assigned=unassigned">Unassigned {{ type_label }}</a>
-      {% if selected_assigned %}<a class="btn btn-sm" href="/tickets?{{ base_qs }}">All {{ type_label }}</a>{% endif %}
     </div>
   </div>
 
   <table>
-    <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th><th>Assignee</th><th>Asset</th><th>Created</th></tr></thead>
+    <thead>
+      <tr>
+        <th>{{ sort_link("ticket_number", "Number") }}</th>
+        <th>{{ sort_link("title", "Title") }}</th>
+        <th>{{ sort_link("severity", "Severity") }}</th>
+        <th>{{ sort_link("status", "Status") }}</th>
+        <th>Assignee</th>
+        <th>Asset</th>
+        <th>{{ sort_link("created_at", "Created") }}</th>
+      </tr>
+    </thead>
     <tbody>
       {% for t in page.items %}
       <tr>

@@ -389,6 +389,23 @@ document.addEventListener("DOMContentLoaded", () => {
     syncChangeFields();
   }
 
+  // Platform Response Rule "Add action" form: only the config field(s)
+  // relevant to the selected action type make sense to fill in (a
+  // notification channel for Slack/email, a URL+payload for a webhook,
+  // ...) -- each group opts in via data-action-fields="type1,type2".
+  const actionTypeSelect = document.querySelector("[data-action-type-select]");
+  const actionFieldGroups = document.querySelectorAll("[data-action-fields]");
+  if (actionTypeSelect && actionFieldGroups.length) {
+    const syncActionFields = () => {
+      actionFieldGroups.forEach((group) => {
+        const types = group.dataset.actionFields.split(",");
+        group.hidden = !types.includes(actionTypeSelect.value);
+      });
+    };
+    actionTypeSelect.addEventListener("change", syncActionFields);
+    syncActionFields();
+  }
+
   // Export column picker: keep the "order" input in sync with visual position.
   document.querySelectorAll("[data-export-columns]").forEach((table) => {
     table.querySelectorAll("input[type=checkbox]").forEach((cb, idx) => {

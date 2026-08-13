@@ -438,13 +438,42 @@ form.inline { display: inline; }
   padding: 14px 16px;
   margin-bottom: 16px;
 }
-.filter-bar-selects { display: flex; flex-wrap: wrap; gap: 14px; margin: 0; }
-.filter-bar-selects .field { min-width: 160px; }
 .filter-bar-divider { width: 1px; align-self: stretch; min-height: 34px; background: var(--border); }
+.filter-bar-refine { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 18px; }
 .filter-bar-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 @media (max-width: 720px) {
   .filter-bar-divider { display: none; }
 }
+
+/* Record-type pills: a segmented-control-style primary filter (a small,
+   fixed set of types) in place of the plain <select> it used to be --
+   color-coded per type so the active one reads at a glance instead of
+   just being "the highlighted one", the same way the ticket status
+   stepper already uses a solid fill for its current step rather than a
+   passive badge tint. */
+.filter-bar-types { display: flex; flex-wrap: wrap; gap: 8px; }
+.type-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.type-pill:hover { text-decoration: none; border-color: var(--accent); color: var(--text); }
+.type-pill.active { border-color: transparent; color: #fff; }
+.type-pill.active { background: var(--text-muted); }
+.type-pill-incident.active { background: var(--danger); }
+.type-pill-vulnerability.active { background: #c2410c; }
+.type-pill-change.active { background: var(--accent); }
+
+/* Sortable column headers. */
+.sort-th { display: inline-flex; align-items: center; gap: 4px; color: inherit; }
+.sort-th:hover { text-decoration: none; color: var(--text); }
+.sort-arrow { color: var(--accent); font-size: 0.85em; }
 .muted { color: var(--text-muted); }
 
 /* ---------- calendar ---------- */
