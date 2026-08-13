@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Calendar - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Your tenant's calendar. Click a day's + to add an entry, click an existing entry to edit it. Recurring entries can bridge into a syslog event so Event Policies can react to them.{% endblock %}
+{% block help_text %}Your tenant's calendar. Click a day's + to add an entry, click an existing entry to edit it. Recurring entries can bridge into a syslog event so Event Policies can react to them. Change tickets with a start/end window (highlighted chips) also show up automatically across every day they span.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <div>
@@ -34,6 +34,9 @@
           <a class="calendar-entry-chip" href="/calendar/{{ entry.id }}/edit" title="{{ entry.title }}">
             {% if entry.recurrence %}<span aria-hidden="true">&orarr;</span> {% endif %}{{ entry.title }}
           </a>
+          {% endfor %}
+          {% for change in changes_by_date.get(day, []) %}
+          <a class="calendar-entry-chip calendar-entry-chip-change" href="/tickets/{{ change.id }}" title="{{ change.ticket_number }}: {{ change.title }}">{{ change.ticket_number }}: {{ change.title }}</a>
           {% endfor %}
         </td>
         {% endfor %}

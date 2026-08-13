@@ -14,8 +14,18 @@
   <tr><th>Severity</th><td>{{ ticket.severity }}</td></tr>
   <tr><th>Asset</th><td>{{ ticket.asset.name if ticket.asset else "-" }}</td></tr>
   <tr><th>Assignee</th><td>{{ user_names.get(ticket.assignee_user_id, "Unassigned") }}</td></tr>
-  <tr><th>Reported by</th><td>{{ user_names.get(ticket.reporter_user_id, "-") }}</td></tr>
+  <tr><th>Reported by</th><td>
+    {% if ticket.reporter_user_id %}{{ user_names.get(ticket.reporter_user_id, "-") }}
+    {%- elif ticket.source_rule %}Event Policy: {{ ticket.source_rule.name }}
+    {%- elif ticket.source_correlation_rule %}Correlation Rule: {{ ticket.source_correlation_rule.name }}
+    {%- else %}-{% endif %}
+  </td></tr>
   <tr><th>Source event</th><td>{% if ticket.source_event_id %}Event #{{ ticket.source_event_id }}{% else %}Manually created{% endif %}</td></tr>
+  {% if ticket.source_ticket %}<tr><th>Promoted from</th><td>{{ ticket.source_ticket.ticket_number }}: {{ ticket.source_ticket.title }}</td></tr>{% endif %}
+  {% if ticket.ticket_type == "change" %}
+  <tr><th>Change window</th><td>{{ ticket.start_date.isoformat() if ticket.start_date else "?" }} to {{ ticket.end_date.isoformat() if ticket.end_date else "?" }}</td></tr>
+  <tr><th>Approval</th><td>{% if ticket.approval %}{{ ticket.approval.overall_status }}{% if ticket.approval.flow %} (using {{ ticket.approval.flow.name }}){% endif %}{% else %}No approval flow attached{% endif %}</td></tr>
+  {% endif %}
   <tr><th>Created</th><td>{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td></tr>
 </table>
 
@@ -57,6 +67,15 @@
       {% if entry.item.to_assignee_user_id %}Assigned this to {{ user_names.get(entry.item.to_assignee_user_id, "someone") }}{% if entry.item.from_assignee_user_id %} (previously {{ user_names.get(entry.item.from_assignee_user_id, "someone") }}){% endif %}
       {% else %}Unassigned this{% if entry.item.from_assignee_user_id %} (previously {{ user_names.get(entry.item.from_assignee_user_id, "someone") }}){% endif %}{% endif %}
     </div>
+    {% elif entry.kind == "asset_change" %}
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} &mdash; {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
+    <div>
+      {% if entry.item.to_asset_id %}Set the affected asset to {{ asset_names.get(entry.item.to_asset_id, "an asset") }}{% if entry.item.from_asset_id %} (previously {{ asset_names.get(entry.item.from_asset_id, "an asset") }}){% endif %}
+      {% else %}Cleared the affected asset{% if entry.item.from_asset_id %} (previously {{ asset_names.get(entry.item.from_asset_id, "an asset") }}){% endif %}{% endif %}
+    </div>
+    {% elif entry.kind == "approval_decision" %}
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} &mdash; {{ user_names.get(entry.item.decided_by_user_id, "Someone") }}</div>
+    <div>{{ entry.item.decision | capitalize }} step "{{ entry.item.step_label }}"{% if entry.item.comment %} -- {{ entry.item.comment }}{% endif %}</div>
     {% else %}
     <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} &mdash; {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
     <div>Changed status{% if entry.item.from_status %} from {{ status_labels.get(entry.item.from_status, entry.item.from_status) }}{% endif %} to {{ status_labels.get(entry.item.to_status, entry.item.to_status) }}</div>

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
@@ -17,6 +17,7 @@ from rain.db.control_models import User
 from rain.db.tenant_models import (
     Asset,
     CorrelationRule,
+    Group,
     NotificationChannel,
     PlatformEventAction,
     PlatformEventRule,
@@ -83,23 +84,32 @@ async def new_ticket_form(
     request: Request,
     ticket_type: str = "incident",
     source_event_id: int | None = None,
+    source_ticket_id: int | None = None,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
     event = await service.get_event(tenant_db, source_event_id) if source_event_id else None
+    source_ticket = await service.get_ticket(tenant_db, source_ticket_id) if source_ticket_id else None
 
-    prefill_title = f"{event.program or event.host or 'Event'}: {event.message[:120]}" if event else ""
-    prefill_description = event.message if event else ""
-    suggested_asset_id = None
-    suggested_asset_name = ""
-    if event is not None and event.host:
+    if source_ticket is not None:
+        prefill_title = f"Change for {source_ticket.ticket_number}: {source_ticket.title}"
+        prefill_description = source_ticket.description or ""
+    else:
+        prefill_title = f"{event.program or event.host or 'Event'}: {event.message[:120]}" if event else ""
+        prefill_description = event.message if event else ""
+    suggested_asset_id = source_ticket.asset_id if source_ticket else None
+    suggested_asset_name = source_ticket.asset.name if source_ticket and source_ticket.asset else ""
+    if event is not None and event.host and suggested_asset_id is None:
         result = await tenant_db.execute(select(Asset).where(Asset.external_id == event.host).limit(1))
         suggested_asset = result.scalar_one_or_none()
         if suggested_asset is not None:
             suggested_asset_id = suggested_asset.id
             suggested_asset_name = suggested_asset.name
+
+    flows = await service.list_approval_flows(tenant_db)
+    default_flow = next((f for f in flows if f.is_default), None)
 
     return templates.TemplateResponse(
         request,
@@ -111,10 +121,14 @@ async def new_ticket_form(
             "severities": SEVERITIES,
             "selected_type": ticket_type,
             "source_event_id": source_event_id,
+            "source_ticket_id": source_ticket_id,
+            "source_ticket": source_ticket,
             "prefill_title": prefill_title,
             "prefill_description": prefill_description,
             "suggested_asset_id": suggested_asset_id,
             "suggested_asset_name": suggested_asset_name,
+            "flows": flows,
+            "default_flow_id": default_flow.id if default_flow else None,
         },
     )
 
@@ -127,7 +141,11 @@ async def create_ticket(
     severity: str = Form("medium"),
     asset_id: str = Form(""),
     source_event_id: str = Form(""),
+    source_ticket_id: str = Form(""),
     assignee_user_id: str = Form(""),
+    start_date: str = Form(""),
+    end_date: str = Form(""),
+    approval_flow_id: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
@@ -144,9 +162,14 @@ async def create_ticket(
         severity=severity,
         asset_id=int(asset_id) if asset_id else None,
         source_event_id=int(source_event_id) if source_event_id else None,
+        source_ticket_id=int(source_ticket_id) if source_ticket_id else None,
+        start_date=date.fromisoformat(start_date) if start_date else None,
+        end_date=date.fromisoformat(end_date) if end_date else None,
         assignee_user_id=int(assignee_user_id) if assignee_user_id else None,
         reporter_user_id=ctx.user.id,
     )
+    if ticket_type == "change":
+        await service.start_approval(tenant_db, ticket, int(approval_flow_id) if approval_flow_id else None)
     return RedirectResponse(f"/tickets/{ticket.id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -239,6 +262,45 @@ async def set_ticket_asset(
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.post("/{ticket_id:int}/approval/attach")
+async def attach_approval_flow(
+    ticket_id: int,
+    flow_id: str = Form(""),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    ticket = await service.get_ticket(tenant_db, ticket_id)
+    if ticket is not None and ticket.ticket_type == "change" and ticket.approval is None:
+        await service.start_approval(tenant_db, ticket, int(flow_id) if flow_id else None)
+    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{ticket_id:int}/approval/decide")
+async def decide_approval(
+    ticket_id: int,
+    decision: str = Form(...),
+    comment: str = Form(""),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    if decision not in ("approved", "rejected"):
+        return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+    ticket = await service.get_ticket(tenant_db, ticket_id)
+    if ticket is not None and ticket.approval is not None and ticket.approval.overall_status == "pending":
+        step = await service.current_approval_step(tenant_db, ticket.approval)
+        if step is not None and await service.is_eligible_approver(tenant_db, step, ctx.user.id):
+            await service.decide_approval_step(
+                tenant_db,
+                ticket.approval,
+                step,
+                decision=decision,
+                decided_by_user_id=ctx.user.id,
+                comment=comment.strip(),
+            )
+    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
 async def _user_names(user_ids: set[int | None]) -> dict[int, str]:
     """Ticket comments/status changes/reporter fields store a plain
     control.users id (cross-schema, app-validated -- see tenant_models'
@@ -254,16 +316,23 @@ async def _user_names(user_ids: set[int | None]) -> dict[int, str]:
 
 
 def _build_activity(ticket: Ticket) -> list[dict]:
-    """Comments, status changes, assignment changes, and asset changes
-    interleaved into one chronological feed ("Activity"), each tagged with
-    its kind so the caller (screen or PDF) can render them differently.
-    Shared so the PDF export shows the same unified feed as the ticket
-    detail screen instead of drifting apart."""
+    """Comments, status changes, assignment changes, asset changes, and
+    (change tickets only) approval decisions interleaved into one
+    chronological feed ("Activity"), each tagged with its kind so the
+    caller (screen or PDF) can render them differently. Shared so the PDF
+    export shows the same unified feed as the ticket detail screen instead
+    of drifting apart."""
+    approval_entries = (
+        [{"kind": "approval_decision", "at": d.created_at, "item": d} for d in ticket.approval.decisions]
+        if ticket.approval
+        else []
+    )
     return sorted(
         [{"kind": "comment", "at": c.created_at, "item": c} for c in ticket.comments]
         + [{"kind": "status_change", "at": sc.created_at, "item": sc} for sc in ticket.status_changes]
         + [{"kind": "assignment_change", "at": ac.created_at, "item": ac} for ac in ticket.assignment_changes]
-        + [{"kind": "asset_change", "at": ac.created_at, "item": ac} for ac in ticket.asset_changes],
+        + [{"kind": "asset_change", "at": ac.created_at, "item": ac} for ac in ticket.asset_changes]
+        + approval_entries,
         key=lambda entry: entry["at"] or datetime.min.replace(tzinfo=timezone.utc),
     )
 
@@ -313,16 +382,38 @@ async def ticket_detail(
     statuses = await service.list_statuses(tenant_db)
     status_labels = {s.key: s.label for s in statuses}
 
+    flow_step_user_ids: set[int | None] = set()
+    group_names: dict[int, str] = {}
+    if ticket.approval and ticket.approval.flow:
+        flow_step_user_ids = {s.approver_user_id for s in ticket.approval.flow.steps if s.approver_user_id}
+        group_ids = {s.approver_group_id for s in ticket.approval.flow.steps if s.approver_group_id}
+        if group_ids:
+            groups_result = await tenant_db.execute(select(Group).where(Group.id.in_(group_ids)))
+            group_names = {g.id: g.name for g in groups_result.scalars()}
+
     user_names = await _user_names(
         {ticket.reporter_user_id, ticket.assignee_user_id}
         | {c.author_user_id for c in ticket.comments}
         | {sc.changed_by_user_id for sc in ticket.status_changes}
         | _assignment_change_ids(ticket)
         | {ac.changed_by_user_id for ac in ticket.asset_changes}
+        | ({d.decided_by_user_id for d in ticket.approval.decisions} if ticket.approval else set())
+        | flow_step_user_ids
     )
     asset_names = await _asset_names(tenant_db, {ticket.asset_id} | _asset_change_ids(ticket))
 
     activity = _build_activity(ticket)
+
+    current_step = None
+    can_decide = False
+    flows = []
+    if ticket.ticket_type == "change":
+        if ticket.approval and ticket.approval.overall_status == "pending":
+            current_step = await service.current_approval_step(tenant_db, ticket.approval)
+            if current_step is not None:
+                can_decide = await service.is_eligible_approver(tenant_db, current_step, ctx.user.id)
+        elif ticket.approval is None:
+            flows = await service.list_approval_flows(tenant_db)
 
     return templates.TemplateResponse(
         request,
@@ -337,6 +428,10 @@ async def ticket_detail(
             "user_names": user_names,
             "asset_names": asset_names,
             "activity": activity,
+            "current_step": current_step,
+            "can_decide": can_decide,
+            "flows": flows,
+            "group_names": group_names,
         },
     )
 
@@ -359,6 +454,7 @@ async def ticket_pdf(
         | {sc.changed_by_user_id for sc in ticket.status_changes}
         | _assignment_change_ids(ticket)
         | {ac.changed_by_user_id for ac in ticket.asset_changes}
+        | ({d.decided_by_user_id for d in ticket.approval.decisions} if ticket.approval else set())
     )
     asset_names = await _asset_names(tenant_db, {ticket.asset_id} | _asset_change_ids(ticket))
     pdf_bytes = render_pdf(

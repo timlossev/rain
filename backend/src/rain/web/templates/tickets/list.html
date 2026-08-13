@@ -3,7 +3,7 @@
 {% block title %}Tickets - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Browse and filter tickets (incidents, vulnerabilities, and changes) by type and status. Click a ticket to view its full detail and activity.{% endblock %}
 {% block content %}
-{% set type_label = "Incidents" if selected_type == "incident" else ("Vulnerabilities" if selected_type == "vulnerability" else "Tickets") %}
+{% set type_label = "Incidents" if selected_type == "incident" else ("Vulnerabilities" if selected_type == "vulnerability" else ("Changes" if selected_type == "change" else "Tickets")) %}
 {% set base_qs = "ticket_type=" ~ selected_type if selected_type else "" %}
 {% if selected_status %}{% set base_qs = base_qs ~ ("&" if base_qs else "") ~ "ticket_status=" ~ selected_status %}{% endif %}
 <div class="panel-row" style="justify-content:flex-end;">

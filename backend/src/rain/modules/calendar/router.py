@@ -52,6 +52,18 @@ async def month_view(
         for occ in recurrence.occurrences_in_range(entry, grid_start, grid_end):
             by_date.setdefault(occ, []).append(entry)
 
+    # Change tickets with a start/end window overlapping the visible grid --
+    # shown alongside CalendarEntry occurrences, one chip per day in range,
+    # so a change's maintenance window is visible without opening the ticket.
+    changes = await service.list_changes_in_range(tenant_db, grid_start, grid_end)
+    changes_by_date: dict[dt.date, list] = {}
+    for change in changes:
+        day = max(change.start_date, grid_start)
+        last = min(change.end_date, grid_end)
+        while day <= last:
+            changes_by_date.setdefault(day, []).append(change)
+            day += dt.timedelta(days=1)
+
     prev_year, prev_month = _shift_month(year, month, -1)
     next_year, next_month = _shift_month(year, month, 1)
 
@@ -66,6 +78,7 @@ async def month_view(
             "month_name": dt.date(year, month, 1).strftime("%B %Y"),
             "weeks": weeks,
             "by_date": by_date,
+            "changes_by_date": changes_by_date,
             "today": today,
             "month_start": month_start,
             "month_end": month_end,

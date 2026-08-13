@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from rain.db.tenant_models import (
+    ApprovalFlow,
+    ApprovalFlowStep,
+    ChangeApproval,
+    ChangeApprovalDecision,
+    GroupMembership,
     SyslogEvent,
     Ticket,
     TicketAssetChange,
@@ -17,7 +22,7 @@ from rain.db.tenant_models import (
 )
 from rain.modules.tickets.schemas import TICKET_TYPE_PREFIX
 
-_SEQUENCE_NAMES = {"incident": "inc_number_seq", "vulnerability": "vuln_number_seq"}
+_SEQUENCE_NAMES = {"incident": "inc_number_seq", "vulnerability": "vuln_number_seq", "change": "chg_number_seq"}
 
 
 async def _next_ticket_number(db: AsyncSession, ticket_type: str) -> str:
@@ -37,6 +42,9 @@ async def create_ticket(
     source_event_id: int | None = None,
     source_rule_id: int | None = None,
     source_correlation_rule_id: int | None = None,
+    source_ticket_id: int | None = None,
+    start_date: dt.date | None = None,
+    end_date: dt.date | None = None,
     assignee_user_id: int | None = None,
     reporter_user_id: int | None = None,
 ) -> Ticket:
@@ -50,6 +58,9 @@ async def create_ticket(
         source_event_id=source_event_id,
         source_rule_id=source_rule_id,
         source_correlation_rule_id=source_correlation_rule_id,
+        source_ticket_id=source_ticket_id,
+        start_date=start_date,
+        end_date=end_date,
         assignee_user_id=assignee_user_id,
         reporter_user_id=reporter_user_id,
     )
@@ -123,12 +134,16 @@ async def get_ticket(db: AsyncSession, ticket_id: int) -> Ticket | None:
         .where(Ticket.id == ticket_id)
         .options(
             selectinload(Ticket.asset),
+            selectinload(Ticket.source_rule),
             selectinload(Ticket.source_correlation_rule),
+            selectinload(Ticket.source_ticket),
             selectinload(Ticket.comments),
             selectinload(Ticket.status_changes),
             selectinload(Ticket.assignment_changes),
             selectinload(Ticket.asset_changes),
             selectinload(Ticket.rule_triggers),
+            selectinload(Ticket.approval).selectinload(ChangeApproval.decisions),
+            selectinload(Ticket.approval).selectinload(ChangeApproval.flow).selectinload(ApprovalFlow.steps),
         )
     )
     result = await db.execute(stmt)
@@ -216,6 +231,100 @@ async def update_asset(
             to_asset_id=new_asset_id,
         )
     )
+    await db.commit()
+
+
+async def list_approval_flows(db: AsyncSession) -> list[ApprovalFlow]:
+    result = await db.execute(select(ApprovalFlow).options(selectinload(ApprovalFlow.steps)).order_by(ApprovalFlow.name))
+    return list(result.scalars())
+
+
+async def get_default_approval_flow(db: AsyncSession) -> ApprovalFlow | None:
+    result = await db.execute(
+        select(ApprovalFlow).options(selectinload(ApprovalFlow.steps)).where(ApprovalFlow.is_default.is_(True))
+    )
+    return result.scalar_one_or_none()
+
+
+async def start_approval(db: AsyncSession, ticket: Ticket, flow_id: int | None) -> None:
+    """Attaches an approval instance to a change ticket. A no-op if
+    flow_id is None or the flow has no steps -- ticket.approval stays
+    unset, and the UI treats that as "no approval process configured"
+    rather than a fake pre-approved state."""
+    if flow_id is None:
+        return
+    flow = await db.get(ApprovalFlow, flow_id, options=[selectinload(ApprovalFlow.steps)])
+    if flow is None or not flow.steps:
+        return
+    first_step = min(flow.steps, key=lambda s: s.sort_order)
+    db.add(ChangeApproval(ticket_id=ticket.id, flow_id=flow.id, current_step_order=first_step.sort_order))
+    await db.commit()
+
+
+async def is_eligible_approver(db: AsyncSession, step: ApprovalFlowStep, user_id: int) -> bool:
+    if step.approver_user_id is not None:
+        return step.approver_user_id == user_id
+    if step.approver_group_id is not None:
+        result = await db.execute(
+            select(GroupMembership).where(
+                GroupMembership.group_id == step.approver_group_id, GroupMembership.user_id == user_id
+            )
+        )
+        return result.scalar_one_or_none() is not None
+    return False
+
+
+async def current_approval_step(db: AsyncSession, approval: ChangeApproval) -> ApprovalFlowStep | None:
+    if approval.flow_id is None:
+        return None
+    result = await db.execute(
+        select(ApprovalFlowStep).where(
+            ApprovalFlowStep.flow_id == approval.flow_id, ApprovalFlowStep.sort_order == approval.current_step_order
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def decide_approval_step(
+    db: AsyncSession,
+    approval: ChangeApproval,
+    step: ApprovalFlowStep,
+    *,
+    decision: str,
+    decided_by_user_id: int,
+    comment: str | None = None,
+) -> None:
+    """Records the decision, then either short-circuits to "rejected" or
+    advances to the next step (or to "approved", if that was the last
+    one). approval.decisions/current_step_order/overall_status are all
+    mutated on the same object the caller already holds, so a re-render
+    right after this sees the update without a fresh query."""
+    db.add(
+        ChangeApprovalDecision(
+            approval_id=approval.id,
+            step_order=step.sort_order,
+            step_label=step.label,
+            decided_by_user_id=decided_by_user_id,
+            decision=decision,
+            comment=comment or None,
+        )
+    )
+    if decision == "rejected":
+        approval.overall_status = "rejected"
+        approval.completed_at = dt.datetime.now(dt.timezone.utc)
+    else:
+        next_result = await db.execute(
+            select(ApprovalFlowStep)
+            .where(ApprovalFlowStep.flow_id == approval.flow_id, ApprovalFlowStep.sort_order > step.sort_order)
+            .order_by(ApprovalFlowStep.sort_order)
+            .limit(1)
+        )
+        next_step = next_result.scalar_one_or_none()
+        if next_step is None:
+            approval.overall_status = "approved"
+            approval.completed_at = dt.datetime.now(dt.timezone.utc)
+        else:
+            approval.current_step_order = next_step.sort_order
     await db.commit()
 
 

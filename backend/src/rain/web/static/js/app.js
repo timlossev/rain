@@ -379,6 +379,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // New-ticket form: the start/end date + approval flow fields only make
+  // sense for a change, so keep them hidden until Type = change is picked.
+  const ticketTypeSelect = document.querySelector("#ticket_type");
+  const changeFields = document.querySelector("[data-change-fields]");
+  if (ticketTypeSelect && changeFields) {
+    const syncChangeFields = () => { changeFields.hidden = ticketTypeSelect.value !== "change"; };
+    ticketTypeSelect.addEventListener("change", syncChangeFields);
+    syncChangeFields();
+  }
+
   // Export column picker: keep the "order" input in sync with visual position.
   document.querySelectorAll("[data-export-columns]").forEach((table) => {
     table.querySelectorAll("input[type=checkbox]").forEach((cb, idx) => {

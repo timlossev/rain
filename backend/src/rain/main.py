@@ -12,6 +12,7 @@ import logging
 import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -124,7 +125,11 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(AuthRequiredError)
     async def auth_required_handler(request: Request, exc: AuthRequiredError):
-        return RedirectResponse(f"/login?next={request.url.path}", status_code=303)
+        # Preserve the query string too (not just the path) -- e.g. a link
+        # that carries ?tenant=<slug> as a post-login hint (see
+        # rain.modules.auth.router.login_submit) would otherwise lose it here.
+        target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+        return RedirectResponse(f"/login?next={quote(target, safe='')}", status_code=303)
 
     @app.exception_handler(TenantRequiredError)
     async def tenant_required_handler(request: Request, exc: TenantRequiredError):

@@ -454,6 +454,7 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
   text-overflow: ellipsis;
 }
 .calendar-entry-chip:hover { text-decoration: none; filter: brightness(0.95); }
+.calendar-entry-chip-change { background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
 @media (max-width: 860px) {
   .calendar-day { height: 72px; font-size: 0.8rem; }
   .calendar-entry-chip { font-size: 0.65rem; }
@@ -609,6 +610,7 @@ td.actions { text-align: right; white-space: nowrap; }
   color: var(--text-muted);
 }
 .badge-accent { background: color-mix(in srgb, var(--accent) 14%, white); color: var(--accent); border-color: transparent; }
+.badge-danger { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
 .flash { padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 0.88rem; }
 .flash-ok { background: var(--ok-bg); color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 30%, white); }
 .flash-error { background: var(--danger-bg); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 30%, white); }
@@ -648,6 +650,18 @@ td.actions { text-align: right; white-space: nowrap; }
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--step-color, #6b7280) 35%, transparent);
 }
 .status-step.current:hover { background: var(--step-color, #6b7280); }
+
+.approval-steps { list-style: none; margin: 0 0 4px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.approval-step {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--border);
+  background: var(--surface-sunken);
+  font-size: 0.88rem;
+}
+.approval-step-done { border-left-color: var(--ok); }
+.approval-step-current { border-left-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
+.approval-step-skipped { border-left-color: var(--danger); opacity: 0.6; }
 
 .activity-entry { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
 .activity-entry:last-of-type { border-bottom: none; }

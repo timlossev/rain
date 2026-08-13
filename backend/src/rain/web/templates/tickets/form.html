@@ -5,10 +5,12 @@
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 {% if source_event_id %}<p class="muted">Promoting syslog event #{{ source_event_id }}.</p>{% endif %}
+{% if source_ticket %}<p class="muted">Promoted from <a href="/tickets/{{ source_ticket.id }}">{{ source_ticket.ticket_number }}: {{ source_ticket.title }}</a>.</p>{% endif %}
 
 <div class="card">
   <form method="post" action="/tickets">
     {% if source_event_id %}<input type="hidden" name="source_event_id" value="{{ source_event_id }}">{% endif %}
+    {% if source_ticket_id %}<input type="hidden" name="source_ticket_id" value="{{ source_ticket_id }}">{% endif %}
     <div class="form-row">
       <div class="field">
         <label for="ticket_type">Type</label>
@@ -37,6 +39,25 @@
       <label for="description">Description</label>
       <textarea id="description" name="description" rows="6">{{ prefill_description }}</textarea>
     </div>
+
+    <div data-change-fields hidden>
+      <h3>Change window &amp; approval</h3>
+      <div class="form-row">
+        <div class="field"><label for="start_date">Start date</label><input type="date" id="start_date" name="start_date"></div>
+        <div class="field"><label for="end_date">End date</label><input type="date" id="end_date" name="end_date"></div>
+        <div class="field">
+          <label for="approval_flow_id">Approval flow</label>
+          <select id="approval_flow_id" name="approval_flow_id">
+            <option value="">No approval flow</option>
+            {% for f in flows %}
+            <option value="{{ f.id }}" {% if f.id == default_flow_id %}selected{% endif %}>{{ f.name }}{% if f.is_default %} (default){% endif %}</option>
+            {% endfor %}
+          </select>
+          {% if not flows %}<div class="field-hint">No approval flows configured yet -- <a href="/admin/approval-flows/new">create one</a>, or attach one to this change later.</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
     <button class="btn btn-primary" type="submit">Create ticket</button>
     <a class="btn" href="/tickets">Cancel</a>
   </form>

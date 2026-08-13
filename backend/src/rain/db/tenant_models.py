@@ -407,6 +407,7 @@ class Ticket(TenantBase):
     closed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     asset: Mapped[Asset | None] = relationship()
+    source_rule: Mapped["TicketRule | None"] = relationship()
     source_correlation_rule: Mapped[CorrelationRule | None] = relationship()
     source_ticket: Mapped["Ticket | None"] = relationship(remote_side=[id])
     comments: Mapped[list["TicketComment"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")

@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from rain.db.tenant_models import CalendarEntry
+from rain.db.tenant_models import CalendarEntry, Ticket
 
 
 def calendar_entries_stmt(*, active_only: bool = False):
@@ -48,3 +48,21 @@ async def delete_entry(db: AsyncSession, entry: CalendarEntry) -> None:
 async def mark_fired(db: AsyncSession, entry: CalendarEntry, on: dt.date) -> None:
     entry.last_fired_date = on
     await db.commit()
+
+
+async def list_changes_in_range(db: AsyncSession, start: dt.date, end: dt.date) -> list[Ticket]:
+    """Change tickets whose [start_date, end_date] window overlaps [start,
+    end] -- shown on the calendar month grid alongside CalendarEntry
+    occurrences. Both dates must be set (a change with only one of the two
+    filled in isn't placeable on a grid) and neither is null-safe against
+    the other in the overlap check below, so both are required in the
+    WHERE clause."""
+    stmt = select(Ticket).where(
+        Ticket.ticket_type == "change",
+        Ticket.start_date.is_not(None),
+        Ticket.end_date.is_not(None),
+        Ticket.start_date <= end,
+        Ticket.end_date >= start,
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars())

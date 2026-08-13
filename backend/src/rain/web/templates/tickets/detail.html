@@ -4,6 +4,9 @@
 {% block help_text %}A single ticket's status, metadata, linked documents, and full activity history (comments, status/assignee/asset changes).{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
+  {% if ticket.ticket_type in ("incident", "vulnerability") %}
+  <a class="btn btn-sm" href="/tickets/new?ticket_type=change&amp;source_ticket_id={{ ticket.id }}">Promote to Change</a>
+  {% endif %}
   <a class="btn btn-sm" href="/tickets/{{ ticket.id }}/pdf">Export to PDF</a>
 </div>
 
@@ -39,10 +42,21 @@
           <button class="btn btn-sm" type="submit">Save</button>
         </form>
       </td></tr>
-      <tr><th>Reported by</th><td class="muted">{{ user_names.get(ticket.reporter_user_id, "-") }}</td></tr>
+      <tr><th>Reported by</th><td class="muted">
+        {% if ticket.reporter_user_id %}{{ user_names.get(ticket.reporter_user_id, "-") }}
+        {%- elif ticket.source_rule %}Event Policy: {{ ticket.source_rule.name }}
+        {%- elif ticket.source_correlation_rule %}Correlation Rule: {{ ticket.source_correlation_rule.name }}
+        {%- else %}-{% endif %}
+      </td></tr>
       <tr><th>Source event</th><td class="muted">{% if ticket.source_event_id %}#{{ ticket.source_event_id }}{% else %}manually created{% endif %}</td></tr>
       {% if ticket.source_correlation_rule %}
       <tr><th>Correlation rule</th><td class="muted"><a href="/tickets/correlation-rules">{{ ticket.source_correlation_rule.name }}</a></td></tr>
+      {% endif %}
+      {% if ticket.source_ticket %}
+      <tr><th>Promoted from</th><td class="muted"><a href="/tickets/{{ ticket.source_ticket.id }}">{{ ticket.source_ticket.ticket_number }}: {{ ticket.source_ticket.title }}</a></td></tr>
+      {% endif %}
+      {% if ticket.ticket_type == "change" %}
+      <tr><th>Change window</th><td class="muted">{{ ticket.start_date.isoformat() if ticket.start_date else "?" }} &rarr; {{ ticket.end_date.isoformat() if ticket.end_date else "?" }}</td></tr>
       {% endif %}
       <tr><th>Created</th><td class="muted">{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td></tr>
     </tbody>
@@ -52,6 +66,57 @@
   {% include "documents/_links_fragment.html" %}
   {% endwith %}
 </div>
+
+{% if ticket.ticket_type == "change" %}
+<div class="card">
+  <div class="card-title">Approval</div>
+  {% if ticket.approval %}
+  <p>
+    <span class="badge {% if ticket.approval.overall_status == 'approved' %}badge-accent{% elif ticket.approval.overall_status == 'rejected' %}badge-danger{% endif %}">{{ ticket.approval.overall_status }}</span>
+    {% if ticket.approval.flow %}using <strong>{{ ticket.approval.flow.name }}</strong>{% endif %}
+  </p>
+  {% if ticket.approval.flow %}
+  <ol class="approval-steps">
+    {% for s in ticket.approval.flow.steps %}
+    <li class="approval-step
+      {%- if ticket.approval.overall_status == 'approved' or s.sort_order < ticket.approval.current_step_order %} approval-step-done
+      {%- elif ticket.approval.overall_status == 'pending' and s.sort_order == ticket.approval.current_step_order %} approval-step-current
+      {%- elif ticket.approval.overall_status == 'rejected' and s.sort_order >= ticket.approval.current_step_order %} approval-step-skipped
+      {%- endif %}">
+      {{ s.label }} &mdash;
+      {% if s.approver_group_id %}group: {{ group_names.get(s.approver_group_id, "deleted group") }}
+      {%- elif s.approver_user_id %}{{ user_names.get(s.approver_user_id, "unknown user") }}
+      {%- else %}(unassigned){% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+
+  {% if can_decide and current_step %}
+  <form method="post" action="/tickets/{{ ticket.id }}/approval/decide" style="margin-top:14px;">
+    <div class="field"><label for="comment">Comment (optional)</label><textarea id="comment" name="comment" rows="2"></textarea></div>
+    <button class="btn btn-primary" type="submit" name="decision" value="approved">Approve &ldquo;{{ current_step.label }}&rdquo;</button>
+    <button class="btn btn-danger" type="submit" name="decision" value="rejected">Reject</button>
+  </form>
+  {% elif ticket.approval.overall_status == "pending" %}
+  <p class="muted" style="margin-top:10px;">Waiting on {% if current_step %}{% if current_step.approver_group_id %}anyone in <strong>{{ group_names.get(current_step.approver_group_id, "deleted group") }}</strong>{% else %}<strong>{{ user_names.get(current_step.approver_user_id, "unknown user") }}</strong>{% endif %}{% else %}a decision{% endif %}. You're not eligible to decide this step.</p>
+  {% endif %}
+  {% else %}
+  <p class="muted">No approval flow attached yet.</p>
+  <form method="post" action="/tickets/{{ ticket.id }}/approval/attach" class="form-row" style="align-items:end;">
+    <div class="field">
+      <label for="flow_id">Approval flow</label>
+      <select id="flow_id" name="flow_id">
+        <option value="">-</option>
+        {% for f in flows %}<option value="{{ f.id }}">{{ f.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-sm" type="submit">Attach</button>
+  </form>
+  {% if not flows %}<p class="field-hint">No approval flows configured yet -- <a href="/admin/approval-flows/new">create one</a>.</p>{% endif %}
+  {% endif %}
+</div>
+{% endif %}
 
 {% if ticket.rule_triggers %}
 <div class="card">
@@ -96,6 +161,13 @@
       {% else %}
       cleared the affected asset{% if entry.item.from_asset_id %} (previously <strong>{{ asset_names.get(entry.item.from_asset_id, "an asset") }}</strong>){% endif %}
       {% endif %}
+    </div>
+    {% elif entry.kind == "approval_decision" %}
+    <div class="activity-entry activity-status-change">
+      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span>
+      &mdash; <strong>{{ user_names.get(entry.item.decided_by_user_id, "Someone") }}</strong>
+      {{ entry.item.decision }} step &ldquo;{{ entry.item.step_label }}&rdquo;
+      {% if entry.item.comment %}<br><span class="muted">{{ entry.item.comment }}</span>{% endif %}
     </div>
     {% else %}
     <div class="activity-entry activity-status-change">
