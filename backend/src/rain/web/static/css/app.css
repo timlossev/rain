@@ -478,11 +478,27 @@ th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--bor
 th { color: var(--text-muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
 tr:last-child td { border-bottom: none; }
 td.actions { text-align: right; white-space: nowrap; }
-/* Narrow contexts (e.g. Linked Documents sitting in a two-column layout
-   next to ticket metadata) don't have room for 2-3 nowrap buttons -- let
-   them wrap onto their own lines instead of overflowing the card. */
-td.actions.actions-wrap { white-space: normal; }
-td.actions.actions-wrap .btn, td.actions.actions-wrap form { margin: 2px 0 2px 6px; }
+
+/* Linked Documents: flex rows instead of a table -- a table's fixed
+   columns are exactly what overflowed in a narrow container (confirmed
+   live); flex rows can wrap their action buttons onto a second line
+   instead of running off the edge, and hold up with any number of
+   linked documents. */
+.doc-link-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.doc-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.doc-link-info { display: flex; flex-direction: column; min-width: 140px; flex: 1 1 140px; }
+.doc-link-info a { font-weight: 600; }
+.doc-link-title { font-size: 0.82rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-link-actions { display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
 
 /* ---------- badges / flash ---------- */
 .badge {

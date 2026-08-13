@@ -7,7 +7,7 @@
 </div>
 
 <div class="ticket-top-row">
-  <div class="card" style="flex:2; min-width:320px;">
+  <div class="card" style="flex:1; min-width:280px;">
     <div style="margin-bottom:10px;">
       <span class="badge severity-{{ ticket.severity }}">{{ ticket.severity }}</span>
       <span class="badge badge-accent">{{ ticket.ticket_type }}</span>
@@ -30,12 +30,15 @@
         <tr><th>Asset</th><td class="muted">{{ ticket.asset.name if ticket.asset else "-" }}</td></tr>
         <tr><th>Reported by</th><td class="muted">{{ user_names.get(ticket.reporter_user_id, "-") }}</td></tr>
         <tr><th>Source event</th><td class="muted">{% if ticket.source_event_id %}#{{ ticket.source_event_id }}{% else %}manually created{% endif %}</td></tr>
+        {% if ticket.source_correlation_rule %}
+        <tr><th>Correlation rule</th><td class="muted"><a href="/tickets/correlation-rules">{{ ticket.source_correlation_rule.name }}</a></td></tr>
+        {% endif %}
         <tr><th>Created</th><td class="muted">{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td></tr>
       </tbody>
     </table>
   </div>
 
-  <div style="flex:1; min-width:260px;">
+  <div style="flex:2; min-width:340px;">
     {% with links = document_links, linked_type = "ticket", linked_id = ticket.id %}
     {% include "documents/_links_fragment.html" %}
     {% endwith %}

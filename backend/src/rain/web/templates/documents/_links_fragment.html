@@ -1,25 +1,24 @@
 {# expects: links (list of DocumentLink with .document loaded), linked_type, linked_id #}
 <div class="card">
   <div class="card-title">Linked Documents</div>
-  <table>
-    <thead><tr><th>Number</th><th>Title</th><th></th></tr></thead>
-    <tbody>
-      {% for link in links %}
-      <tr>
-        <td><a href="/documents/{{ link.document.id }}">{{ link.document.doc_number }}</a></td>
-        <td>{{ link.document.title }}</td>
-        <td class="actions actions-wrap">
-          <button type="button" class="btn btn-sm" data-doc-preview="{{ link.document.id }}" data-doc-filename="{{ link.document.filename }}" data-doc-title="{{ link.document.doc_number }}: {{ link.document.title }}" hidden>View</button>
-          <a class="btn btn-sm" href="/documents/{{ link.document.id }}/download">Download</a>
-          <form class="inline" method="post" action="/documents/{{ link.document_id }}/unlink/{{ link.id }}" data-confirm="Unlink this document?">
-            <button class="btn btn-sm btn-danger" type="submit">Unlink</button>
-          </form>
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="3" class="muted">No documents linked yet.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <a class="btn btn-sm" href="/documents/new?linked_type={{ linked_type }}&linked_id={{ linked_id }}">+ Attach document</a>
+  <div class="doc-link-list">
+    {% for link in links %}
+    <div class="doc-link-row">
+      <div class="doc-link-info">
+        <a href="/documents/{{ link.document.id }}">{{ link.document.doc_number }}</a>
+        <span class="doc-link-title">{{ link.document.title }}</span>
+      </div>
+      <div class="doc-link-actions">
+        <button type="button" class="btn btn-sm" data-doc-preview="{{ link.document.id }}" data-doc-filename="{{ link.document.filename }}" data-doc-title="{{ link.document.doc_number }}: {{ link.document.title }}" hidden>View</button>
+        <a class="btn btn-sm" href="/documents/{{ link.document.id }}/download">Download</a>
+        <form class="inline" method="post" action="/documents/{{ link.document_id }}/unlink/{{ link.id }}" data-confirm="Unlink this document?">
+          <button class="btn btn-sm btn-danger" type="submit">Unlink</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <p class="muted">No documents linked yet.</p>
+    {% endfor %}
+  </div>
+  <a class="btn btn-sm" href="/documents/new?linked_type={{ linked_type }}&linked_id={{ linked_id }}" style="margin-top:10px;">+ Attach document</a>
 </div>

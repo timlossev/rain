@@ -215,6 +215,76 @@ class TicketRule(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class CorrelationRule(TenantBase):
+    """Multi-event correlation, evaluated once per newly-persisted event
+    (rain.modules.tickets.correlation), alongside -- not instead of --
+    TicketRule's single-event promotion. `rule_type` is a forward-looking
+    discriminator: "threshold" (the only kind implemented) counts events
+    matching `match_field`/`pattern` within a trailing `window_minutes`
+    window, optionally grouped by `group_by` (a distinct correlation
+    "instance" per group-key value, e.g. per host), and fires once that
+    count reaches `threshold_count`. A future "sequence" rule_type (A
+    then B within T, or absence-of-B-after-A) could reuse this same
+    table/nav/evaluation entry point without a schema change to this
+    table beyond whatever its own config needs -- deliberately not
+    designed yet, since threshold correlation alone already covers the
+    common case (rate/frequency-based alerting) real correlation rules
+    in practice mostly are.
+
+    No continuous streaming engine behind this (compare: Esper/Norikra) --
+    the count is a plain, bounded SQL query against syslog_events run at
+    the moment a new event arrives, which is sufficient because the only
+    thing that can ever push a threshold rule over its line is the event
+    that was just persisted."""
+
+    __tablename__ = "correlation_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    rule_type: Mapped[str] = mapped_column(String(15), default="threshold", server_default="threshold")
+    ticket_type: Mapped[str] = mapped_column(String(15))  # incident | vulnerability
+    match_field: Mapped[str] = mapped_column(String(15), default="message", server_default="message")
+    pattern: Mapped[str] = mapped_column(String(500))
+    group_by: Mapped[str] = mapped_column(String(15), default="none", server_default="none")  # none|host|program
+    threshold_count: Mapped[int] = mapped_column(Integer, default=5, server_default="5")
+    window_minutes: Mapped[int] = mapped_column(Integer, default=5, server_default="5")
+    title_template: Mapped[str] = mapped_column(
+        String(255),
+        default="{count} matching events in {window}m",
+        server_default="{count} matching events in {window}m",
+    )
+    severity: Mapped[str] = mapped_column(String(15), default="medium", server_default="medium")
+    asset_match_field: Mapped[str | None] = mapped_column(String(15), nullable=True)  # host|program, matched to Asset.external_id
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CorrelationRuleState(TenantBase):
+    """One row per (rule, group-key) actually seen -- e.g. one row per
+    host for a rule grouped by host. Tracks when that group last fired a
+    ticket so a threshold that stays breached doesn't spawn a new ticket
+    on every subsequent matching event; it re-arms once `window_minutes`
+    has elapsed since the last trigger (not once the count drops back
+    under the threshold -- simpler to reason about and to implement
+    without keeping a live count outside of the DB query itself).
+
+    `group_key` is `""` (never NULL) for an ungrouped (group_by="none")
+    rule -- Postgres unique constraints treat every NULL as distinct from
+    every other NULL, which would silently defeat both the uniqueness
+    guarantee and the ON CONFLICT upsert in
+    rain.modules.tickets.correlation for any rule that isn't grouped."""
+
+    __tablename__ = "correlation_rule_states"
+    __table_args__ = (UniqueConstraint("rule_id", "group_key", name="uq_correlation_rule_states_rule_group"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rule_id: Mapped[int] = mapped_column(ForeignKey("correlation_rules.id", ondelete="CASCADE"), index=True)
+    group_key: Mapped[str] = mapped_column(String(255), default="", server_default="")
+    last_triggered_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+
+
 class TicketStatus(TenantBase):
     """Per-tenant customizable ticket status ('Open', 'In Progress', ...).
     Ticket.status stores this row's `key` as a plain string rather than a
@@ -249,6 +319,9 @@ class Ticket(TenantBase):
     asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"), nullable=True)
     source_event_id: Mapped[int | None] = mapped_column(ForeignKey("syslog_events.id", ondelete="SET NULL"), nullable=True)
     source_rule_id: Mapped[int | None] = mapped_column(ForeignKey("ticket_rules.id", ondelete="SET NULL"), nullable=True)
+    source_correlation_rule_id: Mapped[int | None] = mapped_column(
+        ForeignKey("correlation_rules.id", ondelete="SET NULL"), nullable=True
+    )
     assignee_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reporter_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
@@ -258,6 +331,7 @@ class Ticket(TenantBase):
     closed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     asset: Mapped[Asset | None] = relationship()
+    source_correlation_rule: Mapped[CorrelationRule | None] = relationship()
     comments: Mapped[list["TicketComment"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")
     status_changes: Mapped[list["TicketStatusChange"]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan", order_by="TicketStatusChange.created_at"

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% import "_pagination.html" as pg %}
+{% block title %}Correlation Rules - {{ branding.instance_name }}{% endblock %}
+{% block content %}
+<h1>Correlation Rules</h1>
+<p class="muted">Unlike Event Policies (one event, first match wins), a correlation rule looks across <em>multiple</em>
+  events: when the count of events matching <code>pattern</code> within the trailing time window reaches the
+  threshold, a ticket is created -- e.g. 5 events matching "failed password" from the same host within 2 minutes.
+  Optionally grouped by host or program, so each host/program breaching the threshold gets its own ticket. Once
+  fired, a rule+group re-arms after the window elapses (it won't fire again on every subsequent matching event).</p>
+
+<div class="tabs" data-tabs>
+  <div class="tab-buttons">
+    <button type="button" class="tab-btn active" data-tab-btn="list">Active rules</button>
+    <button type="button" class="tab-btn" data-tab-btn="new">New rule</button>
+  </div>
+
+<div class="tab-panel active" data-tab-panel="list">
+<div class="card">
+  <table>
+    <thead><tr><th>Order</th><th>Name</th><th>Type</th><th>Pattern</th><th>Threshold</th><th>Window</th><th>Group by</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for r in page.items %}
+      <tr>
+        <td class="muted">{{ r.sort_order }}</td>
+        <td>{{ r.name }}</td>
+        <td><span class="badge">{{ r.ticket_type }}</span></td>
+        <td class="muted">{{ r.match_field }}: <code>{{ r.pattern }}</code></td>
+        <td class="muted">{{ r.threshold_count }} events</td>
+        <td class="muted">{{ r.window_minutes }}m</td>
+        <td class="muted">{{ r.group_by }}</td>
+        <td>
+          <form class="inline" method="post" action="/tickets/correlation-rules/{{ r.id }}/toggle">
+            {% if r.is_active %}<button class="btn btn-sm" type="submit">active</button>
+            {% else %}<button class="btn btn-sm btn-danger" type="submit">disabled</button>{% endif %}
+          </form>
+        </td>
+        <td class="actions">
+          <form class="inline" method="post" action="/tickets/correlation-rules/{{ r.id }}/delete" data-confirm="Delete rule '{{ r.name }}'?">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" class="muted">No correlation rules yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ pg.render_pagination(page) }}
+</div>
+</div>
+
+<div class="tab-panel" data-tab-panel="new">
+<div class="card">
+  <form method="post" action="/tickets/correlation-rules">
+    <div class="form-row">
+      <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" placeholder="Brute-force login attempts" required></div>
+      <div class="field">
+        <label for="ticket_type">Ticket type</label>
+        <select id="ticket_type" name="ticket_type">
+          {% for t in ticket_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="severity">Severity</label>
+        <select id="severity" name="severity">
+          {% for s in severities %}<option value="{{ s }}" {% if s == "medium" %}selected{% endif %}>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label for="match_field">Match on</label>
+        <select id="match_field" name="match_field">
+          {% for f in match_fields %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="pattern">Pattern (regex)</label><input type="text" id="pattern" name="pattern" placeholder="failed password" required></div>
+      <div class="field" style="flex:0 0 100px;"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label for="group_by">Group by</label>
+        <select id="group_by" name="group_by">
+          {% for g in group_by_fields %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
+        </select>
+        <div class="field-hint">"none" correlates across all matching events tenant-wide; "host"/"program" gives each value its own count and its own ticket.</div>
+      </div>
+      <div class="field" style="flex:0 0 140px;"><label for="threshold_count">Threshold (events)</label><input type="number" id="threshold_count" name="threshold_count" value="5" min="2" required></div>
+      <div class="field" style="flex:0 0 140px;"><label for="window_minutes">Window (minutes)</label><input type="number" id="window_minutes" name="window_minutes" value="5" min="1" required></div>
+    </div>
+    <div class="field">
+      <label for="title_template">Title template</label>
+      <input type="text" id="title_template" name="title_template" value="{count} matching events in {window}m" placeholder="{count} matching events in {window}m">
+      <div class="field-hint">Available placeholders: <code>{count}</code>, <code>{window}</code>, <code>{message}</code>, <code>{host}</code>, <code>{program}</code> (the last three come from the most recent contributing event).</div>
+    </div>
+    <div class="field">
+      <label for="asset_match_field">Auto-link asset by</label>
+      <select id="asset_match_field" name="asset_match_field">
+        <option value="">Don't auto-link</option>
+        <option value="host">Most recent event's host = asset External ID</option>
+        <option value="program">Most recent event's program = asset External ID</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Add rule</button>
+  </form>
+</div>
+</div>
+</div>
+{% endblock %}

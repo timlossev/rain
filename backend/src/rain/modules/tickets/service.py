@@ -28,6 +28,7 @@ async def create_ticket(
     asset_id: int | None = None,
     source_event_id: int | None = None,
     source_rule_id: int | None = None,
+    source_correlation_rule_id: int | None = None,
     assignee_user_id: int | None = None,
     reporter_user_id: int | None = None,
 ) -> Ticket:
@@ -40,6 +41,7 @@ async def create_ticket(
         asset_id=asset_id,
         source_event_id=source_event_id,
         source_rule_id=source_rule_id,
+        source_correlation_rule_id=source_correlation_rule_id,
         assignee_user_id=assignee_user_id,
         reporter_user_id=reporter_user_id,
     )
@@ -101,6 +103,7 @@ async def get_ticket(db: AsyncSession, ticket_id: int) -> Ticket | None:
         .where(Ticket.id == ticket_id)
         .options(
             selectinload(Ticket.asset),
+            selectinload(Ticket.source_correlation_rule),
             selectinload(Ticket.comments),
             selectinload(Ticket.status_changes),
             selectinload(Ticket.rule_triggers),

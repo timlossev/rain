@@ -21,7 +21,7 @@ from rain.core.tenant_config import get_tenant_config
 from rain.db.base import control_session, tenant_session
 from rain.db.control_models import Tenant
 from rain.db.tenant_models import SyslogEvent
-from rain.modules.tickets import rules
+from rain.modules.tickets import correlation, rules
 from rain.modules.tickets.live_bus import live_bus
 from rain.modules.tickets.routing import resolve_tenant_for_event
 from rain.modules.tickets.syslog_parser import parse_line, severity_label
@@ -95,6 +95,12 @@ async def handle_raw_line(raw_line: str) -> None:
                 # any are configured to match) -- no separate notify step
                 # needed here.
                 await rules.apply_rule(db, matched_rule, event)
+
+            # Correlation Rules (multi-event: "N matching events within
+            # T minutes") run independently of the single-event match
+            # above -- an event can both promote itself via a TicketRule
+            # *and* contribute to a Correlation Rule's count.
+            await correlation.evaluate_correlation_rules(db, event)
     except Exception:
         logger.exception("failed to handle syslog line: %r", raw_line[:200])
 

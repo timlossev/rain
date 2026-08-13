@@ -20,14 +20,22 @@ async def find_matching_rule(db: AsyncSession, event: SyslogEvent) -> TicketRule
     return None
 
 
-def rule_matches(rule: TicketRule, event: SyslogEvent) -> bool:
-    value = getattr(event, rule.match_field, None)
+def field_matches(match_field: str, pattern: str, event: SyslogEvent) -> bool:
+    """The one matcher every regex-based rule concept in this app shares
+    (TicketRule here, CorrelationRule's base filter in
+    rain.modules.tickets.correlation) -- so "does this event match this
+    field/pattern" always means exactly the same thing everywhere."""
+    value = getattr(event, match_field, None)
     if not value:
         return False
     try:
-        return re.search(rule.pattern, value) is not None
+        return re.search(pattern, value) is not None
     except re.error:
         return False
+
+
+def rule_matches(rule: TicketRule, event: SyslogEvent) -> bool:
+    return field_matches(rule.match_field, rule.pattern, event)
 
 
 async def apply_rule(db: AsyncSession, rule: TicketRule, event: SyslogEvent) -> Ticket:
