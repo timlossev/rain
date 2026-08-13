@@ -43,6 +43,14 @@ nav_registry.register(
                 order=8,
                 roles=("internal_admin",),
             ),
+            NavNode(key="admin-groups", label="Groups", href="/admin/groups", order=9, roles=("internal_admin",)),
+            NavNode(
+                key="admin-approval-flows",
+                label="Approval Flows",
+                href="/admin/approval-flows",
+                order=10,
+                roles=("internal_admin",),
+            ),
         ],
     )
 )

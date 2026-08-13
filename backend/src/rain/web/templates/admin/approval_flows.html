@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% import "_pagination.html" as pg %}
+{% block title %}Approval Flows - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Named, ordered approval processes for Change tickets. Each step is assigned to a group (any one member clears it) or an individual user; a step doesn't open until the one before it clears. Mark one flow "default" to have it auto-selected on new changes.{% endblock %}
+{% block content %}
+<div class="panel-row" style="justify-content:flex-end;">
+  <a class="btn btn-primary" href="/admin/approval-flows/new">+ New flow</a>
+</div>
+
+<div class="card">
+  <table>
+    <thead><tr><th>Name</th><th>Steps</th><th>Default</th><th></th></tr></thead>
+    <tbody>
+      {% for f in page.items %}
+      <tr>
+        <td>{{ f.name }}</td>
+        <td class="muted">
+          {% for s in f.steps %}{{ loop.index }}. {{ s.label }} &rarr; {% if s.approver_group_id %}group: {{ group_names.get(s.approver_group_id, "deleted group") }}{% elif s.approver_user_id %}{{ step_user_names.get(s.approver_user_id, "unknown user") }}{% else %}(unassigned){% endif %}{% if not loop.last %}<br>{% endif %}{% else %}No steps.{% endfor %}
+        </td>
+        <td>{% if f.is_default %}<span class="badge badge-accent">default</span>{% else %}
+          <form class="inline" method="post" action="/admin/approval-flows/{{ f.id }}/set-default">
+            <button class="btn btn-sm" type="submit">Make default</button>
+          </form>
+        {% endif %}</td>
+        <td class="actions">
+          <form class="inline" method="post" action="/admin/approval-flows/{{ f.id }}/delete" data-confirm="Delete flow '{{ f.name }}'? Changes already using it keep their recorded decisions.">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">No approval flows yet -- Change tickets won't have an approval process until one is created.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ pg.render_pagination(page) }}
+</div>
+{% endblock %}

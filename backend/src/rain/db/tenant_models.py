@@ -285,6 +285,73 @@ class CorrelationRuleState(TenantBase):
     last_triggered_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
 
 
+class Group(TenantBase):
+    """A named set of users, scoped to this tenant -- the assignment target
+    for an approval flow step (rather than naming individual people one by
+    one every time a flow is defined)."""
+
+    __tablename__ = "groups"
+    __table_args__ = (UniqueConstraint("name", name="uq_groups_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    members: Mapped[list["GroupMembership"]] = relationship(back_populates="group", cascade="all, delete-orphan")
+
+
+class GroupMembership(TenantBase):
+    __tablename__ = "group_memberships"
+    __table_args__ = (UniqueConstraint("group_id", "user_id", name="uq_group_memberships_group_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), index=True)
+    # control.users id -- cross-schema, plain integer (see module docstring).
+    user_id: Mapped[int] = mapped_column(Integer)
+
+    group: Mapped[Group] = relationship(back_populates="members")
+
+
+class ApprovalFlow(TenantBase):
+    """A reusable, named approval process -- an ordered list of steps, each
+    assigned to a group or an individual user. Change tickets attach one
+    instance of a flow (ChangeApproval) at creation time; editing a flow
+    afterwards doesn't retroactively change tickets already using it (each
+    decision snapshots its step's label -- see ChangeApprovalDecision)."""
+
+    __tablename__ = "approval_flows"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    steps: Mapped[list["ApprovalFlowStep"]] = relationship(
+        back_populates="flow", cascade="all, delete-orphan", order_by="ApprovalFlowStep.sort_order"
+    )
+
+
+class ApprovalFlowStep(TenantBase):
+    """One step in an ApprovalFlow. Exactly one of approver_group_id /
+    approver_user_id is set (enforced at the app layer, not the DB, matching
+    this codebase's light-touch constraint style elsewhere) -- a group step
+    clears when any one of its members approves."""
+
+    __tablename__ = "approval_flow_steps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    flow_id: Mapped[int] = mapped_column(ForeignKey("approval_flows.id", ondelete="CASCADE"), index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    label: Mapped[str] = mapped_column(String(255))
+    approver_group_id: Mapped[int | None] = mapped_column(ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
+    # control.users id -- cross-schema, plain integer (see module docstring).
+    approver_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    flow: Mapped[ApprovalFlow] = relationship(back_populates="steps")
+    approver_group: Mapped[Group | None] = relationship()
+
+
 class TicketStatus(TenantBase):
     """Per-tenant customizable ticket status ('Open', 'In Progress', ...).
     Ticket.status stores this row's `key` as a plain string rather than a
@@ -310,8 +377,8 @@ class Ticket(TenantBase):
     __tablename__ = "tickets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    ticket_number: Mapped[str] = mapped_column(String(31), unique=True, index=True)  # INC-000123 / VULN-000045
-    ticket_type: Mapped[str] = mapped_column(String(15))  # incident | vulnerability
+    ticket_number: Mapped[str] = mapped_column(String(31), unique=True, index=True)  # INC-000123 / VULN-000045 / CHG-000012
+    ticket_type: Mapped[str] = mapped_column(String(15))  # incident | vulnerability | change
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(15), default="open", server_default="open")
@@ -322,6 +389,15 @@ class Ticket(TenantBase):
     source_correlation_rule_id: Mapped[int | None] = mapped_column(
         ForeignKey("correlation_rules.id", ondelete="SET NULL"), nullable=True
     )
+    # Set when this ticket was promoted from another one (incident/vulnerability
+    # -> change is the only path today, but this is generic). SET NULL on
+    # delete rather than CASCADE -- losing the origin ticket shouldn't take
+    # the promoted one down with it.
+    source_ticket_id: Mapped[int | None] = mapped_column(ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True)
+    # change tickets only -- the maintenance/implementation window. Shown on
+    # the tenant calendar alongside CalendarEntry rows.
+    start_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
     assignee_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reporter_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
@@ -332,6 +408,7 @@ class Ticket(TenantBase):
 
     asset: Mapped[Asset | None] = relationship()
     source_correlation_rule: Mapped[CorrelationRule | None] = relationship()
+    source_ticket: Mapped["Ticket | None"] = relationship(remote_side=[id])
     comments: Mapped[list["TicketComment"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")
     status_changes: Mapped[list["TicketStatusChange"]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan", order_by="TicketStatusChange.created_at"
@@ -344,6 +421,9 @@ class Ticket(TenantBase):
     )
     rule_triggers: Mapped[list["PlatformEventTrigger"]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan", order_by="PlatformEventTrigger.created_at"
+    )
+    approval: Mapped["ChangeApproval | None"] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan", uselist=False
     )
 
 
@@ -410,6 +490,51 @@ class TicketAssetChange(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     ticket: Mapped[Ticket] = relationship(back_populates="asset_changes")
+
+
+class ChangeApproval(TenantBase):
+    """One change ticket's approval lifecycle -- which flow it's running
+    (null if none was configured/selected), which step it's currently
+    waiting on, and the running outcome. `current_step_order` matches an
+    ApprovalFlowStep.sort_order; once the last step's decision is recorded,
+    overall_status flips to "approved" (or "rejected" immediately, on any
+    step's rejection -- rejection short-circuits the remaining steps)."""
+
+    __tablename__ = "change_approvals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), unique=True, index=True)
+    flow_id: Mapped[int | None] = mapped_column(ForeignKey("approval_flows.id", ondelete="SET NULL"), nullable=True)
+    current_step_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    overall_status: Mapped[str] = mapped_column(String(15), default="pending", server_default="pending")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    ticket: Mapped[Ticket] = relationship(back_populates="approval")
+    flow: Mapped[ApprovalFlow | None] = relationship()
+    decisions: Mapped[list["ChangeApprovalDecision"]] = relationship(
+        back_populates="approval", cascade="all, delete-orphan", order_by="ChangeApprovalDecision.created_at"
+    )
+
+
+class ChangeApprovalDecision(TenantBase):
+    """One approve/reject decision recorded against a ChangeApproval --
+    the audit trail shown in the ticket's activity feed. step_label is a
+    snapshot (not a live join to ApprovalFlowStep) so editing or deleting
+    the flow template later doesn't rewrite what already happened."""
+
+    __tablename__ = "change_approval_decisions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    approval_id: Mapped[int] = mapped_column(ForeignKey("change_approvals.id", ondelete="CASCADE"), index=True)
+    step_order: Mapped[int] = mapped_column(Integer)
+    step_label: Mapped[str] = mapped_column(String(255))
+    decided_by_user_id: Mapped[int] = mapped_column(Integer)
+    decision: Mapped[str] = mapped_column(String(15))  # approved | rejected
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    approval: Mapped[ChangeApproval] = relationship(back_populates="decisions")
 
 
 class NotificationChannel(TenantBase):

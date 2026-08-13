@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% import "_pagination.html" as pg %}
+{% import "_modal.html" as modal %}
+{% block title %}Groups - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Named sets of users, scoped to the active tenant. Used as an approval flow step's target -- any one member of the group can clear that step -- instead of naming individual people every time a flow is defined.{% endblock %}
+{% block content %}
+<div class="panel-row" style="justify-content:flex-end;">
+  {{ modal.trigger_button("group", "+ New group") }}
+</div>
+
+<div class="card">
+  <table>
+    <thead><tr><th>Name</th><th>Description</th><th>Members</th><th></th></tr></thead>
+    <tbody>
+      {% for g in page.items %}
+      <tr>
+        <td><a href="/admin/groups/{{ g.id }}">{{ g.name }}</a></td>
+        <td class="muted">{{ g.description or "-" }}</td>
+        <td class="muted">{{ member_counts.get(g.id, 0) }}</td>
+        <td class="actions">
+          <form class="inline" method="post" action="/admin/groups/{{ g.id }}/delete" data-confirm="Delete group '{{ g.name }}'? Any approval flow steps assigned to it will lose that assignment.">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">No groups yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ pg.render_pagination(page) }}
+</div>
+
+{% call modal.modal("group", "New group") %}
+  <form method="post" action="/admin/groups">
+    <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" placeholder="Change Advisory Board" required></div>
+    <div class="field"><label for="description">Description (optional)</label><input type="text" id="description" name="description" placeholder="Reviews and approves standard changes"></div>
+    <button class="btn btn-primary" type="submit">Create group</button>
+  </form>
+{% endcall %}
+{% endblock %}

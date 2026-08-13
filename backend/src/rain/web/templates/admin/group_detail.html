@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% import "_search_picker.html" as picker %}
+{% block title %}{{ group.name }} - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Manage this group's members. Any one member can clear an approval flow step this group is assigned to.{% endblock %}
+{% block content %}
+<div class="panel-row" style="justify-content:flex-end;">
+  <a class="btn btn-sm" href="/admin/groups">&larr; All groups</a>
+</div>
+
+<div class="card">
+  <div class="card-title">{{ group.name }}</div>
+  {% if group.description %}<p class="muted">{{ group.description }}</p>{% endif %}
+
+  <table>
+    <thead><tr><th>Member</th><th></th></tr></thead>
+    <tbody>
+      {% for m in group.members %}
+      <tr>
+        <td>{{ member_names.get(m.user_id, "Unknown user #" ~ m.user_id) }}</td>
+        <td class="actions">
+          <form class="inline" method="post" action="/admin/groups/{{ group.id }}/members/{{ m.id }}/remove" data-confirm="Remove this member from {{ group.name }}?">
+            <button class="btn btn-sm btn-danger" type="submit">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="2" class="muted">No members yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <form method="post" action="/admin/groups/{{ group.id }}/members" class="form-row" style="margin-top:14px; align-items:end;">
+    {{ picker.search_picker("user_id", "/tickets/users/search", label="Add member", placeholder="Search by name or email...") }}
+    <button class="btn btn-sm" type="submit">Add</button>
+  </form>
+</div>
+{% endblock %}

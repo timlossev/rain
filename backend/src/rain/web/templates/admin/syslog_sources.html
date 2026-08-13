@@ -5,8 +5,7 @@
 {% block help_text %}Point your syslog-ng destination at this host and route incoming events to the correct tenant by matching host or program against a pattern -- the first matching rule wins; unmatched events are dropped.{% endblock %}
 {% block content %}
 <div class="card">
-  <p>Point your syslog-ng destination at this host, port <strong>{{ listener_port }}</strong> (TCP or UDP, newline-delimited).
-  Example syslog-ng destination:</p>
+  <p>Port <strong>{{ listener_port }}</strong> (TCP or UDP, newline-delimited). Example syslog-ng destination:</p>
   <pre style="background:var(--surface-sunken); padding:12px; border-radius:var(--radius-sm); overflow-x:auto;"><code>destination d_rain {
     network("&lt;rain-host&gt;" port({{ listener_port }}) transport("tcp"));
 };
@@ -18,8 +17,7 @@ log { source(s_src); destination(d_rain); };</code></pre>
 </div>
 
 <div class="card">
-  <p class="muted">Each incoming event is matched against these rules, in order, to decide which tenant it belongs to.
-    The first match wins; unmatched events are dropped. Use pattern <code>.*</code> with Regex checked as a catch-all.</p>
+  <p class="muted">Use pattern <code>.*</code> with Regex checked as a catch-all.</p>
   <table>
     <thead><tr><th>Order</th><th>Tenant</th><th>Match on</th><th>Pattern</th><th>Regex</th><th></th></tr></thead>
     <tbody>
