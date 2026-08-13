@@ -122,6 +122,13 @@ p { margin: 0 0 1em; }
 .user-menu-divider { border-top: 1px solid var(--border); margin: 10px 0; }
 .content { padding: 24px; max-width: 1100px; width: 100%; }
 .content-full { max-width: none; }
+/* Collapsing the sidebar is the reader's own signal that they want the
+   screen space back -- keeping content capped at 1100px while the
+   sidebar sits at 60px instead of ~272px left a static block of unused
+   white space on the right exactly as wide as the space just reclaimed
+   (reported live). Only loosens the cap while collapsed; the expanded
+   sidebar's normal reading-width behavior is unchanged. */
+.shell:has(.sidebar.collapsed) .content { max-width: none; }
 .content-standalone {
   min-height: 100vh;
   display: flex;
@@ -287,14 +294,22 @@ p { margin: 0 0 1em; }
 .sidebar.collapsed > nav > .nav-tree > .nav-item.has-children > .nav-children {
   display: none;
   position: absolute;
+  /* Flush against the sidebar (no margin-left gap) -- a gap here is a dead
+     zone: moving the mouse off the icon toward the flyout crosses empty
+     space where neither element is hovered, so :hover drops and the flyout
+     closes before the pointer arrives (reported live: "before I can select
+     a sub-item, the menu disappears"). Zero gap means every point on the
+     path from icon to flyout stays inside one hoverable box or the other;
+     the old 8px gap is kept as padding instead (still part of this box,
+     not empty space outside it), so the visible menu still looks inset
+     from the sidebar the same amount as before. */
   left: 100%;
   top: -6px;
-  margin-left: 8px;
   min-width: 210px;
   background: #1b1e2b;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius);
-  padding: 6px;
+  padding: 6px 6px 6px 14px;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
   z-index: 30;
 }
@@ -569,6 +584,23 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
 table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 th { color: var(--text-muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+/* Column headers (thead th) specifically -- more specific than the bare
+   `th` rule above on purpose, since plenty of tables (ticket/asset
+   metadata) also use a <th> as a row's leftmost label cell in <tbody>,
+   which should keep looking like a plain label, not a column-header bar.
+   A tinted band + firmer bottom border gives every list table (tickets,
+   assets, users, ...) a clearer head/body separation than a 1px line
+   that's otherwise identical to every row divider below it. */
+thead th {
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-weight: 700;
+  padding: 11px 10px;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+thead tr:first-child th:first-child { border-top-left-radius: var(--radius-sm); }
+thead tr:first-child th:last-child { border-top-right-radius: var(--radius-sm); }
 tr:last-child td { border-bottom: none; }
 td.actions { text-align: right; white-space: nowrap; }
 
