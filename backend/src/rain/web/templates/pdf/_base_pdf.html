@@ -9,7 +9,6 @@
   body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #1a1d29; }
   .pdf-header { width: 100%; border-bottom: 2px solid {{ branding.accent_color or "#6366f1" }}; padding-bottom: 10px; margin-bottom: 18px; }
   .pdf-header table { width: 100%; }
-  .pdf-logo { width: 30px; height: 30px; }
   .pdf-instance { font-size: 8.5pt; color: #6b7280; }
   .pdf-doc-type { font-size: 8.5pt; color: #6b7280; text-align: right; }
   .pdf-title { font-size: 18pt; font-weight: bold; margin: 4px 0 2px; }
@@ -45,7 +44,7 @@
   <div class="pdf-header">
     <table>
       <tr>
-        {% if branding.logo_path %}<td style="width:38px;"><img class="pdf-logo" src="{{ branding.logo_path }}"></td>{% endif %}
+        {% if pdf_logo_src %}<td style="width:{{ pdf_logo_width + 8 }}px;"><img style="width:{{ pdf_logo_width }}px;height:{{ pdf_logo_height }}px;" src="{{ pdf_logo_src }}"></td>{% endif %}
         <td><div class="pdf-instance">{{ branding.instance_name or "RAIN" }}</div></td>
         <td class="pdf-doc-type">{{ doc_kind }}<br>Generated {{ generated_at }}</td>
       </tr>

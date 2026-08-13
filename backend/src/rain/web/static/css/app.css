@@ -80,6 +80,9 @@ p { margin: 0 0 1em; }
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
+.breadcrumb { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.breadcrumb-sep { color: var(--sidebar-text-dim); font-size: 0.85rem; }
+.breadcrumb-item { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-user { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--text-muted); }
 .content { padding: 24px; max-width: 1100px; width: 100%; }
 .content-standalone {
@@ -268,11 +271,14 @@ p { margin: 0 0 1em; }
   margin-left: 0;
 }
 .nav-open-btn {
+  all: unset;
   display: flex;
   align-items: center;
   gap: 6px;
+  cursor: pointer;
   color: var(--text-muted);
   font-weight: 600;
+  font-size: 0.85rem;
 }
 .nav-open-btn:hover { color: var(--text); }
 .nav-open-btn .nav-icon { width: 18px; height: 18px; color: inherit; }

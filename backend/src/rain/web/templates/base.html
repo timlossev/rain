@@ -74,9 +74,17 @@
   </aside>
   <div class="main">
     <header class="topbar">
-      <button type="button" class="btn-link nav-open-btn" data-nav-open title="Toggle menu" style="margin-right:auto;">
-        <span class="nav-icon">{{ nav_icon("menu") }}</span> Menu
-      </button>
+      {% set full_title = self.title() %}
+      {% set brand_suffix = " - " ~ branding.instance_name %}
+      {% if full_title.endswith(brand_suffix) %}{% set leaf_label = full_title[:-(brand_suffix|length)] %}{% else %}{% set leaf_label = full_title %}{% endif %}
+      {% set top_label = top_nav_label(nav_tree, request.url.path) %}
+      <div class="breadcrumb" style="margin-right:auto;">
+        <button type="button" class="nav-open-btn" data-nav-open title="Toggle menu">
+          <span class="nav-icon">{{ nav_icon("menu") }}</span> Menu
+        </button>
+        {% if top_label %}<span class="breadcrumb-sep">&rsaquo;</span><span class="breadcrumb-item">{{ top_label }}</span>{% endif %}
+        {% if leaf_label and leaf_label != top_label %}<span class="breadcrumb-sep">&rsaquo;</span><span class="breadcrumb-item">{{ leaf_label }}</span>{% endif %}
+      </div>
       <div class="topbar-user">
         {{ ctx.user.display_name }} <span class="badge badge-accent">{{ ctx.user.role_key }}</span>
         <form method="post" action="/logout" class="inline">
