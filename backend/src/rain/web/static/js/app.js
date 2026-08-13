@@ -60,12 +60,10 @@ document.addEventListener("DOMContentLoaded", () => {
         a.className = "nav-search-result" + (idx === activeIndex ? " active" : "");
         a.href = entry.href;
         a.textContent = entry.label;
-        if (entry.path) {
-          const path = document.createElement("span");
-          path.className = "nav-search-path";
-          path.textContent = entry.path;
-          a.appendChild(path);
-        }
+        const path = document.createElement("span");
+        path.className = "nav-search-path";
+        path.textContent = entry.path ? `Option in Quick Navigation (${entry.path})` : "Option in Quick Navigation";
+        a.appendChild(path);
         navSearchResults.appendChild(a);
       });
       navSearchResults.hidden = matches.length === 0;

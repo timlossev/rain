@@ -33,7 +33,7 @@
 {% endif %}
 
 {% if ticket.rule_triggers %}
-<h2 class="pdf-section">Platform event rule triggers</h2>
+<h2 class="pdf-section">Platform response rule triggers</h2>
 {% for t in ticket.rule_triggers %}
 <div class="pdf-comment">
   <div class="pdf-comment-meta">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "" }} &mdash; {{ t.rule_name }}</div>

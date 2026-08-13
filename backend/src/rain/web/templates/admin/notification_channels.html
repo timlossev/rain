@@ -4,7 +4,7 @@
 {% block content %}
 <h1>Notification Channels</h1>
 <p class="muted">Slack/email destinations for the active tenant ({{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}).
-  These don't fire on their own -- point a <a href="/tickets/platform-events">Platform Event</a> rule's action at
+  These don't fire on their own -- point a <a href="/tickets/platform-events">Platform Response Rule</a>'s action at
   one to decide when it actually gets used. The outbound mail relay itself is configured once, instance-wide, in
   <a href="/admin/smtp">Admin &gt; SMTP Relay</a>.</p>
 
@@ -24,7 +24,7 @@
         <td>{{ c.name }}</td>
         <td><span class="badge">{{ c.channel_type }}</span></td>
         <td class="actions">
-          <form class="inline" method="post" action="/admin/notification-channels/{{ c.id }}/delete" data-confirm="Delete channel '{{ c.name }}'? Any Platform Event actions pointed at it will stop working.">
+          <form class="inline" method="post" action="/admin/notification-channels/{{ c.id }}/delete" data-confirm="Delete channel '{{ c.name }}'? Any Platform Response Rule actions pointed at it will stop working.">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>

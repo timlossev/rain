@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
-{% block title %}Platform Events - {{ branding.instance_name }}{% endblock %}
+{% block title %}Platform Response Rules - {{ branding.instance_name }}{% endblock %}
 {% block content %}
-<h1>Platform Events</h1>
+<h1>Platform Response Rules</h1>
 <p class="muted">React to tickets as they're created -- every active rule whose pattern matches fires (not just the
   first), each running one or more actions. Open a rule to add actions. Every firing is logged on the ticket itself.</p>
 
@@ -34,7 +34,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="8" class="muted">No platform event rules yet.</td></tr>
+      <tr><td colspan="8" class="muted">No platform response rules yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>
