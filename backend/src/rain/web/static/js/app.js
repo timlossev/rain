@@ -190,6 +190,33 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".modal-overlay[data-modal]:not([hidden])").forEach((modal) => { modal.hidden = true; });
   });
 
+  // Topbar user-menu: icon button toggles a dropdown (name/role/Sign out).
+  // Click-toggle + click-outside-to-close rather than hover -- it holds an
+  // actionable Sign out button, and a hover-only menu is a bad fit for that.
+  document.querySelectorAll("[data-user-menu]").forEach((menu) => {
+    const btn = menu.querySelector("[data-user-menu-toggle]");
+    const panel = menu.querySelector("[data-user-menu-panel]");
+    if (!btn || !panel) return;
+    btn.addEventListener("click", (evt) => {
+      evt.stopPropagation();
+      const opening = panel.hidden;
+      panel.hidden = !opening;
+      btn.setAttribute("aria-expanded", String(opening));
+    });
+    document.addEventListener("click", (evt) => {
+      if (!panel.hidden && !menu.contains(evt.target)) {
+        panel.hidden = true;
+        btn.setAttribute("aria-expanded", "false");
+      }
+    });
+    document.addEventListener("keydown", (evt) => {
+      if (evt.key === "Escape" && !panel.hidden) {
+        panel.hidden = true;
+        btn.setAttribute("aria-expanded", "false");
+      }
+    });
+  });
+
   // Confirm before any destructive form submit.
   document.querySelectorAll("form[data-confirm]").forEach((form) => {
     form.addEventListener("submit", (evt) => {
