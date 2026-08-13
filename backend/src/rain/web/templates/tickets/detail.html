@@ -22,10 +22,13 @@
       {% if ticket.is_chronic %}<span class="badge chronic-badge">{{ nav_icon("repeat") }} Chronic</span>{% endif %}
       <span class="badge badge-accent">{{ ticket.ticket_type | capitalize }}</span>
     </div>
-    <div class="ticket-title-inline" title="{{ ticket.title }}">{{ ticket.title }}</div>
+    <form method="post" action="/tickets/{{ ticket.id }}/title" class="ticket-title-form">
+      <input type="text" name="title" value="{{ ticket.title }}" class="ticket-title-input" maxlength="255" required>
+      <button type="submit" class="btn btn-sm">Save</button>
+    </form>
   </div>
   <p class="ticket-description">{{ ticket.description or "No description." }}</p>
-  <table>
+  <table class="ticket-meta">
     <tbody>
       <tr><th>Status</th><td>
         <div class="status-stepper">

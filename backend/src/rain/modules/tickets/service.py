@@ -255,6 +255,20 @@ async def update_chronic(db: AsyncSession, ticket: Ticket, is_chronic: bool) -> 
     await db.commit()
 
 
+async def update_title(db: AsyncSession, ticket: Ticket, new_title: str) -> bool:
+    """Returns False (no-op) for a blank title -- the caller decides how
+    to surface that, same shape as update_status's False for an unknown
+    status. No dedicated change-history table for this one (unlike
+    status/assignee/asset): a title edit is a correction, not a state
+    transition worth its own audit trail."""
+    new_title = new_title.strip()[:255]
+    if not new_title or new_title == ticket.title:
+        return True
+    ticket.title = new_title
+    await db.commit()
+    return True
+
+
 async def update_assignee(
     db: AsyncSession, ticket: Ticket, new_assignee_user_id: int | None, *, changed_by_user_id: int | None = None
 ) -> None:

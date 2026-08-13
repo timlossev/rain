@@ -803,18 +803,29 @@ td.actions { text-align: right; white-space: nowrap; }
 /* ---------- ticket detail header ---------- */
 .ticket-badges-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 14px; }
 .ticket-badges-left { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.ticket-title-inline {
-  min-width: 0;
-  flex: 1 1 auto;
-  text-align: right;
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.ticket-title-form { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 260px; max-width: 480px; margin-left: auto; }
+.ticket-title-input { min-width: 0; flex: 1 1 auto; font-weight: 700; }
 .ticket-description { margin: 0 0 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border); color: var(--text); line-height: 1.5; }
+
+/* Every row in the ticket's key/value metadata table (Status, Assignee,
+   Asset, Reported by, ...) mixes plain text with different interactive
+   controls (status pills, a search-picker input + Save button) that all
+   have their own natural size -- left alone, that made row heights
+   visibly inconsistent (a text row is shorter than a row holding a
+   padded input). Pinning every control in this table to the same
+   height, rather than each other, is scoped here instead of on the
+   shared .status-step/input/.btn-sm rules so it doesn't change their
+   size anywhere else in the app. */
+.ticket-meta td { min-height: 34px; }
+.ticket-meta .status-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 12px;
+}
+.ticket-meta input[type=text] { height: 34px; padding: 0 10px; }
+.ticket-meta .btn-sm { height: 34px; }
 
 /* ---------- chronic flag (manually-set "recurring problem" marker) ---------- */
 .ticket-title-cell { display: flex; align-items: center; gap: 6px; }

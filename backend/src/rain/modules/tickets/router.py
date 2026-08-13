@@ -214,6 +214,19 @@ async def search_assignable_users(
         return [{"id": u.id, "label": f"{u.display_name} ({u.email})"} for u in result.scalars()]
 
 
+@router.post("/{ticket_id:int}/title")
+async def rename_ticket(
+    ticket_id: int,
+    title: str = Form(...),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is not None:
+        await service.update_title(tenant_db, ticket, title)
+    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.post("/{ticket_id:int}/assign")
 async def assign_ticket(
     ticket_id: int,
