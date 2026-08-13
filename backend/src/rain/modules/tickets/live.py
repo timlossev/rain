@@ -14,14 +14,16 @@ import json
 import logging
 
 import asyncpg
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, Form, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from rain.core.rbac import require_login
+from rain.core.rbac import require_internal_admin, require_login
 from rain.core.security import SESSION_COOKIE_NAME
-from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, resolve_ws_tenant_schema
-from rain.db.base import tenant_session
+from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db, resolve_ws_tenant_schema
+from rain.db.base import control_session, tenant_session
+from rain.db.control_models import SyslogSourceMap
 from rain.modules.tickets import service
 from rain.modules.tickets.live_bus import asyncpg_dsn, channel_for
 from rain.modules.tickets.syslog_parser import severity_label
@@ -55,6 +57,61 @@ async def live_page(
 ):
     nav = await build_nav_context(ctx)
     return templates.TemplateResponse(request, "tickets/live.html", {**nav, "ctx": ctx})
+
+
+@router.post("/live/bulk-promote")
+async def live_bulk_promote(
+    event_ids: str = Form(...),  # comma-separated ids, built client-side from the checked rows
+    ticket_type: str = Form(...),  # incident | vulnerability
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Backs the live-feed selection menu's "Turn these into incidents/
+    vulnerabilities" -- one ticket per selected event (there's no "one
+    ticket, several source events" shape in the schema), titled/described
+    the same way the single-event New Ticket form prefills from
+    source_event_id. Skips the review step that flow gets -- deliberately,
+    since reviewing N tickets one at a time defeats the point of a bulk
+    action; assignee/description edits happen after, on each ticket."""
+    if ticket_type not in ("incident", "vulnerability"):
+        return RedirectResponse("/tickets/live", status_code=status.HTTP_303_SEE_OTHER)
+    ids = [int(i) for i in event_ids.split(",") if i.strip().isdigit()]
+    for event_id in ids:
+        event = await service.get_event(tenant_db, event_id)
+        if event is None:
+            continue
+        title = f"{event.program or event.host or 'Event'}: {event.message[:120]}"
+        await service.create_ticket(
+            tenant_db,
+            ticket_type=ticket_type,
+            title=title,
+            description=event.message,
+            source_event_id=event.id,
+            reporter_user_id=ctx.user.id,
+        )
+    return RedirectResponse(f"/tickets?ticket_type={ticket_type}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/live/bulk-discard")
+async def live_bulk_discard(
+    hosts: str = Form(...),  # comma-separated distinct hosts, deduped client-side from the selection
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    """Backs the live-feed selection menu's "Discard these" -- one
+    negation rule (Admin > Syslog Sources) per distinct host among the
+    selected events. Admin-only (unlike bulk-promote above): this writes
+    control-schema routing config that affects every future event from
+    that host, not just tenant-local ticket data. Doesn't touch the
+    already-persisted events themselves -- only stops the host's *future*
+    events from reaching a tenant at all."""
+    host_list = sorted({h.strip() for h in hosts.split(",") if h.strip()})
+    if host_list:
+        async with control_session() as session:
+            for host in host_list:
+                session.add(SyslogSourceMap(match_field="host", pattern=host, is_regex=False, action="discard"))
+            await session.commit()
+    return RedirectResponse("/admin/syslog-sources", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.websocket("/live/ws")

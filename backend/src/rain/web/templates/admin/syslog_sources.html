@@ -2,7 +2,7 @@
 {% import "_pagination.html" as pg %}
 {% import "_modal.html" as modal %}
 {% block title %}Syslog Sources - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Point your syslog-ng destination at this host and route incoming events to the correct tenant by matching host or program against a pattern -- the first matching rule wins; unmatched events are dropped.{% endblock %}
+{% block help_text %}Point your syslog-ng destination at this host and route incoming events to the correct tenant by matching host or program against a pattern -- the first matching rule wins; unmatched events are dropped. A "discard" rule matches the same way but drops the event instead of routing it, for muting a noisy source before it ever reaches a tenant.{% endblock %}
 {% block content %}
 <div class="card">
   <p>Port <strong>{{ listener_port }}</strong> (TCP or UDP, newline-delimited). Example syslog-ng destination:</p>
@@ -19,33 +19,40 @@ log { source(s_src); destination(d_rain); };</code></pre>
 <div class="card">
   <p class="muted">Use pattern <code>.*</code> with Regex checked as a catch-all.</p>
   <table>
-    <thead><tr><th>Order</th><th>Tenant</th><th>Match on</th><th>Pattern</th><th>Regex</th><th></th></tr></thead>
+    <thead><tr><th>Order</th><th>Action</th><th>Match on</th><th>Pattern</th><th>Regex</th><th></th></tr></thead>
     <tbody>
       {% for s in page.items %}
       <tr>
         <td class="muted">{{ s.sort_order }}</td>
-        <td>{{ s.tenant.name }}</td>
+        <td>{% if s.action == "discard" %}<span class="badge badge-danger">discard</span>{% else %}<span class="badge badge-accent">route &rarr; {{ s.tenant.name if s.tenant else "deleted tenant" }}</span>{% endif %}</td>
         <td class="muted">{{ s.match_field }}</td>
         <td><code>{{ s.pattern }}</code></td>
         <td>{{ "yes" if s.is_regex else "-" }}</td>
         <td class="actions">
-          <form class="inline" method="post" action="/admin/syslog-sources/{{ s.id }}/delete" data-confirm="Delete this routing rule?">
+          <form class="inline" method="post" action="/admin/syslog-sources/{{ s.id }}/delete" data-confirm="Delete this rule?">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted">No routing rules yet -- every event will be dropped until one is added.</td></tr>
+      <tr><td colspan="6" class="muted">No rules yet -- every event will be dropped until a routing rule is added.</td></tr>
       {% endfor %}
     </tbody>
   </table>
   {{ pg.render_pagination(page) }}
 </div>
 
-{% call modal.modal("syslog-source", "New routing rule") %}
+{% call modal.modal("syslog-source", "New rule") %}
   <form method="post" action="/admin/syslog-sources">
     <div class="form-row">
       <div class="field">
+        <label for="action">Action</label>
+        <select id="action" name="action" data-action-type-select>
+          <option value="route">Route to tenant</option>
+          <option value="discard">Discard (drop matching events)</option>
+        </select>
+      </div>
+      <div class="field" data-action-fields="route">
         <label for="tenant_id">Tenant</label>
         <select id="tenant_id" name="tenant_id">
           {% for t in tenants %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
@@ -59,6 +66,8 @@ log { source(s_src); destination(d_rain); };</code></pre>
           <option value="message">message (event body)</option>
         </select>
       </div>
+    </div>
+    <div class="form-row">
       <div class="field"><label for="pattern">Pattern</label><input type="text" id="pattern" name="pattern" placeholder="web-.* or .* for catch-all" required></div>
       <div class="field" style="flex:0 0 90px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_regex"> Regex</label></div>
       <div class="field" style="flex:0 0 90px;"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="0"></div>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_search_picker.html" as picker %}
-{% block title %}New Approval Flow - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Define an ordered approval process. Fill in as many of the {{ step_range | length }} step rows as you need, top to bottom -- a row left completely blank (no label, no group, no user) is skipped, so a flow can have anywhere from 1 to {{ step_range | length }} steps.{% endblock %}
+{% block title %}{{ "Edit" if flow else "New" }} Approval Flow - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Define an ordered approval process. Use + Add step / Remove to size it anywhere from 1 to {{ step_range | length }} steps, top to bottom.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
@@ -9,39 +9,50 @@
 </div>
 
 <div class="card">
-  <form method="post" action="/admin/approval-flows">
+  <form method="post" action="{{ '/admin/approval-flows/' ~ flow.id ~ '/edit' if flow else '/admin/approval-flows' }}">
     <div class="form-row">
-      <div class="field"><label for="name">Flow name</label><input type="text" id="name" name="name" placeholder="Standard Change Approval" required autofocus></div>
-      <div class="field" style="flex:0 0 220px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_default"> Make this the default flow</label></div>
+      <div class="field"><label for="name">Flow name</label><input type="text" id="name" name="name" value="{{ flow.name if flow else '' }}" placeholder="Standard Change Approval" required autofocus></div>
+      <div class="field" style="flex:0 0 220px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_default" {% if flow and flow.is_default %}checked{% endif %}> Make this the default flow</label></div>
     </div>
 
     <h3>Steps, in order</h3>
     <p class="field-hint">Each step needs either a group or an individual user -- not both. If both are filled in, the group wins.
       {% if not groups %}No groups exist yet -- <a href="/admin/groups">create one</a> first if you want a group-based step.{% endif %}</p>
-    {% for i in step_range %}
-    <div class="card" style="background:var(--surface-sunken); margin-bottom:10px; padding:14px;">
-      <div class="form-row" style="margin-bottom:0;">
-        <div class="field" style="flex:0 0 60px;">
-          <label>Step</label>
-          <div style="padding-top:8px; font-weight:700; color:var(--text-muted);">{{ i }}</div>
-        </div>
-        <div class="field">
-          <label for="step_label_{{ i }}">Label</label>
-          <input type="text" id="step_label_{{ i }}" name="step_label_{{ i }}" placeholder="{% if i == 1 %}Peer review{% elif i == 2 %}CAB sign-off{% else %}(optional)-- e.g. Final approval{% endif %}">
-        </div>
-        <div class="field">
-          <label for="step_group_{{ i }}">Group</label>
-          <select id="step_group_{{ i }}" name="step_group_{{ i }}">
-            <option value="">-</option>
-            {% for g in groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}
-          </select>
-        </div>
-        {{ picker.search_picker("step_user_" ~ i, "/tickets/users/search", label="or an individual user", placeholder="Search by name or email...") }}
-      </div>
-    </div>
-    {% endfor %}
 
-    <button class="btn btn-primary" type="submit">Create flow</button>
+    {% set initial_visible = [(step_prefill | length), 1] | max %}
+    <div data-step-field data-step-min="1" data-step-max="{{ step_range | length }}">
+    <div data-step-rows>
+      {% for i in step_range %}
+      {% set prefill = step_prefill.get(i) %}
+      <div class="card" data-step-row style="background:var(--surface-sunken); margin-bottom:10px; padding:14px;" {% if i > initial_visible %}hidden{% endif %}>
+        <div class="form-row" style="margin-bottom:0; align-items:flex-end;">
+          <div class="field" style="flex:0 0 60px;">
+            <label>Step</label>
+            <div style="padding-top:8px; font-weight:700; color:var(--text-muted);">{{ i }}</div>
+          </div>
+          <div class="field">
+            <label for="step_label_{{ i }}">Label</label>
+            <input type="text" id="step_label_{{ i }}" name="step_label_{{ i }}" value="{{ prefill.label if prefill else '' }}" placeholder="{% if i == 1 %}Peer review{% elif i == 2 %}CAB sign-off{% else %}(optional)-- e.g. Final approval{% endif %}">
+          </div>
+          <div class="field">
+            <label for="step_group_{{ i }}">Group</label>
+            <select id="step_group_{{ i }}" name="step_group_{{ i }}">
+              <option value="">-</option>
+              {% for g in groups %}<option value="{{ g.id }}" {% if prefill and prefill.group_id == g.id %}selected{% endif %}>{{ g.name }}</option>{% endfor %}
+            </select>
+          </div>
+          {{ picker.search_picker("step_user_" ~ i, "/tickets/users/search", label="or an individual user", initial_value=prefill.user_id if prefill else none, initial_label=prefill.user_label if prefill else "", placeholder="Search by name or email...") }}
+          <div class="field" style="flex:0 0 auto;">
+            <button type="button" class="btn btn-sm btn-danger" data-remove-step-btn>Remove</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="btn btn-sm" data-add-step-btn style="margin-bottom:16px;">+ Add step</button>
+    </div>
+
+    <button class="btn btn-primary" type="submit">{{ "Save changes" if flow else "Create flow" }}</button>
     <a class="btn" href="/admin/approval-flows">Cancel</a>
   </form>
 </div>

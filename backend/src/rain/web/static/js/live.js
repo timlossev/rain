@@ -52,6 +52,7 @@
     const row = document.createElement("div");
     const sevClass = evt.severity_label || "unknown";
     row.className = `live-row sev-${sevClass}`;
+    row.dataset.id = evt.id;
     row.dataset.severity = evt.severity ?? "";
     row.dataset.host = evt.host || "";
     row.dataset.program = evt.program || "";
@@ -59,15 +60,12 @@
 
     const time = new Date(evt.received_at).toLocaleTimeString();
     row.innerHTML = `
+      <input type="checkbox" class="live-select" data-live-select aria-label="Select this event">
       <span class="live-time">${time}</span>
       <span class="badge live-sev sev-${sevClass}">${sevClass}</span>
       <span class="live-host">${escapeHtml(evt.host || "-")}</span>
       <span class="live-program">${escapeHtml(evt.program || "-")}</span>
       <span class="live-message">${escapeHtml(evt.message || "")}</span>
-      <span class="live-actions">
-        <a class="btn btn-sm" href="/tickets/new?ticket_type=incident&source_event_id=${evt.id}">Incident</a>
-        <a class="btn btn-sm" href="/tickets/new?ticket_type=vulnerability&source_event_id=${evt.id}">Vuln</a>
-      </span>
     `;
     return row;
   }
@@ -75,6 +73,57 @@
   [filterText, filterSeverity].forEach((el) => {
     el.addEventListener("input", () => {
       feed.querySelectorAll(".live-row").forEach(applyFilterToRow);
+    });
+  });
+
+  // Selection menu: the [...] dropdown in the panel-row acts on whichever
+  // rows are currently checked, replacing the old per-row Incident/Vuln
+  // links -- those only ever handled one event at a time.
+  const selectionMenu = document.getElementById("live-selection-menu");
+  const selectionCount = document.getElementById("live-selection-count");
+  const promoteForm = document.getElementById("live-bulk-promote-form");
+  const discardForm = document.getElementById("live-bulk-discard-form");
+
+  function selectedRows() {
+    return Array.from(feed.querySelectorAll("[data-live-select]:checked")).map((cb) => cb.closest(".live-row"));
+  }
+
+  function updateSelectionUI() {
+    const count = selectedRows().length;
+    selectionCount.textContent = `${count} selected`;
+    selectionMenu.hidden = count === 0;
+  }
+
+  feed.addEventListener("change", (evt) => {
+    if (evt.target.matches("[data-live-select]")) updateSelectionUI();
+  });
+
+  document.querySelectorAll("[data-live-action]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const rows = selectedRows();
+      if (!rows.length) return;
+      const action = btn.dataset.liveAction;
+
+      if (action === "incident" || action === "vulnerability") {
+        promoteForm.querySelector("[name=event_ids]").value = rows.map((row) => row.dataset.id).join(",");
+        promoteForm.querySelector("[name=ticket_type]").value = action;
+        promoteForm.submit();
+      } else if (action === "discard") {
+        const hosts = Array.from(new Set(rows.map((row) => row.dataset.host).filter(Boolean)));
+        if (!hosts.length) return; // nothing with a host among the selection to build a rule from
+        discardForm.dataset.confirm =
+          `Add a discard rule for ${hosts.length} host(s) (${hosts.join(", ")})? ` +
+          "Future events from them will be dropped before reaching any tenant -- this doesn't delete what's already here.";
+        discardForm.querySelector("[name=hosts]").value = hosts.join(",");
+        discardForm.submit();
+      } else if (action === "correlate") {
+        const params = new URLSearchParams({
+          prefill_pattern: rows[0].dataset.message.slice(0, 200),
+          prefill_match_field: "message",
+          prefill_threshold: String(rows.length),
+        });
+        window.location.href = `/tickets/correlation-rules?${params.toString()}`;
+      }
     });
   });
 

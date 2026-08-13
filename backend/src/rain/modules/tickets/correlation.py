@@ -1,4 +1,4 @@
-"""Threshold correlation for Event Policies: "N events matching a base
+"""Threshold correlation for Event Promotion Policies: "N events matching a base
 pattern within T minutes, optionally per host/program" -- evaluated once
 per newly-persisted syslog event (rain.modules.tickets.listener), not on
 a timer, since the only thing that can push a threshold rule over its

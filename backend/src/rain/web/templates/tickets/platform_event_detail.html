@@ -12,14 +12,29 @@
 </div>
 
 <div class="card">
-  <table>
-    <tbody>
-      <tr><th>Trigger</th><td>{{ trigger_event_labels.get(rule.trigger_event, rule.trigger_event) }}</td></tr>
-      <tr><th>Match on</th><td class="muted">{{ rule.match_field }}</td></tr>
-      <tr><th>Pattern</th><td><code>{{ rule.pattern }}</code></td></tr>
-      <tr><th>Status</th><td>{% if rule.is_active %}<span class="badge badge-accent">active</span>{% else %}<span class="badge">inactive</span>{% endif %}</td></tr>
-    </tbody>
-  </table>
+  <form method="post" action="/tickets/platform-events/{{ rule.id }}/edit">
+    <div class="form-row">
+      <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" value="{{ rule.name }}" required></div>
+      <div class="field">
+        <label for="trigger_event">Trigger</label>
+        <select id="trigger_event" name="trigger_event">
+          {% for value, label in trigger_events %}<option value="{{ value }}" {% if value == rule.trigger_event %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field" style="flex:0 0 100px;"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="{{ rule.sort_order }}"></div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label for="match_field">Match on</label>
+        <select id="match_field" name="match_field">
+          {% for f in match_fields %}<option value="{{ f }}" {% if f == rule.match_field %}selected{% endif %}>{{ f }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="pattern">Pattern (regex)</label><input type="text" id="pattern" name="pattern" value="{{ rule.pattern }}" required></div>
+      <div class="field" style="flex:0 0 140px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_active" {% if rule.is_active %}checked{% endif %}> Active</label></div>
+    </div>
+    <button class="btn btn-primary" type="submit">Save changes</button>
+  </form>
 </div>
 
 <div class="card">

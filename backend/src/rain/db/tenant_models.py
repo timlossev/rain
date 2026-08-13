@@ -698,7 +698,7 @@ class CalendarEntry(TenantBase):
     it's projected.
 
     `emit_syslog_event`/`event_program` are the bridge requested to make
-    calendar entries usable as Event Policy triggers: when an occurrence
+    calendar entries usable as Event Promotion Policy triggers: when an occurrence
     falls due, the worker synthesizes a SyslogEvent exactly as if it had
     arrived over the wire (rain.modules.calendar.sweep), so the *existing*
     rule engine (TicketRule/Platform Events) reacts to it with no separate

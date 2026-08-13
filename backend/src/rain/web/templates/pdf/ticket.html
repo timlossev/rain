@@ -17,7 +17,7 @@
   <tr><th>Assignee</th><td>{{ user_names.get(ticket.assignee_user_id, "Unassigned") }}</td></tr>
   <tr><th>Reported by</th><td>
     {% if ticket.reporter_user_id %}{{ user_names.get(ticket.reporter_user_id, "-") }}
-    {%- elif ticket.source_rule %}Event Policy: {{ ticket.source_rule.name }}
+    {%- elif ticket.source_rule %}Event Promotion Policy: {{ ticket.source_rule.name }}
     {%- elif ticket.source_correlation_rule %}Correlation Rule: {{ ticket.source_correlation_rule.name }}
     {%- else %}-{% endif %}
   </td></tr>

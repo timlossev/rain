@@ -80,9 +80,14 @@ p { margin: 0 0 1em; }
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
-.breadcrumb { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.breadcrumb-sep { color: var(--sidebar-text-dim); font-size: 0.85rem; }
-.breadcrumb-item { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.breadcrumb { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; }
+/* A flex item's default min-width is auto (its content size), not 0 -- so
+   without this, a long leaf label (e.g. a ticket's own "NUMBER: title" as
+   the page title) never actually reaches the text-overflow:ellipsis
+   below; it just keeps the whole topbar (nowrap) stretching wider than
+   the viewport instead of truncating in place. */
+.breadcrumb-item { min-width: 0; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.breadcrumb-sep { flex-shrink: 0; color: var(--sidebar-text-dim); font-size: 0.85rem; }
 .topbar-user { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; color: var(--text-muted); }
 .session-tenant-badge { font-size: 0.8rem; color: var(--text-muted); padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-sunken); white-space: nowrap; }
 .session-tenant-badge strong { color: var(--text); }
@@ -715,7 +720,9 @@ td.actions { text-align: right; white-space: nowrap; }
 
 /* ---------- badges / flash ---------- */
 .badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--surface-sunken);
@@ -750,11 +757,12 @@ td.actions { text-align: right; white-space: nowrap; }
   all: unset;
   box-sizing: border-box;
   cursor: pointer;
-  padding: 6px 14px;
+  padding: 5px 12px;
   border-radius: 999px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  border: 2px solid var(--step-color, #d1d5db);
+  line-height: 1.3;
+  border: 1.5px solid var(--step-color, #d1d5db);
   color: var(--step-color, #6b7280);
   background: var(--surface);
   transition: background 0.1s ease, color 0.1s ease;
@@ -764,7 +772,7 @@ td.actions { text-align: right; white-space: nowrap; }
   background: var(--step-color, #6b7280);
   color: #fff;
   cursor: default;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--step-color, #6b7280) 35%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--step-color, #6b7280) 35%, transparent);
 }
 .status-step.current:hover { background: var(--step-color, #6b7280); }
 
@@ -792,11 +800,27 @@ td.actions { text-align: right; white-space: nowrap; }
 .severity-high, .sev-err { background: #ffedd5; color: #9a3412; border-color: transparent; }
 .severity-critical, .sev-crit, .sev-alert, .sev-emerg { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
 
+/* ---------- ticket detail header ---------- */
+.ticket-badges-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 14px; }
+.ticket-badges-left { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ticket-title-inline {
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: right;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ticket-description { margin: 0 0 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border); color: var(--text); line-height: 1.5; }
+
 /* ---------- chronic flag (manually-set "recurring problem" marker) ---------- */
 .ticket-title-cell { display: flex; align-items: center; gap: 6px; }
 .chronic-icon { display: inline-flex; flex-shrink: 0; color: #c2410c; }
 .chronic-icon svg { width: 15px; height: 15px; }
-.chronic-badge { display: inline-flex; align-items: center; gap: 5px; color: #c2410c; background: #ffedd5; border-color: transparent; }
+.chronic-badge { gap: 5px; color: #c2410c; background: #ffedd5; border-color: transparent; }
 .chronic-badge svg { width: 13px; height: 13px; }
 
 /* ---------- live syslog viewer ---------- */
@@ -812,7 +836,7 @@ td.actions { text-align: right; white-space: nowrap; }
 }
 .live-row {
   display: grid;
-  grid-template-columns: 90px 74px 140px 140px 1fr auto;
+  grid-template-columns: 20px 90px 74px 140px 140px 1fr;
   gap: 10px;
   align-items: center;
   padding: 6px 10px;
@@ -820,10 +844,10 @@ td.actions { text-align: right; white-space: nowrap; }
   white-space: nowrap;
 }
 .live-row:last-child { border-bottom: none; }
+.live-select { cursor: pointer; }
 .live-time { color: var(--text-muted); }
 .live-host, .live-program { overflow: hidden; text-overflow: ellipsis; }
 .live-message { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.live-actions { display: flex; gap: 6px; }
 .live-sev.sev-emerg, .live-sev.sev-alert, .live-sev.sev-crit { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
 .live-sev.sev-err { background: #ffedd5; color: #9a3412; border-color: transparent; }
 .live-sev.sev-warning { background: #fef9c3; color: #854d0e; border-color: transparent; }

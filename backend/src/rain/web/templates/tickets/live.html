@@ -1,13 +1,37 @@
 {% extends "base.html" %}
 {% block title %}Events - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}A live feed of incoming syslog events. Filter by text or minimum severity. Matching events get promoted to tickets by Event Policies and Correlation Rules.{% endblock %}
+{% block help_text %}A live feed of incoming syslog events. Filter by text or minimum severity. Matching events get promoted to tickets by Event Promotion Policies and Correlation Rules.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <div class="live-controls">
     <span id="live-status" class="badge">connecting&hellip;</span>
     <button type="button" class="btn btn-sm" id="live-pause">Pause</button>
   </div>
+  {# Hidden until >=1 row is checked (live.js). Same [data-menu] dropdown
+     the tickets-list row menu uses, acting on the checked rows instead of
+     one record -- see live.py's bulk-promote/bulk-discard routes and
+     correlation_rules_list's prefill_* query params for "Correlate". #}
+  <div class="dropdown-menu" data-menu id="live-selection-menu" hidden>
+    <button type="button" class="dropdown-menu-btn btn btn-sm" data-menu-toggle aria-haspopup="true" aria-expanded="false">
+      <span id="live-selection-count">0 selected</span> <span class="nav-icon">{{ nav_icon("dots-vertical") }}</span>
+    </button>
+    <div class="dropdown-menu-panel row-menu-panel" data-menu-panel hidden>
+      <button type="button" class="row-menu-item" data-live-action="incident">Turn these into incidents</button>
+      <button type="button" class="row-menu-item" data-live-action="vulnerability">Turn these into vulnerabilities</button>
+      <button type="button" class="row-menu-item" data-live-action="correlate">Correlate these</button>
+      <div class="dropdown-menu-divider"></div>
+      <button type="button" class="row-menu-item danger" data-live-action="discard">Discard these</button>
+    </div>
+  </div>
 </div>
+
+<form id="live-bulk-promote-form" method="post" action="/tickets/live/bulk-promote" hidden>
+  <input type="hidden" name="event_ids">
+  <input type="hidden" name="ticket_type">
+</form>
+<form id="live-bulk-discard-form" method="post" action="/tickets/live/bulk-discard" hidden data-confirm="">
+  <input type="hidden" name="hosts">
+</form>
 
 <div class="card">
   <div class="form-row" style="margin-bottom:12px;">

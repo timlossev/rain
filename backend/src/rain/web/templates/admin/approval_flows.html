@@ -23,6 +23,7 @@
           </form>
         {% endif %}</td>
         <td class="actions">
+          <a class="btn btn-sm" href="/admin/approval-flows/{{ f.id }}/edit">Edit</a>
           <form class="inline" method="post" action="/admin/approval-flows/{{ f.id }}/delete" data-confirm="Delete flow '{{ f.name }}'? Changes already using it keep their recorded decisions.">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>

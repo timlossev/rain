@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from rain.core.pagination import paginate
-from rain.core.rbac import require_login
+from rain.core.rbac import require_internal_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.user_names import resolve_user_names
 from rain.db.base import control_session
@@ -635,7 +635,7 @@ async def rules_list(
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_internal_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = select(TicketRule).order_by(TicketRule.sort_order)
@@ -667,7 +667,7 @@ async def rules_create(
     sort_order: int = Form(0),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_internal_admin),
 ):
     tenant_db.add(
         TicketRule(
@@ -688,7 +688,7 @@ async def rules_create(
 
 @router.post("/rules/{rule_id:int}/delete")
 async def rules_delete(
-    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_login)
+    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
 ):
     rule = await tenant_db.get(TicketRule, rule_id)
     if rule is not None:
@@ -704,7 +704,7 @@ async def rules_test(
     sample: str = Form(...),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_internal_admin),
 ):
     import re
 
@@ -736,13 +736,33 @@ async def rules_test(
 async def correlation_rules_list(
     request: Request,
     page: int = 1,
+    prefill_pattern: str | None = None,
+    prefill_match_field: str | None = None,
+    prefill_ticket_type: str | None = None,
+    prefill_group_by: str | None = None,
+    prefill_threshold: int | None = None,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_internal_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = select(CorrelationRule).order_by(CorrelationRule.sort_order)
     rule_page = await paginate(tenant_db, stmt, page=page)
+    # "Correlate these" (tickets/live's selection menu) lands here with the
+    # New rule modal pre-filled from the selected events instead of asking
+    # the admin to retype a pattern they just saw stream by -- see
+    # live.js's buildCorrelatePrefillUrl.
+    prefill = (
+        {
+            "pattern": prefill_pattern,
+            "match_field": prefill_match_field if prefill_match_field in MATCH_FIELDS else "message",
+            "ticket_type": prefill_ticket_type if prefill_ticket_type in TICKET_TYPES else "incident",
+            "group_by": prefill_group_by if prefill_group_by in GROUP_BY_FIELDS else "none",
+            "threshold": prefill_threshold or 5,
+        }
+        if prefill_pattern
+        else None
+    )
     return templates.TemplateResponse(
         request,
         "tickets/correlation_rules.html",
@@ -754,6 +774,7 @@ async def correlation_rules_list(
             "severities": SEVERITIES,
             "match_fields": MATCH_FIELDS,
             "group_by_fields": GROUP_BY_FIELDS,
+            "prefill": prefill,
         },
     )
 
@@ -773,7 +794,7 @@ async def correlation_rules_create(
     sort_order: int = Form(0),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_internal_admin),
 ):
     tenant_db.add(
         CorrelationRule(
@@ -797,7 +818,7 @@ async def correlation_rules_create(
 
 @router.post("/correlation-rules/{rule_id:int}/delete")
 async def correlation_rules_delete(
-    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_login)
+    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
 ):
     rule = await tenant_db.get(CorrelationRule, rule_id)
     if rule is not None:
@@ -808,7 +829,7 @@ async def correlation_rules_delete(
 
 @router.post("/correlation-rules/{rule_id:int}/toggle")
 async def correlation_rules_toggle(
-    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_login)
+    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
 ):
     rule = await tenant_db.get(CorrelationRule, rule_id)
     if rule is not None:
@@ -826,7 +847,7 @@ async def platform_events_list(
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_internal_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = (
@@ -858,7 +879,7 @@ async def platform_events_create(
     sort_order: int = Form(0),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_internal_admin),
 ):
     rule = PlatformEventRule(
         name=name.strip(),
@@ -877,7 +898,7 @@ async def platform_events_create(
 
 @router.post("/platform-events/{rule_id:int}/delete")
 async def platform_events_delete(
-    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_login)
+    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
 ):
     rule = await tenant_db.get(PlatformEventRule, rule_id)
     if rule is not None:
@@ -892,7 +913,7 @@ async def platform_event_detail(
     rule_id: int,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_internal_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = (
@@ -911,7 +932,9 @@ async def platform_event_detail(
             **nav,
             "ctx": ctx,
             "rule": rule,
+            "trigger_events": platform_events.TRIGGER_EVENTS,
             "trigger_event_labels": dict(platform_events.TRIGGER_EVENTS),
+            "match_fields": platform_events.MATCH_FIELDS,
             "action_types": platform_events.ACTION_TYPES,
             "channels": channels,
             "documents": documents,
@@ -920,13 +943,37 @@ async def platform_event_detail(
     )
 
 
+@router.post("/platform-events/{rule_id:int}/edit")
+async def platform_event_edit(
+    rule_id: int,
+    name: str = Form(...),
+    trigger_event: str = Form(...),
+    match_field: str = Form("title"),
+    pattern: str = Form(...),
+    sort_order: int = Form(0),
+    is_active: bool = Form(False),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    rule = await tenant_db.get(PlatformEventRule, rule_id)
+    if rule is not None:
+        rule.name = name.strip()
+        rule.trigger_event = trigger_event
+        rule.match_field = match_field
+        rule.pattern = pattern
+        rule.sort_order = sort_order
+        rule.is_active = is_active
+        await tenant_db.commit()
+    return RedirectResponse(f"/tickets/platform-events/{rule_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.post("/platform-events/{rule_id:int}/actions")
 async def platform_event_action_create(
     request: Request,
     rule_id: int,
     action_type: str = Form(...),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_internal_admin),
 ):
     form = await request.form()
     if action_type in ("notify_slack", "notify_email"):
@@ -955,7 +1002,7 @@ async def platform_event_action_delete(
     rule_id: int,
     action_id: int,
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_internal_admin),
 ):
     action = await tenant_db.get(PlatformEventAction, action_id)
     if action is not None:

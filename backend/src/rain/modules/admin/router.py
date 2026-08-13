@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from rain.core import ldap_client
 from rain.core.config_store import FONT_CHOICES, config_store
-from rain.core.crypto import encrypt_json
+from rain.core.crypto import decrypt_json, encrypt_json
 from rain.core.pagination import paginate
 from rain.core.rbac import require_internal_admin, require_login
 from rain.core.security import hash_password
@@ -311,20 +311,23 @@ async def syslog_sources_list(
 
 @router.post("/syslog-sources")
 async def syslog_sources_create(
-    tenant_id: int = Form(...),
+    action: str = Form("route"),
+    tenant_id: str = Form(""),  # required for action=route, ignored/blank for action=discard
     match_field: str = Form(...),
     pattern: str = Form(...),
     is_regex: bool = Form(False),
     sort_order: int = Form(0),
     _: CurrentUser = Depends(require_internal_admin),
 ):
+    action = action if action == "discard" else "route"
     async with control_session() as session:
         session.add(
             SyslogSourceMap(
-                tenant_id=tenant_id,
+                tenant_id=int(tenant_id) if action == "route" and tenant_id else None,
                 match_field=match_field,
                 pattern=pattern.strip(),
                 is_regex=is_regex,
+                action=action,
                 sort_order=sort_order,
             )
         )
@@ -539,10 +542,14 @@ async def notification_channels_list(
     nav = await build_nav_context(ctx)
     stmt = select(NotificationChannel).order_by(NotificationChannel.name)
     channel_page = await paginate(tenant_db, stmt, page=page)
+    # Decrypted once here (not per-row in the template) so the Edit modal
+    # can prefill recipients/webhook_url -- config_encrypted is otherwise
+    # opaque to Jinja.
+    channel_configs = {c.id: decrypt_json(c.config_encrypted) for c in channel_page.items}
     return templates.TemplateResponse(
         request,
         "admin/notification_channels.html",
-        {**nav, "ctx": ctx, "page": channel_page, "channel_types": CHANNEL_TYPES},
+        {**nav, "ctx": ctx, "page": channel_page, "channel_types": CHANNEL_TYPES, "channel_configs": channel_configs},
     )
 
 
@@ -565,6 +572,30 @@ async def notification_channels_create(
         NotificationChannel(channel_type=channel_type, name=name.strip(), config_encrypted=encrypt_json(config))
     )
     await tenant_db.commit()
+    return RedirectResponse("/admin/notification-channels", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/notification-channels/{channel_id:int}/edit")
+async def notification_channels_edit(
+    request: Request,
+    channel_id: int,
+    channel_type: str = Form(...),
+    name: str = Form(...),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    channel = await tenant_db.get(NotificationChannel, channel_id)
+    if channel is not None:
+        form = await request.form()
+        if channel_type == "email":
+            recipients = [addr.strip() for addr in str(form.get("recipients", "")).split(",") if addr.strip()]
+            config = {"recipients": recipients}
+        else:
+            config = {"webhook_url": str(form.get("webhook_url", "")).strip()}
+        channel.channel_type = channel_type
+        channel.name = name.strip()
+        channel.config_encrypted = encrypt_json(config)
+        await tenant_db.commit()
     return RedirectResponse("/admin/notification-channels", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -690,10 +721,12 @@ async def group_remove_member(
 # Per-tenant. A named, ordered sequence of steps, each assigned to a group
 # (any one member's approval clears it) or an individual user -- Change
 # tickets attach one instance of a flow (ChangeApproval) at creation time.
-# The create form offers a fixed 5 step rows rather than a JS-driven
-# add/remove-row builder (this app has no JS framework); a row with neither
-# a group nor a user picked is simply skipped, so a flow can have 1-5 steps.
-_MAX_APPROVAL_STEPS = 5
+# The form pre-renders _MAX_APPROVAL_STEPS rows (app.js's [data-step-rows]
+# handler show/hides them -- no JS framework here, so no dynamic DOM
+# templating); a row with neither a group nor a user picked is simply
+# skipped on submit, so a flow can have 1-10 steps regardless of which
+# rows the add/remove buttons left visible.
+_MAX_APPROVAL_STEPS = 10
 
 
 @router.get("/approval-flows", response_class=HTMLResponse)
@@ -737,7 +770,14 @@ async def approval_flows_new_form(
     return templates.TemplateResponse(
         request,
         "admin/approval_flow_form.html",
-        {**nav, "ctx": ctx, "groups": groups, "step_range": range(1, _MAX_APPROVAL_STEPS + 1)},
+        {
+            **nav,
+            "ctx": ctx,
+            "flow": None,
+            "groups": groups,
+            "step_range": range(1, _MAX_APPROVAL_STEPS + 1),
+            "step_prefill": {},
+        },
     )
 
 
@@ -755,7 +795,16 @@ async def approval_flows_create(
     flow = ApprovalFlow(name=name.strip(), is_default=is_default)
     tenant_db.add(flow)
     await tenant_db.flush()
+    await _replace_approval_steps(tenant_db, flow.id, form)
+    await tenant_db.commit()
+    return RedirectResponse("/admin/approval-flows", status_code=status.HTTP_303_SEE_OTHER)
 
+
+async def _replace_approval_steps(tenant_db: AsyncSession, flow_id: int, form) -> None:
+    """Shared by create and edit -- steps have no identity worth preserving
+    across an edit (they're just an ordered label/approver list), so an
+    edit rebuilds them from the submitted form rather than diffing against
+    what's already there."""
     sort_order = 0
     for i in range(1, _MAX_APPROVAL_STEPS + 1):
         group_id = str(form.get(f"step_group_{i}", "")).strip()
@@ -765,7 +814,7 @@ async def approval_flows_create(
         label = str(form.get(f"step_label_{i}", "")).strip() or f"Step {sort_order + 1}"
         tenant_db.add(
             ApprovalFlowStep(
-                flow_id=flow.id,
+                flow_id=flow_id,
                 sort_order=sort_order,
                 label=label,
                 approver_group_id=int(group_id) if group_id else None,
@@ -773,6 +822,70 @@ async def approval_flows_create(
             )
         )
         sort_order += 1
+
+
+@router.get("/approval-flows/{flow_id:int}/edit", response_class=HTMLResponse)
+async def approval_flows_edit_form(
+    request: Request,
+    flow_id: int,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    nav = await build_nav_context(ctx)
+    flow = await tenant_db.get(ApprovalFlow, flow_id, options=[selectinload(ApprovalFlow.steps)])
+    if flow is None:
+        return RedirectResponse("/admin/approval-flows", status_code=status.HTTP_303_SEE_OTHER)
+    groups_result = await tenant_db.execute(select(Group).order_by(Group.name))
+    groups = list(groups_result.scalars())
+    user_names = await resolve_user_names({s.approver_user_id for s in flow.steps if s.approver_user_id})
+    # Steps have no fixed slot -- keyed here by their position (1-based) in
+    # sort_order so the form's step_range loop can prefill row i from
+    # step_prefill.get(i) the same way it reads step_range itself.
+    step_prefill = {
+        i + 1: {
+            "label": s.label,
+            "group_id": s.approver_group_id,
+            "user_id": s.approver_user_id,
+            "user_label": user_names.get(s.approver_user_id, "") if s.approver_user_id else "",
+        }
+        for i, s in enumerate(sorted(flow.steps, key=lambda s: s.sort_order))
+    }
+    return templates.TemplateResponse(
+        request,
+        "admin/approval_flow_form.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "flow": flow,
+            "groups": groups,
+            "step_range": range(1, _MAX_APPROVAL_STEPS + 1),
+            "step_prefill": step_prefill,
+        },
+    )
+
+
+@router.post("/approval-flows/{flow_id:int}/edit")
+async def approval_flows_edit(
+    request: Request,
+    flow_id: int,
+    name: str = Form(...),
+    is_default: bool = Form(False),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    flow = await tenant_db.get(ApprovalFlow, flow_id, options=[selectinload(ApprovalFlow.steps)])
+    if flow is None:
+        return RedirectResponse("/admin/approval-flows", status_code=status.HTTP_303_SEE_OTHER)
+    form = await request.form()
+    if is_default:
+        await tenant_db.execute(ApprovalFlow.__table__.update().values(is_default=False))
+    flow.name = name.strip()
+    flow.is_default = is_default
+    for step in list(flow.steps):
+        await tenant_db.delete(step)
+    await tenant_db.flush()
+    await _replace_approval_steps(tenant_db, flow.id, form)
     await tenant_db.commit()
     return RedirectResponse("/admin/approval-flows", status_code=status.HTTP_303_SEE_OTHER)
 

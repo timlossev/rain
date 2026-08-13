@@ -146,21 +146,29 @@ class SyslogSourceMap(ControlBase):
     or `program` before the event is written into any tenant schema (the
     tenant isn't known yet at that point, so this table has to live in
     `control`). Evaluated in `sort_order`; first match wins. A pattern of
-    `.*` with is_regex=true acts as a catch-all / default tenant."""
+    `.*` with is_regex=true acts as a catch-all / default tenant.
+
+    action="discard" is a negation rule instead: a matching event is
+    dropped by the listener before it's ever persisted or routed
+    (tenant_id is None for these -- there's nothing to route to). Backs
+    the tickets/live "Discard these" bulk action, for muting noisy
+    sources without a tenant seeing (and having to individually dismiss)
+    every occurrence."""
 
     __tablename__ = "syslog_source_map"
     __table_args__ = {"schema": CONTROL_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    tenant_id: Mapped[int] = mapped_column(ForeignKey(f"{CONTROL_SCHEMA}.tenants.id", ondelete="CASCADE"))
+    tenant_id: Mapped[int | None] = mapped_column(ForeignKey(f"{CONTROL_SCHEMA}.tenants.id", ondelete="CASCADE"))
     match_field: Mapped[str] = mapped_column(String(15))  # host | program
     pattern: Mapped[str] = mapped_column(String(255))
     is_regex: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    action: Mapped[str] = mapped_column(String(10), default="route", server_default="route")  # route | discard
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    tenant: Mapped[Tenant] = relationship()
+    tenant: Mapped[Tenant | None] = relationship()
 
 
 class AuditLog(ControlBase):

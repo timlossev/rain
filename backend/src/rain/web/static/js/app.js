@@ -424,4 +424,46 @@ document.addEventListener("DOMContentLoaded", () => {
       if (orderInput && !orderInput.value) orderInput.value = String(idx);
     });
   });
+
+  // Approval Flow step builder: the server pre-renders data-step-max rows
+  // (blank ones are skipped on submit -- see admin.router's
+  // _replace_approval_steps), this just shows/hides them so it reads as
+  // an add/remove list instead of a fixed wall of empty rows. Removing a
+  // row clears its inputs too, so a hidden-but-still-filled-in row can't
+  // sneak a step back in on submit.
+  document.querySelectorAll("[data-step-field]").forEach((field) => {
+    const min = parseInt(field.dataset.stepMin, 10) || 1;
+    const rows = Array.from(field.querySelectorAll("[data-step-row]"));
+    const addBtn = field.querySelector("[data-add-step-btn]");
+    if (!rows.length || !addBtn) return;
+
+    const refresh = () => {
+      const visible = rows.filter((row) => !row.hidden);
+      addBtn.hidden = visible.length >= rows.length;
+      visible.forEach((row) => {
+        const removeBtn = row.querySelector("[data-remove-step-btn]");
+        if (removeBtn) removeBtn.hidden = visible.length <= min;
+      });
+    };
+    const clearRow = (row) => {
+      row.querySelectorAll("input[type=text], input[type=hidden]").forEach((el) => { el.value = ""; });
+      row.querySelectorAll("select").forEach((el) => { el.value = ""; });
+    };
+
+    addBtn.addEventListener("click", () => {
+      const nextRow = rows.find((row) => row.hidden);
+      if (nextRow) nextRow.hidden = false;
+      refresh();
+    });
+    rows.forEach((row) => {
+      const removeBtn = row.querySelector("[data-remove-step-btn]");
+      if (!removeBtn) return;
+      removeBtn.addEventListener("click", () => {
+        clearRow(row);
+        row.hidden = true;
+        refresh();
+      });
+    });
+    refresh();
+  });
 });

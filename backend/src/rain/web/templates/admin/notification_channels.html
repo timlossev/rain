@@ -18,6 +18,7 @@
         <td>{{ c.name }}</td>
         <td><span class="badge">{{ c.channel_type }}</span></td>
         <td class="actions">
+          {{ modal.trigger_button("notification-channel-edit-" ~ c.id, "Edit", variant="btn-sm") }}
           <form class="inline" method="post" action="/admin/notification-channels/{{ c.id }}/delete" data-confirm="Delete channel '{{ c.name }}'? Any Platform Response Rule actions pointed at it will stop working.">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
@@ -30,6 +31,33 @@
   </table>
   {{ pg.render_pagination(page) }}
 </div>
+
+{# One modal per channel -- kept outside the table (a <div> can't legally
+   live inside <tbody>) alongside the "New channel" modal below. #}
+{% for c in page.items %}
+{% call modal.modal("notification-channel-edit-" ~ c.id, "Edit channel") %}
+  <form method="post" action="/admin/notification-channels/{{ c.id }}/edit">
+    <div class="form-row">
+      <div class="field">
+        <label for="channel_type-{{ c.id }}">Type</label>
+        <select id="channel_type-{{ c.id }}" name="channel_type">
+          {% for t in channel_types %}<option value="{{ t }}" {% if t == c.channel_type %}selected{% endif %}>{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="name-{{ c.id }}">Name</label><input type="text" id="name-{{ c.id }}" name="name" value="{{ c.name }}" required></div>
+    </div>
+    <div class="field">
+      <label for="recipients-{{ c.id }}">Email recipients (comma-separated, if type = email)</label>
+      <input type="text" id="recipients-{{ c.id }}" name="recipients" value="{{ channel_configs.get(c.id, {}).get('recipients', []) | join(', ') }}" placeholder="ops@example.com, oncall@example.com">
+    </div>
+    <div class="field">
+      <label for="webhook_url-{{ c.id }}">Slack incoming webhook URL (if type = slack)</label>
+      <input type="text" id="webhook_url-{{ c.id }}" name="webhook_url" value="{{ channel_configs.get(c.id, {}).get('webhook_url', '') }}" placeholder="https://hooks.slack.com/services/...">
+    </div>
+    <button class="btn btn-primary" type="submit">Save changes</button>
+  </form>
+{% endcall %}
+{% endfor %}
 
 {% call modal.modal("notification-channel", "New channel") %}
   <form method="post" action="/admin/notification-channels">

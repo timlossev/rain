@@ -51,6 +51,27 @@ nav_registry.register(
                 order=10,
                 roles=("internal_admin",),
             ),
+            NavNode(
+                key="admin-event-promotion-policies",
+                label="Event Promotion Policies",
+                href="/tickets/rules/all",
+                order=11,
+                roles=("internal_admin",),
+            ),
+            NavNode(
+                key="admin-correlation-rules",
+                label="Correlation Rules",
+                href="/tickets/correlation-rules",
+                order=12,
+                roles=("internal_admin",),
+            ),
+            NavNode(
+                key="admin-platform-response-rules",
+                label="Platform Response Rules",
+                href="/tickets/platform-events",
+                order=13,
+                roles=("internal_admin",),
+            ),
         ],
     )
 )

@@ -16,12 +16,15 @@
 </div>
 
 <div class="card">
-  <div style="margin-bottom:10px;">
-    <span class="badge severity-{{ ticket.severity }}">{{ ticket.severity }}</span>
-    <span class="badge badge-accent">{{ ticket.ticket_type }}</span>
-    {% if ticket.is_chronic %}<span class="badge chronic-badge">{{ nav_icon("repeat") }} Chronic</span>{% endif %}
+  <div class="ticket-badges-row">
+    <div class="ticket-badges-left">
+      <span class="badge severity-{{ ticket.severity }}">{{ ticket.severity | capitalize }} priority</span>
+      {% if ticket.is_chronic %}<span class="badge chronic-badge">{{ nav_icon("repeat") }} Chronic</span>{% endif %}
+      <span class="badge badge-accent">{{ ticket.ticket_type | capitalize }}</span>
+    </div>
+    <div class="ticket-title-inline" title="{{ ticket.title }}">{{ ticket.title }}</div>
   </div>
-  <p>{{ ticket.description or "No description." }}</p>
+  <p class="ticket-description">{{ ticket.description or "No description." }}</p>
   <table>
     <tbody>
       <tr><th>Status</th><td>
@@ -50,7 +53,7 @@
       </td></tr>
       <tr><th>Reported by</th><td class="muted">
         {% if ticket.reporter_user_id %}{{ user_names.get(ticket.reporter_user_id, "-") }}
-        {%- elif ticket.source_rule %}Event Policy: {{ ticket.source_rule.name }}
+        {%- elif ticket.source_rule %}Event Promotion Policy: {{ ticket.source_rule.name }}
         {%- elif ticket.source_correlation_rule %}Correlation Rule: {{ ticket.source_correlation_rule.name }}
         {%- else %}-{% endif %}
       </td></tr>

@@ -31,31 +31,43 @@ JS framework in the browser.
   one record, one activity feed, and one export pipeline
 - A hand-written syslog listener (TCP + UDP, no third-party library)
   turns any syslog-ng-fed event stream into a live event feed
-- **Event Policies**: regex rules that auto-promote a matching syslog
-  event into an `INC-xxxxxx` (incident) or `VULN-xxxxxx` (vulnerability)
-  ticket, first match wins
+- **Event Promotion Policies**: regex rules that auto-promote a matching
+  syslog event into an `INC-xxxxxx` (incident) or `VULN-xxxxxx`
+  (vulnerability) ticket, first match wins
 - **Correlation Rules**: multi-event, threshold-based promotion --
   count events matching a pattern within a trailing time window,
   optionally grouped by host/program (a separate correlation "instance"
   and ticket per group value), and fire once the count is reached.
-  Evaluated alongside Event Policies, not instead of them
+  Evaluated alongside Event Promotion Policies, not instead of them
 - **Platform Response Rules**: a third, independent reaction layer --
   rules that match on ticket creation (title/description regex) and
   fire one or more actions: notify Slack, notify email, call a webhook
   with a custom JSON payload, attach a document, or attach an asset.
   Every active matching rule fires, and every firing is logged to the
-  ticket's activity feed
+  ticket's activity feed. Fully editable after creation (name, trigger,
+  pattern), not just at creation time
+- Event Promotion Policies, Correlation Rules, and Platform Response
+  Rules all live under Admin and require the `internal_admin` role --
+  configuring how events become tickets is a platform-operator concern,
+  not a per-tenant one
+- **Live event triage**: the live syslog feed's rows are multi-select,
+  with a selection menu to act on several at once -- "Turn these into
+  incidents/vulnerabilities" (one ticket per selected event), "Correlate
+  these" (jumps to Correlation Rules with a new rule pre-filled from the
+  selection), or "Discard these" (adds a negation rule -- Admin > Syslog
+  Sources -- so future events from those hosts are dropped before ever
+  reaching a tenant, without touching what's already been ingested)
 - **Change tickets** (`CHG-xxxxxx`): reported directly, or promoted
   from an existing incident/vulnerability (pre-fills title, description,
   and asset, and links back to the source). Carries a start/end date
   window -- shown on the ticket, its PDF export, and as a chip on every
   day it spans on the tenant calendar -- plus its own approval
   lifecycle, independent of the generic status stepper: an ordered
-  sequence of steps, each assigned to a group (any one member's
-  approval clears it) or an individual user, enforced server-side, not
-  just hidden in the UI. Flows are fully tenant-defined (Admin >
-  Approval Flows), with one markable as the default applied to new
-  changes
+  sequence of 1-10 steps (add/remove as needed), each assigned to a
+  group (any one member's approval clears it) or an individual user,
+  enforced server-side, not just hidden in the UI. Flows are fully
+  tenant-defined and editable after creation (Admin > Approval Flows),
+  with one markable as the default applied to new changes
 - **Groups** (Admin > Groups): named, tenant-scoped sets of users --
   the assignment target for an approval flow step, so a step can name
   "the CAB" once instead of every current member individually
@@ -64,18 +76,27 @@ JS framework in the browser.
   scale), with every change logged to the activity feed ("user X
   assigned this to Y", "user X set the affected asset to Z") -- same
   treatment as status changes
-- "My {Incidents,Vulnerabilities,Changes}" and "Unassigned ..."
-  quick-filter chips on every ticket list view
 - **Tenant-customizable ticket statuses** -- define your own workflow
   (labels, colors, which statuses count as "closed") instead of a fixed
   open/closed enum
 - A merged, chronological activity feed per ticket: comments, status
   changes, assignee/asset changes, and approval decisions, with
-  resolved names throughout -- including "Event Policy: X" / "Correlation
-  Rule: X" as the reporter on a ticket no human filed
+  resolved names throughout -- including "Event Promotion Policy: X" /
+  "Correlation Rule: X" as the reporter on a ticket no human filed
+- **Chronic flag**: a manually-set marker (conventionally, "happened 5+
+  times in the trailing 30 days" -- left to human judgment rather than
+  auto-detected, since nothing in the schema groups "the same underlying
+  issue" across tickets closely enough to count occurrences without
+  false positives) shown as an icon next to the title in the list and a
+  badge on the ticket itself
+- A per-row quick-action menu on every ticket list (Mark closed, Mark/
+  unmark chronic, and -- changes only, enforced server-side -- Mark
+  cancelled), plus "Mine" / "Unassigned" / "Chronic" / "All" quick-filter
+  chips and type/status filters all in one toolbar alongside "+ New
+  ticket", instead of scattered across the page
 - Branded PDF export of any ticket, including its full activity history
-- Email/Slack notification channels, configured once and reused by any
-  number of Platform Response Rules
+- Email/Slack notification channels, fully editable after creation, and
+  reused by any number of Platform Response Rules
 
 **Calendar**
 - Per-tenant calendar with a server-rendered month-grid visual editor

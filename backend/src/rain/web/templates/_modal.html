@@ -17,8 +17,8 @@
 <button type="button" class="btn {{ variant }}" data-modal-open="modal-{{ id }}">{{ label }}</button>
 {% endmacro %}
 
-{% macro modal(id, title) %}
-<div class="modal-overlay" id="modal-{{ id }}" hidden data-modal>
+{% macro modal(id, title, open=False) %}
+<div class="modal-overlay" id="modal-{{ id }}" {% if not open %}hidden{% endif %} data-modal>
   <div class="modal-box">
     <div class="modal-header">
       <span>{{ title }}</span>
