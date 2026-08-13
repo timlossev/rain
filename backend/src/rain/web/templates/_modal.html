@@ -1,0 +1,32 @@
+{# Reusable "+ New X" trigger button + modal window, for the sitewide pattern
+   of a create-form that used to live in a "New X" tab. Tabs are for
+   switching between views of the same data; a form belongs in a modal.
+
+   Usage:
+     {% import "_modal.html" as modal %}
+     {{ modal.trigger_button("new-tenant", "+ New tenant") }}
+     ...
+     {% call modal.modal("new-tenant", "New tenant") %}
+       <form>...</form>
+     {% endcall %}
+
+   JS (app.js) wires up [data-modal-open] -> #modal-<id>, plus the existing
+   data-modal-close / backdrop-click / Escape handling shared with the
+   doc-preview modal. #}
+{% macro trigger_button(id, label, variant="btn-primary") %}
+<button type="button" class="btn {{ variant }}" data-modal-open="modal-{{ id }}">{{ label }}</button>
+{% endmacro %}
+
+{% macro modal(id, title) %}
+<div class="modal-overlay" id="modal-{{ id }}" hidden data-modal>
+  <div class="modal-box">
+    <div class="modal-header">
+      <span>{{ title }}</span>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      {{ caller() }}
+    </div>
+  </div>
+</div>
+{% endmacro %}

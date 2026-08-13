@@ -1,17 +1,13 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
-{% import "_help.html" as help %}
+{% import "_modal.html" as modal %}
 {% block title %}Cloud Sync - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Connection management is available now. Automated asset discovery for AWS and Azure ships in the next release.{% endblock %}
 {% block content %}
-<h1>Cloud Sync{{ help.help_icon("Connection management is available now. Automated asset discovery for AWS and Azure ships in the next release.") }}</h1>
+<div class="panel-row" style="justify-content:flex-end;">
+  {{ modal.trigger_button("sync-connection", "+ New connection") }}
+</div>
 
-<div class="tabs" data-tabs>
-  <div class="tab-buttons">
-    <button type="button" class="tab-btn active" data-tab-btn="list">Connections</button>
-    <button type="button" class="tab-btn" data-tab-btn="new">New connection</button>
-  </div>
-
-<div class="tab-panel active" data-tab-panel="list">
 <div class="card">
   <table>
     <thead><tr><th>Name</th><th>Provider</th><th>Status</th><th>Last synced</th><th></th></tr></thead>
@@ -38,10 +34,8 @@
   </table>
   {{ pg.render_pagination(page) }}
 </div>
-</div>
 
-<div class="tab-panel" data-tab-panel="new">
-<div class="card">
+{% call modal.modal("sync-connection", "New connection") %}
   <form method="post" action="/assets/sync">
     <div class="form-row">
       <div class="field">
@@ -64,7 +58,5 @@
     </div>
     <button class="btn btn-primary" type="submit">Add connection</button>
   </form>
-</div>
-</div>
-</div>
+{% endcall %}
 {% endblock %}

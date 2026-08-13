@@ -1,17 +1,13 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
-{% import "_help.html" as help %}
+{% import "_modal.html" as modal %}
 {% block title %}Correlation Rules - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Unlike Event Policies (one event, first match wins), a correlation rule looks across multiple events: when the count of events matching pattern within the trailing time window reaches the threshold, a ticket is created -- e.g. 5 events matching "failed password" from the same host within 2 minutes. Optionally grouped by host or program, so each host/program breaching the threshold gets its own ticket. Once fired, a rule+group re-arms after the window elapses.{% endblock %}
 {% block content %}
-<h1>Correlation Rules{{ help.help_icon("Unlike Event Policies (one event, first match wins), a correlation rule looks across multiple events: when the count of events matching pattern within the trailing time window reaches the threshold, a ticket is created -- e.g. 5 events matching \"failed password\" from the same host within 2 minutes. Optionally grouped by host or program, so each host/program breaching the threshold gets its own ticket. Once fired, a rule+group re-arms after the window elapses.") }}</h1>
+<div class="panel-row" style="justify-content:flex-end;">
+  {{ modal.trigger_button("correlation-rule", "+ New rule") }}
+</div>
 
-<div class="tabs" data-tabs>
-  <div class="tab-buttons">
-    <button type="button" class="tab-btn active" data-tab-btn="list">Active rules</button>
-    <button type="button" class="tab-btn" data-tab-btn="new">New rule</button>
-  </div>
-
-<div class="tab-panel active" data-tab-panel="list">
 <div class="card">
   <table>
     <thead><tr><th>Order</th><th>Name</th><th>Type</th><th>Pattern</th><th>Threshold</th><th>Window</th><th>Group by</th><th>Status</th><th></th></tr></thead>
@@ -44,10 +40,8 @@
   </table>
   {{ pg.render_pagination(page) }}
 </div>
-</div>
 
-<div class="tab-panel" data-tab-panel="new">
-<div class="card">
+{% call modal.modal("correlation-rule", "New rule") %}
   <form method="post" action="/tickets/correlation-rules">
     <div class="form-row">
       <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" placeholder="Brute-force login attempts" required></div>
@@ -100,7 +94,5 @@
     </div>
     <button class="btn btn-primary" type="submit">Add rule</button>
   </form>
-</div>
-</div>
-</div>
+{% endcall %}
 {% endblock %}

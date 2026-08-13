@@ -1,8 +1,7 @@
 {% extends "base.html" %}
-{% import "_help.html" as help %}
 {% block title %}Import Result - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Summary of the asset import you just ran -- created, updated, and any per-row errors.{% endblock %}
 {% block content %}
-<h1>Import Result{{ help.help_icon("Summary of the asset import you just ran -- created, updated, and any per-row errors.") }}</h1>
 <div class="card" style="max-width:640px;">
   <p><span class="badge badge-accent">{{ result.created }} created</span> &nbsp; <span class="badge badge-accent">{{ result.updated }} updated</span>
   {% if result.errors %} &nbsp; <span class="badge">{{ result.errors | length }} errors</span>{% endif %}</p>

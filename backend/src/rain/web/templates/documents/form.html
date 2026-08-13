@@ -1,8 +1,7 @@
 {% extends "base.html" %}
-{% import "_help.html" as help %}
 {% block title %}Upload Document - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Upload a new document into the repository. txt/md files get an inline editor and Markdown preview once uploaded.{% endblock %}
 {% block content %}
-<h1>Upload Document{{ help.help_icon("Upload a new document into the repository. txt/md files get an inline editor and Markdown preview once uploaded.") }}</h1>
 {% if linked_type and linked_id %}
 <p class="muted">This will be attached to the {{ linked_type }} #{{ linked_id }} automatically.</p>
 {% endif %}

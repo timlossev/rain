@@ -1,18 +1,14 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
-{% import "_help.html" as help %}
+{% import "_modal.html" as modal %}
 {% block title %}Ticket Statuses - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Customize the set of statuses tickets can move through, for the active tenant. Statuses flagged "closed" stamp a ticket's closed date when it's moved there. Deactivating a status hides it from new selections without breaking tickets already set to it.{% endblock %}
 {% block content %}
-<h1>Ticket Statuses{{ help.help_icon("Customize the set of statuses tickets can move through, for the active tenant. Statuses flagged \"closed\" stamp a ticket's closed date when it's moved there. Deactivating a status hides it from new selections without breaking tickets already set to it.") }}</h1>
-<p class="muted">Active tenant: {{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}</p>
+<div class="panel-row">
+  <p class="muted" style="margin:0;">Active tenant: {{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}</p>
+  {{ modal.trigger_button("ticket-status", "+ New status") }}
+</div>
 
-<div class="tabs" data-tabs>
-  <div class="tab-buttons">
-    <button type="button" class="tab-btn active" data-tab-btn="list">Statuses</button>
-    <button type="button" class="tab-btn" data-tab-btn="new">New status</button>
-  </div>
-
-<div class="tab-panel active" data-tab-panel="list">
 <div class="card">
   <table>
     <thead><tr><th>Order</th><th>Status</th><th>Key</th><th>Closed?</th><th>Active</th><th></th></tr></thead>
@@ -42,10 +38,8 @@
   </table>
   {{ pg.render_pagination(page) }}
 </div>
-</div>
 
-<div class="tab-panel" data-tab-panel="new">
-<div class="card">
+{% call modal.modal("ticket-status", "New status") %}
   <form method="post" action="/admin/ticket-statuses">
     <div class="form-row">
       <div class="field"><label for="label">Label</label><input type="text" id="label" name="label" placeholder="Waiting on vendor" required></div>
@@ -58,7 +52,5 @@
     </div>
     <button class="btn btn-primary" type="submit">Add status</button>
   </form>
-</div>
-</div>
-</div>
+{% endcall %}
 {% endblock %}

@@ -1,9 +1,8 @@
 {% extends "base.html" %}
-{% import "_help.html" as help %}
-{% block title %}{{ doc.doc_number }} - {{ branding.instance_name }}{% endblock %}
+{% block title %}{{ doc.doc_number }}: {{ doc.title }} - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}A single document's details and, for txt/md files, an inline editor. Shows what tickets/assets it's linked to.{% endblock %}
 {% block content %}
-<div class="panel-row">
-  <h1 style="margin:0;">{{ doc.doc_number }}: {{ doc.title }}{{ help.help_icon("A single document's details and, for txt/md files, an inline editor. Shows what tickets/assets it's linked to.") }}</h1>
+<div class="panel-row" style="justify-content:flex-end;">
   <div>
     <a class="btn btn-primary" href="/documents/{{ doc.id }}/download">Download</a>
     <a class="btn" href="/documents/{{ doc.id }}/pdf">Export to PDF</a>

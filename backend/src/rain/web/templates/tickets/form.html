@@ -1,8 +1,7 @@
 {% extends "base.html" %}
-{% import "_help.html" as help %}
 {% block title %}New ticket - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Manually create a ticket -- incident, vulnerability, or change. Tickets can also be created automatically from Events via Event Policies or Correlation Rules.{% endblock %}
 {% block content %}
-<h1>New ticket{{ help.help_icon("Manually create a ticket -- incident, vulnerability, or change. Tickets can also be created automatically from Events via Event Policies or Correlation Rules.") }}</h1>
 {% if source_event_id %}<p class="muted">Promoting syslog event #{{ source_event_id }}.</p>{% endif %}
 
 <div class="card" style="max-width:640px;">

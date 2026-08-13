@@ -1,9 +1,7 @@
 {% extends "base.html" %}
-{% import "_help.html" as help %}
 {% block title %}Export Assets - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Export assets to CSV, JSON, or Excel. Pick an asset type to bring in its custom fields as columns, adjust headers/order, and optionally save the layout as a reusable profile.{% endblock %}
 {% block content %}
-<h1>Export Assets{{ help.help_icon("Export assets to CSV, JSON, or Excel. Pick an asset type to bring in its custom fields as columns, adjust headers/order, and optionally save the layout as a reusable profile.") }}</h1>
-
 <div class="card" style="max-width:720px;">
   <form method="get" action="/assets/export">
     <div class="field">

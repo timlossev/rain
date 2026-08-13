@@ -1,20 +1,14 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
-{% import "_help.html" as help %}
+{% import "_modal.html" as modal %}
 {% block title %}Asset Types - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Categories of assets (e.g. Server, Laptop, Network device). Each type can have its own custom fields and its own assets.{% endblock %}
 {% block content %}
 <div class="panel-row">
-  <h1 style="margin:0;">Asset Types{{ help.help_icon("Categories of assets (e.g. Server, Laptop, Network device). Each type can have its own custom fields and its own assets.") }}</h1>
   <a class="btn btn-sm" href="/assets/fields">Manage custom fields &rarr;</a>
+  {{ modal.trigger_button("asset-type", "+ New asset type") }}
 </div>
 
-<div class="tabs" data-tabs>
-  <div class="tab-buttons">
-    <button type="button" class="tab-btn active" data-tab-btn="list">Asset types</button>
-    <button type="button" class="tab-btn" data-tab-btn="new">New asset type</button>
-  </div>
-
-<div class="tab-panel active" data-tab-panel="list">
 <div class="card">
   <table>
     <thead><tr><th>Key</th><th>Name</th><th>Custom fields</th><th>Status</th><th></th></tr></thead>
@@ -38,10 +32,8 @@
   </table>
   {{ pg.render_pagination(page) }}
 </div>
-</div>
 
-<div class="tab-panel" data-tab-panel="new">
-<div class="card">
+{% call modal.modal("asset-type", "New asset type") %}
   <form method="post" action="/assets/types">
     <div class="form-row">
       <div class="field"><label for="key">Key</label><input type="text" id="key" name="key" placeholder="server" pattern="[a-z][a-z0-9_]*" required></div>
@@ -51,7 +43,5 @@
     <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="2"></textarea></div>
     <button class="btn btn-primary" type="submit">Create type</button>
   </form>
-</div>
-</div>
-</div>
+{% endcall %}
 {% endblock %}

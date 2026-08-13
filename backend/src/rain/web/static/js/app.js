@@ -168,14 +168,27 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
-  if (previewModal) {
-    previewModal.addEventListener("click", (evt) => {
-      if (evt.target === previewModal || evt.target.closest("[data-modal-close]")) previewModal.hidden = true;
+  // Generic modal plumbing -- shared by the doc-preview modal above and by
+  // every "+ New X" button + modal (see _modal.html) that replaced the old
+  // "New X" tabs sitewide: tabs are for switching between views of the same
+  // data, a create-form belongs in a modal. A trigger just needs
+  // data-modal-open="<modal id>"; the modal itself opts in with data-modal
+  // so Escape/backdrop-click close it without every page wiring that up.
+  document.querySelectorAll("[data-modal-open]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const modal = document.getElementById(btn.dataset.modalOpen);
+      if (modal) modal.hidden = false;
     });
-    document.addEventListener("keydown", (evt) => {
-      if (evt.key === "Escape" && !previewModal.hidden) previewModal.hidden = true;
+  });
+  document.querySelectorAll(".modal-overlay[data-modal]").forEach((modal) => {
+    modal.addEventListener("click", (evt) => {
+      if (evt.target === modal || evt.target.closest("[data-modal-close]")) modal.hidden = true;
     });
-  }
+  });
+  document.addEventListener("keydown", (evt) => {
+    if (evt.key !== "Escape") return;
+    document.querySelectorAll(".modal-overlay[data-modal]:not([hidden])").forEach((modal) => { modal.hidden = true; });
+  });
 
   // Confirm before any destructive form submit.
   document.querySelectorAll("form[data-confirm]").forEach((form) => {

@@ -1,18 +1,14 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
-{% import "_help.html" as help %}
+{% import "_modal.html" as modal %}
 {% block title %}Tenants - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Manage tenants (customer organizations), each with its own isolated database schema. Internal admins can switch their active tenant from here.{% endblock %}
 {% block content %}
-<h1>Tenants{{ help.help_icon("Manage tenants (customer organizations), each with its own isolated database schema. Internal admins can switch their active tenant from here.") }}</h1>
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+<div class="panel-row" style="justify-content:flex-end;">
+  {{ modal.trigger_button("tenant", "+ New tenant") }}
+</div>
 
-<div class="tabs" data-tabs>
-  <div class="tab-buttons">
-    <button type="button" class="tab-btn active" data-tab-btn="list">All tenants</button>
-    <button type="button" class="tab-btn" data-tab-btn="new">New tenant</button>
-  </div>
-
-<div class="tab-panel active" data-tab-panel="list">
 <div class="card">
   <table>
     <thead><tr><th>Name</th><th>Slug</th><th>Schema</th><th>Status</th><th></th></tr></thead>
@@ -39,10 +35,8 @@
   </table>
   {{ pg.render_pagination(page) }}
 </div>
-</div>
 
-<div class="tab-panel" data-tab-panel="new">
-<div class="card">
+{% call modal.modal("tenant", "New tenant") %}
   <form method="post" action="/admin/tenants">
     <div class="form-row">
       <div class="field">
@@ -56,7 +50,5 @@
     </div>
     <button class="btn btn-primary" type="submit">Create tenant</button>
   </form>
-</div>
-</div>
-</div>
+{% endcall %}
 {% endblock %}

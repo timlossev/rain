@@ -1,9 +1,8 @@
 {% extends "base.html" %}
-{% import "_help.html" as help %}
 {% block title %}Edit {{ edit_user.email }} - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Change a user's name, role, tenant assignment, or password, or deactivate their account.{% endblock %}
 {% block content %}
-<div class="panel-row">
-  <h1 style="margin:0;">Edit user{{ help.help_icon("Change a user's name, role, tenant assignment, or password, or deactivate their account.") }}</h1>
+<div class="panel-row" style="justify-content:flex-end;">
   <a class="btn btn-sm" href="/admin/users">&larr; All users</a>
 </div>
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}

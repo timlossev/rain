@@ -1,8 +1,7 @@
 {% extends "base.html" %}
-{% import "_help.html" as help %}
 {% block title %}Branding - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Instance-wide look & feel -- instance name, accent color, logo, and font. Changes apply immediately across every tenant.{% endblock %}
 {% block content %}
-<h1>Branding{{ help.help_icon("Instance-wide look & feel -- instance name, accent color, logo, and font. Changes apply immediately across every tenant.") }}</h1>
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 <div class="card" style="max-width:520px;">
   <form method="post" action="/admin/branding" enctype="multipart/form-data">

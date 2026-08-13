@@ -8,6 +8,12 @@
   <style>:root { --accent: {{ branding.accent_color }}; --font-family: {{ branding.font_family | safe }}; }</style>
 </head>
 <body>
+{# Page-specific help text, captured via self.help_text() below (in the
+   breadcrumb) rather than rendered here -- this block only exists so
+   individual pages have somewhere to declare it without emitting the raw
+   text into the page body. #}
+<span hidden>{% block help_text %}{% endblock %}</span>
+{% import "_help.html" as help %}
 {% macro nav_icon(name) %}{% if name == "ticket" %}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.5a1.5 1.5 0 0 0 0 3V14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1.5a1.5 1.5 0 0 0 0-3V8Z"/><path d="M9 6.5v11" stroke-dasharray="2.2 2.2"/></svg>
 {% elif name == "server" %}
@@ -84,6 +90,12 @@
         </button>
         {% if top_label %}<span class="breadcrumb-sep">&rsaquo;</span><span class="breadcrumb-item">{{ top_label }}</span>{% endif %}
         {% if leaf_label and leaf_label != top_label %}<span class="breadcrumb-sep">&rsaquo;</span><span class="breadcrumb-item">{{ leaf_label }}</span>{% endif %}
+        {# striptags forces plain text regardless of whether Jinja treats the
+           block's own output as pre-escaped "safe" markup -- without it, a
+           literal "&" inside a {% block help_text %} (unlike one passed as a
+           quoted string argument) could render unescaped in the popover. #}
+        {% set help_text = self.help_text() | striptags | trim %}
+        {% if help_text %}{{ help.help_icon(help_text) }}{% endif %}
       </div>
       <div class="topbar-user">
         {{ ctx.user.display_name }} <span class="badge badge-accent">{{ ctx.user.role_key }}</span>

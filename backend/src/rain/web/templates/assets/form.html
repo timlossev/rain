@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% import "_help.html" as help %}
 {% block title %}{{ "Edit" if asset else "New" }} asset - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Create or edit an asset. Custom fields shown here depend on the selected asset type.{% endblock %}
 {% block content %}
-<div class="panel-row">
-  <h1 style="margin:0;">{{ "Edit asset" if asset else "New asset" }}{{ help.help_icon("Create or edit an asset. Custom fields shown here depend on the selected asset type.") }}</h1>
-  {% if asset %}<a class="btn btn-sm" href="/assets/{{ asset.id }}/pdf">Export to PDF</a>{% endif %}
+{% if asset %}
+<div class="panel-row" style="justify-content:flex-end;">
+  <a class="btn btn-sm" href="/assets/{{ asset.id }}/pdf">Export to PDF</a>
 </div>
+{% endif %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
 <div class="card" style="max-width:640px;">

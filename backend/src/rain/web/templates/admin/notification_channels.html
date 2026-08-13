@@ -1,18 +1,14 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
-{% import "_help.html" as help %}
+{% import "_modal.html" as modal %}
 {% block title %}Notification Channels - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Slack/email destinations for the active tenant. These don't fire on their own -- point a Platform Response Rule's action at one to decide when it actually gets used. The outbound mail relay itself is configured once, instance-wide, in Admin > SMTP Relay.{% endblock %}
 {% block content %}
-<h1>Notification Channels{{ help.help_icon("Slack/email destinations for the active tenant. These don't fire on their own -- point a Platform Response Rule's action at one to decide when it actually gets used. The outbound mail relay itself is configured once, instance-wide, in Admin > SMTP Relay.") }}</h1>
-<p class="muted">Active tenant: {{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}</p>
+<div class="panel-row">
+  <p class="muted" style="margin:0;">Active tenant: {{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}</p>
+  {{ modal.trigger_button("notification-channel", "+ New channel") }}
+</div>
 
-<div class="tabs" data-tabs>
-  <div class="tab-buttons">
-    <button type="button" class="tab-btn active" data-tab-btn="list">Channels</button>
-    <button type="button" class="tab-btn" data-tab-btn="new">New channel</button>
-  </div>
-
-<div class="tab-panel active" data-tab-panel="list">
 <div class="card">
   <table>
     <thead><tr><th>Name</th><th>Type</th><th></th></tr></thead>
@@ -34,10 +30,8 @@
   </table>
   {{ pg.render_pagination(page) }}
 </div>
-</div>
 
-<div class="tab-panel" data-tab-panel="new">
-<div class="card">
+{% call modal.modal("notification-channel", "New channel") %}
   <form method="post" action="/admin/notification-channels">
     <div class="form-row">
       <div class="field">
@@ -58,7 +52,5 @@
     </div>
     <button class="btn btn-primary" type="submit">Add channel</button>
   </form>
-</div>
-</div>
-</div>
+{% endcall %}
 {% endblock %}

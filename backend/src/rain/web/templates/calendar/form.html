@@ -1,8 +1,7 @@
 {% extends "base.html" %}
-{% import "_help.html" as help %}
 {% block title %}{{ "Edit" if entry else "New" }} calendar entry - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Create or edit a calendar entry -- one-time or recurring (quarterly/every 6 months/annually). Optionally emit a syslog event on each occurrence so Event Policies can act on it.{% endblock %}
 {% block content %}
-<h1>{{ "Edit entry" if entry else "New entry" }}{{ help.help_icon("Create or edit a calendar entry -- one-time or recurring (quarterly/every 6 months/annually). Optionally emit a syslog event on each occurrence so Event Policies can act on it.") }}</h1>
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
 <div class="card" style="max-width:640px;">

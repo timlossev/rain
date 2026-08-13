@@ -1,9 +1,7 @@
 {% extends "base.html" %}
-{% import "_help.html" as help %}
 {% block title %}Export Tickets - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Export tickets to CSV, JSON, or Excel. Filter by type/status, and choose which columns to include, their header text, and their order -- the same column set used across the app's exports.{% endblock %}
 {% block content %}
-<h1>Export Tickets{{ help.help_icon("Export tickets to CSV, JSON, or Excel. Filter by type/status, and choose which columns to include, their header text, and their order -- the same column set used across the app's exports.") }}</h1>
-
 <div class="card" style="max-width:720px;">
   <form method="post" action="/tickets/export/run">
     <div class="form-row">
