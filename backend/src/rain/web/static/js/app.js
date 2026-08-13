@@ -117,6 +117,66 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Markdown document body editor: "Preview" tab fetches a server-rendered
+  // preview of the current textarea content (rain.modules.documents.
+  // textbody.render_markdown -- the exact same renderer used for "Export
+  // to PDF", so what's previewed here is what actually ships) rather than
+  // reimplementing a Markdown parser in JS.
+  document.querySelectorAll("[data-md-preview-tab]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const form = btn.closest("[data-md-editor]");
+      const source = form && form.querySelector("[data-md-source]");
+      const target = form && form.querySelector("[data-md-preview-target]");
+      if (!source || !target) return;
+      target.innerHTML = "<p class=\"muted\">Rendering...</p>";
+      try {
+        const resp = await fetch(form.action.replace(/\/body$/, "/preview-markdown"), {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "body=" + encodeURIComponent(source.value),
+        });
+        target.innerHTML = resp.ok ? await resp.text() : "<p class=\"muted\">Preview failed.</p>";
+      } catch (err) {
+        target.innerHTML = "<p class=\"muted\">Preview failed.</p>";
+      }
+    });
+  });
+
+  // Linked-document "View" modal, for inline-viewable (txt/md) documents
+  // only -- decided client-side off the filename extension so the
+  // Linked Documents fragment (shared by ticket/asset detail) doesn't
+  // need a server-side body_kind lookup per link. Fetches the same
+  // rendered-body fragment the inline editor's Preview tab uses.
+  const TEXT_PREVIEW_EXTENSIONS = [".txt", ".text", ".log", ".md", ".markdown"];
+  const previewModal = document.querySelector("#doc-preview-modal");
+  const previewBody = document.querySelector("#doc-preview-body");
+  const previewTitle = document.querySelector("#doc-preview-title");
+  document.querySelectorAll("[data-doc-preview]").forEach((btn) => {
+    const filename = (btn.dataset.docFilename || "").toLowerCase();
+    if (!TEXT_PREVIEW_EXTENSIONS.some((ext) => filename.endsWith(ext))) return;
+    btn.hidden = false;
+    btn.addEventListener("click", async () => {
+      if (!previewModal) return;
+      previewTitle.textContent = btn.dataset.docTitle || "";
+      previewBody.innerHTML = "<p class=\"muted\">Loading...</p>";
+      previewModal.hidden = false;
+      try {
+        const resp = await fetch(`/documents/${btn.dataset.docPreview}/body-preview`);
+        previewBody.innerHTML = resp.ok ? await resp.text() : "<p class=\"muted\">Couldn't load preview.</p>";
+      } catch (err) {
+        previewBody.innerHTML = "<p class=\"muted\">Couldn't load preview.</p>";
+      }
+    });
+  });
+  if (previewModal) {
+    previewModal.addEventListener("click", (evt) => {
+      if (evt.target === previewModal || evt.target.closest("[data-modal-close]")) previewModal.hidden = true;
+    });
+    document.addEventListener("keydown", (evt) => {
+      if (evt.key === "Escape" && !previewModal.hidden) previewModal.hidden = true;
+    });
+  }
+
   // Confirm before any destructive form submit.
   document.querySelectorAll("form[data-confirm]").forEach((form) => {
     form.addEventListener("submit", (evt) => {

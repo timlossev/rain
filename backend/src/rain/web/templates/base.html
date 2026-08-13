@@ -99,6 +99,17 @@
   {% block content_alone %}{% endblock %}
 </main>
 {% endif %}
+{% if ctx %}
+<div class="modal-overlay" id="doc-preview-modal" hidden>
+  <div class="modal-box">
+    <div class="modal-header">
+      <span id="doc-preview-title"></span>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="doc-preview-body"><p class="muted">Loading...</p></div>
+  </div>
+</div>
+{% endif %}
 <script src="/static/js/app.js"></script>
 {% block extra_scripts %}{% endblock %}
 </body>

@@ -25,6 +25,14 @@
 <p class="pdf-muted">Not linked to anything.</p>
 {% endif %}
 
+{% if body_kind == "markdown" %}
+<h2 class="pdf-section">Document body</h2>
+<div class="pdf-doc-body">{{ body_html | safe }}</div>
+{% elif body_kind == "text" %}
+<h2 class="pdf-section">Document body</h2>
+<pre class="pdf-doc-body">{{ body_text }}</pre>
+{% else %}
 <p class="pdf-muted">The underlying file itself is not embedded in this report -- download it from the Documents
   screen for the original attachment.</p>
+{% endif %}
 {% endblock %}

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
-from rain.modules.documents import service, storage
+from rain.modules.documents import service, storage, textbody
 from rain.modules.documents.schemas import LINKED_TYPES, MAX_UPLOAD_BYTES
 from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
@@ -106,9 +106,73 @@ async def document_detail(
     doc = await service.get_document(tenant_db, document_id)
     if doc is None:
         return RedirectResponse("/documents", status_code=status.HTTP_303_SEE_OTHER)
+    body_kind = textbody.body_kind(doc.filename)
+    body_text = None
+    if body_kind is not None:
+        try:
+            body_text = textbody.decode_body(storage.get_storage().read(doc.storage_key))
+        except FileNotFoundError:
+            body_kind = None
     return templates.TemplateResponse(
-        request, "documents/detail.html", {**nav, "ctx": ctx, "doc": doc, "linked_types": LINKED_TYPES}
+        request,
+        "documents/detail.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "doc": doc,
+            "linked_types": LINKED_TYPES,
+            "body_kind": body_kind,
+            "body_text": body_text,
+        },
     )
+
+
+@router.post("/{document_id:int}/body")
+async def update_document_body(
+    document_id: int,
+    body: str = Form(...),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    if textbody.body_kind(doc.filename) is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This document type isn't inline-editable.")
+    data = body.encode("utf-8")
+    storage.get_storage().save(doc.storage_key, data)
+    await service.update_body_size(tenant_db, doc, len(data))
+    return RedirectResponse(f"/documents/{document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{document_id:int}/preview-markdown", response_class=HTMLResponse)
+async def preview_markdown(document_id: int, body: str = Form(...), _: CurrentUser = Depends(require_login)):
+    return HTMLResponse(textbody.render_markdown(body))
+
+
+@router.get("/{document_id:int}/body-preview", response_class=HTMLResponse)
+async def body_preview(
+    document_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Rendered-body fragment for the "View" modal on linked-document
+    lists (ticket/asset detail) -- same renderer as the inline editor's
+    Preview tab and the PDF export, so all three agree."""
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    kind = textbody.body_kind(doc.filename)
+    if kind is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This document type has no inline preview.")
+    try:
+        text = textbody.decode_body(storage.get_storage().read(doc.storage_key))
+    except FileNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Stored file is missing.")
+    if kind == "markdown":
+        return HTMLResponse(textbody.render_markdown(text))
+    escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return HTMLResponse(f"<pre class=\"doc-preview-text\">{escaped}</pre>")
 
 
 @router.get("/{document_id:int}/pdf")
@@ -120,11 +184,28 @@ async def document_pdf(
     doc = await service.get_document(tenant_db, document_id)
     if doc is None:
         return RedirectResponse("/documents", status_code=status.HTTP_303_SEE_OTHER)
+
+    body_kind = textbody.body_kind(doc.filename)
+    body_text = None
+    body_html = None
+    if body_kind is not None:
+        try:
+            text = textbody.decode_body(storage.get_storage().read(doc.storage_key))
+            if body_kind == "markdown":
+                body_html = textbody.render_markdown(text)
+            else:
+                body_text = text
+        except FileNotFoundError:
+            body_kind = None
+
     pdf_bytes = render_pdf(
         "pdf/document.html",
         {
             "doc": doc,
             "doc_kind": "Document",
+            "body_kind": body_kind,
+            "body_text": body_text,
+            "body_html": body_html,
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         },
     )

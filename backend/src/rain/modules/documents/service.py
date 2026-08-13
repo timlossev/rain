@@ -62,6 +62,11 @@ async def get_document(db: AsyncSession, document_id: int) -> Document | None:
     return result.scalar_one_or_none()
 
 
+async def update_body_size(db: AsyncSession, doc: Document, size_bytes: int) -> None:
+    doc.size_bytes = size_bytes
+    await db.commit()
+
+
 async def delete_document(db: AsyncSession, document: Document) -> None:
     await db.delete(document)  # cascades to document_links
     await db.commit()

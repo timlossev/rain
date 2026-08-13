@@ -339,6 +339,9 @@ class Document(TenantBase):
     size_bytes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     uploaded_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     links: Mapped[list["DocumentLink"]] = relationship(back_populates="document", cascade="all, delete-orphan")
 

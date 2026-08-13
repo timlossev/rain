@@ -22,6 +22,34 @@
   </table>
 </div>
 
+{% if body_kind %}
+<div class="card">
+  <div class="card-title">Document body</div>
+  <form method="post" action="/documents/{{ doc.id }}/body" data-md-editor>
+    {% if body_kind == "markdown" %}
+    <div class="tabs" data-tabs>
+      <div class="tab-buttons">
+        <button type="button" class="tab-btn active" data-tab-btn="write">Write</button>
+        <button type="button" class="tab-btn" data-tab-btn="preview" data-md-preview-tab="{{ doc.id }}">Preview</button>
+      </div>
+      <div class="tab-panel active" data-tab-panel="write">
+        <textarea name="body" rows="18" class="doc-body-editor" data-md-source>{{ body_text }}</textarea>
+      </div>
+      <div class="tab-panel" data-tab-panel="preview">
+        <div class="card doc-md-preview" data-md-preview-target>
+          <p class="muted">Switch to this tab to render a preview.</p>
+        </div>
+      </div>
+    </div>
+    <div class="field-hint">Markdown -- rendered the same way in the Preview tab and in "Export to PDF".</div>
+    {% else %}
+    <textarea name="body" rows="18" class="doc-body-editor">{{ body_text }}</textarea>
+    {% endif %}
+    <button class="btn btn-primary" type="submit" style="margin-top:10px;">Save</button>
+  </form>
+</div>
+{% endif %}
+
 <div class="card">
   <div class="card-title">Linked to</div>
   <table>

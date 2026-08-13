@@ -406,6 +406,65 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
   .calendar-entry-chip { font-size: 0.65rem; }
 }
 
+/* ---------- document body editor (txt/md inline editing) ---------- */
+.doc-body-editor {
+  width: 100%;
+  font-family: "Cascadia Mono", "SF Mono", Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+.doc-md-preview { min-height: 200px; }
+.doc-md-preview h1, .doc-md-preview h2, .doc-md-preview h3 { margin: 0.6em 0 0.3em; }
+.doc-md-preview p { margin: 0 0 0.8em; }
+.doc-md-preview pre { background: var(--surface-sunken); padding: 10px; border-radius: var(--radius-sm); overflow-x: auto; }
+.doc-md-preview code { font-family: "Cascadia Mono", "SF Mono", Consolas, monospace; background: var(--surface-sunken); padding: 1px 4px; border-radius: 4px; }
+.doc-md-preview blockquote { margin: 0 0 0.8em; padding-left: 12px; border-left: 3px solid var(--border); color: var(--text-muted); }
+.doc-md-preview table { width: 100%; border-collapse: collapse; margin-bottom: 0.8em; }
+.doc-md-preview th, .doc-md-preview td { border: 1px solid var(--border); padding: 5px 8px; }
+
+/* ---------- modal (document preview) ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 17, 26, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+/* Higher specificity than the bare .modal-overlay rule above (attribute
+   selector + class beats class alone), so it wins regardless of source
+   order -- without this, the browser's own default `[hidden] { display:
+   none }` UA rule loses to our `display: flex` and the modal renders
+   permanently open, covering the page, on every load (confirmed: it
+   did exactly that before this fix). */
+.modal-overlay[hidden] { display: none; }
+.modal-box {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  width: 100%;
+  max-width: 720px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+}
+.modal-close { all: unset; cursor: pointer; font-size: 1.3rem; line-height: 1; color: var(--text-muted); padding: 2px 6px; }
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 18px; overflow-y: auto; }
+.modal-body pre.doc-preview-text { white-space: pre-wrap; font-family: "Cascadia Mono", "SF Mono", Consolas, monospace; font-size: 0.85rem; }
+
 /* ---------- pagination ---------- */
 .pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
 .pagination-controls { display: flex; align-items: center; gap: 10px; }
@@ -419,6 +478,11 @@ th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--bor
 th { color: var(--text-muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
 tr:last-child td { border-bottom: none; }
 td.actions { text-align: right; white-space: nowrap; }
+/* Narrow contexts (e.g. Linked Documents sitting in a two-column layout
+   next to ticket metadata) don't have room for 2-3 nowrap buttons -- let
+   them wrap onto their own lines instead of overflowing the card. */
+td.actions.actions-wrap { white-space: normal; }
+td.actions.actions-wrap .btn, td.actions.actions-wrap form { margin: 2px 0 2px 6px; }
 
 /* ---------- badges / flash ---------- */
 .badge {

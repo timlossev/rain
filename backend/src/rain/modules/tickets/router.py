@@ -149,6 +149,18 @@ async def _user_names(user_ids: set[int | None]) -> dict[int, str]:
         return {u.id: u.display_name for u in result.scalars()}
 
 
+def _build_activity(ticket: Ticket) -> list[dict]:
+    """Comments and status changes interleaved into one chronological feed
+    ("Activity"), each tagged with its kind so the caller (screen or PDF)
+    can render them differently. Shared so the PDF export shows the same
+    unified feed as the ticket detail screen instead of drifting apart."""
+    return sorted(
+        [{"kind": "comment", "at": c.created_at, "item": c} for c in ticket.comments]
+        + [{"kind": "status_change", "at": sc.created_at, "item": sc} for sc in ticket.status_changes],
+        key=lambda entry: entry["at"] or datetime.min.replace(tzinfo=timezone.utc),
+    )
+
+
 @router.get("/{ticket_id:int}", response_class=HTMLResponse)
 async def ticket_detail(
     request: Request,
@@ -174,14 +186,7 @@ async def ticket_detail(
         | {sc.changed_by_user_id for sc in ticket.status_changes}
     )
 
-    # Comments and status changes interleaved into one chronological feed
-    # ("Activity"), each tagged with its kind so the template can render
-    # them differently.
-    activity = sorted(
-        [{"kind": "comment", "at": c.created_at, "item": c} for c in ticket.comments]
-        + [{"kind": "status_change", "at": sc.created_at, "item": sc} for sc in ticket.status_changes],
-        key=lambda entry: entry["at"] or datetime.min.replace(tzinfo=timezone.utc),
-    )
+    activity = _build_activity(ticket)
 
     return templates.TemplateResponse(
         request,
@@ -209,6 +214,8 @@ async def ticket_pdf(
     if ticket is None:
         return RedirectResponse("/tickets", status_code=status.HTTP_303_SEE_OTHER)
     document_links = await document_service.links_for(tenant_db, "ticket", ticket_id)
+    statuses = await service.list_statuses(tenant_db)
+    status_labels = {s.key: s.label for s in statuses}
     user_names = await _user_names(
         {ticket.reporter_user_id}
         | {c.author_user_id for c in ticket.comments}
@@ -220,6 +227,8 @@ async def ticket_pdf(
             "ticket": ticket,
             "document_links": document_links,
             "user_names": user_names,
+            "status_labels": status_labels,
+            "activity": _build_activity(ticket),
             "doc_kind": "Ticket",
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         },
