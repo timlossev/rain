@@ -7,6 +7,11 @@
   {% if ticket.ticket_type in ("incident", "vulnerability") %}
   <a class="btn btn-sm" href="/tickets/new?ticket_type=change&amp;source_ticket_id={{ ticket.id }}">Promote to Change</a>
   {% endif %}
+  <form method="post" action="/tickets/{{ ticket.id }}/chronic/toggle" class="inline">
+    <input type="hidden" name="next" value="/tickets/{{ ticket.id }}">
+    <input type="hidden" name="is_chronic" value="{{ '0' if ticket.is_chronic else '1' }}">
+    <button type="submit" class="btn btn-sm{% if ticket.is_chronic %} active{% endif %}">{{ "Unmark chronic" if ticket.is_chronic else "Mark chronic" }}</button>
+  </form>
   <a class="btn btn-sm" href="/tickets/{{ ticket.id }}/pdf">Export to PDF</a>
 </div>
 

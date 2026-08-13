@@ -4,7 +4,6 @@
 {% block help_text %}Browse and filter tickets (incidents, vulnerabilities, and changes) by type and status. Click a column header to sort by it. Click a ticket to view its full detail and activity.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
-{% set type_label = "Incidents" if selected_type == "incident" else ("Vulnerabilities" if selected_type == "vulnerability" else ("Changes" if selected_type == "change" else "Tickets")) %}
 
 {# Builds a /tickets query string, keeping every filter/sort dimension at
    its current value except the one(s) passed in -- None means "keep
@@ -32,8 +31,10 @@
 <a class="sort-th" href="/tickets?{{ qs(sort=key, dir=next_dir) }}">{{ label }}{% if selected_sort == key %}<span class="sort-arrow" aria-hidden="true">{{ "&uarr;" | safe if selected_dir == "asc" else "&darr;" | safe }}</span>{% endif %}</a>
 {% endmacro %}
 
-<div class="panel-row filter-bar-toolbar">
-  <div class="filter-bar" style="margin-bottom: 0; flex: 1 1 auto; min-width: 0;">
+<div class="panel-row" style="margin-bottom: 0;">
+  <div class="filter-bar">
+    <a class="btn btn-primary" href="/tickets/new{{ '?ticket_type=' ~ selected_type if selected_type else '' }}" style="flex-shrink:0;">+ New ticket</a>
+
     <div class="filter-bar-types">
       <a class="type-pill {% if not selected_type %}active{% endif %}" href="/tickets?{{ qs(type='') }}">All</a>
       <a class="type-pill type-pill-incident {% if selected_type == 'incident' %}active{% endif %}" href="/tickets?{{ qs(type='incident') }}">Incidents</a>
@@ -41,32 +42,29 @@
       <a class="type-pill type-pill-change {% if selected_type == 'change' %}active{% endif %}" href="/tickets?{{ qs(type='change') }}">Changes</a>
     </div>
 
+    <form method="get" action="/tickets" class="field" style="margin-bottom:0;">
+      <input type="hidden" name="ticket_type" value="{{ selected_type }}">
+      {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
+      {% if selected_chronic %}<input type="hidden" name="chronic" value="1">{% endif %}
+      {% if selected_sort and selected_sort != "created_at" %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
+      {% if selected_dir != "desc" %}<input type="hidden" name="dir" value="{{ selected_dir }}">{% endif %}
+      <select id="ticket_status" name="ticket_status" onchange="this.form.submit()" aria-label="Status" title="Filter by status">
+        <option value="">All statuses</option>
+        {% for s in statuses %}
+        <option value="{{ s.key }}" {% if selected_status == s.key %}selected{% endif %}>{{ s.label }}</option>
+        {% endfor %}
+      </select>
+    </form>
+
     <div class="filter-bar-divider"></div>
 
-    <div class="filter-bar-refine">
-      <form method="get" action="/tickets" class="field" style="margin-bottom:0;">
-        <input type="hidden" name="ticket_type" value="{{ selected_type }}">
-        {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
-        {% if selected_chronic %}<input type="hidden" name="chronic" value="1">{% endif %}
-        {% if selected_sort and selected_sort != "created_at" %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
-        {% if selected_dir != "desc" %}<input type="hidden" name="dir" value="{{ selected_dir }}">{% endif %}
-        <select id="ticket_status" name="ticket_status" onchange="this.form.submit()" aria-label="Status" title="Filter by status">
-          <option value="">All statuses</option>
-          {% for s in statuses %}
-          <option value="{{ s.key }}" {% if selected_status == s.key %}selected{% endif %}>{{ s.label }}</option>
-          {% endfor %}
-        </select>
-      </form>
-      <div class="filter-bar-chips">
-        <a class="btn btn-sm {% if selected_assigned == 'me' %}active{% endif %}" href="/tickets?{{ qs(assigned='me') }}">My {{ type_label }}</a>
-        <a class="btn btn-sm {% if selected_assigned == 'unassigned' %}active{% endif %}" href="/tickets?{{ qs(assigned='unassigned') }}">Unassigned {{ type_label }}</a>
-        {% if selected_assigned %}<a class="btn btn-sm" href="/tickets?{{ qs(assigned='') }}">All {{ type_label }}</a>{% endif %}
-        <a class="btn btn-sm {% if selected_chronic %}active{% endif %}" href="/tickets?{{ qs(chronic='' if selected_chronic else '1') }}">Only Chronic</a>
-      </div>
+    <div class="filter-bar-chips">
+      <a class="btn btn-sm {% if selected_assigned == 'me' %}active{% endif %}" href="/tickets?{{ qs(assigned='me') }}">Mine</a>
+      <a class="btn btn-sm {% if selected_assigned == 'unassigned' %}active{% endif %}" href="/tickets?{{ qs(assigned='unassigned') }}">Unassigned</a>
+      {% if selected_assigned %}<a class="btn btn-sm" href="/tickets?{{ qs(assigned='') }}">All</a>{% endif %}
+      <a class="btn btn-sm {% if selected_chronic %}active{% endif %}" href="/tickets?{{ qs(chronic='' if selected_chronic else '1') }}">Chronic</a>
     </div>
   </div>
-
-  <a class="btn btn-primary" href="/tickets/new{{ '?ticket_type=' ~ selected_type if selected_type else '' }}" style="flex-shrink:0;">+ New ticket</a>
 </div>
 
 <div class="card">
@@ -98,7 +96,7 @@
         <td class="muted">{{ user_names.get(t.assignee_user_id, "Unassigned") }}</td>
         <td class="muted">{{ t.asset.name if t.asset else "-" }}</td>
         <td class="muted">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "-" }}</td>
-        <td class="actions">
+        <td>
           <div class="dropdown-menu" data-menu>
             <button type="button" class="dropdown-menu-btn row-menu-btn" data-menu-toggle aria-haspopup="true" aria-expanded="false" title="Actions">
               <span class="nav-icon">{{ nav_icon("dots-vertical") }}</span>
@@ -113,12 +111,17 @@
                 <input type="hidden" name="is_chronic" value="{{ '0' if t.is_chronic else '1' }}">
                 <button type="submit" class="row-menu-item">{{ "Unmark chronic" if t.is_chronic else "Mark chronic" }}</button>
               </form>
+              {% if t.ticket_type in ("incident", "vulnerability") %}
+              <a class="row-menu-item" href="/tickets/new?ticket_type=change&amp;source_ticket_id={{ t.id }}">Promote to Change</a>
+              {% endif %}
               {% if t.ticket_type == "change" %}
               <form method="post" action="/tickets/{{ t.id }}/mark-cancelled">
                 <input type="hidden" name="next" value="/tickets?{{ qs() }}">
                 <button type="submit" class="row-menu-item danger">Mark cancelled</button>
               </form>
               {% endif %}
+              <div class="dropdown-menu-divider"></div>
+              <a class="row-menu-item" href="/tickets/{{ t.id }}/pdf">Get a hard copy (PDF)</a>
             </div>
           </div>
         </td>
