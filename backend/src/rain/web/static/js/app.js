@@ -277,16 +277,27 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".modal-overlay[data-modal]:not([hidden])").forEach((modal) => { modal.hidden = true; });
   });
 
-  // Topbar user-menu: icon button toggles a dropdown (name/role/Sign out).
-  // Click-toggle + click-outside-to-close rather than hover -- it holds an
-  // actionable Sign out button, and a hover-only menu is a bad fit for that.
-  document.querySelectorAll("[data-user-menu]").forEach((menu) => {
-    const btn = menu.querySelector("[data-user-menu-toggle]");
-    const panel = menu.querySelector("[data-user-menu-panel]");
+  // Generic click-toggle dropdown: a trigger button ([data-menu-toggle])
+  // opens an absolutely-positioned panel ([data-menu-panel]) inside a
+  // [data-menu] wrapper. Click-toggle + click-outside/Escape-to-close
+  // rather than hover -- shared by the topbar user-menu (name/role/Sign
+  // out, which holds an actionable button hover would fumble) and each
+  // tickets-list row's [...] quick-action menu, so this logic lives in
+  // exactly one place instead of being duplicated per menu.
+  document.querySelectorAll("[data-menu]").forEach((menu) => {
+    const btn = menu.querySelector("[data-menu-toggle]");
+    const panel = menu.querySelector("[data-menu-panel]");
     if (!btn || !panel) return;
     btn.addEventListener("click", (evt) => {
       evt.stopPropagation();
       const opening = panel.hidden;
+      // Close any other open menu first -- otherwise a row menu left open
+      // while another one (or the user menu) opens would stack up.
+      document.querySelectorAll("[data-menu-panel]:not([hidden])").forEach((openPanel) => {
+        if (openPanel === panel) return;
+        openPanel.hidden = true;
+        openPanel.closest("[data-menu]")?.querySelector("[data-menu-toggle]")?.setAttribute("aria-expanded", "false");
+      });
       panel.hidden = !opening;
       btn.setAttribute("aria-expanded", String(opening));
     });

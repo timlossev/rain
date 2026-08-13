@@ -404,6 +404,14 @@ class Ticket(TenantBase):
     # the tenant calendar alongside CalendarEntry rows.
     start_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
     end_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    # Manually set (tickets list quick-action menu) to flag a recurring
+    # problem -- conventionally, one that's happened more than 5 times in
+    # the trailing 30 days -- rather than a one-off. Not auto-computed:
+    # nothing in this schema groups "the same underlying issue" across
+    # tickets closely enough to count occurrences without a real risk of
+    # false positives (title text and asset alone both under- and
+    # over-match in practice), so this stays a human judgment call.
+    is_chronic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     assignee_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reporter_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

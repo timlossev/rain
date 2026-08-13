@@ -87,24 +87,23 @@ p { margin: 0 0 1em; }
 .session-tenant-badge { font-size: 0.8rem; color: var(--text-muted); padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-sunken); white-space: nowrap; }
 .session-tenant-badge strong { color: var(--text); }
 
-.user-menu { position: relative; }
-.user-menu-btn {
+/* Generic click-toggle dropdown (rain.web.static.js.app.js's [data-menu]
+   handler): a trigger button plus an absolutely-positioned panel, shared by
+   the topbar user-menu (.user-menu-btn/.user-menu-dropdown below) and each
+   tickets-list row's [...] quick-action menu (.row-menu-btn/.row-menu-panel
+   in tickets.css/list.html) so the open/close behavior and base look live
+   in one place. */
+.dropdown-menu { position: relative; }
+.dropdown-menu-btn {
   all: unset;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--surface-sunken);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
   cursor: pointer;
 }
-.user-menu-btn:hover, .user-menu-btn[aria-expanded="true"] { color: var(--text); border-color: var(--accent); }
-.user-menu-btn .nav-icon { width: 18px; height: 18px; color: inherit; }
-.user-menu-dropdown {
+.dropdown-menu-btn:hover, .dropdown-menu-btn[aria-expanded="true"] { color: var(--text); }
+.dropdown-menu-panel {
   position: absolute;
   top: 130%;
   right: 0;
@@ -117,9 +116,46 @@ p { margin: 0 0 1em; }
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
   padding: 12px;
 }
-.user-menu-dropdown[hidden] { display: none; }
+.dropdown-menu-panel[hidden] { display: none; }
+
+.user-menu-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.user-menu-btn:hover, .user-menu-btn[aria-expanded="true"] { border-color: var(--accent); }
+.user-menu-btn .nav-icon { width: 18px; height: 18px; color: inherit; }
 .user-menu-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 6px; }
 .user-menu-divider { border-top: 1px solid var(--border); margin: 10px 0; }
+
+.row-menu-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+}
+.row-menu-btn:hover, .row-menu-btn[aria-expanded="true"] { color: var(--text); background: var(--surface-sunken); border-color: var(--border); }
+.row-menu-btn .nav-icon { width: 16px; height: 16px; color: inherit; }
+.row-menu-panel { min-width: 180px; padding: 6px; }
+.row-menu-item {
+  all: unset;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.row-menu-item:hover { background: var(--surface-sunken); }
+.row-menu-item.danger { color: var(--danger); }
 .content { padding: 24px; max-width: 1100px; width: 100%; }
 .content-full { max-width: none; }
 /* Collapsing the sidebar is the reader's own signal that they want the
@@ -429,7 +465,7 @@ form.inline { display: inline; }
    One tinted, bordered band reads as a single toolbar instead. */
 .filter-bar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   flex-wrap: wrap;
   gap: 14px 18px;
   background: var(--surface-sunken);
@@ -439,10 +475,21 @@ form.inline { display: inline; }
   margin-bottom: 16px;
 }
 .filter-bar-divider { width: 1px; align-self: stretch; min-height: 34px; background: var(--border); }
-.filter-bar-refine { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 18px; }
+.filter-bar-refine { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; }
 .filter-bar-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 @media (max-width: 720px) {
   .filter-bar-divider { display: none; }
+}
+
+/* Tickets list toolbar (this .panel-row instance): the filter bar and the
+   "+ New ticket" button share one ribbon -- nowrap here so the button is
+   never pushed onto its own line, while .filter-bar's own flex-wrap above
+   still lets pills/select/chips reflow internally if that ribbon gets
+   tight. Only relaxed back to wrapping the whole row below a width where
+   that internal reflow alone can't keep things usable. */
+.filter-bar-toolbar { flex-wrap: nowrap; align-items: center; }
+@media (max-width: 860px) {
+  .filter-bar-toolbar { flex-wrap: wrap; }
 }
 
 /* Record-type pills: a segmented-control-style primary filter (a small,
@@ -755,6 +802,13 @@ td.actions { text-align: right; white-space: nowrap; }
 .severity-medium, .sev-notice, .sev-warning { background: #fef9c3; color: #854d0e; border-color: transparent; }
 .severity-high, .sev-err { background: #ffedd5; color: #9a3412; border-color: transparent; }
 .severity-critical, .sev-crit, .sev-alert, .sev-emerg { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
+
+/* ---------- chronic flag (manually-set "recurring problem" marker) ---------- */
+.ticket-title-cell { display: flex; align-items: center; gap: 6px; }
+.chronic-icon { display: inline-flex; flex-shrink: 0; color: #c2410c; }
+.chronic-icon svg { width: 15px; height: 15px; }
+.chronic-badge { display: inline-flex; align-items: center; gap: 5px; color: #c2410c; background: #ffedd5; border-color: transparent; }
+.chronic-badge svg { width: 13px; height: 13px; }
 
 /* ---------- live syslog viewer ---------- */
 .live-controls { display: flex; align-items: center; gap: 10px; }

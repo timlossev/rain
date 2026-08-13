@@ -12,6 +12,7 @@
   <tr><th>Type</th><td>{{ ticket.ticket_type }}</td></tr>
   <tr><th>Status</th><td>{{ status_labels.get(ticket.status, ticket.status) }}</td></tr>
   <tr><th>Severity</th><td>{{ ticket.severity }}</td></tr>
+  <tr><th>Chronic</th><td>{{ "Yes" if ticket.is_chronic else "No" }}</td></tr>
   <tr><th>Asset</th><td>{{ ticket.asset.name if ticket.asset else "-" }}</td></tr>
   <tr><th>Assignee</th><td>{{ user_names.get(ticket.assignee_user_id, "Unassigned") }}</td></tr>
   <tr><th>Reported by</th><td>

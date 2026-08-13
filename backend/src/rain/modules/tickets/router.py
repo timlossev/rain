@@ -32,6 +32,7 @@ from rain.modules.tickets.correlation import GROUP_BY_FIELDS
 from rain.modules.tickets.schemas import MATCH_FIELDS, SEVERITIES, TICKET_TYPES
 from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
+from rain.web.safe_redirect import safe_relative_path
 from rain.web.templating import templates
 
 router = APIRouter(prefix="/tickets")
@@ -46,6 +47,7 @@ async def list_tickets(
     ticket_type: str | None = None,
     ticket_status: str | None = None,
     assigned: str | None = None,  # "me" | "unassigned" | None
+    chronic: str | None = None,  # "1" | None
     sort: str | None = None,
     dir: str = "desc",
     page: int = 1,
@@ -60,6 +62,7 @@ async def list_tickets(
         status=ticket_status,
         assigned_to=ctx.user.id if assigned == "me" else None,
         unassigned=assigned == "unassigned",
+        chronic_only=bool(chronic),
         sort=sort,
         direction=dir,
     )
@@ -80,6 +83,7 @@ async def list_tickets(
             "selected_type": ticket_type,
             "selected_status": ticket_status,
             "selected_assigned": assigned,
+            "selected_chronic": bool(chronic),
             "selected_sort": sort if sort in service.SORTABLE_COLUMNS else "created_at",
             "selected_dir": dir,
             "user_names": user_names,
@@ -496,6 +500,64 @@ async def change_status(
     if ticket is not None:
         await service.update_status(tenant_db, ticket, new_status, changed_by_user_id=ctx.user.id)
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+# ---------------------------------------------------- list quick-actions -
+
+# The three actions below back the per-row [...] menu on the tickets list
+# (rain.web.templates.tickets.list.html): unlike the detail-page actions
+# above, they're fired from the list itself and must return there --
+# `next` carries the list's current filter/sort/page query string so the
+# redirect lands back on the same view rather than resetting it, guarded
+# by safe_relative_path since it's user-suppliable input.
+
+
+@router.post("/{ticket_id:int}/chronic/toggle")
+async def toggle_chronic(
+    ticket_id: int,
+    is_chronic: str = Form(...),  # "1" | "0" -- current value the row already shows, so this is a set not a flip
+    next: str = Form("/tickets"),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is not None:
+        await service.update_chronic(tenant_db, ticket, is_chronic == "1")
+    return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{ticket_id:int}/mark-closed")
+async def mark_closed(
+    ticket_id: int,
+    next: str = Form("/tickets"),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is not None:
+        closed_status = await service.get_closed_status(tenant_db)
+        if closed_status is not None:
+            await service.update_status(tenant_db, ticket, closed_status.key, changed_by_user_id=ctx.user.id)
+    return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{ticket_id:int}/mark-cancelled")
+async def mark_cancelled(
+    ticket_id: int,
+    next: str = Form("/tickets"),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    # Changes-only, enforced server-side (not just hidden in the UI) --
+    # "cancelled" isn't a meaningful state for incidents/vulnerabilities.
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is not None and ticket.ticket_type == "change":
+        cancelled_status = await service.find_status_by_name(tenant_db, "cancelled")
+        if cancelled_status is not None:
+            await service.update_status(tenant_db, ticket, cancelled_status.key, changed_by_user_id=ctx.user.id)
+    return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
 
 
 # ------------------------------------------------------------- export ----

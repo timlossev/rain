@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import Sequence, select
+from sqlalchemy import Sequence, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -117,6 +117,7 @@ def ticket_list_stmt(
     status: str | None = None,
     assigned_to: int | None = None,
     unassigned: bool = False,
+    chronic_only: bool = False,
     sort: str | None = None,
     direction: str = "desc",
 ):
@@ -138,6 +139,8 @@ def ticket_list_stmt(
         stmt = stmt.where(Ticket.assignee_user_id.is_(None))
     elif assigned_to is not None:
         stmt = stmt.where(Ticket.assignee_user_id == assigned_to)
+    if chronic_only:
+        stmt = stmt.where(Ticket.is_chronic.is_(True))
     return stmt
 
 
@@ -212,6 +215,44 @@ async def update_status(
     )
     await db.commit()
     return True
+
+
+async def get_closed_status(db: AsyncSession) -> TicketStatus | None:
+    """The status "Mark closed" (tickets list quick-action menu) applies --
+    the tenant's first active, is_closed-flagged status by sort_order.
+    None if the tenant hasn't configured one yet; the caller decides how
+    to surface that (there's no sane single status to invent)."""
+    result = await db.execute(
+        select(TicketStatus)
+        .where(TicketStatus.is_active.is_(True), TicketStatus.is_closed.is_(True))
+        .order_by(TicketStatus.sort_order, TicketStatus.label)
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def find_status_by_name(db: AsyncSession, name: str) -> TicketStatus | None:
+    """Case-insensitive match on key or label -- backs "Mark cancelled"
+    (tickets list quick-action menu, changes only), which has no dedicated
+    boolean flag on TicketStatus the way is_closed does for "Mark closed".
+    Matching by name instead of adding one more single-purpose column
+    keeps this to a naming convention rather than more schema surface for
+    a narrower need; a tenant just needs a status literally called
+    "Cancelled" (or "cancelled") for the action to find it."""
+    result = await db.execute(
+        select(TicketStatus).where(
+            TicketStatus.is_active.is_(True),
+            (func.lower(TicketStatus.key) == name.lower()) | (func.lower(TicketStatus.label) == name.lower()),
+        )
+    )
+    return result.scalars().first()
+
+
+async def update_chronic(db: AsyncSession, ticket: Ticket, is_chronic: bool) -> None:
+    if is_chronic == ticket.is_chronic:
+        return
+    ticket.is_chronic = is_chronic
+    await db.commit()
 
 
 async def update_assignee(

@@ -14,6 +14,7 @@
   <div style="margin-bottom:10px;">
     <span class="badge severity-{{ ticket.severity }}">{{ ticket.severity }}</span>
     <span class="badge badge-accent">{{ ticket.ticket_type }}</span>
+    {% if ticket.is_chronic %}<span class="badge chronic-badge">{{ nav_icon("repeat") }} Chronic</span>{% endif %}
   </div>
   <p>{{ ticket.description or "No description." }}</p>
   <table>

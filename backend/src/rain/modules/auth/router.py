@@ -17,15 +17,10 @@ from rain.core.tenancy import CurrentUser, get_current_user_optional
 from rain.db.base import control_session
 from rain.db.control_models import Session as SessionRow, Tenant, User
 from rain.modules.auth.provider import authenticate_user
+from rain.web.safe_redirect import safe_relative_path
 from rain.web.templating import templates
 
 router = APIRouter()
-
-
-def _safe_next(path: str) -> str:
-    if path.startswith("/") and not path.startswith("//"):
-        return path
-    return "/"
 
 
 async def _hinted_tenant_id(session, next_path: str, user: User) -> int | None:
@@ -92,7 +87,7 @@ async def login_submit(
         )
         await session.commit()
 
-    response = RedirectResponse(_safe_next(next), status_code=status.HTTP_303_SEE_OTHER)
+    response = RedirectResponse(safe_relative_path(next), status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         SESSION_COOKIE_NAME, token, max_age=SESSION_TTL_SECONDS, httponly=True, samesite="lax", secure=True
     )
