@@ -8,7 +8,7 @@
 </div>
 
 <div class="ticket-top-row">
-  <div class="card" style="flex:1; min-width:280px;">
+  <div class="card" style="flex:2; min-width:280px;">
     <div style="margin-bottom:10px;">
       <span class="badge severity-{{ ticket.severity }}">{{ ticket.severity }}</span>
       <span class="badge badge-accent">{{ ticket.ticket_type }}</span>
@@ -39,7 +39,7 @@
     </table>
   </div>
 
-  <div style="flex:2; min-width:340px;">
+  <div style="flex:1; min-width:220px;">
     {% with links = document_links, linked_type = "ticket", linked_id = ticket.id %}
     {% include "documents/_links_fragment.html" %}
     {% endwith %}

@@ -80,7 +80,7 @@
       <div class="topbar-user">
         {{ ctx.user.display_name }} <span class="badge badge-accent">{{ ctx.user.role_key }}</span>
         <form method="post" action="/logout" class="inline">
-          <button class="btn-link sign-out-btn" type="submit" title="Sign out">
+          <button class="btn btn-sm" type="submit" title="Sign out">
             <span class="nav-icon">{{ nav_icon("sign-out") }}</span>
             <span class="label-text">Sign out</span>
           </button>
