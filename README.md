@@ -103,9 +103,13 @@ JS framework in the browser.
 
 **Platform**
 - Schema-per-tenant multi-tenancy on a single Postgres instance
-- Local email/password auth (Argon2, DB-backed sessions) with
-  `OIDC/SAML/LDAP` provider slots already modeled, ready to enable in a
-  future release
+- Local email/password auth (Argon2, DB-backed sessions), plus an
+  optional LDAP/Active Directory provider (Admin > Auth Providers >
+  LDAP): point it at a directory with a bind DN, and it periodically
+  syncs users and groups into one target tenant -- a synced user never
+  gets a local password, every one of their logins binds live against
+  the directory instead. `OIDC`/`SAML` provider slots are still just
+  modeled, ready to enable in a future release
 - Role-based access control (`internal_admin` / `client`), with an
   Admin console for platform- and tenant-level configuration
 - Runtime branding: instance name, accent color, logo upload, and a
@@ -152,7 +156,7 @@ the exact destination snippet and lets you map hosts/programs to tenants.
 | App | FastAPI + Jinja2, server-rendered | No Node/SPA build; the entire client-side footprint is one hand-written CSS file and a couple of small vanilla-JS files -- no htmx/Alpine/Tailwind/React dependency to track for CVEs |
 | DB | `pgvector/pgvector:pg17-trixie` (official image, pgvector pre-installed) | pgvector installed now, unused until the future LLM search hook; official image avoids maintaining our own pgvector build |
 | Multi-tenancy | Schema-per-tenant | One Postgres instance, `control` schema for platform data, `tenant_<slug>` per tenant |
-| Auth | Local email/password (Argon2, DB-backed sessions) | `control.auth_providers` already has disabled OIDC/SAML/LDAP rows, ready for a future release |
+| Auth | Local email/password (Argon2, DB-backed sessions) + optional LDAP (`ldap3`, pure Python) | `control.auth_providers` still has disabled OIDC/SAML rows, ready for a future release |
 | Ticketing bus | Hand-written syslog listener (TCP+UDP) in `worker` | No third-party syslog library; syslog-ng pushes to it as a `network()` destination |
 | Document storage | Local volume behind a `StorageBackend` abstraction | Swappable for S3 later without touching callers; served only through an authenticated download route, never the static file mount |
 | Exports | CSV, JSON, Excel (`openpyxl`), PDF (`xhtml2pdf`), iCalendar | All pure-Python, no headless browser or system library required in the image |
@@ -222,8 +226,10 @@ Per [`docs/architecture.md`](docs/architecture.md#roadmap):
   installed, unused).
 - Real AWS/Azure asset discovery (`SyncProvider.discover_assets()` is
   currently a stub).
-- OIDC/SAML/LDAP auth providers (`control.auth_providers` rows already
-  exist, disabled).
+- OIDC/SAML auth providers (`control.auth_providers` rows already
+  exist, disabled; LDAP is done).
+- Multiple independent LDAP directories (currently one directory syncs
+  into exactly one target tenant, instance-wide).
 - Acting on `CalendarEntry.policy_ref` (currently an inert, round-tripping
   hook for a future "recurring policy" concept, e.g. "update document X
   quarterly").
