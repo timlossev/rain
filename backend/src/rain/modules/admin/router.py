@@ -33,6 +33,7 @@ from rain.db.tenant_models import (
     TicketStatus,
     WebhookConfig,
 )
+from rain.modules.auth import saml_config
 from rain.modules.auth.ldap_config import get_provider_row, get_raw_config, save_ldap_config
 from rain.modules.auth.ldap_sync import run_ldap_sync
 from rain.modules.tickets.schemas import CHANNEL_TYPES
@@ -488,6 +489,75 @@ async def ldap_config_test(_: CurrentUser = Depends(require_internal_admin)):
 async def ldap_config_sync_now(_: CurrentUser = Depends(require_internal_admin)):
     await run_ldap_sync()
     return RedirectResponse("/admin/auth-providers/ldap?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/auth-providers/saml", response_class=HTMLResponse)
+async def saml_config_form(
+    request: Request,
+    ctx: RequestContext = Depends(get_request_context),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    nav = await build_nav_context(ctx)
+    async with control_session() as session:
+        row = await saml_config.get_provider_row(session)
+        config = await saml_config.get_raw_config(session)
+        tenants = list(
+            (await session.execute(select(Tenant).where(Tenant.is_active.is_(True)).order_by(Tenant.name))).scalars()
+        )
+    return templates.TemplateResponse(
+        request,
+        "admin/auth_provider_saml.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "config": config,
+            "tenants": tenants,
+            "is_enabled": row.is_enabled if row else False,
+            "metadata_url": f"{request.url.scheme}://{request.url.netloc}/auth/saml/metadata",
+            "acs_url": f"{request.url.scheme}://{request.url.netloc}/auth/saml/acs",
+        },
+    )
+
+
+@router.post("/auth-providers/saml")
+async def saml_config_save(
+    idp_entity_id: str = Form(...),
+    idp_sso_url: str = Form(...),
+    idp_x509_cert: str = Form(...),
+    sp_entity_id: str = Form(...),
+    attr_username: str = Form(""),
+    attr_email: str = Form(...),
+    attr_first_name: str = Form(...),
+    attr_last_name: str = Form(...),
+    attr_role: str = Form(...),
+    role_admin_value: str = Form(...),
+    target_tenant_id: str = Form(...),
+    is_enabled: bool = Form(False),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    async with control_session() as session:
+        await saml_config.save_saml_config(
+            session,
+            is_enabled=is_enabled,
+            idp_entity_id=idp_entity_id.strip(),
+            idp_sso_url=idp_sso_url.strip(),
+            # Accept a cert pasted with or without the PEM header/footer --
+            # OneLogin_Saml2_Settings wants just the base64 body.
+            idp_x509_cert="".join(
+                line.strip()
+                for line in idp_x509_cert.splitlines()
+                if line.strip() and "BEGIN CERTIFICATE" not in line and "END CERTIFICATE" not in line
+            ),
+            sp_entity_id=sp_entity_id.strip(),
+            attr_username=attr_username.strip(),
+            attr_email=attr_email.strip(),
+            attr_first_name=attr_first_name.strip(),
+            attr_last_name=attr_last_name.strip(),
+            attr_role=attr_role.strip(),
+            role_admin_value=role_admin_value.strip(),
+            target_tenant_id=int(target_tenant_id),
+        )
+    return RedirectResponse("/admin/auth-providers/saml?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
 # --------------------------------------------------------- ticket statuses

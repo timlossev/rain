@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}SAML - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Configure SAML 2.0 single sign-on against one Identity Provider. A first-time sign-in creates the user (or, for an email that already exists as a local/LDAP account, is refused rather than silently taking it over); every sign-in after that refreshes their name and role from the assertion.{% endblock %}
+{% block content_class %}content-full{% endblock %}
+{% block content %}
+<div class="panel-row" style="justify-content:flex-end;">
+  <a class="btn btn-sm" href="/admin/auth-providers">&larr; Auth Providers</a>
+</div>
+
+{% if request.query_params.get('ok') %}<div class="flash flash-ok">Saved.</div>{% endif %}
+
+<div class="card">
+  <div class="card-title">This RAIN instance (give these to your IdP)</div>
+  <table>
+    <tbody>
+      <tr><th>SP metadata URL</th><td class="muted">{{ metadata_url }}</td></tr>
+      <tr><th>ACS URL</th><td class="muted">{{ acs_url }}</td></tr>
+    </tbody>
+  </table>
+  <div class="field-hint">Most IdPs can import the metadata URL directly instead of entering the ACS URL and entity ID by hand.</div>
+</div>
+
+<div class="card">
+  <form method="post" action="/admin/auth-providers/saml">
+    <div class="field"><label class="checkbox-row"><input type="checkbox" name="is_enabled" {% if is_enabled %}checked{% endif %}> Enabled -- required for the "Sign in with SSO" link to appear on the login page</label></div>
+
+    <h3>Identity Provider</h3>
+    <div class="form-row">
+      <div class="field"><label for="idp_entity_id">IdP entity ID</label><input type="text" id="idp_entity_id" name="idp_entity_id" value="{{ config.idp_entity_id }}" placeholder="https://idp.example.com/saml/metadata" required></div>
+      <div class="field"><label for="idp_sso_url">IdP SSO URL</label><input type="text" id="idp_sso_url" name="idp_sso_url" value="{{ config.idp_sso_url }}" placeholder="https://idp.example.com/saml/sso" required></div>
+    </div>
+    <div class="field">
+      <label for="idp_x509_cert">IdP signing certificate (X.509, PEM)</label>
+      <textarea id="idp_x509_cert" name="idp_x509_cert" rows="6" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" required>{{ config.idp_x509_cert }}</textarea>
+      <div class="field-hint">The header/footer lines are stripped automatically if pasted -- either the raw base64 body or the full PEM block works.</div>
+    </div>
+
+    <h3>Service Provider</h3>
+    <div class="field"><label for="sp_entity_id">SP entity ID</label><input type="text" id="sp_entity_id" name="sp_entity_id" value="{{ config.sp_entity_id }}" placeholder="e.g. this RAIN instance's URL" required></div>
+
+    <h3>Attribute mapping</h3>
+    <p class="field-hint">Which assertion attribute carries each value. Leave "Username attribute" blank to use the assertion's NameID directly instead of a separate attribute (the SAML-standard place for it) -- set it only if your IdP puts the actual username somewhere else.</p>
+    <div class="form-row">
+      <div class="field"><label for="attr_username">Username attribute (optional)</label><input type="text" id="attr_username" name="attr_username" value="{{ config.attr_username }}" placeholder="Blank = use NameID"></div>
+      <div class="field"><label for="attr_email">Email attribute</label><input type="text" id="attr_email" name="attr_email" value="{{ config.attr_email }}" required></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="attr_first_name">First name attribute</label><input type="text" id="attr_first_name" name="attr_first_name" value="{{ config.attr_first_name }}" required></div>
+      <div class="field"><label for="attr_last_name">Last name attribute</label><input type="text" id="attr_last_name" name="attr_last_name" value="{{ config.attr_last_name }}" required></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="attr_role">Role attribute</label><input type="text" id="attr_role" name="attr_role" value="{{ config.attr_role }}" required></div>
+      <div class="field"><label for="role_admin_value">Value that grants Internal Admin</label><input type="text" id="role_admin_value" name="role_admin_value" value="{{ config.role_admin_value }}" required></div>
+    </div>
+    <div class="field-hint" style="margin-top:-8px;">The Role attribute must equal this value exactly (case-sensitive) for RAIN to grant Internal Admin. Any other value, several values with none matching, or the attribute missing entirely all grant Client instead -- a misconfigured or blank Role claim never silently grants admin.</div>
+
+    <h3>Target tenant</h3>
+    <div class="field">
+      <label for="target_tenant_id">Sign in to tenant</label>
+      <select id="target_tenant_id" name="target_tenant_id" required>
+        <option value="">-</option>
+        {% for t in tenants %}
+        <option value="{{ t.id }}" {% if t.id == config.target_tenant_id %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+      <div class="field-hint">Every SAML-provisioned user (other than one granted Internal Admin, which is cross-tenant) lands in this one tenant. One IdP, one tenant -- if you need more than one SAML-backed tenant, that's a bigger change this page doesn't support yet.</div>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Save</button>
+  </form>
+</div>
+{% endblock %}

@@ -58,18 +58,25 @@ class User(ControlBase):
         ForeignKey(f"{CONTROL_SCHEMA}.tenants.id", ondelete="CASCADE"), nullable=True, index=True
     )
     email: Mapped[str] = mapped_column(String(320), index=True)
-    # NULL for an LDAP-sourced user (auth_source == "ldap") -- that user
-    # never gets a local password at all; every login binds live against
-    # the directory instead (see rain.modules.auth.provider). Required for
-    # a "local" user, enforced at the app layer where such a user is
-    # created, same trade-off this codebase already makes elsewhere for
-    # conditionally-required columns.
+    # NULL for an LDAP- or SAML-sourced user (auth_source in ("ldap",
+    # "saml")) -- that user never gets a local password at all; every
+    # login either binds live against the directory or arrives via an
+    # already-authenticated SSO assertion instead (see
+    # rain.modules.auth.provider / saml_provider). Required for a "local"
+    # user, enforced at the app layer where such a user is created, same
+    # trade-off this codebase already makes elsewhere for conditionally-
+    # required columns.
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role_key: Mapped[str] = mapped_column(ForeignKey(f"{CONTROL_SCHEMA}.roles.key"))
     display_name: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-    # local | ldap. Set once at creation (by the admin "New user" form for
-    # local, by the LDAP sync for ldap) and not meant to change afterwards.
+    # local | ldap | saml. Set once at creation (by the admin "New user"
+    # form for local, by the LDAP sync for ldap, by the first successful
+    # SSO login for saml) and not meant to change afterwards. Unlike an
+    # LDAP user's role_key (fixed to "client" at sync time), a SAML user's
+    # role_key is re-derived from the assertion's Role attribute on every
+    # login -- see rain.modules.auth.saml_provider -- so a promotion/
+    # demotion made in the IdP takes effect the next time they sign in.
     auth_source: Mapped[str] = mapped_column(String(15), default="local", server_default="local")
     # The user's full distinguished name in the directory -- only set for
     # auth_source == "ldap", used to bind-authenticate them at login.
@@ -119,9 +126,11 @@ class GlobalConfig(ControlBase):
 
 
 class AuthProviderConfig(ControlBase):
-    """local | oidc | saml | ldap. Only `local` is functional in this
-    milestone; the others exist so Admin UI can show them as configurable
-    placeholders ("coming soon") without a later schema change."""
+    """local | saml | ldap -- one row per provider, seeded by the initial
+    migration. local/ldap/saml are all functional; see
+    rain.modules.auth.provider (dispatch), rain.modules.auth.ldap_config /
+    saml_config (per-provider config), rain.modules.auth.saml_provider
+    (the SSO flow itself)."""
 
     __tablename__ = "auth_providers"
     __table_args__ = {"schema": CONTROL_SCHEMA}

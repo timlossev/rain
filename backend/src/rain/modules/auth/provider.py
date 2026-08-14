@@ -1,14 +1,18 @@
-"""Auth providers. `authenticate_user` is the single entry point
-login_submit calls -- it looks the user up once, then dispatches on their
-own `auth_source` (set once at creation, not meant to change afterwards):
-a "local" user gets the same Argon2 password-hash check as before LDAP
-ever existed; a user whose auth_source is "ldap" (created by the LDAP
-sync, see rain.modules.auth.ldap_sync) is routed to `authenticate_ldap`,
-a live directory bind, instead -- they never have a usable password_hash
-to check in the first place. OIDC/SAML would each add a sibling
-`authenticate_<provider>()` here plus a branch in the dispatch -- those
-rows already exist too (seeded disabled by the initial migration), ready
-for a later release to implement."""
+"""Auth providers for the password-form login path. `authenticate_user` is
+the single entry point login_submit calls -- it looks the user up once,
+then dispatches on their own `auth_source` (set once at creation, not
+meant to change afterwards): a "local" user gets the same Argon2
+password-hash check as before LDAP ever existed; a user whose
+auth_source is "ldap" (created by the LDAP sync, see
+rain.modules.auth.ldap_sync) is routed to `authenticate_ldap`, a live
+directory bind, instead -- they never have a usable password_hash to
+check in the first place.
+
+SAML (auth_source == "saml") never goes through this module at all --
+it's a browser-redirect SSO flow, not a password submitted to a form, so
+there's no password to check here. See rain.modules.auth.saml_provider
+for that flow and rain.modules.auth.router's /auth/saml/* routes for
+where a SAML-sourced user's session actually gets minted."""
 from __future__ import annotations
 
 import asyncio

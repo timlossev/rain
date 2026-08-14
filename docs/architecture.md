@@ -66,13 +66,16 @@ transparently lands in the right tenant's schema.
 
 ## Auth & RBAC
 
-Local email+password (Argon2, `argon2-cffi`) is the only functional
-provider in Milestone 1. Sessions are DB-backed (`control.sessions`): the
-cookie holds an opaque token, only its sha256 hash is stored, revocation is
-a row delete. `control.auth_providers` already has disabled `oidc`/`saml`/
-`ldap` rows -- the hooks the spec asked for -- ready for a future release
-to implement `authenticate_<provider>()` alongside
-`rain.modules.auth.provider.authenticate_local`.
+Local email+password (Argon2, `argon2-cffi`), LDAP/Active Directory (bind
+auth + periodic user/group sync, `rain.modules.auth.ldap_sync`), and SAML
+2.0 SSO (`rain.modules.auth.saml_provider`, `python3-saml`) are all
+functional, one `control.auth_providers` row each. Sessions are DB-backed
+(`control.sessions`): the cookie holds an opaque token, only its sha256
+hash is stored, revocation is a row delete. A local/LDAP user authenticates
+through the password form (`rain.modules.auth.provider.authenticate_user`
+dispatches on `User.auth_source`); SAML is a separate browser-redirect
+flow entirely (`/auth/saml/login` → IdP → `/auth/saml/acs`) that mints the
+same kind of session at the end instead of checking a password.
 
 Roles come from a `control.roles` table (not a hardcoded enum), seeded with
 exactly `internal_admin` (platform operator, all tenants) and `client`
@@ -337,6 +340,5 @@ response.
   table and a `SearchProvider` interface once a concrete model/API is
   chosen. Natural to wire into the Document Repository first (index
   `documents` content) and extend to tickets/assets from there.
-- **OIDC/SAML/LDAP**: `control.auth_providers` rows already exist,
-  disabled -- implement `authenticate_<provider>()` alongside
-  `rain.modules.auth.provider.authenticate_local`.
+- **Multiple LDAP/SAML sources**: currently one of each, syncing/signing
+  into exactly one target tenant, instance-wide.

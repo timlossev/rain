@@ -26,8 +26,30 @@ def run_web() -> None:
     # there, with disable_existing_loggers=False) -- but dictConfig has
     # the exact same default-True footgun, so this stays as defense in
     # depth against the same class of bug recurring from uvicorn's side.
+    # proxy_headers + forwarded_allow_ips="*": trust X-Forwarded-Proto/-For
+    # from whatever's in front of this container (Caddy when WEB_FRONTEND
+    # is on, an ALB or similar when it's off) and rewrite the ASGI scope
+    # accordingly -- without this, request.url.scheme/host are always
+    # "http"/the internal container address as far as this process can
+    # see, since the actual TLS termination and public hostname live one
+    # hop upstream. That's silently wrong for anything that builds an
+    # absolute URL from the current request (SAML's SP metadata/ACS URL,
+    # notably -- an IdP matching against a registered "https://..." ACS
+    # URL will reject a request that self-reports as "http://...").
+    # "*" is safe here specifically because this process is never itself
+    # directly internet-facing in either deployment mode (see
+    # docker-compose.yml's WEB_FRONTEND/APP_PORT).
     port = get_settings().app_port
-    uvicorn.run("rain.main:app", host="0.0.0.0", port=port, log_level="info", ws="wsproto", log_config=None)
+    uvicorn.run(
+        "rain.main:app",
+        host="0.0.0.0",
+        port=port,
+        log_level="info",
+        ws="wsproto",
+        log_config=None,
+        proxy_headers=True,
+        forwarded_allow_ips="*",
+    )
 
 
 async def _worker_main() -> None:

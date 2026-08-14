@@ -84,9 +84,10 @@ JS framework in the browser.
 
 **Platform**
 - Schema-per-tenant multi-tenancy on a single Postgres instance
-- Local email/password auth, plus an optional LDAP/Active Directory
-  provider; OIDC/SAML provider slots are modeled, ready for a future
-  release
+- Local email/password auth, plus optional LDAP/Active Directory and
+  SAML 2.0 SSO providers -- a SAML sign-in is JIT-provisioned (or
+  matched by email) with its role re-derived from a configurable
+  attribute on every login
 - Role-based access control (`internal_admin` / `client`), with an Admin
   console for platform- and tenant-level configuration
 - Runtime branding: instance name, accent color, logo, and font
@@ -137,7 +138,7 @@ Caddy container for deployments that already terminate TLS in front of RAIN
 | App | FastAPI + Jinja2, server-rendered | No Node/SPA build, no third-party JS framework to track for CVEs |
 | DB | Postgres with pgvector | pgvector installed now, unused until a future search feature |
 | Multi-tenancy | Schema-per-tenant | One Postgres instance, isolated per tenant |
-| Auth | Local email/password + optional LDAP | OIDC/SAML planned |
+| Auth | Local email/password + optional LDAP + SAML 2.0 | `python3-saml` for SAML (XML signature verification, not hand-rolled) |
 | Ticketing bus | Built-in syslog listener (TCP+UDP) | syslog-ng pushes to it directly, no third-party syslog library |
 | Document storage | Local volume behind a storage abstraction | Swappable for S3 later without touching callers |
 | Exports | CSV, JSON, Excel, PDF, iCalendar | All pure-Python, no extra system dependencies in the image |
@@ -202,6 +203,5 @@ Per [`docs/architecture.md`](docs/architecture.md#roadmap):
 
 - pgvector-backed keyword/vector search hook (pgvector is already
   installed, unused).
-- OIDC/SAML auth providers (LDAP is done).
-- Multiple independent LDAP directories (currently one directory syncs
-  into exactly one target tenant, instance-wide).
+- Multiple independent LDAP or SAML sources (currently one of each,
+  syncing/signing into exactly one target tenant, instance-wide).

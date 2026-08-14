@@ -1,7 +1,12 @@
 # Multi-stage build: compiler toolchain never reaches the final image.
 FROM python:3.12-alpine AS builder
 
-RUN apk add --no-cache build-base libffi-dev
+# xmlsec1-dev (+ its own libxml2-dev/libxslt-dev) is only needed to build
+# the `xmlsec` Python package's C extension, which python3-saml uses for
+# XML-DSig signature verification on SAML responses -- hand-rolling that
+# instead of using an established toolkit isn't worth the risk for
+# something this security-sensitive.
+RUN apk add --no-cache build-base libffi-dev xmlsec-dev libxml2-dev libxslt-dev
 
 WORKDIR /build
 COPY pyproject.toml ./
@@ -12,6 +17,10 @@ RUN python -m venv /venv \
  && /venv/bin/pip install --no-cache-dir .
 
 FROM python:3.12-alpine
+
+# xmlsec (runtime shared libs only, no -dev/compiler) for the `xmlsec`
+# package built above -- see the builder stage's comment.
+RUN apk add --no-cache xmlsec
 
 RUN addgroup -S rain \
  && adduser -S rain -G rain \

@@ -920,6 +920,8 @@ td.actions { text-align: right; white-space: nowrap; }
 .auth-card.wide { max-width: 560px; }
 .auth-card .brand-name { color: var(--text); font-size: 1.3rem; }
 .auth-card .brand { justify-content: center; padding-bottom: 24px; }
+.auth-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; color: var(--text-muted); font-size: 0.8rem; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
 
 @media (max-width: 860px) {
   .sidebar { position: fixed; inset: 0 auto 0 0; width: 272px !important; transform: translateX(-100%); transition: transform 0.2s ease; z-index: 20; }

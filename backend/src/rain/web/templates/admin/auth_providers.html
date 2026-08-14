@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Auth Providers - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Local sign-in and LDAP are both functional. OIDC and SAML are wired up as placeholders and will become configurable here in a future release.{% endblock %}
+{% block help_text %}Local sign-in, LDAP, and SAML are all functional.{% endblock %}
 {% block content %}
 <div class="card">
   <table>
@@ -12,13 +12,13 @@
         <td>{{ p.name }}</td>
         <td>
           {% if p.provider_type == "local" %}<span class="badge badge-accent">enabled</span>
-          {% elif p.provider_type == "ldap" %}
+          {% elif p.provider_type in ("ldap", "saml") %}
             {% if p.is_enabled %}<span class="badge badge-accent">enabled</span>{% else %}<span class="badge">disabled</span>{% endif %}
             {% if p.last_synced_at %}<span class="muted" style="font-size:0.8rem;"> &middot; last synced {{ p.last_synced_at.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
           {% else %}<span class="badge">coming soon</span>{% endif %}
         </td>
         <td class="actions">
-          {% if p.provider_type == "ldap" %}<a class="btn btn-sm" href="/admin/auth-providers/ldap">Configure</a>{% endif %}
+          {% if p.provider_type in ("ldap", "saml") %}<a class="btn btn-sm" href="/admin/auth-providers/{{ p.provider_type }}">Configure</a>{% endif %}
         </td>
       </tr>
       {% endfor %}

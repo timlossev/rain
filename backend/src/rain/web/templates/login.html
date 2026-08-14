@@ -19,5 +19,9 @@
     </div>
     <button class="btn btn-primary" type="submit" style="width:100%;">Sign in</button>
   </form>
+  {% if saml_enabled %}
+  <div class="auth-divider"><span>or</span></div>
+  <a class="btn" style="width:100%; justify-content:center;" href="/auth/saml/login?next={{ next | urlencode }}">Sign in with SSO</a>
+  {% endif %}
 </div>
 {% endblock %}
