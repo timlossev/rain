@@ -27,12 +27,23 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from pgvector.sqlalchemy import Vector
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class TenantBase(DeclarativeBase):
     pass
+
+
+# Dimension for the reserved (currently unpopulated) `embedding` columns
+# below -- 1536 matches the most common embedding APIs' output size
+# (e.g. OpenAI text-embedding-3-small/ada-002) as a reasonable default to
+# reserve space for, not a commitment to that specific provider. Nothing
+# writes or reads these columns yet -- see rain.modules.search's
+# docstring for why (no LLM/embedding source wired in, so search today is
+# Postgres full-text search only, via the search_vector columns instead).
+EMBEDDING_DIM = 1536
 
 
 class AssetType(TenantBase):
@@ -395,6 +406,13 @@ class Ticket(TenantBase):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     closed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # DB-generated (GENERATED ALWAYS AS ... STORED, see migration 0023) from
+    # ticket_number/title/description -- never written from Python, only
+    # ever read (search_vector.op("@@")(...)), see rain.modules.search.
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True, deferred=True)
+    # Reserved for a future semantic-search source -- see EMBEDDING_DIM's
+    # comment above. Always NULL today.
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
 
     asset: Mapped[Asset | None] = relationship()
     source_rule: Mapped["TicketRule | None"] = relationship()
@@ -642,6 +660,14 @@ class Document(TenantBase):
     webhook_id: Mapped[int | None] = mapped_column(ForeignKey("webhook_configs.id", ondelete="SET NULL"), nullable=True)
     alert_on_change: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     last_refreshed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # DB-generated (GENERATED ALWAYS AS ... STORED, see migration 0023) from
+    # doc_number/title/description -- never written from Python, only ever
+    # read (search_vector.op("@@")(...)), see rain.modules.search. Indexes
+    # metadata only, not the file body -- see that module's docstring.
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True, deferred=True)
+    # Reserved for a future semantic-search source -- see EMBEDDING_DIM's
+    # comment near the top of this file. Always NULL today.
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
 
     links: Mapped[list["DocumentLink"]] = relationship(back_populates="document", cascade="all, delete-orphan")
     webhook: Mapped["WebhookConfig | None"] = relationship()

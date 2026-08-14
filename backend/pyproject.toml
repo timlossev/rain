@@ -27,6 +27,7 @@ dependencies = [
     "markdown>=3.7,<4",
     "ldap3>=2.9,<3",
     "python3-saml>=1.16,<2",
+    "pgvector>=0.3,<0.4",
 ]
 
 [project.optional-dependencies]

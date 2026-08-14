@@ -88,7 +88,35 @@ p { margin: 0 0 1em; }
    the viewport instead of truncating in place. */
 .breadcrumb-item { min-width: 0; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .breadcrumb-sep { flex-shrink: 0; color: var(--sidebar-text-dim); font-size: 0.85rem; }
+.topbar-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 280px;
+  min-width: 120px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-sunken);
+}
+.topbar-search:focus-within { border-color: var(--accent); }
+.topbar-search-icon { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-muted); }
+/* input[type=text] specifically (not just "input") to out-specificity the
+   shared form-control rule further down this file (same 1-class-plus-tag
+   specificity otherwise, and that one is declared later, so it would win
+   the cascade and reintroduce its own border/background/radius here). */
+.topbar-search input[type=text] {
+  border: none;
+  background: transparent;
+  padding: 0;
+  width: 100%;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.topbar-search input[type=text]:focus { outline: none; }
 .topbar-user { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; color: var(--text-muted); }
+.search-snippet { font-size: 0.82rem; color: var(--text-muted); margin-top: 3px; }
+.search-snippet mark { background: color-mix(in srgb, var(--accent) 35%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }
 .session-tenant-badge { font-size: 0.8rem; color: var(--text-muted); padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-sunken); white-space: nowrap; }
 .session-tenant-badge strong { color: var(--text); }
 

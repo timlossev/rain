@@ -50,6 +50,8 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>
 {% elif name == "x-circle" %}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+{% elif name == "search" %}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg>
 {% else %}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/></svg>
 {% endif %}{% endmacro %}
@@ -115,6 +117,10 @@
         {% if help_text %}{{ help.help_icon(help_text) }}{% endif %}
       </div>
       <div class="topbar-user">
+        <form class="topbar-search" method="get" action="/search">
+          <span class="nav-icon topbar-search-icon">{{ nav_icon("search") }}</span>
+          <input type="text" name="q" placeholder="Search tickets, documents... or INC-000001" value="{{ q if request.url.path == '/search' else '' }}" aria-label="Search tickets and documents" autocomplete="off">
+        </form>
         {% if ctx.active_tenant %}
         <div class="session-tenant-badge" title="You're working in {{ ctx.active_tenant.name }}">Session for <strong>{{ ctx.active_tenant.name }}</strong></div>
         {% endif %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Search{% if q %}: {{ q }}{% endif %} - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Keyword search across ticket and document titles/descriptions/numbers. Type a number like INC-000001 or DOC-000004 to jump straight to that record instead of a results list.{% endblock %}
+{% block content_class %}content-full{% endblock %}
+{% block content %}
+{% if not q %}
+<div class="card"><p class="muted">Type a search term above -- ticket or document title, description, or number.</p></div>
+{% elif not results %}
+<div class="card"><p class="muted">No matches for &ldquo;{{ q }}&rdquo;.</p></div>
+{% else %}
+<div class="card">
+  <div class="card-title">{{ results | length }} result{{ "s" if results | length != 1 else "" }} for &ldquo;{{ q }}&rdquo;</div>
+  <table>
+    <thead><tr><th style="width:100px;">Type</th><th style="width:140px;">Number</th><th>Title</th></tr></thead>
+    <tbody>
+      {% for r in results %}
+      <tr>
+        <td><span class="badge{% if r.kind == 'ticket' %} badge-accent{% endif %}">{{ "Ticket" if r.kind == "ticket" else "Document" }}</span></td>
+        <td class="muted">{{ r.number }}</td>
+        <td>
+          <a href="{{ r.href }}">{{ r.title }}</a>
+          {% if r.snippet %}<div class="search-snippet">{{ r.snippet }}</div>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
