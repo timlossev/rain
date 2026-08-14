@@ -97,7 +97,9 @@
           <td><span class="badge">{{ link.linked_type }}</span></td>
           <td>
             {% if link.linked_type == "asset" %}<a href="/assets/{{ link.linked_id }}/edit">#{{ link.linked_id }}</a>
-            {% elif link.linked_type == "ticket" %}<a href="/tickets/{{ link.linked_id }}">#{{ link.linked_id }}</a>
+            {% elif link.linked_type == "ticket" %}
+              {% set ticket_number = ticket_numbers.get(link.linked_id) %}
+              <a href="/tickets/{{ ticket_number or link.linked_id }}">{{ ticket_number or "#" ~ link.linked_id }}</a>
             {% else %}#{{ link.linked_id }}{% endif %}
           </td>
           <td class="actions">
@@ -114,14 +116,23 @@
 
     <form method="post" action="/documents/{{ doc.id }}/link" class="form-row" style="margin-top:12px; align-items:end;">
       <div class="field" style="margin-bottom:0;">
-        <label for="linked_type">Link to</label>
-        <select id="linked_type" name="linked_type">
-          {% for t in linked_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-        </select>
+        <label>Link to</label>
+        <div class="pill-radio-group" data-pill-select>
+          {% for t in linked_types %}
+          <label class="type-pill pill-radio">
+            <input type="radio" name="linked_type" value="{{ t }}" {% if t == "ticket" %}checked{% endif %}>
+            {{ t | capitalize }}
+          </label>
+          {% endfor %}
+        </div>
       </div>
-      <div class="field" style="margin-bottom:0;">
-        <label for="linked_id">ID</label>
-        <input type="number" id="linked_id" name="linked_id" required style="width:120px;">
+      <div class="field" style="margin-bottom:0;" data-action-fields="ticket">
+        <label for="ticket_ref">Ticket number</label>
+        <input type="text" id="ticket_ref" name="ticket_ref" placeholder="INC-000001" style="width:160px;">
+      </div>
+      <div class="field" style="margin-bottom:0;" data-action-fields="asset" hidden>
+        <label for="linked_id">Asset ID</label>
+        <input type="number" id="linked_id" name="linked_id" style="width:120px;">
       </div>
       <button class="btn btn-sm" type="submit">Add link</button>
     </form>

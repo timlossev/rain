@@ -192,6 +192,16 @@ async def get_ticket_by_ref(db: AsyncSession, ref: str) -> Ticket | None:
     return result.scalar_one_or_none()
 
 
+async def get_ticket_numbers(db: AsyncSession, ticket_ids: list[int]) -> dict[int, str]:
+    """Bulk id -> ticket_number lookup -- e.g. for rendering a polymorphic
+    document link ("ticket", linked_id) as INC-000123 instead of a bare
+    database id, without eager-loading a full Ticket per row."""
+    if not ticket_ids:
+        return {}
+    result = await db.execute(select(Ticket.id, Ticket.ticket_number).where(Ticket.id.in_(ticket_ids)))
+    return {row.id: row.ticket_number for row in result}
+
+
 async def add_comment(db: AsyncSession, ticket_id: int, author_user_id: int | None, body: str) -> TicketComment:
     comment = TicketComment(ticket_id=ticket_id, author_user_id=author_user_id, body=body)
     db.add(comment)

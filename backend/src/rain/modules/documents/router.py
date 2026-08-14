@@ -195,6 +195,12 @@ async def document_detail(
         except FileNotFoundError:
             body_kind = None
     webhooks = await webhook_service.list_webhooks(tenant_db) if body_kind is not None else []
+    # So the Links tab can show "INC-000123" instead of a bare database id
+    # for ticket-typed links -- DocumentLink is polymorphic and doesn't
+    # eager-load a Ticket, so this is a small bulk lookup rather than
+    # widening the model.
+    ticket_link_ids = [link.linked_id for link in doc.links if link.linked_type == "ticket"]
+    ticket_numbers = await ticket_service.get_ticket_numbers(tenant_db, ticket_link_ids)
     return templates.TemplateResponse(
         request,
         "documents/detail.html",
@@ -206,6 +212,7 @@ async def document_detail(
             "body_kind": body_kind,
             "body_text": body_text,
             "webhooks": webhooks,
+            "ticket_numbers": ticket_numbers,
         },
     )
 
@@ -429,16 +436,28 @@ async def link_existing_document(
 async def link_document(
     document_id: int,
     linked_type: str = Form(...),
-    linked_id: int = Form(...),
+    linked_id: str = Form(""),
+    ticket_ref: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     doc = await service.get_document(tenant_db, document_id)
-    if linked_type in LINKED_TYPES:
-        await service.add_link(tenant_db, document_id, linked_type, linked_id, ctx.user.id)
+    # Tickets are picked by their pretty number (INC-000123) here, not a
+    # raw database id -- matches how every other ticket reference in the
+    # UI works post-pretty-URLs. Assets don't have an equivalent pretty
+    # ref yet, so that side keeps the plain numeric id field.
+    resolved_id: int | None = None
+    if linked_type == "ticket":
+        ticket = await ticket_service.get_ticket_by_ref(tenant_db, ticket_ref.strip()) if ticket_ref.strip() else None
+        resolved_id = ticket.id if ticket is not None else None
+    elif linked_type == "asset" and linked_id.strip().isdigit():
+        resolved_id = int(linked_id)
+
+    if linked_type in LINKED_TYPES and resolved_id is not None:
+        await service.add_link(tenant_db, document_id, linked_type, resolved_id, ctx.user.id)
         if linked_type == "ticket" and doc is not None:
-            await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=linked_id, user_id=ctx.user.id)
+            await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=resolved_id, user_id=ctx.user.id)
     return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
