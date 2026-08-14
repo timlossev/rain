@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import re
 from datetime import datetime
 from urllib.parse import quote
 
@@ -40,6 +41,16 @@ class _DocRefConvertor(Convertor):
 register_url_convertor("doc_ref", _DocRefConvertor())
 
 router = APIRouter(prefix="/documents")
+
+
+def _filename_slug(title: str) -> str:
+    """Turns a document's title into a storage filename stem for the
+    "type new content" create path -- there's no real uploaded filename
+    to fall back on there. Not a uniqueness guarantee (storage_key
+    already carries a random prefix, see storage.make_storage_key); this
+    is purely cosmetic, for what the download filename looks like."""
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", title.strip()).strip("-").lower()
+    return slug or "document"
 
 
 async def _log_ticket_link_activity(
@@ -97,35 +108,59 @@ async def new_document_form(
 @router.post("")
 async def create_document(
     request: Request,
-    file: UploadFile,
+    file: UploadFile | None = None,
     title: str = Form(...),
     description: str = Form(""),
+    body: str = Form(""),
+    body_format: str = Form("txt"),
     linked_type: str = Form(""),
     linked_id: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
-    data = await file.read(MAX_UPLOAD_BYTES + 1)
-    if len(data) > MAX_UPLOAD_BYTES:
+    # Two mutually exclusive ways in: an uploaded file, or typed-in
+    # content saved as a new .txt/.md placeholder named after the title
+    # (editable further, or wired to a webhook for auto-update, from the
+    # document's own page afterward) -- no need to have a real file on
+    # hand just to create a document.
+    has_file = file is not None and file.filename
+    if has_file:
+        data = await file.read(MAX_UPLOAD_BYTES + 1)
+        if len(data) > MAX_UPLOAD_BYTES:
+            nav = await build_nav_context(ctx)
+            return templates.TemplateResponse(
+                request,
+                "documents/form.html",
+                {**nav, "ctx": ctx, "linked_type": linked_type, "linked_id": linked_id, "error": "File too large (max 25MB)."},
+                status_code=400,
+            )
+        filename = file.filename or "file"
+        mime_type = file.content_type
+    elif body.strip():
+        ext = "md" if body_format == "md" else "txt"
+        filename = f"{_filename_slug(title)}.{ext}"
+        mime_type = "text/markdown" if ext == "md" else "text/plain"
+        data = body.encode("utf-8")
+    else:
         nav = await build_nav_context(ctx)
         return templates.TemplateResponse(
             request,
             "documents/form.html",
-            {**nav, "ctx": ctx, "linked_type": linked_type, "linked_id": linked_id, "error": "File too large (max 25MB)."},
+            {**nav, "ctx": ctx, "linked_type": linked_type, "linked_id": linked_id, "error": "Upload a file, or type some content."},
             status_code=400,
         )
 
-    key = storage.make_storage_key(ctx.active_tenant.schema_name, file.filename or "file")
+    key = storage.make_storage_key(ctx.active_tenant.schema_name, filename)
     storage.get_storage().save(key, data)
 
     doc = await service.create_document(
         tenant_db,
         title=title.strip(),
         description=description.strip() or None,
-        filename=file.filename or "file",
+        filename=filename,
         storage_key=key,
-        mime_type=file.content_type,
+        mime_type=mime_type,
         size_bytes=len(data),
         uploaded_by=ctx.user.id,
     )

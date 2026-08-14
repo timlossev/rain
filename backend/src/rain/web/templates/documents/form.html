@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Upload Document - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Upload a new document into the repository. txt/md files get an inline editor and Markdown preview once uploaded.{% endblock %}
+{% block help_text %}Add a new document into the repository -- upload a file, or type its contents directly to create a text/Markdown placeholder on the spot. txt/md files get an inline editor and Markdown preview afterward.{% endblock %}
 {% block content %}
 {% if linked_type and linked_id %}
 <p class="muted">This will be attached to the {{ linked_type }} #{{ linked_id }} automatically.</p>
 {% endif %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
-<div class="card" style="max-width:560px;">
+<div class="card" style="max-width:640px;" data-tabs>
   <form method="post" action="/documents" enctype="multipart/form-data">
     {% if linked_type %}<input type="hidden" name="linked_type" value="{{ linked_type }}">{% endif %}
     {% if linked_id %}<input type="hidden" name="linked_id" value="{{ linked_id }}">{% endif %}
@@ -19,12 +19,36 @@
       <label for="description">Description</label>
       <textarea id="description" name="description" rows="3"></textarea>
     </div>
-    <div class="field">
-      <label for="file">File</label>
-      <input type="file" id="file" name="file" required>
-      <div class="field-hint">Up to 25MB.</div>
+
+    <div class="tab-buttons">
+      <button type="button" class="tab-btn active" data-tab-btn="upload">Upload a file</button>
+      <button type="button" class="tab-btn" data-tab-btn="type">Type new content</button>
     </div>
-    <button class="btn btn-primary" type="submit">Upload</button>
+
+    <div class="tab-panel active" data-tab-panel="upload">
+      <div class="field">
+        <label for="file">File</label>
+        <input type="file" id="file" name="file">
+        <div class="field-hint">Up to 25MB.</div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-tab-panel="type">
+      <div class="field">
+        <label for="body_format">Save as</label>
+        <select id="body_format" name="body_format">
+          <option value="txt">Plain text (.txt)</option>
+          <option value="md">Markdown (.md)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="body">Contents</label>
+        <textarea id="body" name="body" rows="10" placeholder="Type the document's contents..."></textarea>
+        <div class="field-hint">Saved as a new file named after the title above. Edit it further, or point it at a webhook for auto-update, from the document's own page afterward.</div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" type="submit" style="margin-top:10px;">Create</button>
     <a class="btn" href="/documents">Cancel</a>
   </form>
 </div>

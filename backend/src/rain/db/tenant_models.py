@@ -18,6 +18,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    FetchedValue,
     ForeignKey,
     Index,
     Integer,
@@ -409,7 +410,16 @@ class Ticket(TenantBase):
     # DB-generated (GENERATED ALWAYS AS ... STORED, see migration 0023) from
     # ticket_number/title/description -- never written from Python, only
     # ever read (search_vector.op("@@")(...)), see rain.modules.search.
-    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True, deferred=True)
+    # server_default=FetchedValue() (not a real DEFAULT clause -- Postgres
+    # already refuses one on a generated column) tells SQLAlchemy this
+    # column is populated by the server and must never be included in an
+    # INSERT/UPDATE it emits; without it, a plain INSERT (e.g. creating a
+    # ticket) fails with asyncpg.exceptions.GeneratedAlwaysError ("cannot
+    # insert a non-DEFAULT value into column 'search_vector'") since
+    # SQLAlchemy has no other way to know this attribute is generated
+    # rather than an ordinary nullable column -- confirmed via a real
+    # request once documents/tickets could be created again after 0023.
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True, deferred=True, server_default=FetchedValue())
     # Reserved for a future semantic-search source -- see EMBEDDING_DIM's
     # comment above. Always NULL today.
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
@@ -664,7 +674,10 @@ class Document(TenantBase):
     # doc_number/title/description -- never written from Python, only ever
     # read (search_vector.op("@@")(...)), see rain.modules.search. Indexes
     # metadata only, not the file body -- see that module's docstring.
-    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True, deferred=True)
+    # server_default=FetchedValue(): see Ticket.search_vector's comment --
+    # without it, creating a document fails the same way creating a
+    # ticket did (asyncpg.exceptions.GeneratedAlwaysError).
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True, deferred=True, server_default=FetchedValue())
     # Reserved for a future semantic-search source -- see EMBEDDING_DIM's
     # comment near the top of this file. Always NULL today.
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
