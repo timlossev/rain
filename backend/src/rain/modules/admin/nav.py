@@ -2,6 +2,15 @@ from __future__ import annotations
 
 from rain.core.nav_registry import NavNode, nav_registry
 
+# Tenant-scoped admin functions -- both internal_admin (cross-tenant) and
+# client_admin (jailed to their one tenant, see rain.core.rbac.
+# require_admin) can reach these; the tenant scoping itself comes for
+# free from schema-per-tenant (get_tenant_db is already bound to the
+# session's one active tenant, so there's no query here that could ever
+# reach another tenant's rows regardless of which of these two roles is
+# asking).
+_TENANT_ADMIN_ROLES = ("internal_admin", "client_admin")
+
 nav_registry.register(
     NavNode(
         key="admin",
@@ -9,75 +18,105 @@ nav_registry.register(
         icon="settings",
         href="/admin",
         order=90,
-        roles=("internal_admin",),
+        roles=_TENANT_ADMIN_ROLES,
         children=[
-            NavNode(key="admin-branding", label="Branding", href="/admin/branding", order=1, roles=("internal_admin",)),
-            NavNode(key="admin-tenants", label="Tenants", href="/admin/tenants", order=2, roles=("internal_admin",)),
-            NavNode(key="admin-users", label="Users", href="/admin/users", order=3, roles=("internal_admin",)),
+            # Platform-wide settings -- each one either spans every tenant
+            # (Tenants, Users, Auth Providers, syslog routing) or configures
+            # something instance-wide (Branding, SMTP relay). internal_admin
+            # only; a client_admin doesn't even see this submenu.
             NavNode(
-                key="admin-auth-providers",
-                label="Auth Providers",
-                href="/admin/auth-providers",
-                order=4,
+                key="admin-platform",
+                label="Platform Administration",
+                order=1,
                 roles=("internal_admin",),
+                children=[
+                    NavNode(key="admin-branding", label="Branding", href="/admin/branding", order=1, roles=("internal_admin",)),
+                    NavNode(key="admin-tenants", label="Tenants", href="/admin/tenants", order=2, roles=("internal_admin",)),
+                    NavNode(
+                        key="admin-auth-providers",
+                        label="Auth Providers",
+                        href="/admin/auth-providers",
+                        order=3,
+                        roles=("internal_admin",),
+                    ),
+                    NavNode(key="admin-smtp", label="SMTP Relay", href="/admin/smtp", order=4, roles=("internal_admin",)),
+                    NavNode(
+                        key="admin-syslog-sources",
+                        label="Syslog Listener",
+                        href="/admin/syslog-sources",
+                        order=5,
+                        roles=("internal_admin",),
+                    ),
+                    # Last in this submenu on purpose -- directly above
+                    # Tenant Administration's own first item, Groups, so
+                    # the two land next to each other in the rendered menu
+                    # (people/accounts vs. groups of them being far apart
+                    # in a flat list was confusing).
+                    NavNode(key="admin-users", label="Users", href="/admin/users", order=6, roles=("internal_admin",)),
+                ],
             ),
-            NavNode(key="admin-smtp", label="SMTP Relay", href="/admin/smtp", order=5, roles=("internal_admin",)),
+            # Tenant-scoped settings -- reachable by internal_admin (for
+            # whichever tenant is currently active) or client_admin (for
+            # their one pinned tenant).
             NavNode(
-                key="admin-syslog-sources",
-                label="Syslog Listener",
-                href="/admin/syslog-sources",
-                order=6,
-                roles=("internal_admin",),
-            ),
-            NavNode(
-                key="admin-ticket-statuses",
-                label="Ticket Statuses",
-                href="/admin/ticket-statuses",
-                order=7,
-                roles=("internal_admin",),
-            ),
-            NavNode(
-                key="admin-notification-channels",
-                label="Notification Channels",
-                href="/admin/notification-channels",
-                order=8,
-                roles=("internal_admin",),
-            ),
-            NavNode(key="admin-groups", label="Groups", href="/admin/groups", order=9, roles=("internal_admin",)),
-            NavNode(
-                key="admin-approval-flows",
-                label="Approval Flows",
-                href="/admin/approval-flows",
-                order=10,
-                roles=("internal_admin",),
-            ),
-            NavNode(
-                key="admin-event-promotion-policies",
-                label="Event Promotion Policies",
-                href="/tickets/rules/all",
-                order=11,
-                roles=("internal_admin",),
-            ),
-            NavNode(
-                key="admin-correlation-rules",
-                label="Correlation Rules",
-                href="/tickets/correlation-rules",
-                order=12,
-                roles=("internal_admin",),
-            ),
-            NavNode(
-                key="admin-platform-response-rules",
-                label="Platform Response Rules",
-                href="/tickets/platform-events",
-                order=13,
-                roles=("internal_admin",),
-            ),
-            NavNode(
-                key="admin-webhooks",
-                label="Webhooks",
-                href="/admin/webhooks",
-                order=14,
-                roles=("internal_admin",),
+                key="admin-tenant",
+                label="Tenant Administration",
+                order=2,
+                roles=_TENANT_ADMIN_ROLES,
+                children=[
+                    # First in this submenu on purpose -- see Users' own
+                    # comment above.
+                    NavNode(key="admin-groups", label="Groups", href="/admin/groups", order=1, roles=_TENANT_ADMIN_ROLES),
+                    NavNode(
+                        key="admin-ticket-statuses",
+                        label="Ticket Statuses",
+                        href="/admin/ticket-statuses",
+                        order=2,
+                        roles=_TENANT_ADMIN_ROLES,
+                    ),
+                    NavNode(
+                        key="admin-notification-channels",
+                        label="Notification Channels",
+                        href="/admin/notification-channels",
+                        order=3,
+                        roles=_TENANT_ADMIN_ROLES,
+                    ),
+                    NavNode(
+                        key="admin-approval-flows",
+                        label="Approval Flows",
+                        href="/admin/approval-flows",
+                        order=4,
+                        roles=_TENANT_ADMIN_ROLES,
+                    ),
+                    NavNode(
+                        key="admin-event-promotion-policies",
+                        label="Event Promotion Policies",
+                        href="/tickets/rules/all",
+                        order=5,
+                        roles=_TENANT_ADMIN_ROLES,
+                    ),
+                    NavNode(
+                        key="admin-correlation-rules",
+                        label="Correlation Rules",
+                        href="/tickets/correlation-rules",
+                        order=6,
+                        roles=_TENANT_ADMIN_ROLES,
+                    ),
+                    NavNode(
+                        key="admin-platform-response-rules",
+                        label="Platform Response Rules",
+                        href="/tickets/platform-events",
+                        order=7,
+                        roles=_TENANT_ADMIN_ROLES,
+                    ),
+                    NavNode(
+                        key="admin-webhooks",
+                        label="Webhooks",
+                        href="/admin/webhooks",
+                        order=8,
+                        roles=_TENANT_ADMIN_ROLES,
+                    ),
+                ],
             ),
         ],
     )

@@ -36,7 +36,7 @@
           </a>
           {% endfor %}
           {% for change in changes_by_date.get(day, []) %}
-          <a class="calendar-entry-chip calendar-entry-chip-change" href="/tickets/{{ change.id }}" title="{{ change.ticket_number }}: {{ change.title }}">{{ change.ticket_number }}: {{ change.title }}</a>
+          <a class="calendar-entry-chip calendar-entry-chip-change" href="/tickets/{{ change.ticket_number }}" title="{{ change.ticket_number }}: {{ change.title }}">{{ change.ticket_number }}: {{ change.title }}</a>
           {% endfor %}
         </td>
         {% endfor %}

@@ -21,7 +21,7 @@
     <a class="btn btn-sm" href="/tickets/new?ticket_type=change&amp;source_ticket_id={{ ticket.id }}">Promote to Change</a>
     {% endif %}
     <form method="post" action="/tickets/{{ ticket.id }}/chronic/toggle" class="inline">
-      <input type="hidden" name="next" value="/tickets/{{ ticket.id }}">
+      <input type="hidden" name="next" value="/tickets/{{ ticket.ticket_number }}">
       <input type="hidden" name="is_chronic" value="{{ '0' if ticket.is_chronic else '1' }}">
       <button type="submit" class="btn btn-sm{% if ticket.is_chronic %} active{% endif %}">{{ "Unmark chronic" if ticket.is_chronic else "Mark chronic" }}</button>
     </form>
@@ -90,7 +90,7 @@
       <tr><th>Correlation rule</th><td class="muted"><a href="/tickets/correlation-rules">{{ ticket.source_correlation_rule.name }}</a></td></tr>
       {% endif %}
       {% if ticket.source_ticket %}
-      <tr><th>Promoted from</th><td class="muted"><a href="/tickets/{{ ticket.source_ticket.id }}">{{ ticket.source_ticket.ticket_number }}: {{ ticket.source_ticket.title }}</a></td></tr>
+      <tr><th>Promoted from</th><td class="muted"><a href="/tickets/{{ ticket.source_ticket.ticket_number }}">{{ ticket.source_ticket.ticket_number }}: {{ ticket.source_ticket.title }}</a></td></tr>
       {% endif %}
       {% if ticket.ticket_type == "change" %}
       <tr><th>Change window</th><td class="muted">{{ ticket.start_date.strftime("%Y-%m-%d %H:%M") if ticket.start_date else "?" }} &rarr; {{ ticket.end_date.strftime("%Y-%m-%d %H:%M") if ticket.end_date else "?" }}</td></tr>

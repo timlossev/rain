@@ -9,10 +9,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response, Streamin
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.convertors import Convertor, register_url_convertor
 
 from rain.core.export_columns import merge_profile_columns
 from rain.core.pagination import paginate
-from rain.core.rbac import require_internal_admin, require_login
+from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.user_names import resolve_user_names
 from rain.db.base import control_session
@@ -37,6 +38,27 @@ from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
 from rain.web.safe_redirect import safe_relative_path
 from rain.web.templating import templates
+
+class _TicketRefConvertor(Convertor):
+    """Matches a ticket_number ("INC-000123"/"VULN-000045"/"CHG-000012" --
+    the URL scheme ticket detail links use) or, for back-compat with any
+    link/bookmark built before that switch, a bare integer id. A real
+    regex-constrained path converter, not a plain {ticket_ref} str -- that
+    would match *any* single path segment and shadow every literal route
+    below it ("/new", "/rules", "/export/run", ...) regardless of
+    registration order; see docs/architecture.md's "A routing bug worth
+    knowing about" for the exact failure mode this sidesteps."""
+
+    regex = r"(?:INC|VULN|CHG)-\d+|\d+"
+
+    def convert(self, value: str) -> str:
+        return value
+
+    def to_string(self, value: str) -> str:
+        return value
+
+
+register_url_convertor("ticket_ref", _TicketRefConvertor())
 
 router = APIRouter(prefix="/tickets")
 
@@ -198,7 +220,7 @@ async def create_ticket(
     )
     if ticket_type == "change":
         await service.start_approval(tenant_db, ticket, int(approval_flow_id) if approval_flow_id else None)
-    return RedirectResponse(f"/tickets/{ticket.id}", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/tickets/{ticket.ticket_number}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/users/search")
@@ -241,7 +263,7 @@ async def rename_ticket(
     ticket = await tenant_db.get(Ticket, ticket_id)
     if ticket is not None:
         await service.update_title(tenant_db, ticket, title, changed_by_user_id=ctx.user.id)
-    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{ticket_id:int}/severity")
@@ -255,7 +277,7 @@ async def change_severity(
     ticket = await tenant_db.get(Ticket, ticket_id)
     if ticket is not None:
         await service.update_severity(tenant_db, ticket, severity, changed_by_user_id=ctx.user.id)
-    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{ticket_id:int}/assign")
@@ -274,7 +296,7 @@ async def assign_ticket(
             int(assignee_user_id) if assignee_user_id else None,
             changed_by_user_id=ctx.user.id,
         )
-    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/assets/search")
@@ -315,7 +337,7 @@ async def set_ticket_asset(
             int(asset_id) if asset_id else None,
             changed_by_user_id=ctx.user.id,
         )
-    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{ticket_id:int}/approval/attach")
@@ -328,7 +350,7 @@ async def attach_approval_flow(
     ticket = await service.get_ticket(tenant_db, ticket_id)
     if ticket is not None and ticket.ticket_type == "change" and ticket.approval is None:
         await service.start_approval(tenant_db, ticket, int(flow_id) if flow_id else None)
-    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{ticket_id:int}/approval/decide")
@@ -354,7 +376,7 @@ async def decide_approval(
                 decided_by_user_id=ctx.user.id,
                 comment=comment.strip(),
             )
-    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 def _build_activity(ticket: Ticket) -> list[dict]:
@@ -406,19 +428,19 @@ def _asset_change_ids(ticket: Ticket) -> set[int | None]:
     return ids
 
 
-@router.get("/{ticket_id:int}", response_class=HTMLResponse)
+@router.get("/{ticket_ref:ticket_ref}", response_class=HTMLResponse)
 async def ticket_detail(
     request: Request,
-    ticket_id: int,
+    ticket_ref: str,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    ticket = await service.get_ticket(tenant_db, ticket_id)
+    ticket = await service.get_ticket_by_ref(tenant_db, ticket_ref)
     if ticket is None:
         return RedirectResponse("/tickets", status_code=status.HTTP_303_SEE_OTHER)
-    document_links = await document_service.links_for(tenant_db, "ticket", ticket_id)
+    document_links = await document_service.links_for(tenant_db, "ticket", ticket.id)
     # Not active_only: a ticket already sitting on a since-deactivated
     # status should still show it (and its color) in the stepper -- only
     # the "New ticket"/filter dropdowns need to hide deactivated ones.
@@ -547,7 +569,7 @@ async def change_status(
     ticket = await tenant_db.get(Ticket, ticket_id)
     if ticket is not None:
         await service.update_status(tenant_db, ticket, new_status, changed_by_user_id=ctx.user.id)
-    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 # ---------------------------------------------------- list quick-actions -
@@ -699,7 +721,7 @@ async def rules_list(
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = select(TicketRule).order_by(TicketRule.sort_order)
@@ -731,7 +753,7 @@ async def rules_create(
     sort_order: int = Form(0),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     tenant_db.add(
         TicketRule(
@@ -752,7 +774,7 @@ async def rules_create(
 
 @router.post("/rules/{rule_id:int}/delete")
 async def rules_delete(
-    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
 ):
     rule = await tenant_db.get(TicketRule, rule_id)
     if rule is not None:
@@ -768,7 +790,7 @@ async def rules_test(
     sample: str = Form(...),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     import re
 
@@ -807,7 +829,7 @@ async def correlation_rules_list(
     prefill_threshold: int | None = None,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = select(CorrelationRule).order_by(CorrelationRule.sort_order)
@@ -858,7 +880,7 @@ async def correlation_rules_create(
     sort_order: int = Form(0),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     tenant_db.add(
         CorrelationRule(
@@ -882,7 +904,7 @@ async def correlation_rules_create(
 
 @router.post("/correlation-rules/{rule_id:int}/delete")
 async def correlation_rules_delete(
-    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
 ):
     rule = await tenant_db.get(CorrelationRule, rule_id)
     if rule is not None:
@@ -893,7 +915,7 @@ async def correlation_rules_delete(
 
 @router.post("/correlation-rules/{rule_id:int}/toggle")
 async def correlation_rules_toggle(
-    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
 ):
     rule = await tenant_db.get(CorrelationRule, rule_id)
     if rule is not None:
@@ -911,7 +933,7 @@ async def platform_events_list(
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = (
@@ -943,7 +965,7 @@ async def platform_events_create(
     sort_order: int = Form(0),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     rule = PlatformEventRule(
         name=name.strip(),
@@ -962,7 +984,7 @@ async def platform_events_create(
 
 @router.post("/platform-events/{rule_id:int}/delete")
 async def platform_events_delete(
-    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
 ):
     rule = await tenant_db.get(PlatformEventRule, rule_id)
     if rule is not None:
@@ -977,7 +999,7 @@ async def platform_event_detail(
     rule_id: int,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = (
@@ -1020,7 +1042,7 @@ async def platform_event_edit(
     sort_order: int = Form(0),
     is_active: bool = Form(False),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     rule = await tenant_db.get(PlatformEventRule, rule_id)
     if rule is not None:
@@ -1040,7 +1062,7 @@ async def platform_event_action_create(
     rule_id: int,
     action_type: str = Form(...),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     form = await request.form()
     if action_type in ("notify_slack", "notify_email"):
@@ -1067,7 +1089,7 @@ async def platform_event_action_delete(
     rule_id: int,
     action_id: int,
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     action = await tenant_db.get(PlatformEventAction, action_id)
     if action is not None:

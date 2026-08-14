@@ -67,7 +67,7 @@
     <tbody>
       {% for t in linked_tickets %}
       <tr>
-        <td><a href="/tickets/{{ t.id }}">{{ t.ticket_number }}</a></td>
+        <td><a href="/tickets/{{ t.ticket_number }}">{{ t.ticket_number }}</a></td>
         <td class="muted">{{ t.ticket_type }}</td>
         <td>{{ t.title }}</td>
         <td><span class="badge severity-{{ t.severity }}">{{ t.severity }}</span></td>

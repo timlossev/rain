@@ -5,7 +5,7 @@
 <div class="panel-row" style="justify-content:space-between; align-items:flex-start;">
   <div>
     <div style="font-size:1.25em; font-weight:600;">{{ doc.doc_number }}: {{ doc.title }}</div>
-    <div class="muted">{{ doc.filename }} ({{ (doc.size_bytes / 1024) | round(1) }} KB) -- uploaded {{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</div>
+    <div class="muted">{{ doc.filename }} ({{ (doc.size_bytes / 1024) | round(1) }} KB)<br>Uploaded {{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</div>
   </div>
   <div>
     <a class="btn" href="/documents/{{ doc.id }}/download">Download</a>

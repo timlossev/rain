@@ -1,6 +1,7 @@
 # RAIN
 
-**RAIN is a self-hosted IT system of record built for environments that
+**RAIN** (Response to Asynchronous Interactions in Networks) **is a
+self-hosted IT system of record built for environments that
 can't (or won't) depend on a SaaS vendor** -- air-gapped networks,
 classified or controlled-unclassified enclaves, and any organization that
 needs its asset inventory, incident/vulnerability/change tickets, and

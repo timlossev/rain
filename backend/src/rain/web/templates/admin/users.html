@@ -59,11 +59,12 @@
         <label for="role_key">Role</label>
         <select id="role_key" name="role_key">
           <option value="client">Client</option>
+          <option value="client_admin">Client Admin</option>
           <option value="internal_admin">Internal Admin</option>
         </select>
       </div>
       <div class="field">
-        <label for="tenant_id">Tenant (required for Client)</label>
+        <label for="tenant_id">Tenant (required for Client / Client Admin)</label>
         <select id="tenant_id" name="tenant_id">
           <option value="">-</option>
           {% for tenant in tenants %}

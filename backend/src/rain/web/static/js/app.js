@@ -187,15 +187,30 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // List/create tab pairs (and any other same-page tab group).
+  // List/create tab pairs (and any other same-page tab group). A [data-tabs]
+  // group can nest inside another one (documents/detail.html: the page's
+  // own Description/Contents/Auto-update/Links tabs, with a second Write/
+  // Preview tab group nested inside the Contents panel for markdown) --
+  // container.querySelectorAll() finds descendants at any depth, so
+  // without the closest() filter below, the outer group's button/panel
+  // lists would also pick up the inner group's buttons/panels (and vice
+  // versa). Clicking either group's button would then also fire the
+  // other's now-mismatched toggle, deactivating a panel that has nothing
+  // to do with the button just clicked (confirmed live: clicking the
+  // outer "Contents" tab deactivated the inner "Write" panel as a side
+  // effect, since it was included in the outer group's panels list too).
   document.querySelectorAll("[data-tabs]").forEach((container) => {
-    const buttons = container.querySelectorAll("[data-tab-btn]");
-    const panels = container.querySelectorAll("[data-tab-panel]");
-    buttons.forEach((btn) => {
+    const ownButtons = Array.from(container.querySelectorAll("[data-tab-btn]")).filter(
+      (el) => el.closest("[data-tabs]") === container
+    );
+    const ownPanels = Array.from(container.querySelectorAll("[data-tab-panel]")).filter(
+      (el) => el.closest("[data-tabs]") === container
+    );
+    ownButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
         const target = btn.dataset.tabBtn;
-        buttons.forEach((b) => b.classList.toggle("active", b === btn));
-        panels.forEach((p) => p.classList.toggle("active", p.dataset.tabPanel === target));
+        ownButtons.forEach((b) => b.classList.toggle("active", b === btn));
+        ownPanels.forEach((p) => p.classList.toggle("active", p.dataset.tabPanel === target));
       });
     });
   });

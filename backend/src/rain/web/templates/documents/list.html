@@ -21,7 +21,7 @@
     <tbody>
       {% for doc in page.items %}
       <tr>
-        <td><a href="/documents/{{ doc.id }}">{{ doc.doc_number }}</a></td>
+        <td><a href="/documents/{{ doc.doc_number }}">{{ doc.doc_number }}</a></td>
         <td>{{ doc.title }}</td>
         <td class="muted">{{ doc.filename }}</td>
         <td class="muted">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</td>

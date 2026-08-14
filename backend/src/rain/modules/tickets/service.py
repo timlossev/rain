@@ -158,26 +158,37 @@ async def list_tickets(
     return list(result.scalars())
 
 
-async def get_ticket(db: AsyncSession, ticket_id: int) -> Ticket | None:
-    stmt = (
-        select(Ticket)
-        .where(Ticket.id == ticket_id)
-        .options(
-            selectinload(Ticket.asset),
-            selectinload(Ticket.source_rule),
-            selectinload(Ticket.source_correlation_rule),
-            selectinload(Ticket.source_ticket),
-            selectinload(Ticket.comments),
-            selectinload(Ticket.status_changes),
-            selectinload(Ticket.assignment_changes),
-            selectinload(Ticket.asset_changes),
-            selectinload(Ticket.field_changes),
-            selectinload(Ticket.rule_triggers),
-            selectinload(Ticket.approval).selectinload(ChangeApproval.decisions),
-            selectinload(Ticket.approval).selectinload(ChangeApproval.flow).selectinload(ApprovalFlow.steps),
-        )
+def _ticket_detail_stmt():
+    return select(Ticket).options(
+        selectinload(Ticket.asset),
+        selectinload(Ticket.source_rule),
+        selectinload(Ticket.source_correlation_rule),
+        selectinload(Ticket.source_ticket),
+        selectinload(Ticket.comments),
+        selectinload(Ticket.status_changes),
+        selectinload(Ticket.assignment_changes),
+        selectinload(Ticket.asset_changes),
+        selectinload(Ticket.field_changes),
+        selectinload(Ticket.rule_triggers),
+        selectinload(Ticket.approval).selectinload(ChangeApproval.decisions),
+        selectinload(Ticket.approval).selectinload(ChangeApproval.flow).selectinload(ApprovalFlow.steps),
     )
-    result = await db.execute(stmt)
+
+
+async def get_ticket(db: AsyncSession, ticket_id: int) -> Ticket | None:
+    result = await db.execute(_ticket_detail_stmt().where(Ticket.id == ticket_id))
+    return result.scalar_one_or_none()
+
+
+async def get_ticket_by_ref(db: AsyncSession, ref: str) -> Ticket | None:
+    """`ref` is a ticket_number ("INC-000123"/"VULN-000045"/"CHG-000012")
+    -- the URL scheme ticket detail links use -- or, for back-compat with
+    any link/bookmark built before that switch, a bare integer id."""
+    if ref.isdigit():
+        ticket = await get_ticket(db, int(ref))
+        if ticket is not None:
+            return ticket
+    result = await db.execute(_ticket_detail_stmt().where(Ticket.ticket_number == ref))
     return result.scalar_one_or_none()
 
 

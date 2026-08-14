@@ -73,13 +73,24 @@ async def list_webhook_populated(db: AsyncSession) -> list[Document]:
     return list(result.scalars())
 
 
+def _document_detail_stmt():
+    return select(Document).options(selectinload(Document.links), selectinload(Document.webhook))
+
+
 async def get_document(db: AsyncSession, document_id: int) -> Document | None:
-    stmt = (
-        select(Document)
-        .where(Document.id == document_id)
-        .options(selectinload(Document.links), selectinload(Document.webhook))
-    )
-    result = await db.execute(stmt)
+    result = await db.execute(_document_detail_stmt().where(Document.id == document_id))
+    return result.scalar_one_or_none()
+
+
+async def get_document_by_ref(db: AsyncSession, ref: str) -> Document | None:
+    """`ref` is a doc_number ("DOC-000123") -- the URL scheme document
+    detail links use -- or, for back-compat with any link/bookmark built
+    before that switch, a bare integer id."""
+    if ref.isdigit():
+        doc = await get_document(db, int(ref))
+        if doc is not None:
+            return doc
+    result = await db.execute(_document_detail_stmt().where(Document.doc_number == ref))
     return result.scalar_one_or_none()
 
 

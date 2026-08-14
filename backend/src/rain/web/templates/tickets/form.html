@@ -6,7 +6,7 @@
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 {% if source_event_id %}<p class="muted">Promoting syslog event #{{ source_event_id }}.</p>{% endif %}
-{% if source_ticket %}<p class="muted">Promoted from <a href="/tickets/{{ source_ticket.id }}">{{ source_ticket.ticket_number }}: {{ source_ticket.title }}</a>.</p>{% endif %}
+{% if source_ticket %}<p class="muted">Promoted from <a href="/tickets/{{ source_ticket.ticket_number }}">{{ source_ticket.ticket_number }}: {{ source_ticket.title }}</a>.</p>{% endif %}
 
 <div class="card">
   <form method="post" action="/tickets">

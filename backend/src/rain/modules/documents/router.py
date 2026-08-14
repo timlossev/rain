@@ -7,6 +7,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.convertors import Convertor, register_url_convertor
 
 from rain.core.pagination import paginate
 from rain.core.rbac import require_login
@@ -18,6 +19,25 @@ from rain.modules.webhooks import service as webhook_service
 from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
 from rain.web.templating import templates
+
+
+class _DocRefConvertor(Convertor):
+    """Matches a doc_number ("DOC-000123" -- the URL scheme document
+    detail links use) or, for back-compat with any link/bookmark built
+    before that switch, a bare integer id. See rain.modules.tickets.
+    router's _TicketRefConvertor for why this is a real regex-constrained
+    converter rather than a plain {doc_ref} str."""
+
+    regex = r"DOC-\d+|\d+"
+
+    def convert(self, value: str) -> str:
+        return value
+
+    def to_string(self, value: str) -> str:
+        return value
+
+
+register_url_convertor("doc_ref", _DocRefConvertor())
 
 router = APIRouter(prefix="/documents")
 
@@ -117,19 +137,19 @@ async def create_document(
         await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=int(linked_id), user_id=ctx.user.id)
         return RedirectResponse(f"/tickets/{linked_id}", status_code=status.HTTP_303_SEE_OTHER)
 
-    return RedirectResponse(f"/documents/{doc.id}", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/documents/{doc.doc_number}", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.get("/{document_id:int}", response_class=HTMLResponse)
+@router.get("/{doc_ref:doc_ref}", response_class=HTMLResponse)
 async def document_detail(
     request: Request,
-    document_id: int,
+    doc_ref: str,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    doc = await service.get_document(tenant_db, document_id)
+    doc = await service.get_document_by_ref(tenant_db, doc_ref)
     if doc is None:
         return RedirectResponse("/documents", status_code=status.HTTP_303_SEE_OTHER)
     body_kind = textbody.body_kind(doc.filename)
@@ -165,7 +185,7 @@ async def update_document_description(
     doc = await service.get_document(tenant_db, document_id)
     if doc is not None:
         await service.update_description(tenant_db, doc, description.strip() or None)
-    return RedirectResponse(f"/documents/{document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{document_id:int}/body")
@@ -183,7 +203,7 @@ async def update_document_body(
     data = body.encode("utf-8")
     storage.get_storage().save(doc.storage_key, data)
     await service.update_body_size(tenant_db, doc, len(data))
-    return RedirectResponse(f"/documents/{document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/documents/{doc.doc_number}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{document_id:int}/webhook-config")
@@ -199,7 +219,7 @@ async def set_document_webhook_config(
         await service.update_webhook_config(
             tenant_db, doc, webhook_id=int(webhook_id) if webhook_id else None, alert_on_change=alert_on_change
         )
-    return RedirectResponse(f"/documents/{document_id}", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{document_id:int}/refresh-from-webhook")
@@ -220,11 +240,11 @@ async def refresh_document_from_webhook(
     outcome = await service.refresh_from_webhook(tenant_db, doc)
     if not outcome.ok:
         return RedirectResponse(
-            f"/documents/{document_id}?error={quote(f'Webhook refresh failed: {outcome.error}')}",
+            f"/documents/{doc.doc_number}?error={quote(f'Webhook refresh failed: {outcome.error}')}",
             status_code=status.HTTP_303_SEE_OTHER,
         )
     query = "refreshed=1" if outcome.changed else "refreshed=0"
-    return RedirectResponse(f"/documents/{document_id}?{query}", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/documents/{doc.doc_number}?{query}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{document_id:int}/preview-markdown", response_class=HTMLResponse)
@@ -379,13 +399,12 @@ async def link_document(
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
+    doc = await service.get_document(tenant_db, document_id)
     if linked_type in LINKED_TYPES:
         await service.add_link(tenant_db, document_id, linked_type, linked_id, ctx.user.id)
-        if linked_type == "ticket":
-            doc = await service.get_document(tenant_db, document_id)
-            if doc is not None:
-                await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=linked_id, user_id=ctx.user.id)
-    return RedirectResponse(f"/documents/{document_id}", status_code=status.HTTP_303_SEE_OTHER)
+        if linked_type == "ticket" and doc is not None:
+            await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=linked_id, user_id=ctx.user.id)
+    return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{document_id:int}/unlink/{link_id:int}")
@@ -399,4 +418,5 @@ async def unlink_document(
     link = await service.remove_link(tenant_db, link_id)
     if link is not None and link.linked_type == "ticket":
         await _log_ticket_link_activity(tenant_db, linked=False, document=link.document, ticket_id=link.linked_id, user_id=ctx.user.id)
-    return RedirectResponse(f"/documents/{document_id}", status_code=status.HTTP_303_SEE_OTHER)
+    doc_ref = link.document.doc_number if link is not None else document_id
+    return RedirectResponse(f"/documents/{doc_ref}", status_code=status.HTTP_303_SEE_OTHER)

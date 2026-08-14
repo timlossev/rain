@@ -1,7 +1,12 @@
-"""Platform-level administration: branding, tenants, users/roles, and
-auth provider configuration. internal_admin only, except the
-tenant-switch action which any internal_admin uses to pick their active
-tenant (client users are pinned to one and never see this)."""
+"""Admin console: two tiers, split by which RBAC dependency each route
+uses (see rain.core.rbac). Branding/Tenants/Users/Auth Providers/SMTP
+Relay/Syslog Listener are platform-wide (require_internal_admin only).
+Ticket Statuses/Notification Channels/Groups/Approval Flows/Webhooks are
+tenant-scoped (require_admin -- internal_admin for whichever tenant is
+active, or client_admin for their one pinned tenant; Event Promotion
+Policies/Correlation Rules/Platform Response Rules are the same tier but
+live in rain.modules.tickets.router instead, alongside the rest of
+Tickets)."""
 from __future__ import annotations
 
 import asyncio
@@ -17,7 +22,7 @@ from rain.core import ldap_client
 from rain.core.config_store import FONT_CHOICES, config_store
 from rain.core.crypto import decrypt_json, encrypt_json
 from rain.core.pagination import paginate
-from rain.core.rbac import require_internal_admin, require_login
+from rain.core.rbac import require_admin, require_internal_admin, require_login
 from rain.core.security import hash_password
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.user_names import resolve_user_names
@@ -176,7 +181,7 @@ async def users_create(
     ctx: RequestContext = Depends(get_request_context),
     _: CurrentUser = Depends(require_internal_admin),
 ):
-    if role_key == "client" and not tenant_id:
+    if role_key in ("client", "client_admin") and not tenant_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Client users must be assigned a tenant.")
 
     async with control_session() as session:
@@ -233,7 +238,7 @@ async def update_user(
     ctx: RequestContext = Depends(get_request_context),
     _: CurrentUser = Depends(require_internal_admin),
 ):
-    if role_key == "client" and not tenant_id:
+    if role_key in ("client", "client_admin") and not tenant_id:
         nav = await build_nav_context(ctx)
         async with control_session() as session:
             user = await session.get(User, user_id)
@@ -573,7 +578,7 @@ async def ticket_statuses_list(
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = select(TicketStatus).order_by(TicketStatus.sort_order, TicketStatus.label)
@@ -591,7 +596,7 @@ async def ticket_statuses_create(
     is_closed: bool = Form(False),
     sort_order: int = Form(0),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     tenant_db.add(
         TicketStatus(
@@ -608,7 +613,7 @@ async def ticket_statuses_create(
 
 @router.post("/ticket-statuses/{status_id:int}/delete")
 async def ticket_statuses_delete(
-    status_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+    status_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
 ):
     row = await tenant_db.get(TicketStatus, status_id)
     if row is not None:
@@ -619,7 +624,7 @@ async def ticket_statuses_delete(
 
 @router.post("/ticket-statuses/{status_id:int}/toggle")
 async def ticket_statuses_toggle(
-    status_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+    status_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
 ):
     row = await tenant_db.get(TicketStatus, status_id)
     if row is not None:
@@ -640,7 +645,7 @@ async def notification_channels_list(
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = select(NotificationChannel).order_by(NotificationChannel.name)
@@ -662,7 +667,7 @@ async def notification_channels_create(
     channel_type: str = Form(...),
     name: str = Form(...),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     form = await request.form()
     if channel_type == "email":
@@ -685,7 +690,7 @@ async def notification_channels_edit(
     channel_type: str = Form(...),
     name: str = Form(...),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     channel = await tenant_db.get(NotificationChannel, channel_id)
     if channel is not None:
@@ -704,7 +709,7 @@ async def notification_channels_edit(
 
 @router.post("/notification-channels/{channel_id:int}/delete")
 async def notification_channels_delete(
-    channel_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+    channel_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
 ):
     channel = await tenant_db.get(NotificationChannel, channel_id)
     if channel is not None:
@@ -724,7 +729,7 @@ async def groups_list(
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = select(Group).order_by(Group.name)
@@ -749,7 +754,7 @@ async def groups_create(
     name: str = Form(...),
     description: str = Form(""),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     tenant_db.add(Group(name=name.strip(), description=description.strip() or None))
     await tenant_db.commit()
@@ -758,7 +763,7 @@ async def groups_create(
 
 @router.post("/groups/{group_id:int}/delete")
 async def groups_delete(
-    group_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+    group_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
 ):
     row = await tenant_db.get(Group, group_id)
     if row is not None:
@@ -773,7 +778,7 @@ async def group_detail(
     group_id: int,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     group = await tenant_db.get(Group, group_id, options=[selectinload(Group.members)])
@@ -792,7 +797,7 @@ async def group_add_member(
     group_id: int,
     user_id: str = Form(""),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     if user_id:
         existing = await tenant_db.execute(
@@ -811,7 +816,7 @@ async def group_remove_member(
     group_id: int,
     membership_id: int,
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     row = await tenant_db.get(GroupMembership, membership_id)
     if row is not None and row.group_id == group_id:
@@ -838,7 +843,7 @@ async def approval_flows_list(
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = select(ApprovalFlow).options(selectinload(ApprovalFlow.steps)).order_by(ApprovalFlow.name)
@@ -865,7 +870,7 @@ async def approval_flows_new_form(
     request: Request,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     groups_result = await tenant_db.execute(select(Group).order_by(Group.name))
@@ -890,7 +895,7 @@ async def approval_flows_create(
     name: str = Form(...),
     is_default: bool = Form(False),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     form = await request.form()
     if is_default:
@@ -933,7 +938,7 @@ async def approval_flows_edit_form(
     flow_id: int,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     flow = await tenant_db.get(ApprovalFlow, flow_id, options=[selectinload(ApprovalFlow.steps)])
@@ -975,7 +980,7 @@ async def approval_flows_edit(
     name: str = Form(...),
     is_default: bool = Form(False),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     flow = await tenant_db.get(ApprovalFlow, flow_id, options=[selectinload(ApprovalFlow.steps)])
     if flow is None:
@@ -995,7 +1000,7 @@ async def approval_flows_edit(
 
 @router.post("/approval-flows/{flow_id:int}/delete")
 async def approval_flows_delete(
-    flow_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+    flow_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
 ):
     row = await tenant_db.get(ApprovalFlow, flow_id)
     if row is not None:
@@ -1006,7 +1011,7 @@ async def approval_flows_delete(
 
 @router.post("/approval-flows/{flow_id:int}/set-default")
 async def approval_flows_set_default(
-    flow_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+    flow_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
 ):
     await tenant_db.execute(ApprovalFlow.__table__.update().values(is_default=False))
     row = await tenant_db.get(ApprovalFlow, flow_id)
@@ -1025,7 +1030,7 @@ async def webhooks_list(
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = select(WebhookConfig).order_by(WebhookConfig.name)
@@ -1039,7 +1044,7 @@ async def webhooks_list(
 async def webhooks_new_form(
     request: Request,
     ctx: RequestContext = Depends(get_request_context),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     return templates.TemplateResponse(request, "admin/webhook_form.html", {**nav, "ctx": ctx, "webhook": None})
@@ -1057,7 +1062,7 @@ async def webhooks_create(
     alert_on_failure: bool = Form(False),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     await webhook_service.create_webhook(
         tenant_db,
@@ -1080,7 +1085,7 @@ async def webhooks_edit_form(
     webhook_id: int,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     webhook = await webhook_service.get_webhook(tenant_db, webhook_id)
@@ -1105,7 +1110,7 @@ async def webhooks_edit(
     success_codes: str = Form("200,201,202,204"),
     alert_on_failure: bool = Form(False),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     webhook = await webhook_service.get_webhook(tenant_db, webhook_id)
     if webhook is not None:
@@ -1126,7 +1131,7 @@ async def webhooks_edit(
 
 @router.post("/webhooks/{webhook_id:int}/delete")
 async def webhooks_delete(
-    webhook_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+    webhook_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
 ):
     webhook = await webhook_service.get_webhook(tenant_db, webhook_id)
     if webhook is not None:

@@ -26,7 +26,7 @@ class NavNode:
     href: str | None = None
     icon: str | None = None
     order: int = 100
-    roles: tuple[str, ...] = ("internal_admin", "client")
+    roles: tuple[str, ...] = ("internal_admin", "client", "client_admin")
     children_provider: ChildrenProvider | None = None
     children: list["NavNode"] = field(default_factory=list)
     # A small live count shown as a badge next to the label (e.g. "12" on

@@ -84,7 +84,7 @@
     <tbody>
       {% for t in page.items %}
       <tr>
-        <td><a href="/tickets/{{ t.id }}">{{ t.ticket_number }}</a></td>
+        <td><a href="/tickets/{{ t.ticket_number }}">{{ t.ticket_number }}</a></td>
         <td>
           <div class="ticket-title-cell">
             {% if t.is_chronic %}<span class="chronic-icon" title="Chronic: recurring issue">{{ nav_icon("repeat") }}</span>{% endif %}
