@@ -16,5 +16,5 @@
 
 	# WebSocket upgrades (live syslog viewer, Milestone 2) pass through
 	# reverse_proxy transparently -- no extra config needed.
-	reverse_proxy app:8000
+	reverse_proxy app:{$APP_PORT:8000}
 }

@@ -26,13 +26,15 @@ def run_web() -> None:
     # there, with disable_existing_loggers=False) -- but dictConfig has
     # the exact same default-True footgun, so this stays as defense in
     # depth against the same class of bug recurring from uvicorn's side.
-    uvicorn.run("rain.main:app", host="0.0.0.0", port=8000, log_level="info", ws="wsproto", log_config=None)
+    port = get_settings().app_port
+    uvicorn.run("rain.main:app", host="0.0.0.0", port=port, log_level="info", ws="wsproto", log_config=None)
 
 
 async def _worker_main() -> None:
     logging.basicConfig(level=logging.INFO)
     # Defensive: bring the DB up to date even if the app container hasn't
     # started yet -- both processes run the same idempotent migration step.
+    await migrate.wait_for_database()
     await migrate.upgrade_control_async()
     await provisioning.reconcile_all_tenant_schemas()
     await config_store.load_all()

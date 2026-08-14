@@ -31,7 +31,11 @@ ENV PATH="/venv/bin:$PATH" \
 USER rain
 EXPOSE 8000
 
+# Shell form (not a JSON array) on purpose -- APP_PORT is only known at
+# container-run time (docker-compose.yml's app service sets it), and
+# shell form is what lets $APP_PORT actually expand here; a JSON-array
+# CMD would pass the literal string "$APP_PORT" to wget instead.
 HEALTHCHECK --interval=10s --timeout=3s --retries=6 \
-    CMD wget -q -O- http://127.0.0.1:8000/healthz || exit 1
+    CMD wget -q -O- http://127.0.0.1:${APP_PORT:-8000}/healthz || exit 1
 
 CMD ["rain-web"]

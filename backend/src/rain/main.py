@@ -39,6 +39,8 @@ async def lifespan(app: FastAPI):
     # which makes failures here needlessly hard to diagnose -- log it
     # ourselves before letting it propagate.
     try:
+        logger.info("waiting for database...")
+        await migrate.wait_for_database()
         logger.info("running control-schema migrations...")
         await migrate.upgrade_control_async()
         logger.info("reconciling tenant schemas...")

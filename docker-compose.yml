@@ -3,12 +3,17 @@ name: rain
 services:
   caddy:
     image: caddy:2-alpine
+    # Off when WEB_FRONTEND=false in .env (e.g. an AWS ALB already
+    # terminates TLS in front of RAIN) -- also drop "web-frontend" from
+    # COMPOSE_PROFILES there when you do. See .env.example.
+    profiles: ["web-frontend"]
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
     environment:
       RAIN_DOMAIN: ${RAIN_DOMAIN:-localhost}
+      APP_PORT: ${APP_PORT:-8000}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -25,16 +30,26 @@ services:
     restart: unless-stopped
     command: ["rain-web"]
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rain}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rain}
+      # POSTGRES_URL, if set, points at an external/managed Postgres
+      # instead of the "db" service below (which then shouldn't be
+      # running at all -- see its profiles: below and .env.example).
+      DATABASE_URL: ${POSTGRES_URL:-postgresql+asyncpg://${POSTGRES_USER:-rain}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rain}}
       APP_SECRET_KEY: ${APP_SECRET_KEY}
+      APP_PORT: ${APP_PORT:-8000}
       # Never true against a real deployment -- puts full tracebacks
       # (source paths, local variables, SQL text) in 500 responses.
       DEBUG: ${DEBUG:-false}
+    ports:
+      - "${APP_PORT:-8000}:${APP_PORT:-8000}"
     volumes:
       - rain_uploads:/data/uploads
-    depends_on:
-      db:
-        condition: service_healthy
+    # No depends_on: db here on purpose -- an explicit dependency would
+    # force Compose to start "db" even when POSTGRES_URL points elsewhere
+    # and "local-db" has been dropped from COMPOSE_PROFILES (Compose
+    # starts anything an active service depends_on regardless of that
+    # service's own profile). rain.db.migrate.wait_for_database() covers
+    # the "Postgres isn't ready yet" window this used to guard instead,
+    # for both the local container and an external instance alike.
     networks: [rain]
 
   worker:
@@ -44,7 +59,7 @@ services:
     restart: unless-stopped
     command: ["rain-worker"]
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rain}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rain}
+      DATABASE_URL: ${POSTGRES_URL:-postgresql+asyncpg://${POSTGRES_USER:-rain}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rain}}
       APP_SECRET_KEY: ${APP_SECRET_KEY}
       SYSLOG_PORT: ${SYSLOG_PORT:-5514}
     # Published directly (not through Caddy -- this is raw syslog, not
@@ -64,15 +79,17 @@ services:
       interval: 10s
       timeout: 3s
       retries: 6
-    depends_on:
-      db:
-        condition: service_healthy
+    # See app's comment above -- same reasoning, no depends_on: db here.
     networks: [rain]
 
   db:
     build:
       context: ./db
       dockerfile: Dockerfile
+    # Off when POSTGRES_URL is set in .env (pointing at an external/
+    # managed Postgres instead) -- also drop "local-db" from
+    # COMPOSE_PROFILES there when you do. See .env.example.
+    profiles: ["local-db"]
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-rain}

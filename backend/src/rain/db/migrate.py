@@ -51,6 +51,7 @@ until the first finishes instead of racing it.
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 
 import asyncpg
@@ -59,6 +60,8 @@ from alembic.config import Config
 
 from rain.settings import get_settings
 
+logger = logging.getLogger("rain.migrate")
+
 APP_ROOT = Path.cwd()
 ALEMBIC_INI = APP_ROOT / "alembic.ini"
 MIGRATIONS_DIR = APP_ROOT / "migrations"
@@ -66,6 +69,32 @@ MIGRATIONS_DIR = APP_ROOT / "migrations"
 
 def _asyncpg_dsn() -> str:
     return get_settings().database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+
+
+async def wait_for_database(max_attempts: int = 30, delay_seconds: float = 2.0) -> None:
+    """Retries a plain connection until Postgres accepts one, or gives up
+    after max_attempts. app/worker no longer have a Docker-level
+    `depends_on: db: condition: service_healthy` to lean on -- that would
+    force-start the "db" service even when it's been deliberately left
+    out of COMPOSE_PROFILES in favor of an external Postgres given via
+    POSTGRES_URL (Compose starts anything an active service `depends_on`
+    regardless of its own profile). This covers the same "Postgres isn't
+    ready yet" window that guarded against -- both for the local db
+    container's own startup time and for an external instance that's
+    momentarily unreachable (e.g. mid-failover)."""
+    last_error: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            conn = await asyncpg.connect(dsn=_asyncpg_dsn())
+            await conn.close()
+            if attempt > 1:
+                logger.info("database reachable after %d attempt(s)", attempt)
+            return
+        except (OSError, asyncpg.PostgresError) as exc:
+            last_error = exc
+            logger.info("database not reachable yet (attempt %d/%d): %s", attempt, max_attempts, exc)
+            await asyncio.sleep(delay_seconds)
+    raise RuntimeError(f"database never became reachable after {max_attempts} attempts") from last_error
 
 
 def _config(section: str) -> Config:

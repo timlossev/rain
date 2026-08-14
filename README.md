@@ -122,6 +122,13 @@ To feed the ticketing side, point a syslog-ng destination at this host on
 the exact destination snippet, a real-time status pill, and lets you map
 hosts/programs to tenants (or discard a noisy source outright).
 
+Three more `.env` settings support deploying behind existing infrastructure
+instead of the full default stack: `POSTGRES_URL` points RAIN at an
+external/managed Postgres instead of running its own `db` container;
+`APP_PORT` changes what the app listens on; `WEB_FRONTEND=false` skips the
+Caddy container for deployments that already terminate TLS in front of RAIN
+(e.g. an AWS ALB). See the comments in `.env.example`.
+
 ## Stack
 
 | Piece | Choice | Why |
