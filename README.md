@@ -112,8 +112,10 @@ JS framework in the browser.
 - The user menu shows the current database schema build number
 - Contextual help on every page, and pagination on every list screen
 
-See [`docs/architecture.md`](docs/architecture.md) for the detailed
-design, lessons from real deployment testing, and the current roadmap.
+See [`docs/user-guide.md`](docs/user-guide.md) for a task-oriented guide
+to using RAIN day to day, and [`docs/architecture.md`](docs/architecture.md)
+for the detailed design, lessons from real deployment testing, and the
+current roadmap.
 
 ## Quickstart
 
