@@ -805,7 +805,9 @@ class CalendarEntry(TenantBase):
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     start_date: Mapped[dt.date] = mapped_column(Date)
-    recurrence: Mapped[str | None] = mapped_column(String(15), nullable=True)  # null|quarterly|biannual|annual
+    # null|daily|weekly|monthly|quarterly|biannual|annual -- see
+    # rain.modules.calendar.recurrence.RECURRENCE_PRESETS
+    recurrence: Mapped[str | None] = mapped_column(String(15), nullable=True)
     recurrence_end: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     emit_syslog_event: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

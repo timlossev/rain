@@ -18,6 +18,9 @@ import re
 from typing import Any
 
 _RRULE_FREQ = {
+    "daily": "FREQ=DAILY",
+    "weekly": "FREQ=WEEKLY",
+    "monthly": "FREQ=MONTHLY",
     "quarterly": "FREQ=MONTHLY;INTERVAL=3",
     "biannual": "FREQ=MONTHLY;INTERVAL=6",
     "annual": "FREQ=YEARLY",
@@ -92,6 +95,12 @@ def parse_ics(content: str) -> list[dict[str, Any]]:
                 current["recurrence"] = "biannual"
             elif freq == "MONTHLY" and interval == "3":
                 current["recurrence"] = "quarterly"
+            elif freq == "MONTHLY":
+                current["recurrence"] = "monthly"
+            elif freq == "WEEKLY":
+                current["recurrence"] = "weekly"
+            elif freq == "DAILY":
+                current["recurrence"] = "daily"
             if "UNTIL" in params:
                 digits = re.sub(r"[^0-9]", "", params["UNTIL"])[:8]
                 if len(digits) == 8:

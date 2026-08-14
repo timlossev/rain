@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from rain.core.export_columns import merge_profile_columns
 from rain.core.pagination import paginate
-from rain.core.rbac import require_login
+from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.db.tenant_models import Asset, AssetType, CustomField
 from rain.modules.assets import exporter, importer, service
@@ -234,7 +234,7 @@ async def types_list(
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     stmt = select(AssetType).order_by(AssetType.sort_order, AssetType.name)
@@ -256,7 +256,7 @@ async def create_type(
     icon: str = Form(""),
     description: str = Form(""),
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_admin),
 ):
     tenant_db.add(AssetType(key=key.strip().lower(), name=name.strip(), icon=icon.strip() or None, description=description.strip() or None))
     await tenant_db.commit()
@@ -267,7 +267,7 @@ async def create_type(
 async def delete_type(
     asset_type_id: int,
     tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
+    _: CurrentUser = Depends(require_admin),
 ):
     asset_type = await tenant_db.get(AssetType, asset_type_id)
     if asset_type is not None:

@@ -116,6 +116,16 @@ nav_registry.register(
                         order=8,
                         roles=_TENANT_ADMIN_ROLES,
                     ),
+                    # Moved here from the Assets menu -- defining the
+                    # asset schema itself reads as an administration
+                    # function, not a day-to-day Assets task.
+                    NavNode(
+                        key="admin-asset-types",
+                        label="Asset Types",
+                        href="/assets/types",
+                        order=9,
+                        roles=_TENANT_ADMIN_ROLES,
+                    ),
                 ],
             ),
         ],

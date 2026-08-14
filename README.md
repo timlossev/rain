@@ -63,7 +63,8 @@ JS framework in the browser.
 
 **Calendar**
 - Per-tenant calendar with a visual month-grid editor
-- Recurring-entry presets (quarterly, every 6 months, annually, one-time)
+- Recurring-entry presets (daily, weekly, monthly, quarterly, every 6
+  months, annually, one-time)
 - Change tickets with a start/end window appear automatically alongside
   manual entries
 - **Syslog bridge**: flag an entry to synthesize a syslog event on each
