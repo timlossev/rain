@@ -1,5 +1,5 @@
-"""Symmetric encryption for sensitive config-at-rest (e.g. cloud-sync
-credentials in rain.db.tenant_models.SyncConnection.config_encrypted).
+"""Symmetric encryption for sensitive config-at-rest (e.g. the SMTP relay
+password, notification channel webhook URLs, and the LDAP bind password).
 
 The Fernet key is derived from APP_SECRET_KEY rather than stored
 separately -- one bootstrap secret to manage, not two.

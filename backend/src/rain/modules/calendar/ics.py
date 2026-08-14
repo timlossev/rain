@@ -6,10 +6,10 @@ timezone-aware DTSTART, only VEVENT/SUMMARY/DESCRIPTION/DTSTART/RRULE/a
 custom X-RAIN-POLICY property) -- good enough for all-day, single-rule
 recurring entries, which is all this app ever writes.
 
-X-RAIN-POLICY carries CalendarEntry.policy_ref (the currently-inert
-"future hook for rule policies" field) through export and back on
-import, as a JSON blob, so nothing is lost round-tripping through an
-external calendar app even though nothing acts on it yet."""
+X-RAIN-POLICY carries CalendarEntry.policy_ref (e.g. a "refresh this
+document on each occurrence" policy -- see the model docstring) through
+export and back on import, as a JSON blob, so nothing is lost
+round-tripping through an external calendar app."""
 from __future__ import annotations
 
 import datetime as dt

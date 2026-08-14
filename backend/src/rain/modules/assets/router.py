@@ -15,7 +15,7 @@ from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.db.tenant_models import Asset, AssetType, CustomField
-from rain.modules.assets import exporter, importer, service, sync as sync_service
+from rain.modules.assets import exporter, importer, service
 from rain.modules.assets.schemas import coerce_field_value
 from rain.modules.documents import service as document_service
 from rain.modules.tickets import service as ticket_service
@@ -498,61 +498,3 @@ async def import_commit(
 
     nav = await build_nav_context(ctx)
     return templates.TemplateResponse(request, "assets/import_result.html", {**nav, "ctx": ctx, "result": result})
-
-
-# --------------------------------------------------------- cloud sync ----
-
-
-@router.get("/sync", response_class=HTMLResponse)
-async def sync_list(
-    request: Request,
-    page: int = 1,
-    ctx: RequestContext = Depends(get_request_context),
-    tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
-):
-    nav = await build_nav_context(ctx)
-    connection_page = await paginate(tenant_db, sync_service.connection_list_stmt(), page=page)
-    return templates.TemplateResponse(request, "assets/sync.html", {**nav, "ctx": ctx, "page": connection_page})
-
-
-@router.post("/sync")
-async def sync_create(
-    request: Request,
-    provider: str = Form(...),
-    name: str = Form(...),
-    tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
-):
-    form = await request.form()
-    config = {k[len("cfg_") :]: v for k, v in form.items() if k.startswith("cfg_")}
-    await sync_service.create_connection(tenant_db, provider=provider, name=name.strip(), config=config)
-    return RedirectResponse("/assets/sync", status_code=status.HTTP_303_SEE_OTHER)
-
-
-@router.post("/sync/{connection_id:int}/test")
-async def sync_test(
-    connection_id: int,
-    tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
-):
-    connection = await tenant_db.get(sync_service.SyncConnection, connection_id)
-    message = "connection not found"
-    if connection is not None:
-        provider = sync_service.PROVIDERS.get(connection.provider)
-        config = sync_service.decrypt_config(connection)
-        ok, message = provider.test_connection(config) if provider else (False, "unknown provider")
-    return RedirectResponse(f"/assets/sync?tested={connection_id}&message={message}", status_code=status.HTTP_303_SEE_OTHER)
-
-
-@router.post("/sync/{connection_id:int}/delete")
-async def sync_delete(
-    connection_id: int,
-    tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_login),
-):
-    connection = await tenant_db.get(sync_service.SyncConnection, connection_id)
-    if connection is not None:
-        await tenant_db.delete(connection)
-        await tenant_db.commit()
-    return RedirectResponse("/assets/sync", status_code=status.HTTP_303_SEE_OTHER)

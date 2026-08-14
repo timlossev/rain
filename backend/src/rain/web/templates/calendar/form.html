@@ -37,6 +37,20 @@
       <div class="field"><label for="event_program">Event "program" value (optional)</label><input type="text" id="event_program" name="event_program" value="{{ entry.event_program if entry and entry.event_program else '' }}" placeholder="Defaults to the title"></div>
     </div>
 
+    <h3>Auto-update</h3>
+    <p class="field-hint">When set, each occurrence refreshes the chosen document from its configured webhook --
+      the same "Refresh from webhook" a document's own page offers, just triggered by this entry's schedule instead
+      of a click. Only documents with a webhook configured (Documents &gt; a document &gt; Auto-update tab) show up
+      below.</p>
+    <div class="field">
+      <label for="refresh_document_id">Refresh document on occurrence</label>
+      <select id="refresh_document_id" name="refresh_document_id">
+        <option value="">-- none --</option>
+        {% for d in webhook_documents %}<option value="{{ d.id }}" {% if refresh_document_id == d.id %}selected{% endif %}>{{ d.doc_number }}: {{ d.title }}</option>{% endfor %}
+      </select>
+      {% if not webhook_documents %}<div class="field-hint">No webhook-populated documents yet.</div>{% endif %}
+    </div>
+
     <button class="btn btn-primary" type="submit">{{ "Save changes" if entry else "Create entry" }}</button>
     <a class="btn" href="/calendar">Cancel</a>
   </form>

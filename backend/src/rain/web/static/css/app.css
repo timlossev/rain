@@ -162,14 +162,14 @@ p { margin: 0 0 1em; }
 }
 .row-menu-item:hover { background: var(--surface-sunken); }
 .row-menu-item.danger { color: var(--danger); }
-.content { padding: 24px; max-width: 1100px; width: 100%; }
+/* No max-width here on purpose -- screens vary from a two-field settings
+   form (which self-constrains via its own .card's inline max-width) to a
+   wide table, and capping the shared wrapper meant every table-heavy
+   screen that didn't opt into .content-full wasted the right half of a
+   normal monitor. .content-full/the collapsed-sidebar rule below are kept
+   as harmless no-ops for any template still setting content_class. */
+.content { padding: 24px; width: 100%; }
 .content-full { max-width: none; }
-/* Collapsing the sidebar is the reader's own signal that they want the
-   screen space back -- keeping content capped at 1100px while the
-   sidebar sits at 60px instead of ~272px left a static block of unused
-   white space on the right exactly as wide as the space just reclaimed
-   (reported live). Only loosens the cap while collapsed; the expanded
-   sidebar's normal reading-width behavior is unchanged. */
 .shell:has(.sidebar.collapsed) .content { max-width: none; }
 .content-standalone {
   min-height: 100vh;
@@ -438,7 +438,8 @@ label { display: block; font-size: 0.83rem; font-weight: 600; margin-bottom: 4px
 .field { margin-bottom: 16px; }
 .field-hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
 input[type=text], input[type=email], input[type=password], input[type=number],
-input[type=date], input[type=url], input[type=color], input[type=file],
+input[type=date], input[type=time], input[type=datetime-local], input[type=url],
+input[type=color], input[type=file],
 select, textarea {
   width: 100%;
   padding: 8px 10px;

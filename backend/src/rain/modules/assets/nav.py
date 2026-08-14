@@ -44,7 +44,6 @@ nav_registry.register(
             NavNode(key="assets-fields", label="Custom Fields", href="/assets/fields", order=4),
             NavNode(key="assets-export", label="Export", href="/assets/export", order=5),
             NavNode(key="assets-import", label="Import", href="/assets/import", order=6),
-            NavNode(key="assets-sync", label="Cloud Sync", href="/assets/sync", order=7),
         ],
     )
 )

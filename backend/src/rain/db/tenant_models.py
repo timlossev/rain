@@ -134,38 +134,6 @@ class ExportProfile(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class SyncConnection(TenantBase):
-    """Cloud asset-sync connection. Discovery/apply are stubbed
-    (NotImplementedError) until the next release -- see
-    rain.modules.assets.sync."""
-
-    __tablename__ = "sync_connections"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    provider: Mapped[str] = mapped_column(String(15))  # aws | azure
-    name: Mapped[str] = mapped_column(String(255))
-    config_encrypted: Mapped[bytes] = mapped_column(LargeBinary)
-    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-    last_synced_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    runs: Mapped[list["SyncRun"]] = relationship(back_populates="connection", cascade="all, delete-orphan")
-
-
-class SyncRun(TenantBase):
-    __tablename__ = "sync_runs"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    sync_connection_id: Mapped[int] = mapped_column(ForeignKey("sync_connections.id", ondelete="CASCADE"))
-    started_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    status: Mapped[str] = mapped_column(String(31), default="pending", server_default="pending")
-    summary: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
-    error_text: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    connection: Mapped[SyncConnection] = relationship(back_populates="runs")
-
-
 class TenantConfig(TenantBase):
     """Per-tenant runtime settings (event retention, etc.) -- the same
     key/value pattern as control.global_config, scoped to one tenant
@@ -588,10 +556,10 @@ class ChangeApprovalDecision(TenantBase):
 
 class NotificationChannel(TenantBase):
     """email | slack. Config is Fernet-encrypted at rest (recipient list /
-    webhook URL), same helper as SyncConnection.config_encrypted. The SMTP
-    relay itself is instance-wide (control.global_config, set by
-    internal_admin) -- this table only holds who gets notified for this
-    tenant and through which channel.
+    webhook URL) via rain.core.crypto. The SMTP relay itself is
+    instance-wide (control.global_config, set by internal_admin) -- this
+    table only holds who gets notified for this tenant and through which
+    channel.
 
     No longer carries notify_on_incident/notify_on_vulnerability: those
     drove an unconditional "notify on every ticket of this type" firing
@@ -783,11 +751,14 @@ class CalendarEntry(TenantBase):
     own dedup marker (one synthetic event per occurrence, not one per
     sweep tick).
 
-    `policy_ref` is an inert, opaque JSON blob -- a forward-looking hook
-    for a future "recurring policy" concept (e.g. "update document X
-    quarterly") that doesn't exist yet. Nothing reads it today; it exists
-    now purely so it round-trips through .ics export/import (as a custom
-    X-RAIN-POLICY property) without a later migration."""
+    `policy_ref` is an opaque JSON blob carrying an occurrence-driven
+    "policy" for this entry, round-tripping through .ics export/import
+    (as a custom X-RAIN-POLICY property). The one shape acted on today
+    (rain.modules.calendar.sweep) is `{"type": "refresh_document",
+    "document_id": <id>}` -- refresh that document from its configured
+    webhook (rain.modules.documents.service.refresh_from_webhook) on
+    every due occurrence, e.g. "update document X quarterly". Independent
+    of `emit_syslog_event`; an entry can do either, both, or neither."""
 
     __tablename__ = "calendar_entries"
 

@@ -10,10 +10,12 @@ nav_registry.register(
         href="/calendar",
         order=15,  # after Tickets, ahead of Assets
         children=[
+            # Export/Import aren't destinations in their own right the way
+            # Month View/New Entry are -- reachable as buttons on /calendar
+            # itself (see calendar/month.html) instead of cluttering the
+            # sidebar with two more entries.
             NavNode(key="calendar-view", label="Month View", href="/calendar", order=1),
             NavNode(key="calendar-new", label="New Entry", href="/calendar/new", order=2),
-            NavNode(key="calendar-export", label="Export (.ics)", href="/calendar/export", order=3),
-            NavNode(key="calendar-import", label="Import (.ics)", href="/calendar/import", order=4),
         ],
     )
 )

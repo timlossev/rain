@@ -24,7 +24,6 @@ JS framework in the browser.
 - CSV / JSON / Excel import and export, with reusable column/header/order
   profiles
 - Tickets linked to an asset show on that asset's own page and PDF export
-- AWS/Azure cloud-sync scaffolding, ready for a future release
 
 **Ticketing** -- the primary focus of the platform
 - Three ticket types -- incident, vulnerability, and change -- sharing
@@ -69,6 +68,9 @@ JS framework in the browser.
 - **Syslog bridge**: flag an entry to synthesize a syslog event on each
   occurrence, so the same rule engine that reacts to real syslog traffic
   can react to a recurring calendar entry too
+- **Auto-update**: point an entry at a webhook-populated document, and
+  each occurrence refreshes it the same way that document's own "Refresh
+  from webhook" button would
 - Standard iCalendar (.ics) export/import
 
 **Document Repository**
@@ -193,10 +195,6 @@ Per [`docs/architecture.md`](docs/architecture.md#roadmap):
 
 - pgvector-backed keyword/vector search hook (pgvector is already
   installed, unused).
-- Real AWS/Azure asset discovery (currently a stub).
 - OIDC/SAML auth providers (LDAP is done).
 - Multiple independent LDAP directories (currently one directory syncs
   into exactly one target tenant, instance-wide).
-- Acting on a recurring calendar entry's attached "policy" (currently an
-  inert, round-tripping hook for a future concept, e.g. "update document
-  X quarterly").

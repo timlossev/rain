@@ -10,6 +10,7 @@ from rain.core.config_store import config_store
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.modules.calendar import ics, recurrence, service
+from rain.modules.documents import service as document_service
 from rain.web.nav import build_nav_context
 from rain.web.templating import templates
 
@@ -94,14 +95,23 @@ async def month_view(
     )
 
 
+def _refresh_document_id(entry) -> int | None:
+    policy = entry.policy_ref or {} if entry else {}
+    if policy.get("type") == "refresh_document":
+        return policy.get("document_id")
+    return None
+
+
 @router.get("/new", response_class=HTMLResponse)
 async def new_entry_form(
     request: Request,
     date: str | None = None,
     ctx: RequestContext = Depends(get_request_context),
+    tenant_db=Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
+    webhook_documents = await document_service.list_webhook_populated(tenant_db)
     return templates.TemplateResponse(
         request,
         "calendar/form.html",
@@ -111,6 +121,8 @@ async def new_entry_form(
             "entry": None,
             "prefill_date": date or dt.date.today().isoformat(),
             "recurrence_presets": recurrence.RECURRENCE_PRESETS,
+            "webhook_documents": webhook_documents,
+            "refresh_document_id": None,
             "error": None,
         },
     )
@@ -125,6 +137,7 @@ async def create_entry(
     recurrence_end: str = Form(""),
     emit_syslog_event: bool = Form(False),
     event_program: str = Form(""),
+    refresh_document_id: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db=Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
@@ -138,6 +151,7 @@ async def create_entry(
         recurrence_end=dt.date.fromisoformat(recurrence_end) if recurrence_end else None,
         emit_syslog_event=emit_syslog_event,
         event_program=event_program.strip() or None,
+        policy_ref={"type": "refresh_document", "document_id": int(refresh_document_id)} if refresh_document_id else None,
         created_by=ctx.user.id,
     )
     return RedirectResponse("/calendar", status_code=status.HTTP_303_SEE_OTHER)
@@ -155,6 +169,7 @@ async def edit_entry_form(
     entry = await service.get_entry(tenant_db, entry_id)
     if entry is None:
         return RedirectResponse("/calendar", status_code=status.HTTP_303_SEE_OTHER)
+    webhook_documents = await document_service.list_webhook_populated(tenant_db)
     return templates.TemplateResponse(
         request,
         "calendar/form.html",
@@ -164,6 +179,8 @@ async def edit_entry_form(
             "entry": entry,
             "prefill_date": entry.start_date.isoformat(),
             "recurrence_presets": recurrence.RECURRENCE_PRESETS,
+            "webhook_documents": webhook_documents,
+            "refresh_document_id": _refresh_document_id(entry),
             "error": None,
         },
     )
@@ -180,6 +197,7 @@ async def update_entry(
     is_active: bool = Form(False),
     emit_syslog_event: bool = Form(False),
     event_program: str = Form(""),
+    refresh_document_id: str = Form(""),
     tenant_db=Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
@@ -196,6 +214,7 @@ async def update_entry(
             is_active=is_active,
             emit_syslog_event=emit_syslog_event,
             event_program=event_program.strip() or None,
+            policy_ref={"type": "refresh_document", "document_id": int(refresh_document_id)} if refresh_document_id else None,
         )
     return RedirectResponse("/calendar", status_code=status.HTTP_303_SEE_OTHER)
 

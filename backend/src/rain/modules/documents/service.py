@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime, timezone
+
 from sqlalchemy import Sequence, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from rain.db.tenant_models import Document, DocumentLink
+from rain.db.tenant_models import Document, DocumentLink, SyslogEvent
+from rain.modules.documents import storage, textbody
+from rain.modules.tickets import correlation as ticket_correlation
+from rain.modules.tickets import rules as ticket_rules
+from rain.modules.webhooks import service as webhook_service
 
 
 async def _next_doc_number(db: AsyncSession) -> str:
@@ -56,6 +63,16 @@ async def list_documents(db: AsyncSession, *, search: str | None = None) -> list
     return list(result.scalars())
 
 
+async def list_webhook_populated(db: AsyncSession) -> list[Document]:
+    """Documents with a webhook configured -- the only ones eligible for a
+    calendar entry's "refresh this document on occurrence" policy
+    (rain.modules.calendar.sweep); backs that picker on the calendar
+    entry form."""
+    stmt = select(Document).where(Document.webhook_id.is_not(None)).order_by(Document.title)
+    result = await db.execute(stmt)
+    return list(result.scalars())
+
+
 async def get_document(db: AsyncSession, document_id: int) -> Document | None:
     stmt = (
         select(Document)
@@ -80,6 +97,70 @@ async def update_webhook_config(db: AsyncSession, doc: Document, *, webhook_id: 
     doc.webhook_id = webhook_id
     doc.alert_on_change = alert_on_change
     await db.commit()
+
+
+@dataclass
+class RefreshOutcome:
+    ok: bool
+    changed: bool = False
+    error: str | None = None
+
+
+async def refresh_from_webhook(db: AsyncSession, doc: Document) -> RefreshOutcome:
+    """Call the document's configured webhook, diff the response against
+    what's currently stored, and overwrite on a real change -- the actual
+    "populate from webhook" logic, shared by the manual "Refresh from
+    webhook" button (documents.router) and a calendar entry's "refresh
+    this document on occurrence" policy (calendar.sweep), so there's
+    exactly one implementation of what a refresh means. Never raises; the
+    caller decides what to do with a failed/no-op outcome (a redirect +
+    flash for the button, a log line for the sweep)."""
+    if doc.webhook_id is None or textbody.body_kind(doc.filename) is None:
+        return RefreshOutcome(ok=False, error="document has no webhook configured")
+
+    webhook = await webhook_service.get_webhook(db, doc.webhook_id)
+    if webhook is None:
+        return RefreshOutcome(ok=False, error="configured webhook no longer exists")
+
+    result = await webhook_service.call_webhook(webhook)
+    if not result.success:
+        if webhook.alert_on_failure:
+            await webhook_service.alert_webhook_failure(
+                db, webhook, result, context=f"document {doc.doc_number} refresh"
+            )
+        return RefreshOutcome(ok=False, error=result.error or f"HTTP {result.status_code}")
+
+    try:
+        old_text = textbody.decode_body(storage.get_storage().read(doc.storage_key))
+    except FileNotFoundError:
+        old_text = None
+    new_text = result.body
+    changed = new_text != old_text
+
+    if changed:
+        data = new_text.encode("utf-8")
+        storage.get_storage().save(doc.storage_key, data)
+        await update_body_size(db, doc, len(data))
+
+        if doc.alert_on_change:
+            event = SyslogEvent(
+                host="documents",
+                program=doc.doc_number,
+                facility=None,
+                severity=5,  # notice
+                message=f"Document {doc.doc_number} ({doc.title}) content changed via webhook refresh",
+                raw=f"document #{doc.id} webhook refresh diff (webhook: {webhook.name})",
+            )
+            db.add(event)
+            await db.commit()
+            matched_rule = await ticket_rules.find_matching_rule(db, event)
+            if matched_rule is not None:
+                await ticket_rules.apply_rule(db, matched_rule, event)
+            await ticket_correlation.evaluate_correlation_rules(db, event)
+
+    doc.last_refreshed_at = datetime.now(timezone.utc)
+    await db.commit()
+    return RefreshOutcome(ok=True, changed=changed)
 
 
 async def delete_document(db: AsyncSession, document: Document) -> None:

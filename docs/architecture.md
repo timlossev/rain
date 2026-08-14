@@ -15,7 +15,7 @@ the same foundation rather than re-deriving it. See the repo root
 
 Only two inputs are needed outside the database: `POSTGRES_PASSWORD` and
 `APP_SECRET_KEY` (session-cookie signing + the Fernet key that encrypts
-config-at-rest, e.g. cloud-sync credentials). `bootstrap.py` /
+config-at-rest, e.g. the SMTP relay password). `bootstrap.py` /
 `bootstrap.ps1` / `bootstrap.sh` generate both into `.env` on first run.
 `RAIN_DOMAIN` is optional and defaults to `localhost` (Caddy's internal CA).
 Everything else lives in Postgres and is edited at runtime through the
@@ -27,10 +27,10 @@ setup wizard and Admin UI.
   `roles`, `global_config`, `auth_providers`, `syslog_source_map`,
   `audit_log`.
 - `tenant_<slug>` schema per tenant: `asset_types`, `custom_fields`,
-  `assets`, `asset_field_values`, `export_profiles`, `sync_connections`,
-  `sync_runs`, `tenant_config`, `syslog_events`, `ticket_rules`, `tickets`,
-  `ticket_comments`, `notification_channels`, `documents`, `document_links`,
-  `audit_log`.
+  `assets`, `asset_field_values`, `export_profiles`, `tenant_config`,
+  `syslog_events`, `ticket_rules`, `tickets`, `ticket_comments`,
+  `notification_channels`, `webhook_configs`, `documents`,
+  `document_links`, `audit_log`.
 - Postgres can't enforce foreign keys across schemas, so references back
   into `control` (e.g. `assets.owner_user_id`) are plain integers,
   validated at the application layer instead of the DB.
@@ -124,11 +124,6 @@ no library, kept in its own file (loaded only on the live-viewer page via
   (`rain.modules.assets.importer`).
 - CSV/JSON export: ad-hoc or saved `export_profiles` -- pick columns,
   headers, and order (`rain.modules.assets.exporter`).
-- Cloud sync scaffolding: `SyncProvider` protocol with `AWSProvider` /
-  `AzureProvider` stubs (`rain.modules.assets.sync`) -- connection CRUD and
-  config validation work now, `discover_assets()` raises "coming in the
-  next release" until implemented. Credentials are Fernet-encrypted at
-  rest, keyed from `APP_SECRET_KEY`.
 
 ## Ticketing (Milestone 2, full scope)
 
@@ -191,8 +186,7 @@ which pre-fills the form and suggests an asset match by `external_id`.
 creation. The outbound SMTP relay is instance-wide
 (`control.global_config`, set once in Admin > SMTP Relay, password
 Fernet-encrypted); *who* gets notified is per-tenant
-(`notification_channels`, config Fernet-encrypted same as
-`sync_connections`).
+(`notification_channels`, config Fernet-encrypted the same way).
 
 **Export.** `GET/POST /tickets/export/run` -- fixed-column CSV/JSON
 (tickets don't carry custom fields the way assets do, so this skips the
@@ -343,8 +337,6 @@ response.
   table and a `SearchProvider` interface once a concrete model/API is
   chosen. Natural to wire into the Document Repository first (index
   `documents` content) and extend to tickets/assets from there.
-- **Cloud sync**: implement `AWSProvider`/`AzureProvider.discover_assets()`
-  (currently `NotImplementedError` stubs -- see Asset Registry above).
 - **OIDC/SAML/LDAP**: `control.auth_providers` rows already exist,
   disabled -- implement `authenticate_<provider>()` alongside
   `rain.modules.auth.provider.authenticate_local`.

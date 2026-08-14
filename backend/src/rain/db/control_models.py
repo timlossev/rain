@@ -130,11 +130,10 @@ class AuthProviderConfig(ControlBase):
     provider_type: Mapped[str] = mapped_column(String(31))
     name: Mapped[str] = mapped_column(String(255))
     config: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
-    # Fernet-encrypted JSON (rain.core.crypto), same as
-    # tenant_models.SyncConnection.config_encrypted -- where an actual
-    # secret (the LDAP bind password) needs to live, unlike the plain
-    # `config` column above which predates having any provider with a
-    # real secret to store.
+    # Fernet-encrypted JSON (rain.core.crypto) -- where an actual secret
+    # (the LDAP bind password) needs to live, unlike the plain `config`
+    # column above which predates having any provider with a real secret
+    # to store.
     config_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     last_synced_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
