@@ -19,152 +19,83 @@ JS framework in the browser.
 ## Capabilities
 
 **Asset Registry**
-- Custom asset types and per-type custom fields (text, number, boolean,
+- Custom asset types with per-type custom fields (text, number, boolean,
   date, URL, email, select)
-- CSV / JSON / Excel (.xlsx) import and export, with a save-and-load
-  reusable column/header/order profile (shared with Tickets' export
-  screen, which has the same save/load, scoped separately)
-- Every ticket currently pointing at an asset shows on that asset's own
-  page (and its PDF export) as "Linked Tickets" -- no need to search
-  Tickets to see an asset's history
-- AWS/Azure cloud-sync connection scaffolding (discovery providers ready
-  for a future release)
+- CSV / JSON / Excel import and export, with reusable column/header/order
+  profiles
+- Tickets linked to an asset show on that asset's own page and PDF export
+- AWS/Azure cloud-sync scaffolding, ready for a future release
 
 **Ticketing** -- the primary focus of the platform
 - Three ticket types -- incident, vulnerability, and change -- sharing
   one record, one activity feed, and one export pipeline
-- A hand-written syslog listener (TCP + UDP, no third-party library)
-  turns any syslog-ng-fed event stream into a live event feed
+- A built-in syslog listener turns any syslog-ng-fed event stream into a
+  live event feed
 - **Event Promotion Policies**: regex rules that auto-promote a matching
-  syslog event into an `INC-xxxxxx` (incident) or `VULN-xxxxxx`
-  (vulnerability) ticket, first match wins
-- **Correlation Rules**: multi-event, threshold-based promotion --
-  count events matching a pattern within a trailing time window,
-  optionally grouped by host/program (a separate correlation "instance"
-  and ticket per group value), and fire once the count is reached.
-  Evaluated alongside Event Promotion Policies, not instead of them
-- **Platform Response Rules**: a third, independent reaction layer --
-  rules that match on ticket creation (title/description regex) and
-  fire one or more actions: notify Slack, notify email, call a webhook
-  with a custom JSON payload, attach a document, or attach an asset.
-  Every active matching rule fires, and every firing is logged to the
-  ticket's activity feed. Fully editable after creation (name, trigger,
-  pattern), not just at creation time
-- Event Promotion Policies, Correlation Rules, and Platform Response
-  Rules all live under Admin and require the `internal_admin` role --
-  configuring how events become tickets is a platform-operator concern,
-  not a per-tenant one
-- **Live event triage**: the live syslog feed's rows are multi-select,
-  with a selection menu to act on several at once -- "Turn these into
-  incidents/vulnerabilities" (one ticket per selected event), "Correlate
-  these" (jumps to Correlation Rules with a new rule pre-filled from the
-  selection), or "Discard these" (adds a negation rule -- Admin > Syslog
-  Listener -- so future events from those hosts are dropped before ever
-  reaching a tenant, without touching what's already been ingested).
-  Admin > Syslog Listener also shows a real-time Active/Down pill for
-  the worker's listener, not just its config
-- **Change tickets** (`CHG-xxxxxx`): reported directly, or promoted
-  from an existing incident/vulnerability (pre-fills title, description,
-  and asset, and links back to the source). Requires a real approval
-  flow at creation -- enforced server-side, not just an absent option in
-  the form -- and carries a start/end window with a time of day, not
-  just a day (shown on the ticket, its PDF export, and as a chip on
-  every day it spans on the tenant calendar). The approval lifecycle is
-  independent of the generic status stepper: an ordered sequence of
-  1-10 steps (add/remove as needed), each assigned to a group (any one
-  member's approval clears it) or an individual user, enforced
-  server-side, not just hidden in the UI. Flows are fully tenant-defined
-  and editable after creation (Admin > Approval Flows), with one
-  markable as the default applied to new changes. An unapproved (or
-  rejected) change shows a red X next to its title on the list; an
-  approved one shows a green check
-- **Groups** (Admin > Groups): named, tenant-scoped sets of users --
-  the assignment target for an approval flow step, so a step can name
-  "the CAB" once instead of every current member individually
+  syslog event into an incident or vulnerability ticket
+- **Correlation Rules**: promote based on how many matching events land
+  within a trailing time window, optionally grouped per host/program
+- **Platform Response Rules**: react to new tickets by notifying Slack or
+  email, calling a webhook, or attaching a document or asset -- every
+  matching rule fires, and every firing is logged to the ticket
+- **Webhooks**: centrally-configured outbound webhooks (Admin >
+  Webhooks) -- one definition (URL, headers, payload, timeout, success
+  codes) reused wherever a webhook call is needed, with an optional
+  syslog alert if a call fails or times out
+- **Live event triage**: bulk-promote, correlate, or discard selected
+  events straight from the live feed, with a real-time status pill for
+  the listener itself
+- **Change tickets**: promoted from an existing incident/vulnerability or
+  filed directly, with a required, tenant-defined approval flow and a
+  scheduled start/end window shown on the ticket and the tenant calendar
+- **Groups**: named sets of users an approval step can target as a whole
 - Title, priority, assignee, and affected asset are all editable after
-  creation -- title/priority via a click-to-edit pencil next to each,
-  assignee/asset via a predictive type-ahead search (not a `<select>`
-  that doesn't scale) -- with every change logged to the activity feed
-  ("user X assigned this to Y", "changed priority from medium to
-  critical") -- same treatment as status changes
-- **Tenant-customizable ticket statuses** -- define your own workflow
-  (labels, colors, which statuses count as "closed") instead of a fixed
-  open/closed enum
-- A merged, chronological activity feed per ticket: comments, status/
-  title/priority/chronic changes, assignee/asset/document-link changes,
-  and approval decisions, with resolved names throughout -- including
-  "Event Promotion Policy: X" / "Correlation Rule: X" as the reporter on
-  a ticket no human filed. Every non-comment entry reads as one line
-  ("Date - Actor - action", no em dashes); a comment's own line breaks
-  are preserved. Newest-first/oldest-first toggle (defaults to newest),
-  with the comment box pinned to the top of the panel
-- **Chronic flag**: a manually-set marker (conventionally, "happened 5+
-  times in the trailing 30 days" -- left to human judgment rather than
-  auto-detected, since nothing in the schema groups "the same underlying
-  issue" across tickets closely enough to count occurrences without
-  false positives) shown as an icon next to the title in the list and a
-  badge on the ticket itself
-- A per-row quick-action menu on every ticket list (Mark closed, Mark/
-  unmark chronic, and -- changes only, enforced server-side -- Mark
-  cancelled), plus "Mine" / "Unassigned" / "Chronic" / "All" quick-filter
-  chips and type/status filters all in one toolbar alongside "+ New
-  ticket", instead of scattered across the page
+  creation, with every change logged to the ticket's activity feed
+- Tenant-customizable ticket statuses instead of a fixed open/closed enum
+- A unified, chronological activity feed per ticket -- comments, field
+  changes, assignment/asset changes, approval decisions, and rule
+  firings, newest- or oldest-first
+- **Chronic flag** for recurring issues, shown in the list and on the
+  ticket
+- Quick-action menu and filter chips on every ticket list
 - Branded PDF export of any ticket, including its full activity history
-- Email/Slack notification channels, fully editable after creation, and
-  reused by any number of Platform Response Rules
+- Email/Slack notification channels, reusable across any number of rules
 
 **Calendar**
-- Per-tenant calendar with a server-rendered month-grid visual editor
-  (no client-side calendar library)
-- Recurring-entry presets: quarterly, every 6 months, annually, or a
-  one-time entry, with an optional end date
-- Change tickets with a start/end window show up automatically as a
-  highlighted chip across every day they span, alongside manual entries
+- Per-tenant calendar with a visual month-grid editor
+- Recurring-entry presets (quarterly, every 6 months, annually, one-time)
+- Change tickets with a start/end window appear automatically alongside
+  manual entries
 - **Syslog bridge**: flag an entry to synthesize a syslog event on each
-  due occurrence, so the same Event Policy / Platform Response Rule
-  engine that reacts to real syslog traffic can also react to a
-  recurring calendar entry (e.g. auto-file a ticket for a quarterly
-  access review)
-- Standard iCalendar (.ics) export/import, interoperable with Outlook,
-  Google Calendar, and Apple Calendar
-- A forward-looking, already-round-tripping hook for attaching a
-  structured "policy" to a recurring entry (e.g. "update document X
-  quarterly") -- carried through export/import today, acted on in a
-  future release
+  occurrence, so the same rule engine that reacts to real syslog traffic
+  can react to a recurring calendar entry too
+- Standard iCalendar (.ics) export/import
 
 **Document Repository**
-- `DOC-xxxxxx` entries with description, file attachment, and
-  polymorphic links to any asset or ticket -- from a ticket or asset,
-  "+ Add new" uploads one on the spot, "Link existing" is a predictive
-  search over documents already on file
-- Branded PDF export
+- `DOC-xxxxxx` entries with description, file attachment, and links to
+  any asset or ticket
+- A document's contents can be populated by calling a configured
+  webhook, with the new content diffed against what's stored and an
+  optional syslog alert when it changes
+- Branded PDF export, noting the source webhook and last-refresh date
+  when a document is webhook-populated
 
 **Platform**
 - Schema-per-tenant multi-tenancy on a single Postgres instance
-- Local email/password auth (Argon2, DB-backed sessions), plus an
-  optional LDAP/Active Directory provider (Admin > Auth Providers >
-  LDAP): point it at a directory with a bind DN, and it periodically
-  syncs users and groups into one target tenant -- a synced user never
-  gets a local password, every one of their logins binds live against
-  the directory instead. `OIDC`/`SAML` provider slots are still just
-  modeled, ready to enable in a future release
-- Role-based access control (`internal_admin` / `client`), with an
-  Admin console for platform- and tenant-level configuration
-- Runtime branding: instance name, accent color, logo upload, and a
-  curated, dependency-free font picker -- no CDN font download
-- A resizable, searchable, collapsible tree navigation sidebar, with a
-  breadcrumb (Menu > Category > Page) and an always-visible "Session
-  for `<tenant>`" indicator in the topbar so which tenant's data is on
-  screen is never a guess. Live count badges on Events/Incidents/
-  Vulnerabilities/Changes (not-closed counts), Assets (active), and
-  Documents (total)
-- A "?" next to every page's heading with a short explanation of what
-  that screen is for, on hover/focus
-- Pagination on every list screen in the app
+- Local email/password auth, plus an optional LDAP/Active Directory
+  provider; OIDC/SAML provider slots are modeled, ready for a future
+  release
+- Role-based access control (`internal_admin` / `client`), with an Admin
+  console for platform- and tenant-level configuration
+- Runtime branding: instance name, accent color, logo, and font
+- A resizable, searchable, collapsible tree navigation sidebar, with live
+  count badges and an always-visible indicator of which tenant's data is
+  on screen
+- The user menu shows the current database schema build number
+- Contextual help on every page, and pagination on every list screen
 
 See [`docs/architecture.md`](docs/architecture.md) for the detailed
-design, every hard-won lesson from real deployment testing, and the
-current roadmap.
+design, lessons from real deployment testing, and the current roadmap.
 
 ## Quickstart
 
@@ -186,27 +117,24 @@ from the Admin console, stored in Postgres.
 
 To feed the ticketing side, point a syslog-ng destination at this host on
 `SYSLOG_PORT` (default `5514`, TCP or UDP) -- Admin > Syslog Listener shows
-the exact destination snippet, a real-time Active/Down status pill, and
-lets you map hosts/programs to tenants (or discard a noisy source
-outright).
+the exact destination snippet, a real-time status pill, and lets you map
+hosts/programs to tenants (or discard a noisy source outright).
 
 ## Stack
 
 | Piece | Choice | Why |
 |---|---|---|
 | Frontend edge | Caddy (alpine) | Automatic HTTPS, reverse proxy, nothing else to configure |
-| App | FastAPI + Jinja2, server-rendered | No Node/SPA build; the entire client-side footprint is one hand-written CSS file and a couple of small vanilla-JS files -- no htmx/Alpine/Tailwind/React dependency to track for CVEs |
-| DB | `pgvector/pgvector:pg17-trixie` (official image, pgvector pre-installed) | pgvector installed now, unused until the future LLM search hook; official image avoids maintaining our own pgvector build |
-| Multi-tenancy | Schema-per-tenant | One Postgres instance, `control` schema for platform data, `tenant_<slug>` per tenant |
-| Auth | Local email/password (Argon2, DB-backed sessions) + optional LDAP (`ldap3`, pure Python) | `control.auth_providers` still has disabled OIDC/SAML rows, ready for a future release |
-| Ticketing bus | Hand-written syslog listener (TCP+UDP) in `worker` | No third-party syslog library; syslog-ng pushes to it as a `network()` destination |
-| Document storage | Local volume behind a `StorageBackend` abstraction | Swappable for S3 later without touching callers; served only through an authenticated download route, never the static file mount |
-| Exports | CSV, JSON, Excel (`openpyxl`), PDF (`xhtml2pdf`), iCalendar | All pure-Python, no headless browser or system library required in the image |
+| App | FastAPI + Jinja2, server-rendered | No Node/SPA build, no third-party JS framework to track for CVEs |
+| DB | Postgres with pgvector | pgvector installed now, unused until a future search feature |
+| Multi-tenancy | Schema-per-tenant | One Postgres instance, isolated per tenant |
+| Auth | Local email/password + optional LDAP | OIDC/SAML planned |
+| Ticketing bus | Built-in syslog listener (TCP+UDP) | syslog-ng pushes to it directly, no third-party syslog library |
+| Document storage | Local volume behind a storage abstraction | Swappable for S3 later without touching callers |
+| Exports | CSV, JSON, Excel, PDF, iCalendar | All pure-Python, no extra system dependencies in the image |
 
 `caddy`/`app`/`worker` are multi-stage, Alpine-based builds; `db` uses
-pgvector's official image (Debian-based -- pgvector doesn't publish an
-Alpine variant, and compiling it ourselves wasn't worth the maintenance
-burden, see `db/Dockerfile`). Only Caddy's ports (and the worker's syslog
+pgvector's official image. Only Caddy's ports (and the worker's syslog
 port) are published to the host.
 
 ## Repository layout
@@ -217,11 +145,11 @@ backend/
   Dockerfile, pyproject.toml
   alembic.ini, migrations/{control,tenant}/    -- two independent migration chains
   src/rain/
-    settings.py        -- the only place env vars are read
-    db/                 -- models, engine/session, tenant provisioning
-    core/                -- security, RBAC, tenancy resolution, config store, nav registry
-    modules/{setup,auth,admin,assets,tickets,calendar,documents}/  -- one router+service per feature area
-    web/                  -- Jinja2 templates, hand-written CSS/JS
+    settings.py         -- the only place env vars are read
+    db/                  -- models, engine/session, tenant provisioning
+    core/                 -- security, RBAC, tenancy resolution, config store, nav registry
+    modules/{setup,auth,admin,assets,tickets,calendar,documents,webhooks}/  -- one router+service per feature area
+    web/                   -- Jinja2 templates, hand-written CSS/JS
   tests/
 ```
 
@@ -237,9 +165,8 @@ TEST_DATABASE_URL=postgresql+asyncpg://rain:rain@localhost:5432/rain_test pytest
 
 Alembic runs from `backend/` against whichever section you need, e.g.
 `alembic -n control upgrade head` for local exploration -- in the running
-app, migrations are driven programmatically (`rain.db.migrate`) and run
-automatically at startup, including catching up any tenant schema that's
-behind head.
+app, migrations run automatically at startup, including catching up any
+tenant schema that's behind head.
 
 Set `DEBUG=true` in `.env` to get full tracebacks inline in 500 responses
 instead of a bare "Internal Server Error" (requires recreating the `app`
@@ -266,12 +193,10 @@ Per [`docs/architecture.md`](docs/architecture.md#roadmap):
 
 - pgvector-backed keyword/vector search hook (pgvector is already
   installed, unused).
-- Real AWS/Azure asset discovery (`SyncProvider.discover_assets()` is
-  currently a stub).
-- OIDC/SAML auth providers (`control.auth_providers` rows already
-  exist, disabled; LDAP is done).
+- Real AWS/Azure asset discovery (currently a stub).
+- OIDC/SAML auth providers (LDAP is done).
 - Multiple independent LDAP directories (currently one directory syncs
   into exactly one target tenant, instance-wide).
-- Acting on `CalendarEntry.policy_ref` (currently an inert, round-tripping
-  hook for a future "recurring policy" concept, e.g. "update document X
-  quarterly").
+- Acting on a recurring calendar entry's attached "policy" (currently an
+  inert, round-tripping hook for a future concept, e.g. "update document
+  X quarterly").
