@@ -134,6 +134,7 @@ p { margin: 0 0 1em; }
 .user-menu-btn:hover, .user-menu-btn[aria-expanded="true"] { border-color: var(--accent); }
 .user-menu-btn .nav-icon { width: 18px; height: 18px; color: inherit; }
 .user-menu-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 6px; }
+.user-menu-build { font-size: 0.75rem; }
 .dropdown-menu-divider { border-top: 1px solid var(--border); margin: 8px 0; }
 
 .row-menu-btn {

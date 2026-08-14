@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 
 from starlette.templating import Jinja2Templates
 
 from rain.core.config_store import config_store
+
+logger = logging.getLogger("rain.templating")
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -16,6 +19,33 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 # can render broken (e.g. a hover-only element showing unconditionally)
 # until the user manually hard-refreshes.
 ASSET_VERSION = str(int(time.time()))
+
+
+def _tenant_schema_build() -> str:
+    """The tenant migration chain's head revision (e.g. "0021"), shown as
+    "Build 0021" in the user menu on every page -- a glance at which schema
+    a given deployment is running without reaching for `alembic history` or
+    a DB shell. Derived from the migrations/ directory itself (not
+    hand-maintained) so it's automatically correct every time a new
+    revision file is added -- nothing to remember to bump. Read once at
+    import time, not per-request: rain.main's lifespan runs every tenant
+    schema to this exact head before the app starts serving, so what's
+    on disk here *is* what's applied for the life of this process."""
+    try:
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
+        from rain.db.migrate import ALEMBIC_INI, MIGRATIONS_DIR
+
+        cfg = Config(str(ALEMBIC_INI), ini_section="tenant")
+        cfg.set_main_option("script_location", str(MIGRATIONS_DIR / "tenant"))
+        return ScriptDirectory.from_config(cfg).get_current_head() or "?"
+    except Exception:
+        logger.exception("could not determine tenant schema build number")
+        return "?"
+
+
+DB_BUILD = _tenant_schema_build()
 
 
 def _branding_context(request):
@@ -44,3 +74,4 @@ def top_nav_label(nodes, path: str) -> str | None:
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR), context_processors=[_branding_context])
 templates.env.globals["asset_version"] = ASSET_VERSION
 templates.env.globals["top_nav_label"] = top_nav_label
+templates.env.globals["db_build"] = DB_BUILD
