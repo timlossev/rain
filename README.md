@@ -21,8 +21,12 @@ JS framework in the browser.
 **Asset Registry**
 - Custom asset types and per-type custom fields (text, number, boolean,
   date, URL, email, select)
-- CSV / JSON / Excel (.xlsx) import and export, with a saved,
-  reusable column/header/order profile
+- CSV / JSON / Excel (.xlsx) import and export, with a save-and-load
+  reusable column/header/order profile (shared with Tickets' export
+  screen, which has the same save/load, scoped separately)
+- Every ticket currently pointing at an asset shows on that asset's own
+  page (and its PDF export) as "Linked Tickets" -- no need to search
+  Tickets to see an asset's history
 - AWS/Azure cloud-sync connection scaffolding (discovery providers ready
   for a future release)
 
@@ -55,34 +59,45 @@ JS framework in the browser.
   incidents/vulnerabilities" (one ticket per selected event), "Correlate
   these" (jumps to Correlation Rules with a new rule pre-filled from the
   selection), or "Discard these" (adds a negation rule -- Admin > Syslog
-  Sources -- so future events from those hosts are dropped before ever
-  reaching a tenant, without touching what's already been ingested)
+  Listener -- so future events from those hosts are dropped before ever
+  reaching a tenant, without touching what's already been ingested).
+  Admin > Syslog Listener also shows a real-time Active/Down pill for
+  the worker's listener, not just its config
 - **Change tickets** (`CHG-xxxxxx`): reported directly, or promoted
   from an existing incident/vulnerability (pre-fills title, description,
-  and asset, and links back to the source). Carries a start/end date
-  window -- shown on the ticket, its PDF export, and as a chip on every
-  day it spans on the tenant calendar -- plus its own approval
-  lifecycle, independent of the generic status stepper: an ordered
-  sequence of 1-10 steps (add/remove as needed), each assigned to a
-  group (any one member's approval clears it) or an individual user,
-  enforced server-side, not just hidden in the UI. Flows are fully
-  tenant-defined and editable after creation (Admin > Approval Flows),
-  with one markable as the default applied to new changes
+  and asset, and links back to the source). Requires a real approval
+  flow at creation -- enforced server-side, not just an absent option in
+  the form -- and carries a start/end window with a time of day, not
+  just a day (shown on the ticket, its PDF export, and as a chip on
+  every day it spans on the tenant calendar). The approval lifecycle is
+  independent of the generic status stepper: an ordered sequence of
+  1-10 steps (add/remove as needed), each assigned to a group (any one
+  member's approval clears it) or an individual user, enforced
+  server-side, not just hidden in the UI. Flows are fully tenant-defined
+  and editable after creation (Admin > Approval Flows), with one
+  markable as the default applied to new changes. An unapproved (or
+  rejected) change shows a red X next to its title on the list; an
+  approved one shows a green check
 - **Groups** (Admin > Groups): named, tenant-scoped sets of users --
   the assignment target for an approval flow step, so a step can name
   "the CAB" once instead of every current member individually
-- Ticket assignee and affected asset are both editable after creation
-  via a predictive type-ahead search (not a `<select>` that doesn't
-  scale), with every change logged to the activity feed ("user X
-  assigned this to Y", "user X set the affected asset to Z") -- same
-  treatment as status changes
+- Title, priority, assignee, and affected asset are all editable after
+  creation -- title/priority via a click-to-edit pencil next to each,
+  assignee/asset via a predictive type-ahead search (not a `<select>`
+  that doesn't scale) -- with every change logged to the activity feed
+  ("user X assigned this to Y", "changed priority from medium to
+  critical") -- same treatment as status changes
 - **Tenant-customizable ticket statuses** -- define your own workflow
   (labels, colors, which statuses count as "closed") instead of a fixed
   open/closed enum
-- A merged, chronological activity feed per ticket: comments, status
-  changes, assignee/asset changes, and approval decisions, with
-  resolved names throughout -- including "Event Promotion Policy: X" /
-  "Correlation Rule: X" as the reporter on a ticket no human filed
+- A merged, chronological activity feed per ticket: comments, status/
+  title/priority/chronic changes, assignee/asset/document-link changes,
+  and approval decisions, with resolved names throughout -- including
+  "Event Promotion Policy: X" / "Correlation Rule: X" as the reporter on
+  a ticket no human filed. Every non-comment entry reads as one line
+  ("Date - Actor - action", no em dashes); a comment's own line breaks
+  are preserved. Newest-first/oldest-first toggle (defaults to newest),
+  with the comment box pinned to the top of the panel
 - **Chronic flag**: a manually-set marker (conventionally, "happened 5+
   times in the trailing 30 days" -- left to human judgment rather than
   auto-detected, since nothing in the schema groups "the same underlying
@@ -119,7 +134,9 @@ JS framework in the browser.
 
 **Document Repository**
 - `DOC-xxxxxx` entries with description, file attachment, and
-  polymorphic links to any asset or ticket
+  polymorphic links to any asset or ticket -- from a ticket or asset,
+  "+ Add new" uploads one on the spot, "Link existing" is a predictive
+  search over documents already on file
 - Branded PDF export
 
 **Platform**
@@ -138,7 +155,9 @@ JS framework in the browser.
 - A resizable, searchable, collapsible tree navigation sidebar, with a
   breadcrumb (Menu > Category > Page) and an always-visible "Session
   for `<tenant>`" indicator in the topbar so which tenant's data is on
-  screen is never a guess
+  screen is never a guess. Live count badges on Events/Incidents/
+  Vulnerabilities/Changes (not-closed counts), Assets (active), and
+  Documents (total)
 - A "?" next to every page's heading with a short explanation of what
   that screen is for, on hover/focus
 - Pagination on every list screen in the app
@@ -166,8 +185,10 @@ custom fields, syslog source routing, documents -- is configured afterwards
 from the Admin console, stored in Postgres.
 
 To feed the ticketing side, point a syslog-ng destination at this host on
-`SYSLOG_PORT` (default `5514`, TCP or UDP) -- Admin > Syslog Sources shows
-the exact destination snippet and lets you map hosts/programs to tenants.
+`SYSLOG_PORT` (default `5514`, TCP or UDP) -- Admin > Syslog Listener shows
+the exact destination snippet, a real-time Active/Down status pill, and
+lets you map hosts/programs to tenants (or discard a noisy source
+outright).
 
 ## Stack
 
