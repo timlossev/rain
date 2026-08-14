@@ -306,6 +306,44 @@ async def update_chronic(
     await db.commit()
 
 
+async def _reset_approval_if_approved(db: AsyncSession, ticket: Ticket, *, changed_by_user_id: int | None) -> None:
+    """Editing an approved change ticket -- title, priority, assignee, or
+    affected asset -- invalidates the approvals already collected for it:
+    what got approved isn't necessarily what's being shipped anymore.
+    Resets the approval back to the first step (clearing every recorded
+    decision, group and individual steps alike) so the flow has to run
+    again in full, and logs that reset to the ticket's own activity feed
+    -- not just a silent status flip -- so anyone reading the history
+    sees why approval status changed with no new decision to explain it.
+    A no-op for anything that isn't a change ticket currently sitting at
+    "approved" (queried directly rather than via ticket.approval, which
+    isn't guaranteed eager-loaded on every caller's Ticket instance)."""
+    if ticket.ticket_type != "change":
+        return
+    result = await db.execute(
+        select(ChangeApproval)
+        .where(ChangeApproval.ticket_id == ticket.id)
+        .options(selectinload(ChangeApproval.decisions))
+    )
+    approval = result.scalar_one_or_none()
+    if approval is None or approval.overall_status != "approved":
+        return
+    for decision in list(approval.decisions):
+        await db.delete(decision)
+    approval.overall_status = "pending"
+    approval.current_step_order = 0
+    approval.completed_at = None
+    await log_field_change(
+        db,
+        ticket.id,
+        "approval_reset",
+        None,
+        "editing this change nullified its collected approvals -- it must be re-approved",
+        changed_by_user_id=changed_by_user_id,
+        commit=False,
+    )
+
+
 async def update_severity(
     db: AsyncSession, ticket: Ticket, new_severity: str, *, changed_by_user_id: int | None = None
 ) -> bool:
@@ -320,6 +358,7 @@ async def update_severity(
     await log_field_change(
         db, ticket.id, "severity", old_severity, new_severity, changed_by_user_id=changed_by_user_id, commit=False
     )
+    await _reset_approval_if_approved(db, ticket, changed_by_user_id=changed_by_user_id)
     await db.commit()
     return True
 
@@ -338,6 +377,7 @@ async def update_title(
     await log_field_change(
         db, ticket.id, "title", old_title, new_title, changed_by_user_id=changed_by_user_id, commit=False
     )
+    await _reset_approval_if_approved(db, ticket, changed_by_user_id=changed_by_user_id)
     await db.commit()
     return True
 
@@ -359,6 +399,7 @@ async def update_assignee(
             to_assignee_user_id=new_assignee_user_id,
         )
     )
+    await _reset_approval_if_approved(db, ticket, changed_by_user_id=changed_by_user_id)
     await db.commit()
 
 
@@ -379,6 +420,7 @@ async def update_asset(
             to_asset_id=new_asset_id,
         )
     )
+    await _reset_approval_if_approved(db, ticket, changed_by_user_id=changed_by_user_id)
     await db.commit()
 
 

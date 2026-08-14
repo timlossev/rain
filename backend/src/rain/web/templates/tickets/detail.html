@@ -3,6 +3,8 @@
 {% block title %}{{ ticket.ticket_number }}: {{ ticket.title }} - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}A single ticket's status, metadata, linked documents, and full activity history (comments, status/assignee/asset changes).{% endblock %}
 {% block content %}
+{% set approval_will_reset = ticket.ticket_type == "change" and ticket.approval and ticket.approval.overall_status == "approved" %}
+{% set approval_reset_warning = "Editing this change will nullify its collected approvals -- it will need to be re-approved. Continue?" %}
 <div class="panel-row">
   <div class="status-stepper">
     {% for s in statuses %}
@@ -37,7 +39,7 @@
             <span class="nav-icon">{{ nav_icon("pencil") }}</span>
           </button>
         </span>
-        <form method="post" action="/tickets/{{ ticket.id }}/severity" class="ticket-severity-form" data-inline-edit-form hidden>
+        <form method="post" action="/tickets/{{ ticket.id }}/severity" class="ticket-severity-form" data-inline-edit-form hidden {% if approval_will_reset %}data-confirm="{{ approval_reset_warning }}"{% endif %}>
           <select name="severity" class="ticket-severity-select">
             {% for s in severities %}<option value="{{ s }}" {% if s == ticket.severity %}selected{% endif %}>{{ s | capitalize }} priority</option>{% endfor %}
           </select>
@@ -55,7 +57,7 @@
           <span class="nav-icon">{{ nav_icon("pencil") }}</span>
         </button>
       </div>
-      <form method="post" action="/tickets/{{ ticket.id }}/title" class="ticket-title-form" data-inline-edit-form hidden>
+      <form method="post" action="/tickets/{{ ticket.id }}/title" class="ticket-title-form" data-inline-edit-form hidden {% if approval_will_reset %}data-confirm="{{ approval_reset_warning }}"{% endif %}>
         <input type="text" name="title" value="{{ ticket.title }}" class="ticket-title-input" maxlength="255" required>
         <button type="submit" class="btn btn-sm">Save</button>
         <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
@@ -66,13 +68,13 @@
   <table class="ticket-meta">
     <tbody>
       <tr><th>Assignee</th><td>
-        <form method="post" action="/tickets/{{ ticket.id }}/assign" class="form-row" style="margin:0; align-items:center;">
+        <form method="post" action="/tickets/{{ ticket.id }}/assign" class="form-row" style="margin:0; align-items:center;" {% if approval_will_reset %}data-confirm="{{ approval_reset_warning }}"{% endif %}>
           {{ picker.search_picker("assignee_user_id", "/tickets/users/search", initial_value=ticket.assignee_user_id, initial_label=user_names.get(ticket.assignee_user_id, ""), placeholder="Unassigned -- search to assign") }}
           <button class="btn btn-sm" type="submit">Save</button>
         </form>
       </td></tr>
       <tr><th>Asset</th><td>
-        <form method="post" action="/tickets/{{ ticket.id }}/asset" class="form-row" style="margin:0; align-items:center;">
+        <form method="post" action="/tickets/{{ ticket.id }}/asset" class="form-row" style="margin:0; align-items:center;" {% if approval_will_reset %}data-confirm="{{ approval_reset_warning }}"{% endif %}>
           {{ picker.search_picker("asset_id", "/tickets/assets/search", initial_value=ticket.asset_id, initial_label=asset_names.get(ticket.asset_id, ""), placeholder="No asset -- search to link") }}
           <button class="btn btn-sm" type="submit">Save</button>
         </form>
@@ -214,6 +216,8 @@
       {% if entry.item.to_value %}linked document <strong>{{ entry.item.to_value }}</strong>{% else %}unlinked document <strong>{{ entry.item.from_value }}</strong>{% endif %}
       {% elif entry.item.field_name == "platform_rule" %}
       Platform Response Rule <strong>{{ entry.item.from_value }}</strong> fired: {{ entry.item.to_value }}
+      {% elif entry.item.field_name == "approval_reset" %}
+      {{ entry.item.to_value }}
       {% endif %}
     </div>
     {% elif entry.kind == "approval_decision" %}

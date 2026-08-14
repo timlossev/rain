@@ -74,7 +74,8 @@
       {% elif entry.item.field_name == "is_chronic" %}{{ "Marked this ticket as chronic" if entry.item.to_value == "true" else "Unmarked this ticket as chronic" }}
       {% elif entry.item.field_name == "title" %}Renamed this from "{{ entry.item.from_value }}" to "{{ entry.item.to_value }}"
       {% elif entry.item.field_name == "document" %}{% if entry.item.to_value %}Linked document {{ entry.item.to_value }}{% else %}Unlinked document {{ entry.item.from_value }}{% endif %}
-      {% elif entry.item.field_name == "platform_rule" %}Platform Response Rule {{ entry.item.from_value }} fired: {{ entry.item.to_value }}{% endif %}
+      {% elif entry.item.field_name == "platform_rule" %}Platform Response Rule {{ entry.item.from_value }} fired: {{ entry.item.to_value }}
+      {% elif entry.item.field_name == "approval_reset" %}{{ entry.item.to_value }}{% endif %}
     </div>
     {% elif entry.kind == "approval_decision" %}
     <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.decided_by_user_id, "Someone") }}</div>
