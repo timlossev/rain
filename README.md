@@ -83,14 +83,27 @@ JS framework in the browser.
 - Branded PDF export, noting the source webhook and last-refresh date
   when a document is webhook-populated
 
+**Search**
+- A global search bar (every page) for keyword search across ticket and
+  document titles/descriptions/numbers, Postgres full-text ranked, with
+  match highlighting
+- Typing a ticket or document number (`INC-000001`, `DOC-000004`) jumps
+  straight to that record instead of a results page
+- Ticket and document detail pages live at that same human-readable
+  number (`/tickets/INC-000001`, `/documents/DOC-000004`)
+
 **Platform**
 - Schema-per-tenant multi-tenancy on a single Postgres instance
 - Local email/password auth, plus optional LDAP/Active Directory and
   SAML 2.0 SSO providers -- a SAML sign-in is JIT-provisioned (or
   matched by email) with its role re-derived from a configurable
   attribute on every login
-- Role-based access control (`internal_admin` / `client`), with an Admin
-  console for platform- and tenant-level configuration
+- Role-based access control: `internal_admin` (platform-wide), `client`
+  (one tenant, no admin functions), and `client_admin` (one tenant, full
+  admin rights over that tenant's own settings -- rules, flows, groups,
+  channels, webhooks -- but not platform-wide ones). The Admin console
+  itself splits the same way, into Platform Administration and Tenant
+  Administration
 - Runtime branding: instance name, accent color, logo, and font
 - A resizable, searchable, collapsible tree navigation sidebar, with live
   count badges and an always-visible indicator of which tenant's data is
@@ -137,7 +150,7 @@ Caddy container for deployments that already terminate TLS in front of RAIN
 |---|---|---|
 | Frontend edge | Caddy (alpine) | Automatic HTTPS, reverse proxy, nothing else to configure |
 | App | FastAPI + Jinja2, server-rendered | No Node/SPA build, no third-party JS framework to track for CVEs |
-| DB | Postgres with pgvector | pgvector installed now, unused until a future search feature |
+| DB | Postgres with pgvector | Full-text search live now (tsvector/GIN); pgvector enabled and reserved for semantic search once an embedding source exists |
 | Multi-tenancy | Schema-per-tenant | One Postgres instance, isolated per tenant |
 | Auth | Local email/password + optional LDAP + SAML 2.0 | `python3-saml` for SAML (XML signature verification, not hand-rolled) |
 | Ticketing bus | Built-in syslog listener (TCP+UDP) | syslog-ng pushes to it directly, no third-party syslog library |
@@ -159,7 +172,7 @@ backend/
     settings.py         -- the only place env vars are read
     db/                  -- models, engine/session, tenant provisioning
     core/                 -- security, RBAC, tenancy resolution, config store, nav registry
-    modules/{setup,auth,admin,assets,tickets,calendar,documents,webhooks}/  -- one router+service per feature area
+    modules/{setup,auth,admin,assets,tickets,calendar,documents,webhooks,search}/  -- one router+service per feature area
     web/                   -- Jinja2 templates, hand-written CSS/JS
   tests/
 ```
@@ -202,7 +215,13 @@ tiers, SLAs, and delivery for air-gapped and controlled environments.
 
 Per [`docs/architecture.md`](docs/architecture.md#roadmap):
 
-- pgvector-backed keyword/vector search hook (pgvector is already
-  installed, unused).
+- Semantic/vector search (pgvector is enabled and each searchable table
+  already carries a reserved `embedding` column; keyword search is live
+  today -- this needs an embedding source, local or API-based, to
+  actually populate and query those columns from).
 - Multiple independent LDAP or SAML sources (currently one of each,
   syncing/signing into exactly one target tenant, instance-wide).
+- Service catalog: a tenant-defined catalog of requestable services/items
+  (e.g. "new laptop", "VPN access"), each optionally routed through an
+  approval flow -- the natural next consumer of the same Approval Flow
+  machinery Change tickets already use.

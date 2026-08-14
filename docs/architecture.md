@@ -78,10 +78,22 @@ flow entirely (`/auth/saml/login` → IdP → `/auth/saml/acs`) that mints the
 same kind of session at the end instead of checking a password.
 
 Roles come from a `control.roles` table (not a hardcoded enum), seeded with
-exactly `internal_admin` (platform operator, all tenants) and `client`
-(full control scoped to their own tenant) -- literally the two personas the
-spec calls for, but structured so a finer-grained role is an admin action
-later, not a migration.
+`internal_admin` (platform operator, all tenants, every setting),
+`client` (full control scoped to their own tenant, no admin functions),
+and `client_admin` (pinned to one tenant exactly like `client` --
+`CurrentUser.is_internal_admin` is false for both -- but also passes
+`rain.core.rbac.require_admin`, giving them admin rights over that one
+tenant's own tenant-scoped settings: Ticket Statuses, Notification
+Channels, Groups, Approval Flows, Webhooks, Event Promotion Policies,
+Correlation Rules, Platform Response Rules). `require_admin` accepts
+`internal_admin` or `client_admin`; platform-wide settings (Branding,
+Tenants, Users, Auth Providers, SMTP Relay, Syslog Listener) stay on the
+stricter `require_internal_admin` instead. The tenant scoping itself
+needs no extra filtering in the tenant-scoped routes: `get_tenant_db` is
+already bound to the caller's one active tenant regardless of which of
+the two roles is asking, so there's no query path there that could reach
+another tenant's rows. The Admin nav mirrors this split into two
+submenus, Platform Administration and Tenant Administration.
 
 ## Tree navigation
 
@@ -261,6 +273,71 @@ form -- one POST creates the `Document` and the `DocumentLink` together.
 Documents can also be linked to additional assets/tickets later from the
 document's own detail page.
 
+## Search
+
+Keyword search only -- no vector/semantic search, because there's no
+LLM or embedding API wired into this app to turn a query into a vector
+in the first place. Considered and rejected: a locally-computed
+hash-based pseudo-embedding (a "hashing trick" bag-of-words vectorizer,
+no model or network call needed); it wouldn't actually be semantic (no
+synonym/meaning understanding) and its quality is often close to or
+worse than plain full-text search, so shipping it as "vector search"
+would read as a misleading claim.
+
+**Index.** `tickets.search_vector`/`documents.search_vector` are
+`GENERATED ALWAYS AS ... STORED` `tsvector` columns (tenant migration
+0023) built from `ticket_number`/`title`/`description` and
+`doc_number`/`title`/`description` respectively, weighted (`setweight`,
+number/title `'A'`, description `'B'`), GIN-indexed. Metadata only, not
+a document's file body -- indexing arbitrary uploaded file content is a
+bigger feature this doesn't attempt.
+
+**Query.** `rain.modules.search.service.search()` runs two independently
+ranked queries (`ts_rank` + `websearch_to_tsquery`, which parses quoted
+phrases/OR/-exclusions the way a search box's users expect) and merges
+the results in Python -- small enough result sets in practice that a
+single cross-table UNION query isn't worth the complexity. Match
+highlighting uses `ts_headline` with sentinel `StartSel`/`StopSel`
+markers, escapes the *entire* returned string first, and only then
+replaces the sentinels with real `<mark>` tags -- so a highlighted
+snippet can never smuggle in unescaped HTML from a ticket/document's own
+(user-authored, never sanitized) title or description.
+
+**Number shortcut.** Typing a ticket/document number (`INC-000001`,
+`DOC-000004`, tolerant of a missing zero-pad) redirects straight to that
+record via `find_by_number()` instead of showing a results page that
+could only ever contain it.
+
+**Reserved for later.** `control` enables the `vector` extension once,
+database-wide (`CREATE EXTENSION IF NOT EXISTS vector`, control migration
+0006 -- extensions are per-database, not per-schema, so this doesn't
+repeat per tenant); `tickets.embedding`/`documents.embedding`
+(`pgvector.sqlalchemy.Vector(1536)`, tenant migration 0023) are nullable
+and completely unpopulated today. The dimension (1536) matches common
+embedding APIs' output size as a reasonable placeholder, not a
+commitment to a specific provider -- see the Roadmap entry below.
+
+### Ticket/document URLs
+
+`/tickets/{ticket_number}` and `/documents/{doc_number}` (e.g.
+`/tickets/INC-000001`) instead of the internal integer id. Each router
+registers a custom Starlette path converter (`_TicketRefConvertor`/
+`_DocRefConvertor`, regex-constrained to `(?:INC|VULN|CHG)-\d+|\d+` /
+`DOC-\d+|\d+`) rather than using a plain `{ref}` string parameter --
+a bare string converter matches *any* single path segment and would
+shadow every literal route registered after it in the same router
+("/new", "/rules", "/export/run", ...) regardless of file order, the
+exact failure mode described below in "A routing bug worth knowing
+about". The regex constraint means this route structurally can't match
+a literal route's path at all, so there's no registration-order
+dependency to get right. Falls back to the bare integer id for any
+link/bookmark built before this switch (`get_ticket_by_ref`/
+`get_document_by_ref` try the number first, then the id if the ref is
+all-digits) -- a couple of harder polymorphic spots (a document's
+"linked ticket" display, which only stores a bare `linked_id`, not a
+loaded `Ticket`) were deliberately left on that fallback rather than
+force a bigger data-model change for one display link.
+
 ## Lessons from the first real Docker run
 
 Everything above was verified through Milestone 3 by static checks only
@@ -336,9 +413,17 @@ response.
 
 ## Roadmap
 
-- **LLM search hook**: pgvector is already installed; add an `embeddings`
-  table and a `SearchProvider` interface once a concrete model/API is
-  chosen. Natural to wire into the Document Repository first (index
-  `documents` content) and extend to tickets/assets from there.
+- **Semantic/vector search**: keyword search (Postgres full-text) is live
+  today -- see the Search section above. `tickets.embedding`/`documents.
+  embedding` (pgvector, enabled) are reserved but unpopulated; this needs
+  a concrete embedding model/API chosen and a backfill + a `SearchProvider`
+  interface, not a schema change.
 - **Multiple LDAP/SAML sources**: currently one of each, syncing/signing
   into exactly one target tenant, instance-wide.
+- **Service catalog**: a tenant-defined catalog of requestable services/
+  items (e.g. "new laptop", "VPN access"), each optionally routed through
+  an approval flow -- the natural next consumer of the same Approval Flow
+  machinery Change tickets already use (`rain.modules.tickets.service`'s
+  `ApprovalFlow`/`ChangeApproval` machinery is already generic over "the
+  thing being approved" in spirit, just not yet wired to anything but a
+  change ticket).
