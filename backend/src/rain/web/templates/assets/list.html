@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg %}
 {% block title %}Assets - {{ branding.instance_name }}{% endblock %}
+{% block content_class %}content-full{% endblock %}
 {% block help_text %}The asset registry. Browse and filter assets by type, or create/edit individual assets and their custom field values.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
