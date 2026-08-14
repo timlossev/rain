@@ -3,7 +3,10 @@
    inside a caller's own <div class="card">...</div> instead of rendering
    its own, e.g. so it can sit under a ticket's metadata rather than as a
    second separate widget. #}
+{% import "_modal.html" as modal %}
+{% import "_search_picker.html" as picker %}
 {% set _wrap = wrap_card if wrap_card is defined else true %}
+{% set _link_modal_id = "link-doc-" ~ linked_type ~ "-" ~ linked_id %}
 {% if _wrap %}<div class="card">{% endif %}
   <div class="card-title"{% if not _wrap %} style="margin-top:18px;"{% endif %}>Linked Documents</div>
   <div class="doc-link-list">
@@ -26,5 +29,16 @@
     <p class="muted">No documents linked yet.</p>
     {% endfor %}
   </div>
-  <a class="btn btn-sm" href="/documents/new?linked_type={{ linked_type }}&linked_id={{ linked_id }}" style="margin-top:10px;">+ Attach document</a>
+  <div style="margin-top:10px; display:flex; gap:8px;">
+    <a class="btn btn-sm" href="/documents/new?linked_type={{ linked_type }}&linked_id={{ linked_id }}">+ Add new</a>
+    {{ modal.trigger_button(_link_modal_id, "Link existing", variant="btn-sm") }}
+  </div>
+  {% call modal.modal(_link_modal_id, "Link an existing document") %}
+    <form method="post" action="/documents/link">
+      <input type="hidden" name="linked_type" value="{{ linked_type }}">
+      <input type="hidden" name="linked_id" value="{{ linked_id }}">
+      {{ picker.search_picker("document_id", "/documents/search", label="Document", placeholder="Search by title or number...") }}
+      <button class="btn btn-primary" type="submit" style="margin-top:12px;">Link</button>
+    </form>
+  {% endcall %}
 {% if _wrap %}</div>{% endif %}

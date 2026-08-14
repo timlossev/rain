@@ -282,8 +282,20 @@ p { margin: 0 0 1em; }
   color: var(--sidebar-text);
   font-size: 0.92rem;
 }
-.nav-link .nav-label { font-weight: 400; }
+.nav-link .nav-label { font-weight: 400; flex: 1; }
 .nav-toggle .nav-label { font-weight: 600; color: #eef0f5; flex: 1; text-align: left; }
+.nav-count {
+  flex-shrink: 0;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--sidebar-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+}
+.nav-toggle .nav-count { margin-right: 4px; }
 .nav-link:hover, .nav-toggle:hover {
   background: rgba(255, 255, 255, 0.07);
   text-decoration: none;
@@ -328,6 +340,8 @@ p { margin: 0 0 1em; }
 }
 .sidebar.collapsed > nav > .nav-tree > .nav-item > .nav-link .nav-label,
 .sidebar.collapsed > nav > .nav-tree > .nav-item > .nav-toggle .nav-label,
+.sidebar.collapsed > nav > .nav-tree > .nav-item > .nav-link .nav-count,
+.sidebar.collapsed > nav > .nav-tree > .nav-item > .nav-toggle .nav-count,
 .sidebar.collapsed > nav > .nav-tree > .nav-item > .nav-toggle .nav-caret {
   display: none;
 }
@@ -722,6 +736,7 @@ td.actions { text-align: right; white-space: nowrap; }
 .badge {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   vertical-align: middle;
   padding: 2px 8px;
   border-radius: 999px;
@@ -733,6 +748,7 @@ td.actions { text-align: right; white-space: nowrap; }
   letter-spacing: 0.03em;
   color: var(--text-muted);
 }
+.badge svg { width: 11px; height: 11px; flex-shrink: 0; }
 .badge-accent { background: color-mix(in srgb, var(--accent) 14%, white); color: var(--accent); border-color: transparent; }
 .badge-danger { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
 .flash { padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 0.88rem; }
@@ -788,9 +804,12 @@ td.actions { text-align: right; white-space: nowrap; }
 .approval-step-current { border-left-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
 .approval-step-skipped { border-left-color: var(--danger); opacity: 0.6; }
 
+.activity-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.activity-sort-toggle { display: flex; gap: 8px; }
 .activity-entry { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
 .activity-entry:last-of-type { border-bottom: none; }
-.activity-meta { display: flex; gap: 8px; align-items: baseline; margin-bottom: 3px; }
+.activity-meta { margin-bottom: 3px; }
+.activity-body { white-space: pre-wrap; }
 .activity-status-change { color: var(--text-muted); }
 .activity-status-change .status-pill { margin: 0 2px; }
 
@@ -803,29 +822,53 @@ td.actions { text-align: right; white-space: nowrap; }
 /* ---------- ticket detail header ---------- */
 .ticket-badges-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 14px; }
 .ticket-badges-left { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.ticket-title-form { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 260px; max-width: 480px; margin-left: auto; }
+
+/* Shared by every click-to-edit field on this page (title, priority):
+   a small pencil trigger, and the display/form pair it swaps between.
+   One generic [hidden] override (rather than one per field) since the
+   UA default [hidden]{display:none} otherwise loses to any of these
+   fields' own `display` declaration -- same fix as .dropdown-menu-panel/
+   .modal-overlay elsewhere in this file. */
+[data-inline-edit-display][hidden], [data-inline-edit-form][hidden] { display: none; }
+.inline-edit-btn {
+  all: unset;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.inline-edit-btn:hover { color: var(--text); background: var(--surface-sunken); }
+.inline-edit-btn .nav-icon { width: 15px; height: 15px; color: inherit; }
+
+.ticket-severity-edit { display: inline-flex; }
+.ticket-severity-display { display: inline-flex; align-items: center; gap: 4px; }
+.ticket-severity-form { display: inline-flex; align-items: center; gap: 6px; }
+.ticket-severity-select { width: auto; }
+
+.ticket-title-edit { display: flex; min-width: 0; flex: 1 1 260px; max-width: 480px; margin-left: auto; justify-content: flex-end; }
+.ticket-title-display { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ticket-title-text { min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ticket-title-form { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; }
 .ticket-title-input { min-width: 0; flex: 1 1 auto; font-weight: 700; }
 .ticket-description { margin: 0 0 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border); color: var(--text); line-height: 1.5; }
 
-/* Every row in the ticket's key/value metadata table (Status, Assignee,
-   Asset, Reported by, ...) mixes plain text with different interactive
-   controls (status pills, a search-picker input + Save button) that all
-   have their own natural size -- left alone, that made row heights
-   visibly inconsistent (a text row is shorter than a row holding a
-   padded input). Pinning every control in this table to the same
-   height, rather than each other, is scoped here instead of on the
-   shared .status-step/input/.btn-sm rules so it doesn't change their
-   size anywhere else in the app. */
-.ticket-meta td { min-height: 34px; }
-.ticket-meta .status-step {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 34px;
-  padding: 0 12px;
-}
-.ticket-meta input[type=text] { height: 34px; padding: 0 10px; }
-.ticket-meta .btn-sm { height: 34px; }
+/* Every row in the ticket's key/value metadata table (Assignee, Asset,
+   Reported by, ...) mixes plain text with, on some rows, a
+   search-picker input + Save button -- left alone, that made row
+   heights visibly inconsistent (the padded input made its row taller
+   than a plain-text row like Reported by). Setting line-height
+   directly on the td is what equalizes them: it gives plain inline
+   text the same content height as the explicitly-sized controls, both
+   then getting the same padding on top. (Elements below that set their
+   own line-height -- .btn -- aren't affected by inheriting this.)
+   Scoped here instead of on the shared input/.btn-sm rules so it
+   doesn't change their size anywhere else in the app. */
+.ticket-meta td { line-height: 26px; }
+.ticket-meta input[type=text] { height: 26px; padding: 0 8px; }
+.ticket-meta .btn-sm { height: 26px; }
 
 /* ---------- chronic flag (manually-set "recurring problem" marker) ---------- */
 .ticket-title-cell { display: flex; align-items: center; gap: 6px; }
@@ -833,6 +876,13 @@ td.actions { text-align: right; white-space: nowrap; }
 .chronic-icon svg { width: 15px; height: 15px; }
 .chronic-badge { gap: 5px; color: #c2410c; background: #ffedd5; border-color: transparent; }
 .chronic-badge svg { width: 13px; height: 13px; }
+
+/* Change tickets only: approved/unapproved indicator next to the title. */
+.approval-icon { display: inline-flex; flex-shrink: 0; }
+.approval-icon svg { width: 15px; height: 15px; }
+.approval-icon-approved { color: var(--ok); }
+.approval-icon-unapproved { color: var(--danger); }
+.unapproved-title { color: var(--danger); }
 
 /* ---------- live syslog viewer ---------- */
 .live-controls { display: flex; align-items: center; gap: 10px; }

@@ -286,6 +286,22 @@ async def smtp_submit(
     return RedirectResponse("/admin/smtp?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
+async def _listener_is_active(port: int) -> bool:
+    """A real-time up/down check rather than a cached/assumed status --
+    opens (and immediately closes) a TCP connection to the worker
+    container's syslog listener, same idea as that container's own
+    Docker healthcheck, just reachable from `app` over the compose
+    network by service name instead of 127.0.0.1. A closed/refused/timed-
+    out connection just means "down", not an error to surface."""
+    try:
+        _reader, writer = await asyncio.wait_for(asyncio.open_connection("worker", port), timeout=1.5)
+        writer.close()
+        await writer.wait_closed()
+        return True
+    except (OSError, asyncio.TimeoutError):
+        return False
+
+
 @router.get("/syslog-sources", response_class=HTMLResponse)
 async def syslog_sources_list(
     request: Request,
@@ -294,6 +310,7 @@ async def syslog_sources_list(
     _: CurrentUser = Depends(require_internal_admin),
 ):
     nav = await build_nav_context(ctx)
+    listener_port = get_settings().syslog_port
     async with control_session() as session:
         stmt = (
             select(SyslogSourceMap)
@@ -305,7 +322,14 @@ async def syslog_sources_list(
     return templates.TemplateResponse(
         request,
         "admin/syslog_sources.html",
-        {**nav, "ctx": ctx, "page": source_page, "tenants": tenants, "listener_port": get_settings().syslog_port},
+        {
+            **nav,
+            "ctx": ctx,
+            "page": source_page,
+            "tenants": tenants,
+            "listener_port": listener_port,
+            "listener_active": await _listener_is_active(listener_port),
+        },
     )
 
 
@@ -461,7 +485,7 @@ async def ldap_config_sync_now(_: CurrentUser = Depends(require_internal_admin))
 # The one screen in this module that isn't control-schema: ticket_statuses
 # lives per-tenant, but is configured here (internal_admin only, against
 # whichever tenant is currently active) rather than under Tickets, at the
-# same tier as Branding/Users/SMTP/Syslog Sources.
+# same tier as Branding/Users/SMTP/Syslog Listener.
 
 
 @router.get("/ticket-statuses", response_class=HTMLResponse)

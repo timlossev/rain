@@ -417,6 +417,70 @@ document.addEventListener("DOMContentLoaded", () => {
     syncActionFields();
   }
 
+  // Click-to-edit field (ticket title, priority, ...): click the pencil
+  // to swap a plain-text/badge display for an edit form (name/value
+  // already rendered server-side either way, so this is a pure
+  // show/hide -- no fetch needed) -- an always-visible input/select read
+  // as excessive chrome for a field that's rarely edited.
+  document.querySelectorAll("[data-inline-edit]").forEach((wrapper) => {
+    const display = wrapper.querySelector("[data-inline-edit-display]");
+    const toggleBtn = wrapper.querySelector("[data-inline-edit-toggle]");
+    const form = wrapper.querySelector("[data-inline-edit-form]");
+    const cancelBtn = wrapper.querySelector("[data-inline-edit-cancel]");
+    if (!display || !toggleBtn || !form) return;
+    const field = form.querySelector("input[type=text], select");
+
+    toggleBtn.addEventListener("click", () => {
+      display.hidden = true;
+      form.hidden = false;
+      if (field) {
+        field.focus();
+        if (field.select) field.select();
+      }
+    });
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", () => {
+        form.reset(); // restores the input's value / select's selected option alike
+        form.hidden = true;
+        display.hidden = false;
+      });
+    }
+  });
+
+  // Ticket Activity feed: Newest first / Oldest first re-sorts the
+  // already-rendered entries client-side (server always emits them
+  // oldest-first, for the PDF export's chronological narrative -- this
+  // just reorders the DOM, no re-fetch) by each entry's data-at
+  // timestamp. Actually moves the elements (not a CSS flex-direction
+  // flip) so .activity-entry:last-of-type's border-bottom rule keeps
+  // matching the true last item regardless of sort direction. Defaults
+  // to newest-first on load, matching the pre-selected button.
+  document.querySelectorAll("[data-activity-sort-toggle]").forEach((toggle) => {
+    const card = toggle.closest(".card");
+    const list = card && card.querySelector("[data-activity-list]");
+    const buttons = toggle.querySelectorAll("[data-activity-sort]");
+    if (!list || !buttons.length) return;
+
+    const applySort = (direction) => {
+      const entries = Array.from(list.querySelectorAll(".activity-entry"));
+      entries.sort((a, b) => {
+        const cmp = (a.dataset.at || "").localeCompare(b.dataset.at || "");
+        return direction === "desc" ? -cmp : cmp;
+      });
+      entries.forEach((el) => list.appendChild(el));
+    };
+
+    buttons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        buttons.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        applySort(btn.dataset.activitySort);
+      });
+    });
+
+    applySort("desc");
+  });
+
   // Export column picker: keep the "order" input in sync with visual position.
   document.querySelectorAll("[data-export-columns]").forEach((table) => {
     table.querySelectorAll("input[type=checkbox]").forEach((cb, idx) => {

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import io
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
@@ -9,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from rain.core.export_columns import merge_profile_columns
 from rain.core.pagination import paginate
 from rain.core.rbac import require_internal_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
@@ -97,6 +99,7 @@ async def new_ticket_form(
     ticket_type: str = "incident",
     source_event_id: int | None = None,
     source_ticket_id: int | None = None,
+    error: str | None = None,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
@@ -141,6 +144,7 @@ async def new_ticket_form(
             "suggested_asset_name": suggested_asset_name,
             "flows": flows,
             "default_flow_id": default_flow.id if default_flow else None,
+            "error": error,
         },
     )
 
@@ -162,6 +166,17 @@ async def create_ticket(
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
+    # Changes must name a real, usable approval flow -- checked before
+    # create_ticket() below, not after, so an invalid/missing flow never
+    # results in an unprotected change ticket getting filed at all.
+    if ticket_type == "change":
+        flow_id = int(approval_flow_id) if approval_flow_id else None
+        if flow_id is None or not await service.approval_flow_exists(tenant_db, flow_id):
+            params = urlencode(
+                {"ticket_type": "change", "error": "Changes require an approval flow -- pick one below."}
+            )
+            return RedirectResponse(f"/tickets/new?{params}", status_code=status.HTTP_303_SEE_OTHER)
+
     # service.create_ticket() already evaluates Platform Event rules
     # (notify Slack/email/webhook/etc, if any are configured to match) --
     # see rain.modules.tickets.notifications for why there's no separate
@@ -175,8 +190,8 @@ async def create_ticket(
         asset_id=int(asset_id) if asset_id else None,
         source_event_id=int(source_event_id) if source_event_id else None,
         source_ticket_id=int(source_ticket_id) if source_ticket_id else None,
-        start_date=date.fromisoformat(start_date) if start_date else None,
-        end_date=date.fromisoformat(end_date) if end_date else None,
+        start_date=datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc) if start_date else None,
+        end_date=datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc) if end_date else None,
         assignee_user_id=int(assignee_user_id) if assignee_user_id else None,
         reporter_user_id=ctx.user.id,
     )
@@ -218,12 +233,27 @@ async def search_assignable_users(
 async def rename_ticket(
     ticket_id: int,
     title: str = Form(...),
+    ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     ticket = await tenant_db.get(Ticket, ticket_id)
     if ticket is not None:
-        await service.update_title(tenant_db, ticket, title)
+        await service.update_title(tenant_db, ticket, title, changed_by_user_id=ctx.user.id)
+    return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{ticket_id:int}/severity")
+async def change_severity(
+    ticket_id: int,
+    severity: str = Form(...),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is not None:
+        await service.update_severity(tenant_db, ticket, severity, changed_by_user_id=ctx.user.id)
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -327,12 +357,12 @@ async def decide_approval(
 
 
 def _build_activity(ticket: Ticket) -> list[dict]:
-    """Comments, status changes, assignment changes, asset changes, and
-    (change tickets only) approval decisions interleaved into one
-    chronological feed ("Activity"), each tagged with its kind so the
-    caller (screen or PDF) can render them differently. Shared so the PDF
-    export shows the same unified feed as the ticket detail screen instead
-    of drifting apart."""
+    """Comments, status changes, assignment changes, asset changes, field
+    changes (severity/chronic/title), and (change tickets only) approval
+    decisions interleaved into one chronological feed ("Activity"), each
+    tagged with its kind so the caller (screen or PDF) can render them
+    differently. Shared so the PDF export shows the same unified feed as
+    the ticket detail screen instead of drifting apart."""
     approval_entries = (
         [{"kind": "approval_decision", "at": d.created_at, "item": d} for d in ticket.approval.decisions]
         if ticket.approval
@@ -343,6 +373,7 @@ def _build_activity(ticket: Ticket) -> list[dict]:
         + [{"kind": "status_change", "at": sc.created_at, "item": sc} for sc in ticket.status_changes]
         + [{"kind": "assignment_change", "at": ac.created_at, "item": ac} for ac in ticket.assignment_changes]
         + [{"kind": "asset_change", "at": ac.created_at, "item": ac} for ac in ticket.asset_changes]
+        + [{"kind": "field_change", "at": fc.created_at, "item": fc} for fc in ticket.field_changes]
         + approval_entries,
         key=lambda entry: entry["at"] or datetime.min.replace(tzinfo=timezone.utc),
     )
@@ -408,6 +439,7 @@ async def ticket_detail(
         | {sc.changed_by_user_id for sc in ticket.status_changes}
         | _assignment_change_ids(ticket)
         | {ac.changed_by_user_id for ac in ticket.asset_changes}
+        | {fc.changed_by_user_id for fc in ticket.field_changes}
         | ({d.decided_by_user_id for d in ticket.approval.decisions} if ticket.approval else set())
         | flow_step_user_ids
     )
@@ -435,6 +467,7 @@ async def ticket_detail(
             "ticket": ticket,
             "statuses": statuses,
             "status_labels": status_labels,
+            "severities": SEVERITIES,
             "document_links": document_links,
             "user_names": user_names,
             "asset_names": asset_names,
@@ -465,6 +498,7 @@ async def ticket_pdf(
         | {sc.changed_by_user_id for sc in ticket.status_changes}
         | _assignment_change_ids(ticket)
         | {ac.changed_by_user_id for ac in ticket.asset_changes}
+        | {fc.changed_by_user_id for fc in ticket.field_changes}
         | ({d.decided_by_user_id for d in ticket.approval.decisions} if ticket.approval else set())
     )
     asset_names = await _asset_names(tenant_db, {ticket.asset_id} | _asset_change_ids(ticket))
@@ -530,12 +564,13 @@ async def toggle_chronic(
     ticket_id: int,
     is_chronic: str = Form(...),  # "1" | "0" -- current value the row already shows, so this is a set not a flip
     next: str = Form("/tickets"),
+    ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     ticket = await tenant_db.get(Ticket, ticket_id)
     if ticket is not None:
-        await service.update_chronic(tenant_db, ticket, is_chronic == "1")
+        await service.update_chronic(tenant_db, ticket, is_chronic == "1", changed_by_user_id=ctx.user.id)
     return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -579,12 +614,15 @@ async def mark_cancelled(
 @router.get("/export/run", response_class=HTMLResponse)
 async def export_form(
     request: Request,
+    profile_id: int | None = None,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
     statuses = await service.list_statuses(tenant_db)
+    profiles = await service.list_export_profiles(tenant_db)
+    selected_profile = next((p for p in profiles if p.id == profile_id), None) if profile_id else None
     return templates.TemplateResponse(
         request,
         "tickets/export.html",
@@ -593,7 +631,12 @@ async def export_form(
             "ctx": ctx,
             "ticket_types": TICKET_TYPES,
             "statuses": statuses,
-            "columns": exporter.available_columns(),
+            "columns": merge_profile_columns(
+                exporter.available_columns(), selected_profile.columns if selected_profile else None
+            ),
+            "profiles": profiles,
+            "selected_profile_id": profile_id,
+            "selected_fmt": selected_profile.format if selected_profile else "csv",
         },
     )
 
@@ -604,6 +647,8 @@ async def export_run(
     ticket_type: str = Form(""),
     ticket_status: str = Form(""),
     fmt: str = Form("csv"),
+    save_as: str = Form(""),
+    ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
@@ -617,6 +662,11 @@ async def export_run(
     columns.sort(key=lambda c: c["order"])
     if not columns:
         columns = [{"source": s, "header": h} for s, h in exporter.available_columns()]
+
+    if save_as.strip():
+        await service.save_export_profile(
+            tenant_db, name=save_as.strip(), fmt=fmt, columns=columns, actor_id=ctx.user.id
+        )
 
     rows = await exporter.build_rows(
         tenant_db, ticket_type=ticket_type or None, status=ticket_status or None, columns=columns

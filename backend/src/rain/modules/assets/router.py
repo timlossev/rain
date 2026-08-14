@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from rain.core.export_columns import merge_profile_columns
 from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
@@ -17,6 +18,7 @@ from rain.db.tenant_models import Asset, AssetType, CustomField
 from rain.modules.assets import exporter, importer, service, sync as sync_service
 from rain.modules.assets.schemas import coerce_field_value
 from rain.modules.documents import service as document_service
+from rain.modules.tickets import service as ticket_service
 from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
 from rain.web.templating import templates
@@ -125,6 +127,7 @@ async def edit_asset_form(
     fields = await service.fields_for_type(tenant_db, asset.asset_type_id)
     values = {fv.field_id: fv.value for fv in asset.field_values}
     document_links = await document_service.links_for(tenant_db, "asset", asset_id)
+    linked_tickets = await ticket_service.list_tickets_for_asset(tenant_db, asset_id)
     return templates.TemplateResponse(
         request,
         "assets/form.html",
@@ -136,6 +139,7 @@ async def edit_asset_form(
             "fields": fields,
             "values": values,
             "document_links": document_links,
+            "linked_tickets": linked_tickets,
             "error": None,
         },
     )
@@ -153,6 +157,7 @@ async def asset_pdf(
     fields = await service.fields_for_type(tenant_db, asset.asset_type_id)
     values = {fv.field_id: fv.value for fv in asset.field_values}
     document_links = await document_service.links_for(tenant_db, "asset", asset_id)
+    linked_tickets = await ticket_service.list_tickets_for_asset(tenant_db, asset_id)
     pdf_bytes = render_pdf(
         "pdf/asset.html",
         {
@@ -160,6 +165,7 @@ async def asset_pdf(
             "fields": fields,
             "values": values,
             "document_links": document_links,
+            "linked_tickets": linked_tickets,
             "doc_kind": "Asset",
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         },
@@ -339,18 +345,32 @@ async def delete_field(
 async def export_form(
     request: Request,
     asset_type_id: int | None = None,
+    profile_id: int | None = None,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
     asset_types = await service.list_asset_types(tenant_db)
-    columns = await exporter.available_columns(tenant_db, asset_type_id)
     profiles = await service.list_export_profiles(tenant_db)
+    selected_profile = next((p for p in profiles if p.id == profile_id), None) if profile_id else None
+    if selected_profile is not None and asset_type_id is None:
+        asset_type_id = selected_profile.asset_type_id
+    available = await exporter.available_columns(tenant_db, asset_type_id)
+    columns = merge_profile_columns(available, selected_profile.columns if selected_profile else None)
     return templates.TemplateResponse(
         request,
         "assets/export.html",
-        {**nav, "ctx": ctx, "asset_types": asset_types, "columns": columns, "profiles": profiles, "selected_type": asset_type_id},
+        {
+            **nav,
+            "ctx": ctx,
+            "asset_types": asset_types,
+            "columns": columns,
+            "profiles": profiles,
+            "selected_type": asset_type_id,
+            "selected_profile_id": profile_id,
+            "selected_fmt": selected_profile.format if selected_profile else "csv",
+        },
     )
 
 

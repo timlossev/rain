@@ -45,4 +45,16 @@
 {% else %}
 <p class="pdf-muted">No documents linked.</p>
 {% endif %}
+
+<h2 class="pdf-section">Linked tickets</h2>
+{% if linked_tickets %}
+<table class="pdf-list">
+  <tr><th>Number</th><th>Type</th><th>Title</th><th>Status</th></tr>
+  {% for t in linked_tickets %}
+  <tr><td>{{ t.ticket_number }}</td><td>{{ t.ticket_type }}</td><td>{{ t.title }}</td><td>{{ t.status }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="pdf-muted">No tickets reference this asset.</p>
+{% endif %}
 {% endblock %}

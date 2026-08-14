@@ -56,13 +56,19 @@ async def list_changes_in_range(db: AsyncSession, start: dt.date, end: dt.date) 
     occurrences. Both dates must be set (a change with only one of the two
     filled in isn't placeable on a grid) and neither is null-safe against
     the other in the overlap check below, so both are required in the
-    WHERE clause."""
+    WHERE clause. start/end are grid day bounds (dates); start_date/
+    end_date are now timestamptz (a change's window can start/end
+    mid-day), so they're widened to whole-day bounds here for the
+    overlap comparison rather than handing asyncpg a bare date for a
+    timestamptz parameter."""
+    start_dt = dt.datetime.combine(start, dt.time.min, tzinfo=dt.timezone.utc)
+    end_dt = dt.datetime.combine(end, dt.time.max, tzinfo=dt.timezone.utc)
     stmt = select(Ticket).where(
         Ticket.ticket_type == "change",
         Ticket.start_date.is_not(None),
         Ticket.end_date.is_not(None),
-        Ticket.start_date <= end,
-        Ticket.end_date >= start,
+        Ticket.start_date <= end_dt,
+        Ticket.end_date >= start_dt,
     )
     result = await db.execute(stmt)
     return list(result.scalars())

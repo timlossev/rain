@@ -3,45 +3,68 @@
 {% block title %}{{ ticket.ticket_number }}: {{ ticket.title }} - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}A single ticket's status, metadata, linked documents, and full activity history (comments, status/assignee/asset changes).{% endblock %}
 {% block content %}
-<div class="panel-row" style="justify-content:flex-end;">
-  {% if ticket.ticket_type in ("incident", "vulnerability") %}
-  <a class="btn btn-sm" href="/tickets/new?ticket_type=change&amp;source_ticket_id={{ ticket.id }}">Promote to Change</a>
-  {% endif %}
-  <form method="post" action="/tickets/{{ ticket.id }}/chronic/toggle" class="inline">
-    <input type="hidden" name="next" value="/tickets/{{ ticket.id }}">
-    <input type="hidden" name="is_chronic" value="{{ '0' if ticket.is_chronic else '1' }}">
-    <button type="submit" class="btn btn-sm{% if ticket.is_chronic %} active{% endif %}">{{ "Unmark chronic" if ticket.is_chronic else "Mark chronic" }}</button>
-  </form>
-  <a class="btn btn-sm" href="/tickets/{{ ticket.id }}/pdf">Export to PDF</a>
+<div class="panel-row">
+  <div class="status-stepper">
+    {% for s in statuses %}
+    <form method="post" action="/tickets/{{ ticket.id }}/status">
+      <input type="hidden" name="new_status" value="{{ s.key }}">
+      <button type="submit" class="status-step{% if ticket.status == s.key %} current{% endif %}" style="--step-color: {{ s.color }};" {% if ticket.status == s.key %}disabled{% endif %} title="{% if ticket.status == s.key %}Current status{% else %}Move to {{ s.label }}{% endif %}">
+        {% if ticket.status == s.key %}<span aria-hidden="true">&check;</span> {% endif %}{{ s.label }}
+      </button>
+    </form>
+    {% endfor %}
+  </div>
+  <div>
+    {% if ticket.ticket_type in ("incident", "vulnerability") %}
+    <a class="btn btn-sm" href="/tickets/new?ticket_type=change&amp;source_ticket_id={{ ticket.id }}">Promote to Change</a>
+    {% endif %}
+    <form method="post" action="/tickets/{{ ticket.id }}/chronic/toggle" class="inline">
+      <input type="hidden" name="next" value="/tickets/{{ ticket.id }}">
+      <input type="hidden" name="is_chronic" value="{{ '0' if ticket.is_chronic else '1' }}">
+      <button type="submit" class="btn btn-sm{% if ticket.is_chronic %} active{% endif %}">{{ "Unmark chronic" if ticket.is_chronic else "Mark chronic" }}</button>
+    </form>
+    <a class="btn btn-sm" href="/tickets/{{ ticket.id }}/pdf">Export to PDF</a>
+  </div>
 </div>
 
 <div class="card">
   <div class="ticket-badges-row">
     <div class="ticket-badges-left">
-      <span class="badge severity-{{ ticket.severity }}">{{ ticket.severity | capitalize }} priority</span>
+      <span class="ticket-severity-edit" data-inline-edit>
+        <span class="ticket-severity-display" data-inline-edit-display>
+          <span class="badge severity-{{ ticket.severity }}">{{ nav_icon("flag") }} {{ ticket.severity | capitalize }} priority</span>
+          <button type="button" class="inline-edit-btn" data-inline-edit-toggle title="Edit priority" aria-label="Edit priority">
+            <span class="nav-icon">{{ nav_icon("pencil") }}</span>
+          </button>
+        </span>
+        <form method="post" action="/tickets/{{ ticket.id }}/severity" class="ticket-severity-form" data-inline-edit-form hidden>
+          <select name="severity" class="ticket-severity-select">
+            {% for s in severities %}<option value="{{ s }}" {% if s == ticket.severity %}selected{% endif %}>{{ s | capitalize }} priority</option>{% endfor %}
+          </select>
+          <button type="submit" class="btn btn-sm">Save</button>
+          <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
+        </form>
+      </span>
       {% if ticket.is_chronic %}<span class="badge chronic-badge">{{ nav_icon("repeat") }} Chronic</span>{% endif %}
-      <span class="badge badge-accent">{{ ticket.ticket_type | capitalize }}</span>
+      <span class="badge badge-accent">{{ nav_icon("alert-triangle" if ticket.ticket_type == "incident" else ("shield" if ticket.ticket_type == "vulnerability" else "swap")) }} {{ ticket.ticket_type | capitalize }}</span>
     </div>
-    <form method="post" action="/tickets/{{ ticket.id }}/title" class="ticket-title-form">
-      <input type="text" name="title" value="{{ ticket.title }}" class="ticket-title-input" maxlength="255" required>
-      <button type="submit" class="btn btn-sm">Save</button>
-    </form>
+    <div class="ticket-title-edit" data-inline-edit>
+      <div class="ticket-title-display" data-inline-edit-display>
+        <span class="ticket-title-text" title="{{ ticket.title }}">{{ ticket.title }}</span>
+        <button type="button" class="inline-edit-btn" data-inline-edit-toggle title="Edit title" aria-label="Edit title">
+          <span class="nav-icon">{{ nav_icon("pencil") }}</span>
+        </button>
+      </div>
+      <form method="post" action="/tickets/{{ ticket.id }}/title" class="ticket-title-form" data-inline-edit-form hidden>
+        <input type="text" name="title" value="{{ ticket.title }}" class="ticket-title-input" maxlength="255" required>
+        <button type="submit" class="btn btn-sm">Save</button>
+        <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
+      </form>
+    </div>
   </div>
   <p class="ticket-description">{{ ticket.description or "No description." }}</p>
   <table class="ticket-meta">
     <tbody>
-      <tr><th>Status</th><td>
-        <div class="status-stepper">
-          {% for s in statuses %}
-          <form method="post" action="/tickets/{{ ticket.id }}/status">
-            <input type="hidden" name="new_status" value="{{ s.key }}">
-            <button type="submit" class="status-step{% if ticket.status == s.key %} current{% endif %}" style="--step-color: {{ s.color }};" {% if ticket.status == s.key %}disabled{% endif %} title="{% if ticket.status == s.key %}Current status{% else %}Move to {{ s.label }}{% endif %}">
-              {% if ticket.status == s.key %}<span aria-hidden="true">&check;</span> {% endif %}{{ s.label }}
-            </button>
-          </form>
-          {% endfor %}
-        </div>
-      </td></tr>
       <tr><th>Assignee</th><td>
         <form method="post" action="/tickets/{{ ticket.id }}/assign" class="form-row" style="margin:0; align-items:center;">
           {{ picker.search_picker("assignee_user_id", "/tickets/users/search", initial_value=ticket.assignee_user_id, initial_label=user_names.get(ticket.assignee_user_id, ""), placeholder="Unassigned -- search to assign") }}
@@ -68,7 +91,7 @@
       <tr><th>Promoted from</th><td class="muted"><a href="/tickets/{{ ticket.source_ticket.id }}">{{ ticket.source_ticket.ticket_number }}: {{ ticket.source_ticket.title }}</a></td></tr>
       {% endif %}
       {% if ticket.ticket_type == "change" %}
-      <tr><th>Change window</th><td class="muted">{{ ticket.start_date.isoformat() if ticket.start_date else "?" }} &rarr; {{ ticket.end_date.isoformat() if ticket.end_date else "?" }}</td></tr>
+      <tr><th>Change window</th><td class="muted">{{ ticket.start_date.strftime("%Y-%m-%d %H:%M") if ticket.start_date else "?" }} &rarr; {{ ticket.end_date.strftime("%Y-%m-%d %H:%M") if ticket.end_date else "?" }}</td></tr>
       {% endif %}
       <tr><th>Created</th><td class="muted">{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td></tr>
     </tbody>
@@ -95,7 +118,7 @@
       {%- elif ticket.approval.overall_status == 'pending' and s.sort_order == ticket.approval.current_step_order %} approval-step-current
       {%- elif ticket.approval.overall_status == 'rejected' and s.sort_order >= ticket.approval.current_step_order %} approval-step-skipped
       {%- endif %}">
-      {{ s.label }} &mdash;
+      {{ s.label }}:
       {% if s.approver_group_id %}group: {{ group_names.get(s.approver_group_id, "deleted group") }}
       {%- elif s.approver_user_id %}{{ user_names.get(s.approver_user_id, "unknown user") }}
       {%- else %}(unassigned){% endif %}
@@ -135,9 +158,8 @@
   <div class="card-title">Platform response rule triggers</div>
   {% for t in ticket.rule_triggers %}
   <p style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px;">
-    <span class="muted">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "" }}</span>
-    &mdash; <strong>{{ t.rule_name }}</strong><br>
-    {{ t.summary }}
+    <span class="muted">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "" }}</span> -
+    <strong>{{ t.rule_name }}</strong>: {{ t.summary }}
   </p>
   {% endfor %}
 </div>
@@ -145,19 +167,31 @@
 
 <div class="card">
   <div class="card-title">Activity</div>
+  <form method="post" action="/tickets/{{ ticket.id }}/comment" style="margin-bottom:16px;">
+    <div class="field">
+      <textarea name="body" rows="3" placeholder="Add a comment..." required></textarea>
+    </div>
+    <div class="activity-toolbar">
+      <button class="btn btn-primary" type="submit">Add comment</button>
+      {% if activity %}
+      <div class="activity-sort-toggle" data-activity-sort-toggle>
+        <button type="button" class="btn active" data-activity-sort="desc">Newest first</button>
+        <button type="button" class="btn" data-activity-sort="asc">Oldest first</button>
+      </div>
+      {% endif %}
+    </div>
+  </form>
+  <div data-activity-list>
   {% for entry in activity %}
     {% if entry.kind == "comment" %}
-    <div class="activity-entry">
-      <div class="activity-meta">
-        <strong>{{ user_names.get(entry.item.author_user_id, "Someone") }}</strong>
-        <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span>
-      </div>
-      <div>{{ entry.item.body }}</div>
+    <div class="activity-entry" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
+      <div class="activity-meta"><span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> - <strong>{{ user_names.get(entry.item.author_user_id, "Someone") }}</strong></div>
+      <div class="activity-body">{{ entry.item.body }}</div>
     </div>
     {% elif entry.kind == "assignment_change" %}
-    <div class="activity-entry activity-status-change">
-      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span>
-      &mdash; <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong>
+    <div class="activity-entry activity-status-change" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
+      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
+      <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
       {% if entry.item.to_assignee_user_id %}
       assigned this to <strong>{{ user_names.get(entry.item.to_assignee_user_id, "someone") }}</strong>{% if entry.item.from_assignee_user_id %} (previously <strong>{{ user_names.get(entry.item.from_assignee_user_id, "someone") }}</strong>){% endif %}
       {% else %}
@@ -165,26 +199,39 @@
       {% endif %}
     </div>
     {% elif entry.kind == "asset_change" %}
-    <div class="activity-entry activity-status-change">
-      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span>
-      &mdash; <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong>
+    <div class="activity-entry activity-status-change" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
+      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
+      <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
       {% if entry.item.to_asset_id %}
       set the affected asset to <strong>{{ asset_names.get(entry.item.to_asset_id, "an asset") }}</strong>{% if entry.item.from_asset_id %} (previously <strong>{{ asset_names.get(entry.item.from_asset_id, "an asset") }}</strong>){% endif %}
       {% else %}
       cleared the affected asset{% if entry.item.from_asset_id %} (previously <strong>{{ asset_names.get(entry.item.from_asset_id, "an asset") }}</strong>){% endif %}
       {% endif %}
     </div>
+    {% elif entry.kind == "field_change" %}
+    <div class="activity-entry activity-status-change" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
+      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
+      <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
+      {% if entry.item.field_name == "severity" %}
+      changed priority from <span class="badge severity-{{ entry.item.from_value }}">{{ entry.item.from_value | capitalize }}</span> to <span class="badge severity-{{ entry.item.to_value }}">{{ entry.item.to_value | capitalize }}</span>
+      {% elif entry.item.field_name == "is_chronic" %}
+      {{ "marked this ticket as chronic" if entry.item.to_value == "true" else "unmarked this ticket as chronic" }}
+      {% elif entry.item.field_name == "title" %}
+      renamed this from &ldquo;{{ entry.item.from_value }}&rdquo; to &ldquo;{{ entry.item.to_value }}&rdquo;
+      {% elif entry.item.field_name == "document" %}
+      {% if entry.item.to_value %}linked document <strong>{{ entry.item.to_value }}</strong>{% else %}unlinked document <strong>{{ entry.item.from_value }}</strong>{% endif %}
+      {% endif %}
+    </div>
     {% elif entry.kind == "approval_decision" %}
-    <div class="activity-entry activity-status-change">
-      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span>
-      &mdash; <strong>{{ user_names.get(entry.item.decided_by_user_id, "Someone") }}</strong>
-      {{ entry.item.decision }} step &ldquo;{{ entry.item.step_label }}&rdquo;
-      {% if entry.item.comment %}<br><span class="muted">{{ entry.item.comment }}</span>{% endif %}
+    <div class="activity-entry activity-status-change" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
+      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
+      <strong>{{ user_names.get(entry.item.decided_by_user_id, "Someone") }}</strong> -
+      {{ entry.item.decision }} step &ldquo;{{ entry.item.step_label }}&rdquo;{% if entry.item.comment %}: {{ entry.item.comment }}{% endif %}
     </div>
     {% else %}
-    <div class="activity-entry activity-status-change">
-      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span>
-      &mdash; <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong>
+    <div class="activity-entry activity-status-change" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
+      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
+      <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
       changed status
       {% if entry.item.from_status %}from <span class="status-pill" style="--pill-color: var(--text-muted);">{{ status_labels.get(entry.item.from_status, entry.item.from_status) }}</span>{% endif %}
       to <span class="status-pill" style="--pill-color: var(--accent);">{{ status_labels.get(entry.item.to_status, entry.item.to_status) }}</span>
@@ -193,11 +240,6 @@
   {% else %}
   <p class="muted">No activity yet.</p>
   {% endfor %}
-  <form method="post" action="/tickets/{{ ticket.id }}/comment" style="margin-top:14px;">
-    <div class="field">
-      <textarea name="body" rows="3" placeholder="Add a comment..." required></textarea>
-    </div>
-    <button class="btn btn-primary" type="submit">Add comment</button>
-  </form>
+  </div>
 </div>
 {% endblock %}

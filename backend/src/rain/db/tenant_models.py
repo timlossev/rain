@@ -115,12 +115,18 @@ class AssetFieldValue(TenantBase):
 
 class ExportProfile(TenantBase):
     """Saved column/header/order preset for CSV/JSON export. Export also
-    accepts an ad-hoc spec without saving one of these."""
+    accepts an ad-hoc spec without saving one of these. Shared by both
+    the Assets and Tickets export screens -- `scope` ("asset" | "ticket")
+    keeps each screen's profile list to its own kind rather than
+    duplicating this table; asset_type_id only ever applies to an
+    asset-scoped row (tickets have no per-tenant custom fields to scope
+    by, so it stays null there)."""
 
     __tablename__ = "export_profiles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
+    scope: Mapped[str] = mapped_column(String(10), default="asset", server_default="asset")
     asset_type_id: Mapped[int | None] = mapped_column(ForeignKey("asset_types.id", ondelete="CASCADE"), nullable=True)
     format: Mapped[str] = mapped_column(String(15), default="csv", server_default="csv")
     columns: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
@@ -400,10 +406,12 @@ class Ticket(TenantBase):
     # delete rather than CASCADE -- losing the origin ticket shouldn't take
     # the promoted one down with it.
     source_ticket_id: Mapped[int | None] = mapped_column(ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True)
-    # change tickets only -- the maintenance/implementation window. Shown on
-    # the tenant calendar alongside CalendarEntry rows.
-    start_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
-    end_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    # change tickets only -- the maintenance/implementation window, with a
+    # time of day (not just a day -- <input type="datetime-local">).
+    # Shown on the tenant calendar alongside CalendarEntry rows, which
+    # only need the .date() half of these for its day-grid placement.
+    start_date: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_date: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Manually set (tickets list quick-action menu) to flag a recurring
     # problem -- conventionally, one that's happened more than 5 times in
     # the trailing 30 days -- rather than a one-off. Not auto-computed:
@@ -433,6 +441,9 @@ class Ticket(TenantBase):
     )
     asset_changes: Mapped[list["TicketAssetChange"]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan", order_by="TicketAssetChange.created_at"
+    )
+    field_changes: Mapped[list["TicketFieldChange"]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan", order_by="TicketFieldChange.created_at"
     )
     rule_triggers: Mapped[list["PlatformEventTrigger"]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan", order_by="PlatformEventTrigger.created_at"
@@ -505,6 +516,29 @@ class TicketAssetChange(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     ticket: Mapped[Ticket] = relationship(back_populates="asset_changes")
+
+
+class TicketFieldChange(TenantBase):
+    """Generic audit trail entry for a simple field edit (severity,
+    is_chronic, title) that doesn't warrant its own dedicated table the
+    way status/assignee/asset changes do -- one row per edit, shown
+    interleaved in the activity feed as a single "Date - Actor - Changed
+    <field> from A to B" line, matching those other change kinds'
+    formatting exactly (severity's A/B render as colored pills there,
+    same as a status change's). field_name is one of "severity",
+    "is_chronic", "title"."""
+
+    __tablename__ = "ticket_field_changes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True)
+    changed_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    field_name: Mapped[str] = mapped_column(String(30))
+    from_value: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    to_value: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    ticket: Mapped[Ticket] = relationship(back_populates="field_changes")
 
 
 class ChangeApproval(TenantBase):

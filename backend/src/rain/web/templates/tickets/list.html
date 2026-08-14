@@ -88,7 +88,17 @@
         <td>
           <div class="ticket-title-cell">
             {% if t.is_chronic %}<span class="chronic-icon" title="Chronic: recurring issue">{{ nav_icon("repeat") }}</span>{% endif %}
+            {% if t.ticket_type == "change" %}
+              {% if t.approval and t.approval.overall_status == "approved" %}
+              <span class="approval-icon approval-icon-approved" title="Approved">{{ nav_icon("check-circle") }}</span>
+              <span>{{ t.title }}</span>
+              {% else %}
+              <span class="approval-icon approval-icon-unapproved" title="{{ 'Rejected' if t.approval and t.approval.overall_status == 'rejected' else 'Not yet approved' }}">{{ nav_icon("x-circle") }}</span>
+              <span class="unapproved-title">{{ t.title }}</span>
+              {% endif %}
+            {% else %}
             <span>{{ t.title }}</span>
+            {% endif %}
           </div>
         </td>
         <td><span class="badge severity-{{ t.severity }}">{{ t.severity }}</span></td>

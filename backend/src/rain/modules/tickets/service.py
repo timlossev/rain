@@ -11,16 +11,18 @@ from rain.db.tenant_models import (
     ApprovalFlowStep,
     ChangeApproval,
     ChangeApprovalDecision,
+    ExportProfile,
     GroupMembership,
     SyslogEvent,
     Ticket,
     TicketAssetChange,
     TicketAssignmentChange,
     TicketComment,
+    TicketFieldChange,
     TicketStatus,
     TicketStatusChange,
 )
-from rain.modules.tickets.schemas import TICKET_TYPE_PREFIX
+from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
 
 _SEQUENCE_NAMES = {"incident": "inc_number_seq", "vulnerability": "vuln_number_seq", "change": "chg_number_seq"}
 
@@ -128,7 +130,12 @@ def ticket_list_stmt(
     `sort` falls back to created_at (the pre-sorting default) for None or
     anything not in SORTABLE_COLUMNS, rather than erroring on a stale or
     hand-edited query string."""
-    stmt = select(Ticket).options(selectinload(Ticket.asset))
+    # selectinload(Ticket.approval): the list view's change rows show an
+    # approved/unapproved indicator next to the title (list.html), which
+    # needs ticket.approval.overall_status -- without eager-loading it
+    # here, that's a lazy load in an async session (raises
+    # MissingGreenlet) the first time a change row renders.
+    stmt = select(Ticket).options(selectinload(Ticket.asset), selectinload(Ticket.approval))
     column = SORTABLE_COLUMNS.get(sort, Ticket.created_at)
     stmt = stmt.order_by(column.desc() if direction != "asc" else column.asc())
     if ticket_type:
@@ -164,6 +171,7 @@ async def get_ticket(db: AsyncSession, ticket_id: int) -> Ticket | None:
             selectinload(Ticket.status_changes),
             selectinload(Ticket.assignment_changes),
             selectinload(Ticket.asset_changes),
+            selectinload(Ticket.field_changes),
             selectinload(Ticket.rule_triggers),
             selectinload(Ticket.approval).selectinload(ChangeApproval.decisions),
             selectinload(Ticket.approval).selectinload(ChangeApproval.flow).selectinload(ApprovalFlow.steps),
@@ -248,23 +256,88 @@ async def find_status_by_name(db: AsyncSession, name: str) -> TicketStatus | Non
     return result.scalars().first()
 
 
-async def update_chronic(db: AsyncSession, ticket: Ticket, is_chronic: bool) -> None:
+async def log_field_change(
+    db: AsyncSession,
+    ticket_id: int,
+    field_name: str,
+    from_value: str | None,
+    to_value: str | None,
+    *,
+    changed_by_user_id: int | None = None,
+    commit: bool = True,
+) -> None:
+    """Appends a generic field-change activity entry. Public (not just
+    used by update_chronic/update_severity/update_title below, which
+    take a from_value/to_value they've already computed) -- also called
+    from outside this module (documents.router, platform_events'
+    attach_document action) to log a document link/unlink against a
+    ticket, since that's a system event, not a human comment, and the
+    activity feed renders every field_name the same single-line way
+    (Date - Actor - action; severity's values as pills, like a status
+    change's) rather than a comment's two-line author/body layout. Takes
+    a bare ticket_id rather than a loaded Ticket -- callers outside this
+    module usually don't have one loaded already. commit=False lets a
+    caller that's about to commit its own change anyway (e.g.
+    update_severity) fold this into that same commit instead of a second
+    round trip."""
+    db.add(
+        TicketFieldChange(
+            ticket_id=ticket_id,
+            changed_by_user_id=changed_by_user_id,
+            field_name=field_name,
+            from_value=from_value,
+            to_value=to_value,
+        )
+    )
+    if commit:
+        await db.commit()
+
+
+async def update_chronic(
+    db: AsyncSession, ticket: Ticket, is_chronic: bool, *, changed_by_user_id: int | None = None
+) -> None:
     if is_chronic == ticket.is_chronic:
         return
+    old_value, new_value = str(ticket.is_chronic).lower(), str(is_chronic).lower()
     ticket.is_chronic = is_chronic
+    await log_field_change(
+        db, ticket.id, "is_chronic", old_value, new_value, changed_by_user_id=changed_by_user_id, commit=False
+    )
     await db.commit()
 
 
-async def update_title(db: AsyncSession, ticket: Ticket, new_title: str) -> bool:
+async def update_severity(
+    db: AsyncSession, ticket: Ticket, new_severity: str, *, changed_by_user_id: int | None = None
+) -> bool:
+    """Returns False for an unrecognized severity, same shape as
+    update_status's False for an unknown status."""
+    if new_severity not in SEVERITIES:
+        return False
+    if new_severity == ticket.severity:
+        return True
+    old_severity = ticket.severity
+    ticket.severity = new_severity
+    await log_field_change(
+        db, ticket.id, "severity", old_severity, new_severity, changed_by_user_id=changed_by_user_id, commit=False
+    )
+    await db.commit()
+    return True
+
+
+async def update_title(
+    db: AsyncSession, ticket: Ticket, new_title: str, *, changed_by_user_id: int | None = None
+) -> bool:
     """Returns False (no-op) for a blank title -- the caller decides how
     to surface that, same shape as update_status's False for an unknown
-    status. No dedicated change-history table for this one (unlike
-    status/assignee/asset): a title edit is a correction, not a state
-    transition worth its own audit trail."""
+    status."""
     new_title = new_title.strip()[:255]
     if not new_title or new_title == ticket.title:
         return True
+    old_title = ticket.title
     ticket.title = new_title
+    await log_field_change(
+        db, ticket.id, "title", old_title, new_title, changed_by_user_id=changed_by_user_id, commit=False
+    )
     await db.commit()
     return True
 
@@ -319,6 +392,16 @@ async def get_default_approval_flow(db: AsyncSession) -> ApprovalFlow | None:
         select(ApprovalFlow).options(selectinload(ApprovalFlow.steps)).where(ApprovalFlow.is_default.is_(True))
     )
     return result.scalar_one_or_none()
+
+
+async def approval_flow_exists(db: AsyncSession, flow_id: int) -> bool:
+    """Whether flow_id names a real, usable flow -- one with at least one
+    step. Backs create_ticket's server-side requirement that a change
+    ticket name a real flow at creation, rather than silently filing an
+    unprotected one -- same "has steps" bar start_approval below already
+    holds attaching a flow to."""
+    flow = await db.get(ApprovalFlow, flow_id, options=[selectinload(ApprovalFlow.steps)])
+    return flow is not None and bool(flow.steps)
 
 
 async def start_approval(db: AsyncSession, ticket: Ticket, flow_id: int | None) -> None:
@@ -410,3 +493,33 @@ async def get_event(db: AsyncSession, event_id: int) -> SyslogEvent | None:
 async def recent_events(db: AsyncSession, *, limit: int = 50) -> list[SyslogEvent]:
     result = await db.execute(select(SyslogEvent).order_by(SyslogEvent.id.desc()).limit(limit))
     return list(reversed(result.scalars().all()))
+
+
+async def list_export_profiles(db: AsyncSession) -> list[ExportProfile]:
+    """Ticket-scoped half of the shared export_profiles table -- see
+    ExportProfile's docstring for why assets and tickets share one table
+    (scope) instead of two."""
+    result = await db.execute(
+        select(ExportProfile).where(ExportProfile.scope == "ticket").order_by(ExportProfile.name)
+    )
+    return list(result.scalars())
+
+
+async def save_export_profile(
+    db: AsyncSession, *, name: str, fmt: str, columns: list[dict], actor_id: int
+) -> ExportProfile:
+    profile = ExportProfile(name=name, scope="ticket", asset_type_id=None, format=fmt, columns=columns, created_by=actor_id)
+    db.add(profile)
+    await db.commit()
+    return profile
+
+
+async def list_tickets_for_asset(db: AsyncSession, asset_id: int) -> list[Ticket]:
+    """Every ticket (any type/status) with this asset currently set as
+    its affected asset -- shown on the asset's own edit page and PDF
+    export, under Linked Documents. Not the asset-change history
+    (TicketAssetChange) -- just tickets currently pointed at it."""
+    result = await db.execute(
+        select(Ticket).where(Ticket.asset_id == asset_id).order_by(Ticket.created_at.desc())
+    )
+    return list(result.scalars())

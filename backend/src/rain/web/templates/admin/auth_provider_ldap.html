@@ -16,7 +16,7 @@
 <div class="card">
   <div class="card-title">Sync status</div>
   {% if last_synced_at %}
-  <p class="muted">Last synced {{ last_synced_at.strftime("%Y-%m-%d %H:%M UTC") }} &mdash; {{ last_sync_summary }}</p>
+  <p class="muted">Last synced {{ last_synced_at.strftime("%Y-%m-%d %H:%M UTC") }} - {{ last_sync_summary }}</p>
   {% else %}
   <p class="muted">Never synced yet.</p>
   {% endif %}

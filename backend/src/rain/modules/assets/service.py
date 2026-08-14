@@ -58,7 +58,7 @@ async def list_assets(db: AsyncSession, *, asset_type_id: int | None = None) -> 
 
 
 async def get_asset(db: AsyncSession, asset_id: int) -> Asset | None:
-    stmt = _asset_list_stmt().where(Asset.id == asset_id)
+    stmt = asset_list_stmt().where(Asset.id == asset_id)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 
@@ -81,7 +81,9 @@ async def set_field_values(db: AsyncSession, asset: Asset, values: dict[int, Any
 
 
 async def list_export_profiles(db: AsyncSession) -> list[ExportProfile]:
-    result = await db.execute(select(ExportProfile).order_by(ExportProfile.name))
+    result = await db.execute(
+        select(ExportProfile).where(ExportProfile.scope == "asset").order_by(ExportProfile.name)
+    )
     return list(result.scalars())
 
 
@@ -94,7 +96,9 @@ async def save_export_profile(
     columns: list[dict],
     actor_id: int,
 ) -> ExportProfile:
-    profile = ExportProfile(name=name, asset_type_id=asset_type_id, format=fmt, columns=columns, created_by=actor_id)
+    profile = ExportProfile(
+        name=name, scope="asset", asset_type_id=asset_type_id, format=fmt, columns=columns, created_by=actor_id
+    )
     db.add(profile)
     await db.commit()
     return profile

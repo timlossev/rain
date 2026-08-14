@@ -4,6 +4,7 @@
 {% block help_text %}Manually create a ticket -- incident, vulnerability, or change. Tickets can also be created automatically from Events via Event Promotion Policies or Correlation Rules.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 {% if source_event_id %}<p class="muted">Promoting syslog event #{{ source_event_id }}.</p>{% endif %}
 {% if source_ticket %}<p class="muted">Promoted from <a href="/tickets/{{ source_ticket.id }}">{{ source_ticket.ticket_number }}: {{ source_ticket.title }}</a>.</p>{% endif %}
 
@@ -43,17 +44,17 @@
     <div data-change-fields hidden>
       <h3>Change window &amp; approval</h3>
       <div class="form-row">
-        <div class="field"><label for="start_date">Start date</label><input type="date" id="start_date" name="start_date"></div>
-        <div class="field"><label for="end_date">End date</label><input type="date" id="end_date" name="end_date"></div>
+        <div class="field"><label for="start_date">Start</label><input type="datetime-local" id="start_date" name="start_date"></div>
+        <div class="field"><label for="end_date">End</label><input type="datetime-local" id="end_date" name="end_date"></div>
         <div class="field">
           <label for="approval_flow_id">Approval flow</label>
-          <select id="approval_flow_id" name="approval_flow_id">
-            <option value="">No approval flow</option>
+          <select id="approval_flow_id" name="approval_flow_id" {% if flows %}required{% else %}disabled{% endif %}>
+            {% if not flows %}<option value="">No approval flows exist yet</option>{% endif %}
             {% for f in flows %}
             <option value="{{ f.id }}" {% if f.id == default_flow_id %}selected{% endif %}>{{ f.name }}{% if f.is_default %} (default){% endif %}</option>
             {% endfor %}
           </select>
-          {% if not flows %}<div class="field-hint">No approval flows configured yet -- <a href="/admin/approval-flows/new">create one</a>, or attach one to this change later.</div>{% endif %}
+          {% if not flows %}<div class="field-hint">Changes require an approval flow, and this tenant has none yet -- <a href="/admin/approval-flows/new">create one</a> before filing a change.</div>{% endif %}
         </div>
       </div>
     </div>

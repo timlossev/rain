@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from rain.core.tenancy import RequestContext
 
 ChildrenProvider = Callable[["RequestContext"], Awaitable[Sequence["NavNode"]]]
+CountProvider = Callable[["RequestContext"], Awaitable["int | None"]]
 
 
 @dataclass
@@ -28,6 +29,13 @@ class NavNode:
     roles: tuple[str, ...] = ("internal_admin", "client")
     children_provider: ChildrenProvider | None = None
     children: list["NavNode"] = field(default_factory=list)
+    # A small live count shown as a badge next to the label (e.g. "12" on
+    # Incidents) -- count_provider is the live/per-request version (a
+    # tenant-scoped query), same shape as children_provider; `count`
+    # itself is only ever the *resolved* value on a tree handed to a
+    # template (see _resolve below), never set directly at registration.
+    count: int | None = None
+    count_provider: CountProvider | None = None
 
 
 class NavRegistry:
@@ -42,6 +50,7 @@ class NavRegistry:
         if node.children_provider is not None:
             children = children + [c for c in await node.children_provider(ctx) if ctx.user.role_key in c.roles]
         resolved_children = [await self._resolve(c, ctx) for c in sorted(children, key=lambda n: n.order)]
+        count = await node.count_provider(ctx) if node.count_provider is not None else node.count
         return NavNode(
             key=node.key,
             label=node.label,
@@ -50,6 +59,7 @@ class NavRegistry:
             order=node.order,
             roles=node.roles,
             children=resolved_children,
+            count=count,
         )
 
     async def tree_for(self, ctx: "RequestContext") -> list[NavNode]:

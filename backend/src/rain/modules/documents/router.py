@@ -12,11 +12,34 @@ from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.modules.documents import service, storage, textbody
 from rain.modules.documents.schemas import LINKED_TYPES, MAX_UPLOAD_BYTES
+from rain.modules.tickets import service as ticket_service
 from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
 from rain.web.templating import templates
 
 router = APIRouter(prefix="/documents")
+
+
+async def _log_ticket_link_activity(
+    tenant_db: AsyncSession, *, linked: bool, document, ticket_id: int, user_id: int | None
+) -> None:
+    """Document links are polymorphic (ticket or asset -- LINKED_TYPES),
+    but only tickets have an activity feed to log to; assets don't. Kept
+    here rather than in documents/service.py so that module doesn't need
+    to import rain.modules.tickets (which already imports documents/
+    service.py the other way, for attach_document actions). Uses the
+    generic field-change log (Date - Actor - action, one line) rather
+    than a comment -- a link/unlink is a system event, not something a
+    person said."""
+    label = f"{document.doc_number}: {document.title}"
+    await ticket_service.log_field_change(
+        tenant_db,
+        ticket_id,
+        "document",
+        None if linked else label,
+        label if linked else None,
+        changed_by_user_id=user_id,
+    )
 
 
 @router.get("", response_class=HTMLResponse)
@@ -89,6 +112,7 @@ async def create_document(
         await service.add_link(tenant_db, doc.id, linked_type, int(linked_id), ctx.user.id)
         if linked_type == "asset":
             return RedirectResponse(f"/assets/{linked_id}/edit", status_code=status.HTTP_303_SEE_OTHER)
+        await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=int(linked_id), user_id=ctx.user.id)
         return RedirectResponse(f"/tickets/{linked_id}", status_code=status.HTTP_303_SEE_OTHER)
 
     return RedirectResponse(f"/documents/{doc.id}", status_code=status.HTTP_303_SEE_OTHER)
@@ -248,6 +272,46 @@ async def delete_document(
     return RedirectResponse("/documents", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.get("/search")
+async def search_documents(
+    q: str = "",
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Backs the "Link existing" picker (documents/_links_fragment.html)
+    -- same predictive-search shape as tickets' assignee/asset pickers."""
+    q = q.strip()
+    if len(q) < 2:
+        return []
+    docs = await service.list_documents(tenant_db, search=q)
+    return [{"id": d.id, "label": f"{d.doc_number}: {d.title}"} for d in docs[:8]]
+
+
+@router.post("/link")
+async def link_existing_document(
+    document_id: int = Form(...),
+    linked_type: str = Form(...),
+    linked_id: int = Form(...),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """The other direction from link_document below -- that one starts
+    from a document's own page and picks a ticket/asset to attach it to;
+    this one starts from the ticket/asset page (_links_fragment.html's
+    "Link existing") and picks a document, so it returns to that page
+    instead of the document's."""
+    if linked_type in LINKED_TYPES:
+        await service.add_link(tenant_db, document_id, linked_type, linked_id, ctx.user.id)
+        if linked_type == "ticket":
+            doc = await service.get_document(tenant_db, document_id)
+            if doc is not None:
+                await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=linked_id, user_id=ctx.user.id)
+    if linked_type == "asset":
+        return RedirectResponse(f"/assets/{linked_id}/edit", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(f"/tickets/{linked_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.post("/{document_id:int}/link")
 async def link_document(
     document_id: int,
@@ -259,6 +323,10 @@ async def link_document(
 ):
     if linked_type in LINKED_TYPES:
         await service.add_link(tenant_db, document_id, linked_type, linked_id, ctx.user.id)
+        if linked_type == "ticket":
+            doc = await service.get_document(tenant_db, document_id)
+            if doc is not None:
+                await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=linked_id, user_id=ctx.user.id)
     return RedirectResponse(f"/documents/{document_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -266,8 +334,11 @@ async def link_document(
 async def unlink_document(
     document_id: int,
     link_id: int,
+    ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
-    await service.remove_link(tenant_db, link_id)
+    link = await service.remove_link(tenant_db, link_id)
+    if link is not None and link.linked_type == "ticket":
+        await _log_ticket_link_activity(tenant_db, linked=False, document=link.document, ticket_id=link.linked_id, user_id=ctx.user.id)
     return RedirectResponse(f"/documents/{document_id}", status_code=status.HTTP_303_SEE_OTHER)

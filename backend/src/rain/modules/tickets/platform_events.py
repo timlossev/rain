@@ -31,6 +31,7 @@ from rain.db.tenant_models import (
     Ticket,
 )
 from rain.modules.documents import service as document_service
+from rain.modules.tickets import service as ticket_service
 from rain.modules.tickets.notifications import send_email, send_slack
 
 logger = logging.getLogger("rain.platform_events")
@@ -180,6 +181,11 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, ticket: Tic
         if document is None:
             return f"{label}: document no longer exists"
         await document_service.add_link(db, document.id, "ticket", ticket.id, created_by=None)
+        # Also on the Activity feed, not just this rule-trigger log --
+        # a link is a change to the ticket regardless of what caused it.
+        await ticket_service.log_field_change(
+            db, ticket.id, "document", None, f"{document.doc_number}: {document.title}"
+        )
         return f"{label}: linked {document.doc_number}"
 
     if action.action_type == "attach_asset":

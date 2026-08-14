@@ -24,7 +24,7 @@
   <tr><th>Source event</th><td>{% if ticket.source_event_id %}Event #{{ ticket.source_event_id }}{% else %}Manually created{% endif %}</td></tr>
   {% if ticket.source_ticket %}<tr><th>Promoted from</th><td>{{ ticket.source_ticket.ticket_number }}: {{ ticket.source_ticket.title }}</td></tr>{% endif %}
   {% if ticket.ticket_type == "change" %}
-  <tr><th>Change window</th><td>{{ ticket.start_date.isoformat() if ticket.start_date else "?" }} to {{ ticket.end_date.isoformat() if ticket.end_date else "?" }}</td></tr>
+  <tr><th>Change window</th><td>{{ ticket.start_date.strftime("%Y-%m-%d %H:%M") if ticket.start_date else "?" }} to {{ ticket.end_date.strftime("%Y-%m-%d %H:%M") if ticket.end_date else "?" }}</td></tr>
   <tr><th>Approval</th><td>{% if ticket.approval %}{{ ticket.approval.overall_status }}{% if ticket.approval.flow %} (using {{ ticket.approval.flow.name }}){% endif %}{% else %}No approval flow attached{% endif %}</td></tr>
   {% endif %}
   <tr><th>Created</th><td>{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td></tr>
@@ -49,7 +49,7 @@
 <h2 class="pdf-section">Platform response rule triggers</h2>
 {% for t in ticket.rule_triggers %}
 <div class="pdf-comment">
-  <div class="pdf-comment-meta">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "" }} &mdash; {{ t.rule_name }}</div>
+  <div class="pdf-comment-meta">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "" }} - {{ t.rule_name }}</div>
   <div>{{ t.summary }}</div>
 </div>
 {% endfor %}
@@ -60,25 +60,33 @@
   {% for entry in activity %}
   <div class="pdf-comment">
     {% if entry.kind == "comment" %}
-    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} &mdash; {{ user_names.get(entry.item.author_user_id, "Someone") }}</div>
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.author_user_id, "Someone") }}</div>
     <div>{{ entry.item.body }}</div>
     {% elif entry.kind == "assignment_change" %}
-    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} &mdash; {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
     <div>
       {% if entry.item.to_assignee_user_id %}Assigned this to {{ user_names.get(entry.item.to_assignee_user_id, "someone") }}{% if entry.item.from_assignee_user_id %} (previously {{ user_names.get(entry.item.from_assignee_user_id, "someone") }}){% endif %}
       {% else %}Unassigned this{% if entry.item.from_assignee_user_id %} (previously {{ user_names.get(entry.item.from_assignee_user_id, "someone") }}){% endif %}{% endif %}
     </div>
     {% elif entry.kind == "asset_change" %}
-    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} &mdash; {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
     <div>
       {% if entry.item.to_asset_id %}Set the affected asset to {{ asset_names.get(entry.item.to_asset_id, "an asset") }}{% if entry.item.from_asset_id %} (previously {{ asset_names.get(entry.item.from_asset_id, "an asset") }}){% endif %}
       {% else %}Cleared the affected asset{% if entry.item.from_asset_id %} (previously {{ asset_names.get(entry.item.from_asset_id, "an asset") }}){% endif %}{% endif %}
     </div>
+    {% elif entry.kind == "field_change" %}
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
+    <div>
+      {% if entry.item.field_name == "severity" %}Changed priority from {{ entry.item.from_value | capitalize }} to {{ entry.item.to_value | capitalize }}
+      {% elif entry.item.field_name == "is_chronic" %}{{ "Marked this ticket as chronic" if entry.item.to_value == "true" else "Unmarked this ticket as chronic" }}
+      {% elif entry.item.field_name == "title" %}Renamed this from "{{ entry.item.from_value }}" to "{{ entry.item.to_value }}"
+      {% elif entry.item.field_name == "document" %}{% if entry.item.to_value %}Linked document {{ entry.item.to_value }}{% else %}Unlinked document {{ entry.item.from_value }}{% endif %}{% endif %}
+    </div>
     {% elif entry.kind == "approval_decision" %}
-    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} &mdash; {{ user_names.get(entry.item.decided_by_user_id, "Someone") }}</div>
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.decided_by_user_id, "Someone") }}</div>
     <div>{{ entry.item.decision | capitalize }} step "{{ entry.item.step_label }}"{% if entry.item.comment %} -- {{ entry.item.comment }}{% endif %}</div>
     {% else %}
-    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} &mdash; {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
     <div>Changed status{% if entry.item.from_status %} from {{ status_labels.get(entry.item.from_status, entry.item.from_status) }}{% endif %} to {{ status_labels.get(entry.item.to_status, entry.item.to_status) }}</div>
     {% endif %}
   </div>

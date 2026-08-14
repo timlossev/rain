@@ -99,7 +99,7 @@ async def live_bulk_discard(
     _: CurrentUser = Depends(require_internal_admin),
 ):
     """Backs the live-feed selection menu's "Discard these" -- one
-    negation rule (Admin > Syslog Sources) per distinct host among the
+    negation rule (Admin > Syslog Listener) per distinct host among the
     selected events. Admin-only (unlike bulk-promote above): this writes
     control-schema routing config that affects every future event from
     that host, not just tenant-local ticket data. Doesn't touch the

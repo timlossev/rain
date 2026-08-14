@@ -1,8 +1,21 @@
 {% extends "base.html" %}
 {% block title %}Export Tickets - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Export tickets to CSV, JSON, or Excel. Filter by type/status, and choose which columns to include, their header text, and their order -- the same column set used across the app's exports.{% endblock %}
+{% block help_text %}Export tickets to CSV, JSON, or Excel. Filter by type/status, and choose which columns to include, their header text, and their order -- the same column set used across the app's exports. Save the layout as a reusable profile, or load one you saved before.{% endblock %}
+{% block content_class %}content-full{% endblock %}
 {% block content %}
-<div class="card" style="max-width:720px;">
+<div class="card">
+  <form method="get" action="/tickets/export/run">
+    <div class="field" style="max-width:360px;">
+      <label for="profile_id">Load a saved profile</label>
+      <select id="profile_id" name="profile_id" onchange="this.form.submit()">
+        <option value="">Start from scratch</option>
+        {% for p in profiles %}
+        <option value="{{ p.id }}" {% if selected_profile_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+
   <form method="post" action="/tickets/export/run">
     <div class="form-row">
       <div class="field">
@@ -19,12 +32,12 @@
           {% for s in statuses %}<option value="{{ s.key }}">{{ s.label }}</option>{% endfor %}
         </select>
       </div>
-      <div class="field">
+      <div class="field" style="flex:0 0 160px;">
         <label for="fmt">Format</label>
         <select id="fmt" name="fmt">
-          <option value="csv">CSV</option>
-          <option value="json">JSON</option>
-          <option value="xlsx">Excel (.xlsx)</option>
+          <option value="csv" {% if selected_fmt == "csv" %}selected{% endif %}>CSV</option>
+          <option value="json" {% if selected_fmt == "json" %}selected{% endif %}>JSON</option>
+          <option value="xlsx" {% if selected_fmt == "xlsx" %}selected{% endif %}>Excel (.xlsx)</option>
         </select>
       </div>
     </div>
@@ -33,18 +46,43 @@
     <table data-export-columns>
       <thead><tr><th>Include</th><th>Source</th><th>Header</th><th>Order</th></tr></thead>
       <tbody>
-        {% for source, label in columns %}
+        {% for col in columns %}
         <tr>
-          <td><input type="checkbox" id="use_{{ source }}" name="use_{{ source }}" value="{{ source }}" checked></td>
-          <td class="muted">{{ source }}</td>
-          <td><input type="text" name="header_{{ source }}" value="{{ label }}"></td>
-          <td><input type="number" name="order_{{ source }}" style="width:70px;" value="{{ loop.index0 }}"></td>
+          <td><input type="checkbox" id="use_{{ col.source }}" name="use_{{ col.source }}" value="{{ col.source }}" {% if col.checked %}checked{% endif %}></td>
+          <td class="muted">{{ col.source }}</td>
+          <td><input type="text" name="header_{{ col.source }}" value="{{ col.header }}"></td>
+          <td><input type="number" name="order_{{ col.source }}" style="width:70px;" value="{{ col.order }}"></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
 
-    <button class="btn btn-primary" type="submit" style="margin-top:16px;">Export</button>
+    <div class="form-row" style="margin-top:16px;">
+      <div class="field">
+        <label for="save_as">Save as a reusable profile (optional)</label>
+        <input type="text" id="save_as" name="save_as" placeholder="e.g. Change window audit">
+      </div>
+    </div>
+    <button class="btn btn-primary" type="submit">Export</button>
   </form>
 </div>
+
+{% if profiles %}
+<div class="card">
+  <div class="card-title">Saved export profiles</div>
+  <table>
+    <thead><tr><th>Name</th><th>Format</th><th>Columns</th><th></th></tr></thead>
+    <tbody>
+      {% for p in profiles %}
+      <tr>
+        <td>{{ p.name }}</td>
+        <td class="muted">{{ p.format }}</td>
+        <td class="muted">{{ p.columns | length }}</td>
+        <td class="actions"><a class="btn btn-sm" href="/tickets/export/run?profile_id={{ p.id }}">Load</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
 {% endblock %}

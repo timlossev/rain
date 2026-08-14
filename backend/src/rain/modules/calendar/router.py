@@ -58,8 +58,12 @@ async def month_view(
     changes = await service.list_changes_in_range(tenant_db, grid_start, grid_end)
     changes_by_date: dict[dt.date, list] = {}
     for change in changes:
-        day = max(change.start_date, grid_start)
-        last = min(change.end_date, grid_end)
+        # .date(): start_date/end_date now carry a time of day (a change's
+        # window can start/end mid-day), but this grid places whole-day
+        # chips, so only the day half matters for max()/min() against
+        # grid_start/grid_end (both plain dates).
+        day = max(change.start_date.date(), grid_start)
+        last = min(change.end_date.date(), grid_end)
         while day <= last:
             changes_by_date.setdefault(day, []).append(change)
             day += dt.timedelta(days=1)

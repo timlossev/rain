@@ -79,11 +79,17 @@ async def add_link(db: AsyncSession, document_id: int, linked_type: str, linked_
     return link
 
 
-async def remove_link(db: AsyncSession, link_id: int) -> None:
-    link = await db.get(DocumentLink, link_id)
+async def remove_link(db: AsyncSession, link_id: int) -> DocumentLink | None:
+    """Returns the now-deleted link (document eager-loaded) rather than
+    None on success -- the caller (documents/router.py) needs
+    linked_type/linked_id/document.title *after* the delete to decide
+    whether to log it to a ticket's activity feed, and a plain id isn't
+    enough to look either back up post-delete."""
+    link = await db.get(DocumentLink, link_id, options=[selectinload(DocumentLink.document)])
     if link is not None:
         await db.delete(link)
         await db.commit()
+    return link
 
 
 async def links_for(db: AsyncSession, linked_type: str, linked_id: int) -> list[DocumentLink]:

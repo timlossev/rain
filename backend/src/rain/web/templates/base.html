@@ -36,6 +36,20 @@
   <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>
 {% elif name == "repeat" %}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.2-4.9"/><path d="M4 13a8 8 0 0 0 14.2 4.9"/><polyline points="5 2.5 5.5 6.5 9.5 6"/><polyline points="19 21.5 18.5 17.5 14.5 18"/></svg>
+{% elif name == "pencil" %}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5 19.5 9.5 8 21H3v-5Z"/><path d="M12.5 6.5 17.5 11.5"/></svg>
+{% elif name == "flag" %}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h11l-2.5 4L16 12H5"/></svg>
+{% elif name == "alert-triangle" %}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 21.5 20h-19Z"/><path d="M12 9.5v4.5"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/></svg>
+{% elif name == "shield" %}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19 6v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6Z"/></svg>
+{% elif name == "swap" %}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13"/><polyline points="14 4 17 8 14 12"/><path d="M20 16H7"/><polyline points="10 12 7 16 10 20"/></svg>
+{% elif name == "check-circle" %}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>
+{% elif name == "x-circle" %}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
 {% else %}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/></svg>
 {% endif %}{% endmacro %}
@@ -48,6 +62,7 @@
           <button type="button" class="nav-toggle" data-nav-toggle title="{{ node.label }}">
             {% if node.icon %}<span class="nav-icon">{{ nav_icon(node.icon) }}</span>{% endif %}
             <span class="nav-label">{{ node.label }}</span>
+            {% if node.count is not none %}<span class="nav-count">{{ node.count }}</span>{% endif %}
             <span class="nav-caret">{{ nav_icon("chevron-left") }}</span>
           </button>
           <div class="nav-children">
@@ -58,6 +73,7 @@
           <a class="nav-link" href="{{ node.href }}" title="{{ node.label }}">
             {% if node.icon or depth == 0 %}<span class="nav-icon">{{ nav_icon(node.icon) }}</span>{% endif %}
             <span class="nav-label">{{ node.label }}</span>
+            {% if node.count is not none %}<span class="nav-count">{{ node.count }}</span>{% endif %}
           </a>
         {% endif %}
       </li>

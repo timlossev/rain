@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from rain.core.nav_registry import NavNode, nav_registry
 from rain.core.tenancy import RequestContext
 from rain.db.base import tenant_session
-from rain.db.tenant_models import AssetType
+from rain.db.tenant_models import Asset, AssetType
 
 
 async def _asset_type_children(ctx: RequestContext) -> list[NavNode]:
@@ -22,6 +22,13 @@ async def _asset_type_children(ctx: RequestContext) -> list[NavNode]:
     ]
 
 
+async def _active_asset_count(ctx: RequestContext) -> int | None:
+    if ctx.active_tenant is None:
+        return None
+    async with tenant_session(ctx.active_tenant.schema_name) as db:
+        return await db.scalar(select(func.count(Asset.id)).where(Asset.status == "active"))
+
+
 nav_registry.register(
     NavNode(
         key="assets",
@@ -29,6 +36,7 @@ nav_registry.register(
         icon="server",
         href="/assets",
         order=20,
+        count_provider=_active_asset_count,
         children=[
             NavNode(key="assets-all", label="All Assets", href="/assets", order=1),
             NavNode(key="assets-by-type", label="By Type", order=2, children_provider=_asset_type_children),

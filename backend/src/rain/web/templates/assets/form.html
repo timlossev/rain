@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ "Edit" if asset else "New" }} asset - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Create or edit an asset. Custom fields shown here depend on the selected asset type.{% endblock %}
+{% block content_class %}content-full{% endblock %}
 {% block content %}
 {% if asset %}
 <div class="panel-row" style="justify-content:flex-end;">
@@ -9,7 +10,7 @@
 {% endif %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
-<div class="card" style="max-width:640px;">
+<div class="card">
   {% if not asset_types %}
   <p class="muted">No asset types exist yet. <a href="/assets/types">Create one first</a>.</p>
   {% else %}
@@ -58,5 +59,25 @@
 {% with links = document_links, linked_type = "asset", linked_id = asset.id %}
 {% include "documents/_links_fragment.html" %}
 {% endwith %}
+
+<div class="card">
+  <div class="card-title">Linked Tickets</div>
+  <table>
+    <thead><tr><th>Number</th><th>Type</th><th>Title</th><th>Severity</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for t in linked_tickets %}
+      <tr>
+        <td><a href="/tickets/{{ t.id }}">{{ t.ticket_number }}</a></td>
+        <td class="muted">{{ t.ticket_type }}</td>
+        <td>{{ t.title }}</td>
+        <td><span class="badge severity-{{ t.severity }}">{{ t.severity }}</span></td>
+        <td class="muted">{{ t.status }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No tickets reference this asset yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endif %}
 {% endblock %}
