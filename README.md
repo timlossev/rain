@@ -134,9 +134,12 @@ custom fields, syslog source routing, documents -- is configured afterwards
 from the Admin console, stored in Postgres.
 
 To feed the ticketing side, point a syslog-ng destination at this host on
-`SYSLOG_PORT` (default `5514`, TCP or UDP) -- Admin > Syslog Listener shows
-the exact destination snippet, a real-time status pill, and lets you map
-hosts/programs to tenants (or discard a noisy source outright).
+`SYSLOG_PORT` (default `5514`, TCP or UDP) -- see
+[`docs/architecture.md`](docs/architecture.md#ticketing-milestone-2-full-scope)
+for the destination snippet. Admin > Syslog Listener shows a real-time
+status pill, lets you map hosts/programs to tenants (or discard a noisy
+source outright), and sets how long an event that never got promoted
+into a ticket sticks around before being discarded (12 hours by default).
 
 Three more `.env` settings support deploying behind existing infrastructure
 instead of the full default stack: `POSTGRES_URL` points RAIN at an
@@ -206,11 +209,7 @@ cadences aligned with U.S. Government timeliness expectations for
 security-relevant fixes are available. Reach out for details on support
 tiers, SLAs, and delivery for air-gapped and controlled environments.
 
-> Maintainer's note: the paragraph above is boilerplate the repository
-> owner asked to have here -- tailor it to your actual support offering,
-> SLA numbers, and any compliance posture you can substantiate (e.g. a
-> specific framework or ATO) before publishing it somewhere a government
-> customer will read it as a commitment.
+Contact: [inquiries@curated.systems](mailto:inquiries@curated.systems)
 
 ## Roadmap
 

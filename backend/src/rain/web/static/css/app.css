@@ -555,6 +555,16 @@ form.inline { display: inline; }
 .type-pill-vulnerability.active { background: #c2410c; }
 .type-pill-change.active { background: var(--accent); }
 
+/* Pill-styled radio group (document detail's "Link to" ticket/asset
+   picker) -- same .type-pill look as the filter pills above, but backed
+   by a real (visually hidden) radio input instead of a nav link, so it's
+   a proper form control and its checked state is what drives
+   data-pill-select's field toggling in app.js, not a JS-managed class. */
+.pill-radio-group { display: flex; gap: 8px; }
+.pill-radio { cursor: pointer; gap: 6px; user-select: none; }
+.pill-radio input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.pill-radio:has(input:checked) { border-color: transparent; color: #fff; background: var(--accent); }
+
 /* Sortable column headers. */
 .sort-th { display: inline-flex; align-items: center; gap: 4px; color: inherit; }
 .sort-th:hover { text-decoration: none; color: var(--text); }

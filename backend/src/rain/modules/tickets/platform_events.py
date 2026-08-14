@@ -31,7 +31,14 @@ from rain.db.tenant_models import (
 )
 from rain.modules.documents import service as document_service
 from rain.modules.tickets import service as ticket_service
-from rain.modules.tickets.notifications import send_email, send_slack
+from rain.modules.tickets.notifications import (
+    DEFAULT_EMAIL_MESSAGE_TEMPLATE,
+    DEFAULT_MESSAGE_TEMPLATE,
+    DEFAULT_SUBJECT_TEMPLATE,
+    render_template,
+    send_email,
+    send_slack,
+)
 from rain.modules.webhooks import service as webhook_service
 
 logger = logging.getLogger("rain.platform_events")
@@ -120,6 +127,21 @@ def _action_label(action_type: str) -> str:
     return dict(ACTION_TYPES).get(action_type, action_type)
 
 
+def _ticket_placeholders(ticket: Ticket) -> dict[str, str]:
+    """The macro set available in a webhook payload_template or a
+    notification channel's message/subject_template -- {{ticket_number}},
+    {{title}}, {{description}}, etc. One definition shared by both
+    callers below so the two don't drift out of sync on what's available."""
+    return {
+        "ticket_number": ticket.ticket_number,
+        "ticket_type": ticket.ticket_type,
+        "title": ticket.title,
+        "description": ticket.description or "",
+        "severity": ticket.severity,
+        "status": ticket.status,
+    }
+
+
 async def _run_action(db: AsyncSession, action: PlatformEventAction, ticket: Ticket) -> str:
     config = action.config or {}
     label = _action_label(action.action_type)
@@ -130,17 +152,41 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, ticket: Tic
         if channel is None:
             return f"{label}: channel no longer exists"
         channel_config = decrypt_json(channel.config_encrypted)
-        if action.action_type == "notify_slack":
+        placeholders = _ticket_placeholders(ticket)
+
+        # Dispatched on the *channel's own* channel_type, not the action's
+        # -- a channel is free to be any of the three types regardless of
+        # which of "Notify Slack"/"Notify Email" a rule author picked to
+        # add the action (both share the same channel picker, see
+        # platform_event_detail.html), so this is the one place that
+        # actually decides how the message goes out.
+        if channel.channel_type == "webhook":
+            webhook_id = channel_config.get("webhook_id")
+            webhook = await db.get(WebhookConfig, webhook_id) if webhook_id else None
+            if webhook is None:
+                return f"{label}: channel's webhook no longer exists"
+            result = await webhook_service.call_webhook(webhook, placeholders)
+            if not result.success and webhook.alert_on_failure:
+                await webhook_service.alert_webhook_failure(
+                    db, webhook, result, context=f"notification channel '{channel.name}' on {ticket.ticket_number}"
+                )
+            if result.error:
+                return f"{label}: {channel.name} -> {result.error}"
+            return f"{label}: {channel.name} -> HTTP {result.status_code}"
+
+        if channel.channel_type == "slack":
             webhook_url = channel_config.get("webhook_url")
             if not webhook_url:
                 return f"{label}: channel has no webhook URL"
-            await send_slack(webhook_url, f"*{ticket.ticket_number}* ({ticket.severity}) {ticket.title}")
+            text = render_template(channel.message_template or DEFAULT_MESSAGE_TEMPLATE, placeholders)
+            await send_slack(webhook_url, text)
             return f"{label}: sent to '{channel.name}'"
+
         recipients = channel_config.get("recipients", [])
         if not recipients:
             return f"{label}: channel has no recipients"
-        subject = f"[RAIN] {ticket.ticket_number}: {ticket.title}"
-        body = f"{ticket.ticket_number} ({ticket.severity}) created.\n\n{ticket.description or ''}"
+        subject = render_template(channel.subject_template or DEFAULT_SUBJECT_TEMPLATE, placeholders)
+        body = render_template(channel.message_template or DEFAULT_EMAIL_MESSAGE_TEMPLATE, placeholders)
         await send_email(recipients, subject, body)
         return f"{label}: sent to '{channel.name}'"
 
@@ -149,14 +195,7 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, ticket: Tic
         webhook = await db.get(WebhookConfig, webhook_id) if webhook_id else None
         if webhook is None:
             return f"{label}: webhook no longer exists"
-        placeholders = {
-            "ticket_number": ticket.ticket_number,
-            "ticket_type": ticket.ticket_type,
-            "title": ticket.title,
-            "description": ticket.description or "",
-            "severity": ticket.severity,
-            "status": ticket.status,
-        }
+        placeholders = _ticket_placeholders(ticket)
         result = await webhook_service.call_webhook(webhook, placeholders)
         if not result.success and webhook.alert_on_failure:
             await webhook_service.alert_webhook_failure(

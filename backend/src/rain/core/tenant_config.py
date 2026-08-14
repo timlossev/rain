@@ -14,7 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from rain.db.tenant_models import TenantConfig
 
 DEFAULTS: dict[str, Any] = {
-    "event_retention_days": 14,
+    # How long a syslog event that never got promoted into a ticket
+    # ("untreated") stays around before rain.modules.tickets.listener.
+    # run_retention_sweep deletes it. Hours (not days) so a short window
+    # like the 12h default is expressible exactly, not rounded to a
+    # whole day.
+    "event_retention_hours": 12,
 }
 
 

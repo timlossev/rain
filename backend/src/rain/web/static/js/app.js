@@ -415,22 +415,52 @@ document.addEventListener("DOMContentLoaded", () => {
     syncChangeFields();
   }
 
-  // Platform Response Rule "Add action" form: only the config field(s)
-  // relevant to the selected action type make sense to fill in (a
-  // notification channel for Slack/email, a URL+payload for a webhook,
-  // ...) -- each group opts in via data-action-fields="type1,type2".
-  const actionTypeSelect = document.querySelector("[data-action-type-select]");
-  const actionFieldGroups = document.querySelectorAll("[data-action-fields]");
-  if (actionTypeSelect && actionFieldGroups.length) {
+  // Type-driven conditional fields (Platform Response Rule "Add action"
+  // form, syslog source rules, notification channels -- a notification
+  // channel for Slack/email, a URL+payload for a webhook, ...) -- each
+  // group opts in via data-action-fields="type1,type2". Scoped per
+  // select's own <form> (querySelectorAll + closest("form"), not a
+  // single document-wide querySelector) so multiple independent
+  // instances on the same page -- Notification Channels' "New channel"
+  // modal plus one "Edit channel" modal per existing row -- each sync
+  // only their own fields instead of the first select on the page
+  // driving every group on the page (same class of scoping bug as the
+  // nested-tabs one fixed above).
+  document.querySelectorAll("[data-action-type-select]").forEach((select) => {
+    const scope = select.closest("form") || document;
+    const groups = scope.querySelectorAll("[data-action-fields]");
+    if (!groups.length) return;
     const syncActionFields = () => {
-      actionFieldGroups.forEach((group) => {
+      groups.forEach((group) => {
         const types = group.dataset.actionFields.split(",");
-        group.hidden = !types.includes(actionTypeSelect.value);
+        group.hidden = !types.includes(select.value);
       });
     };
-    actionTypeSelect.addEventListener("change", syncActionFields);
+    select.addEventListener("change", syncActionFields);
     syncActionFields();
-  }
+  });
+
+  // Same [data-action-fields] convention as above, but driven by a
+  // pill-styled radio group instead of a <select> (document detail's
+  // "Link to" -- ticket/asset -- reads better as two pills than a
+  // one-item dropdown). Scoped per group's own <form> for the same
+  // multiple-instances reason as data-action-type-select.
+  document.querySelectorAll("[data-pill-select]").forEach((group) => {
+    const radios = group.querySelectorAll("input[type=radio]");
+    const scope = group.closest("form") || document;
+    const fieldGroups = scope.querySelectorAll("[data-action-fields]");
+    if (!radios.length || !fieldGroups.length) return;
+    const syncPillFields = () => {
+      const checked = group.querySelector("input[type=radio]:checked");
+      const value = checked ? checked.value : "";
+      fieldGroups.forEach((fg) => {
+        const types = fg.dataset.actionFields.split(",");
+        fg.hidden = !types.includes(value);
+      });
+    };
+    radios.forEach((radio) => radio.addEventListener("change", syncPillFields));
+    syncPillFields();
+  });
 
   // Click-to-edit field (ticket title, priority, ...): click the pencil
   // to swap a plain-text/badge display for an edit form (name/value

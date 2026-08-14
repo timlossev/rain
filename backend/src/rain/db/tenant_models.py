@@ -583,11 +583,21 @@ class ChangeApprovalDecision(TenantBase):
 
 
 class NotificationChannel(TenantBase):
-    """email | slack. Config is Fernet-encrypted at rest (recipient list /
-    webhook URL) via rain.core.crypto. The SMTP relay itself is
-    instance-wide (control.global_config, set by internal_admin) -- this
-    table only holds who gets notified for this tenant and through which
-    channel.
+    """email | slack | webhook. Config is Fernet-encrypted at rest via
+    rain.core.crypto -- a recipient list for email, an incoming-webhook
+    URL for slack, or (like Platform Response Rules' own "webhook" action)
+    a `{"webhook_id": <WebhookConfig.id>}` reference for webhook, reusing
+    the same centrally-configured webhook instead of a third place to
+    enter a URL/payload/timeout. The SMTP relay itself is instance-wide
+    (control.global_config, set by internal_admin) -- this table only
+    holds who gets notified for this tenant and through which channel.
+
+    message_template/subject_template (subject is email-only) are plain
+    text with the same double-brace ({{ticket_number}}, {{title}}, ...)
+    placeholder substitution as WebhookConfig.payload_template -- see
+    rain.modules.tickets.notifications.render_template. Meaningless for
+    webhook: that channel type's payload is the referenced WebhookConfig's
+    own payload_template instead, not this field.
 
     No longer carries notify_on_incident/notify_on_vulnerability: those
     drove an unconditional "notify on every ticket of this type" firing
@@ -600,10 +610,12 @@ class NotificationChannel(TenantBase):
     __tablename__ = "notification_channels"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    channel_type: Mapped[str] = mapped_column(String(15))  # email | slack
+    channel_type: Mapped[str] = mapped_column(String(15))  # email | slack | webhook
     name: Mapped[str] = mapped_column(String(255))
     config_encrypted: Mapped[bytes] = mapped_column(LargeBinary)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    message_template: Mapped[str] = mapped_column(Text, default="", server_default="")
+    subject_template: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

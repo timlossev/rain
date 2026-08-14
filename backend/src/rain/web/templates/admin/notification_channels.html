@@ -2,7 +2,7 @@
 {% import "_pagination.html" as pg %}
 {% import "_modal.html" as modal %}
 {% block title %}Notification Channels - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Slack/email destinations for the active tenant. These don't fire on their own -- point a Platform Response Rule's action at one to decide when it actually gets used. The outbound mail relay itself is configured once, instance-wide, in Admin > SMTP Relay.{% endblock %}
+{% block help_text %}Slack/email/webhook destinations for the active tenant. These don't fire on their own -- point a Platform Response Rule's action at one to decide when it actually gets used. The outbound mail relay itself is configured once, instance-wide, in Admin > SMTP Relay; a webhook channel reuses an existing definition from Admin > Webhooks rather than a fourth place to enter a URL.{% endblock %}
 {% block content %}
 <div class="panel-row">
   <p class="muted" style="margin:0;">Active tenant: {{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}</p>
@@ -40,20 +40,40 @@
     <div class="form-row">
       <div class="field">
         <label for="channel_type-{{ c.id }}">Type</label>
-        <select id="channel_type-{{ c.id }}" name="channel_type">
+        <select id="channel_type-{{ c.id }}" name="channel_type" data-action-type-select>
           {% for t in channel_types %}<option value="{{ t }}" {% if t == c.channel_type %}selected{% endif %}>{{ t }}</option>{% endfor %}
         </select>
       </div>
       <div class="field"><label for="name-{{ c.id }}">Name</label><input type="text" id="name-{{ c.id }}" name="name" value="{{ c.name }}" required></div>
     </div>
-    <div class="field">
-      <label for="recipients-{{ c.id }}">Email recipients (comma-separated, if type = email)</label>
+
+    <div class="field" data-action-fields="email">
+      <label for="recipients-{{ c.id }}">Email recipients (comma-separated)</label>
       <input type="text" id="recipients-{{ c.id }}" name="recipients" value="{{ channel_configs.get(c.id, {}).get('recipients', []) | join(', ') }}" placeholder="ops@example.com, oncall@example.com">
     </div>
-    <div class="field">
-      <label for="webhook_url-{{ c.id }}">Slack incoming webhook URL (if type = slack)</label>
+    <div class="field" data-action-fields="slack">
+      <label for="webhook_url-{{ c.id }}">Slack incoming webhook URL</label>
       <input type="text" id="webhook_url-{{ c.id }}" name="webhook_url" value="{{ channel_configs.get(c.id, {}).get('webhook_url', '') }}" placeholder="https://hooks.slack.com/services/...">
     </div>
+    <div class="field" data-action-fields="webhook">
+      <label for="webhook_config_id-{{ c.id }}">Webhook</label>
+      <select id="webhook_config_id-{{ c.id }}" name="webhook_config_id">
+        <option value="">-</option>
+        {% for w in webhooks %}<option value="{{ w.id }}" {% if channel_configs.get(c.id, {}).get('webhook_id') == w.id %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
+      </select>
+      {% if not webhooks %}<div class="field-hint">No webhooks yet -- create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.</div>{% endif %}
+    </div>
+
+    <div class="field" data-action-fields="email">
+      <label for="subject_template-{{ c.id }}">Email subject</label>
+      <input type="text" id="subject_template-{{ c.id }}" name="subject_template" value="{{ c.subject_template or '' }}" placeholder="{{ default_subject_template }}">
+    </div>
+    <div class="field" data-action-fields="email,slack">
+      <label for="message_template-{{ c.id }}">Message</label>
+      <textarea id="message_template-{{ c.id }}" name="message_template" rows="3" placeholder="{{ default_message_template if c.channel_type == 'slack' else default_email_message_template }}">{{ c.message_template }}</textarea>
+      <div class="field-hint">Leave blank to use the default shown above. Placeholders: {% raw %}{{ticket_number}}, {{title}}, {{description}}, {{severity}}, {{status}}, {{ticket_type}}{% endraw %}.</div>
+    </div>
+
     <button class="btn btn-primary" type="submit">Save changes</button>
   </form>
 {% endcall %}
@@ -64,20 +84,40 @@
     <div class="form-row">
       <div class="field">
         <label for="channel_type">Type</label>
-        <select id="channel_type" name="channel_type">
+        <select id="channel_type" name="channel_type" data-action-type-select>
           {% for t in channel_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
         </select>
       </div>
       <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" placeholder="On-call Slack" required></div>
     </div>
-    <div class="field">
-      <label for="recipients">Email recipients (comma-separated, if type = email)</label>
+
+    <div class="field" data-action-fields="email">
+      <label for="recipients">Email recipients (comma-separated)</label>
       <input type="text" id="recipients" name="recipients" placeholder="ops@example.com, oncall@example.com">
     </div>
-    <div class="field">
-      <label for="webhook_url">Slack incoming webhook URL (if type = slack)</label>
+    <div class="field" data-action-fields="slack">
+      <label for="webhook_url">Slack incoming webhook URL</label>
       <input type="text" id="webhook_url" name="webhook_url" placeholder="https://hooks.slack.com/services/...">
     </div>
+    <div class="field" data-action-fields="webhook">
+      <label for="webhook_config_id">Webhook</label>
+      <select id="webhook_config_id" name="webhook_config_id">
+        <option value="">-</option>
+        {% for w in webhooks %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}
+      </select>
+      {% if not webhooks %}<div class="field-hint">No webhooks yet -- create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.</div>{% endif %}
+    </div>
+
+    <div class="field" data-action-fields="email">
+      <label for="subject_template">Email subject</label>
+      <input type="text" id="subject_template" name="subject_template" placeholder="{{ default_subject_template }}">
+    </div>
+    <div class="field" data-action-fields="email,slack">
+      <label for="message_template">Message</label>
+      <textarea id="message_template" name="message_template" rows="3" placeholder="{{ default_message_template }}"></textarea>
+      <div class="field-hint">Leave blank to use the default shown above. Placeholders: {% raw %}{{ticket_number}}, {{title}}, {{description}}, {{severity}}, {{status}}, {{ticket_type}}{% endraw %}.</div>
+    </div>
+
     <button class="btn btn-primary" type="submit">Add channel</button>
   </form>
 {% endcall %}

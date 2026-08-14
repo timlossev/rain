@@ -25,6 +25,7 @@ from rain.core.pagination import paginate
 from rain.core.rbac import require_admin, require_internal_admin, require_login
 from rain.core.security import hash_password
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
+from rain.core.tenant_config import get_tenant_config, set_tenant_config
 from rain.core.user_names import resolve_user_names
 from rain.db.base import control_session
 from rain.db.control_models import AuthProviderConfig, Session as SessionRow, SyslogSourceMap, Tenant, User
@@ -41,6 +42,7 @@ from rain.db.tenant_models import (
 from rain.modules.auth import saml_config
 from rain.modules.auth.ldap_config import get_provider_row, get_raw_config, save_ldap_config
 from rain.modules.auth.ldap_sync import run_ldap_sync
+from rain.modules.tickets import notifications
 from rain.modules.tickets.schemas import CHANNEL_TYPES
 from rain.modules.webhooks import service as webhook_service
 from rain.settings import get_settings
@@ -322,6 +324,7 @@ async def syslog_sources_list(
     request: Request,
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_internal_admin),
 ):
     nav = await build_nav_context(ctx)
@@ -334,6 +337,7 @@ async def syslog_sources_list(
         )
         source_page = await paginate(session, stmt, page=page)
         tenants = list((await session.execute(select(Tenant).order_by(Tenant.name))).scalars())
+    retention_hours = await get_tenant_config(tenant_db, "event_retention_hours", 12)
     return templates.TemplateResponse(
         request,
         "admin/syslog_sources.html",
@@ -344,8 +348,25 @@ async def syslog_sources_list(
             "tenants": tenants,
             "listener_port": listener_port,
             "listener_active": await _listener_is_active(listener_port),
+            "retention_hours": retention_hours,
         },
     )
+
+
+@router.post("/syslog-sources/retention")
+async def syslog_sources_retention_save(
+    retention_hours: float = Form(...),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    """How long an "untreated" syslog event (never promoted into a
+    ticket) stays around before rain.modules.tickets.listener.
+    run_retention_sweep deletes it, for the currently active tenant --
+    TenantConfig is per-tenant-schema, same as every other setting on
+    this page's active-tenant scope."""
+    await set_tenant_config(tenant_db, "event_retention_hours", max(0.5, retention_hours), updated_by=ctx.user.id)
+    return RedirectResponse("/admin/syslog-sources?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/syslog-sources")
@@ -639,6 +660,16 @@ async def ticket_statuses_toggle(
 # Tickets > Platform Event rules, not by anything configured here.
 
 
+def _channel_config_from_form(channel_type: str, form) -> dict:
+    if channel_type == "email":
+        recipients = [addr.strip() for addr in str(form.get("recipients", "")).split(",") if addr.strip()]
+        return {"recipients": recipients}
+    if channel_type == "webhook":
+        webhook_id = str(form.get("webhook_config_id", "")).strip()
+        return {"webhook_id": int(webhook_id)} if webhook_id else {}
+    return {"webhook_url": str(form.get("webhook_url", "")).strip()}
+
+
 @router.get("/notification-channels", response_class=HTMLResponse)
 async def notification_channels_list(
     request: Request,
@@ -651,13 +682,24 @@ async def notification_channels_list(
     stmt = select(NotificationChannel).order_by(NotificationChannel.name)
     channel_page = await paginate(tenant_db, stmt, page=page)
     # Decrypted once here (not per-row in the template) so the Edit modal
-    # can prefill recipients/webhook_url -- config_encrypted is otherwise
-    # opaque to Jinja.
+    # can prefill recipients/webhook_url/webhook_config_id --
+    # config_encrypted is otherwise opaque to Jinja.
     channel_configs = {c.id: decrypt_json(c.config_encrypted) for c in channel_page.items}
+    webhooks = await webhook_service.list_webhooks(tenant_db)
     return templates.TemplateResponse(
         request,
         "admin/notification_channels.html",
-        {**nav, "ctx": ctx, "page": channel_page, "channel_types": CHANNEL_TYPES, "channel_configs": channel_configs},
+        {
+            **nav,
+            "ctx": ctx,
+            "page": channel_page,
+            "channel_types": CHANNEL_TYPES,
+            "channel_configs": channel_configs,
+            "webhooks": webhooks,
+            "default_message_template": notifications.DEFAULT_MESSAGE_TEMPLATE,
+            "default_email_message_template": notifications.DEFAULT_EMAIL_MESSAGE_TEMPLATE,
+            "default_subject_template": notifications.DEFAULT_SUBJECT_TEMPLATE,
+        },
     )
 
 
@@ -666,18 +708,21 @@ async def notification_channels_create(
     request: Request,
     channel_type: str = Form(...),
     name: str = Form(...),
+    message_template: str = Form(""),
+    subject_template: str = Form(""),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
     form = await request.form()
-    if channel_type == "email":
-        recipients = [addr.strip() for addr in str(form.get("recipients", "")).split(",") if addr.strip()]
-        config = {"recipients": recipients}
-    else:
-        config = {"webhook_url": str(form.get("webhook_url", "")).strip()}
-
+    config = _channel_config_from_form(channel_type, form)
     tenant_db.add(
-        NotificationChannel(channel_type=channel_type, name=name.strip(), config_encrypted=encrypt_json(config))
+        NotificationChannel(
+            channel_type=channel_type,
+            name=name.strip(),
+            config_encrypted=encrypt_json(config),
+            message_template=message_template.strip(),
+            subject_template=subject_template.strip() or None,
+        )
     )
     await tenant_db.commit()
     return RedirectResponse("/admin/notification-channels", status_code=status.HTTP_303_SEE_OTHER)
@@ -689,20 +734,19 @@ async def notification_channels_edit(
     channel_id: int,
     channel_type: str = Form(...),
     name: str = Form(...),
+    message_template: str = Form(""),
+    subject_template: str = Form(""),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
     channel = await tenant_db.get(NotificationChannel, channel_id)
     if channel is not None:
         form = await request.form()
-        if channel_type == "email":
-            recipients = [addr.strip() for addr in str(form.get("recipients", "")).split(",") if addr.strip()]
-            config = {"recipients": recipients}
-        else:
-            config = {"webhook_url": str(form.get("webhook_url", "")).strip()}
         channel.channel_type = channel_type
         channel.name = name.strip()
-        channel.config_encrypted = encrypt_json(config)
+        channel.config_encrypted = encrypt_json(_channel_config_from_form(channel_type, form))
+        channel.message_template = message_template.strip()
+        channel.subject_template = subject_template.strip() or None
         await tenant_db.commit()
     return RedirectResponse("/admin/notification-channels", status_code=status.HTTP_303_SEE_OTHER)
 

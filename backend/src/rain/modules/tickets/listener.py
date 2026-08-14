@@ -143,12 +143,12 @@ async def run_retention_sweep() -> None:
     for schema_name in schemas:
         try:
             async with tenant_session(schema_name) as db:
-                retention_days = await get_tenant_config(db, "event_retention_days", 14)
+                retention_hours = await get_tenant_config(db, "event_retention_hours", 12)
                 try:
-                    retention_days = int(retention_days)
+                    retention_hours = float(retention_hours)
                 except (TypeError, ValueError):
-                    retention_days = 14
-                cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=retention_days)
+                    retention_hours = 12
+                cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=retention_hours)
                 await db.execute(
                     delete(SyslogEvent).where(SyslogEvent.received_at < cutoff, SyslogEvent.promoted_ticket_id.is_(None))
                 )

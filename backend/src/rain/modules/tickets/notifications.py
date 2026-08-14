@@ -28,6 +28,26 @@ from rain.core.crypto import decrypt_json
 
 logger = logging.getLogger("rain.notifications")
 
+# Used when a channel's own message_template/subject_template is blank --
+# NotificationChannel ships with empty templates (migration 0024), not
+# these baked into the column default, so "never customized" and
+# "deliberately cleared" both fall back the same simple way rather than
+# needing an explicit sentinel.
+DEFAULT_MESSAGE_TEMPLATE = "*{{ticket_number}}* ({{severity}}) {{title}}"
+DEFAULT_EMAIL_MESSAGE_TEMPLATE = "{{ticket_number}} ({{severity}}) created.\n\n{{description}}"
+DEFAULT_SUBJECT_TEMPLATE = "[RAIN] {{ticket_number}}: {{title}}"
+
+
+def render_template(template: str, placeholders: dict[str, str]) -> str:
+    """Plain double-brace ({{key}}) substitution for a notification
+    channel's message/subject template -- no JSON-escaping (unlike
+    rain.modules.webhooks.service.render_payload, which renders into a
+    JSON payload body); this is human-readable Slack/email text."""
+    rendered = template
+    for key, value in placeholders.items():
+        rendered = rendered.replace(f"{{{{{key}}}}}", str(value))
+    return rendered
+
 
 async def send_email(recipients: list[str], subject: str, body: str) -> None:
     host = config_store.get("smtp_host")
