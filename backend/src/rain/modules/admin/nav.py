@@ -72,6 +72,13 @@ nav_registry.register(
                 order=13,
                 roles=("internal_admin",),
             ),
+            NavNode(
+                key="admin-webhooks",
+                label="Webhooks",
+                href="/admin/webhooks",
+                order=14,
+                roles=("internal_admin",),
+            ),
         ],
     )
 )

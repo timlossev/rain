@@ -11,11 +11,9 @@ succeeded -- a failed Slack post shouldn't hide the fact the rule matched.
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -29,16 +27,19 @@ from rain.db.tenant_models import (
     PlatformEventRule,
     PlatformEventTrigger,
     Ticket,
+    WebhookConfig,
 )
 from rain.modules.documents import service as document_service
 from rain.modules.tickets import service as ticket_service
 from rain.modules.tickets.notifications import send_email, send_slack
+from rain.modules.webhooks import service as webhook_service
 
 logger = logging.getLogger("rain.platform_events")
 
 TRIGGER_EVENTS = [
     ("incident_created", "When an incident is created"),
     ("vulnerability_created", "When a vulnerability is created"),
+    ("change_created", "When a change is created"),
 ]
 MATCH_FIELDS = ["title", "description"]
 ACTION_TYPES = [
@@ -49,16 +50,11 @@ ACTION_TYPES = [
     ("attach_asset", "Attach an asset"),
 ]
 
-_TRIGGER_BY_TICKET_TYPE = {"incident": "incident_created", "vulnerability": "vulnerability_created"}
-
-
-def _json_escape(value: str) -> str:
-    """Escape a raw string for embedding inside a JSON string literal in a
-    payload_template (the surrounding quotes are the template author's own,
-    same as any other placeholder-substitution templating). json.dumps of a
-    plain string always yields "escaped text" -- strip that outer quote
-    pair since the template already supplies its own."""
-    return json.dumps(value)[1:-1]
+_TRIGGER_BY_TICKET_TYPE = {
+    "incident": "incident_created",
+    "vulnerability": "vulnerability_created",
+    "change": "change_created",
+}
 
 
 async def evaluate_ticket_created(db: AsyncSession, ticket: Ticket) -> None:
@@ -112,6 +108,11 @@ async def _fire_rule(db: AsyncSession, rule: PlatformEventRule, ticket: Ticket) 
 
     summary = "; ".join(outcomes) if outcomes else "matched (no actions configured)"
     db.add(PlatformEventTrigger(rule_id=rule.id, rule_name=rule.name, ticket_id=ticket.id, summary=summary))
+    # Also onto the ticket's own unified activity feed, not just the rule's
+    # trigger-history table -- a rule firing is a system-caused change to
+    # this specific ticket and belongs alongside status/severity/etc
+    # changes, not only visible by navigating to the rule.
+    await ticket_service.log_field_change(db, ticket.id, "platform_rule", rule.name, summary, commit=False)
     await db.commit()
 
 
@@ -144,15 +145,10 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, ticket: Tic
         return f"{label}: sent to '{channel.name}'"
 
     if action.action_type == "webhook":
-        url = config.get("url")
-        if not url:
-            return f"{label}: no URL configured"
-        template = config.get("payload_template") or "{}"
-        # Double-brace placeholders ({{ticket_number}}, Mustache/Jinja-style)
-        # rather than str.format()'s single-brace {ticket_number}: the
-        # payload itself is JSON, which is full of single braces, and
-        # str.format() tried to parse those as fields too (confirmed via a
-        # real webhook action run: KeyError on the JSON object's own '{').
+        webhook_id = config.get("webhook_id")
+        webhook = await db.get(WebhookConfig, webhook_id) if webhook_id else None
+        if webhook is None:
+            return f"{label}: webhook no longer exists"
         placeholders = {
             "ticket_number": ticket.ticket_number,
             "ticket_type": ticket.ticket_type,
@@ -161,19 +157,14 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, ticket: Tic
             "severity": ticket.severity,
             "status": ticket.status,
         }
-        rendered = template
-        for key, value in placeholders.items():
-            rendered = rendered.replace(f"{{{{{key}}}}}", _json_escape(value))
-        try:
-            payload = json.loads(rendered)
-        except ValueError:
-            payload = None
-        async with httpx.AsyncClient(timeout=10) as client:
-            if payload is not None:
-                resp = await client.post(url, json=payload)
-            else:
-                resp = await client.post(url, content=rendered, headers={"Content-Type": "application/json"})
-        return f"{label}: {url} -> HTTP {resp.status_code}"
+        result = await webhook_service.call_webhook(webhook, placeholders)
+        if not result.success and webhook.alert_on_failure:
+            await webhook_service.alert_webhook_failure(
+                db, webhook, result, context=f"Platform Response Rule action on {ticket.ticket_number}"
+            )
+        if result.error:
+            return f"{label}: {webhook.name} -> {result.error}"
+        return f"{label}: {webhook.name} -> HTTP {result.status_code}"
 
     if action.action_type == "attach_document":
         document_id = config.get("document_id")

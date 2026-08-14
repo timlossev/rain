@@ -24,10 +24,19 @@ from rain.core.user_names import resolve_user_names
 from rain.db.base import control_session
 from rain.db.control_models import AuthProviderConfig, Session as SessionRow, SyslogSourceMap, Tenant, User
 from rain.db.provisioning import InvalidSlugError, provision_tenant
-from rain.db.tenant_models import ApprovalFlow, ApprovalFlowStep, Group, GroupMembership, NotificationChannel, TicketStatus
+from rain.db.tenant_models import (
+    ApprovalFlow,
+    ApprovalFlowStep,
+    Group,
+    GroupMembership,
+    NotificationChannel,
+    TicketStatus,
+    WebhookConfig,
+)
 from rain.modules.auth.ldap_config import get_provider_row, get_raw_config, save_ldap_config
 from rain.modules.auth.ldap_sync import run_ldap_sync
 from rain.modules.tickets.schemas import CHANNEL_TYPES
+from rain.modules.webhooks import service as webhook_service
 from rain.settings import get_settings
 from rain.web.nav import build_nav_context
 from rain.web.templating import templates
@@ -935,3 +944,121 @@ async def approval_flows_set_default(
         row.is_default = True
         await tenant_db.commit()
     return RedirectResponse("/admin/approval-flows", status_code=status.HTTP_303_SEE_OTHER)
+
+
+# ------------------------------------------------------------ webhooks ---
+
+
+@router.get("/webhooks", response_class=HTMLResponse)
+async def webhooks_list(
+    request: Request,
+    page: int = 1,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    nav = await build_nav_context(ctx)
+    stmt = select(WebhookConfig).order_by(WebhookConfig.name)
+    webhook_page = await paginate(tenant_db, stmt, page=page)
+    return templates.TemplateResponse(
+        request, "admin/webhooks.html", {**nav, "ctx": ctx, "page": webhook_page}
+    )
+
+
+@router.get("/webhooks/new", response_class=HTMLResponse)
+async def webhooks_new_form(
+    request: Request,
+    ctx: RequestContext = Depends(get_request_context),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    nav = await build_nav_context(ctx)
+    return templates.TemplateResponse(request, "admin/webhook_form.html", {**nav, "ctx": ctx, "webhook": None})
+
+
+@router.post("/webhooks")
+async def webhooks_create(
+    name: str = Form(...),
+    url: str = Form(...),
+    http_method: str = Form("POST"),
+    headers_text: str = Form(""),
+    payload_template: str = Form("{}"),
+    timeout_seconds: int = Form(10),
+    success_codes: str = Form("200,201,202,204"),
+    alert_on_failure: bool = Form(False),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    await webhook_service.create_webhook(
+        tenant_db,
+        name=name.strip(),
+        url=url.strip(),
+        http_method=http_method,
+        headers=webhook_service.parse_headers_text(headers_text),
+        payload_template=payload_template or "{}",
+        timeout_seconds=max(1, timeout_seconds),
+        success_codes=success_codes.strip() or "200,201,202,204",
+        alert_on_failure=alert_on_failure,
+        created_by=ctx.user.id,
+    )
+    return RedirectResponse("/admin/webhooks", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/webhooks/{webhook_id:int}/edit", response_class=HTMLResponse)
+async def webhooks_edit_form(
+    request: Request,
+    webhook_id: int,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    nav = await build_nav_context(ctx)
+    webhook = await webhook_service.get_webhook(tenant_db, webhook_id)
+    if webhook is None:
+        return RedirectResponse("/admin/webhooks", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(
+        request,
+        "admin/webhook_form.html",
+        {**nav, "ctx": ctx, "webhook": webhook, "headers_text": webhook_service.format_headers_text(webhook.headers)},
+    )
+
+
+@router.post("/webhooks/{webhook_id:int}/edit")
+async def webhooks_edit(
+    webhook_id: int,
+    name: str = Form(...),
+    url: str = Form(...),
+    http_method: str = Form("POST"),
+    headers_text: str = Form(""),
+    payload_template: str = Form("{}"),
+    timeout_seconds: int = Form(10),
+    success_codes: str = Form("200,201,202,204"),
+    alert_on_failure: bool = Form(False),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    webhook = await webhook_service.get_webhook(tenant_db, webhook_id)
+    if webhook is not None:
+        await webhook_service.update_webhook(
+            tenant_db,
+            webhook,
+            name=name.strip(),
+            url=url.strip(),
+            http_method=http_method,
+            headers=webhook_service.parse_headers_text(headers_text),
+            payload_template=payload_template or "{}",
+            timeout_seconds=max(1, timeout_seconds),
+            success_codes=success_codes.strip() or "200,201,202,204",
+            alert_on_failure=alert_on_failure,
+        )
+    return RedirectResponse("/admin/webhooks", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/webhooks/{webhook_id:int}/delete")
+async def webhooks_delete(
+    webhook_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_internal_admin)
+):
+    webhook = await webhook_service.get_webhook(tenant_db, webhook_id)
+    if webhook is not None:
+        await webhook_service.delete_webhook(tenant_db, webhook)
+    return RedirectResponse("/admin/webhooks", status_code=status.HTTP_303_SEE_OTHER)

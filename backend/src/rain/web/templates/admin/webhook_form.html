@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if webhook else "New" }} Webhook - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}{% raw %}Define an outbound webhook once, then reference it by name wherever a webhook call is needed. The payload template is ignored for GET (no body). Placeholders available depend on the caller -- a Platform Response Rule fills in ticket fields ({{ticket_number}}, {{title}}, ...); a document refresh calls with none, so a payload template there should be static.{% endraw %}{% endblock %}
+{% block content %}
+<div class="panel-row" style="justify-content:flex-end;">
+  <a class="btn btn-sm" href="/admin/webhooks">&larr; All webhooks</a>
+</div>
+
+<div class="card" style="max-width:720px;">
+  <form method="post" action="{{ '/admin/webhooks/' ~ webhook.id ~ '/edit' if webhook else '/admin/webhooks' }}">
+    <div class="form-row">
+      <div class="field">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" value="{{ webhook.name if webhook else '' }}" placeholder="Ops ticket relay" required autofocus>
+      </div>
+      <div class="field" style="flex:0 0 140px;">
+        <label for="http_method">Method</label>
+        <select id="http_method" name="http_method">
+          {% for m in ["POST", "GET", "PUT", "PATCH"] %}
+          <option value="{{ m }}" {% if (webhook.http_method if webhook else "POST") == m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="url">URL</label>
+      <input type="text" id="url" name="url" value="{{ webhook.url if webhook else '' }}" placeholder="https://example.com/hook" required>
+    </div>
+    <div class="form-row">
+      <div class="field" style="flex:0 0 160px;">
+        <label for="timeout_seconds">Timeout (seconds)</label>
+        <input type="number" id="timeout_seconds" name="timeout_seconds" min="1" value="{{ webhook.timeout_seconds if webhook else 10 }}">
+      </div>
+      <div class="field">
+        <label for="success_codes">Success codes</label>
+        <input type="text" id="success_codes" name="success_codes" value="{{ webhook.success_codes if webhook else '200,201,202,204' }}" placeholder="200,201,202,204">
+        <div class="field-hint">Comma-separated HTTP status codes treated as success; anything else counts as a failed call.</div>
+      </div>
+    </div>
+    <div class="field">
+      <label for="headers_text">Headers</label>
+      <textarea id="headers_text" name="headers_text" rows="3" placeholder="Authorization: Bearer ...&#10;X-Custom-Header: value">{{ headers_text if webhook else '' }}</textarea>
+      <div class="field-hint">One per line, "Name: value".</div>
+    </div>
+    <div class="field">
+      <label for="payload_template">Payload template (JSON, ignored for GET)</label>
+      <textarea id="payload_template" name="payload_template" rows="5" placeholder="{% raw %}{&quot;text&quot;: &quot;{{ticket_number}}: {{title}}&quot;}{% endraw %}">{{ webhook.payload_template if webhook else '{}' }}</textarea>
+    </div>
+    <div class="field">
+      <label class="checkbox-row"><input type="checkbox" name="alert_on_failure" {% if webhook and webhook.alert_on_failure %}checked{% endif %}> Emit syslog alert when this webhook fails or times out</label>
+      <div class="field-hint">Applies wherever this webhook is called from (Platform Response Rule action, document refresh). Off by default.</div>
+    </div>
+    <button class="btn btn-primary" type="submit">{{ "Save changes" if webhook else "Create webhook" }}</button>
+    <a class="btn" href="/admin/webhooks">Cancel</a>
+  </form>
+</div>
+{% endblock %}

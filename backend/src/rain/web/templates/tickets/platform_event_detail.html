@@ -50,7 +50,7 @@
           {% if a.action_type in ("notify_slack", "notify_email") %}
             channel_id: {{ a.config.get("channel_id", "-") }}
           {% elif a.action_type == "webhook" %}
-            {{ a.config.get("url", "-") }}
+            {{ webhook_names.get(a.config.get("webhook_id"), "deleted webhook") }}
           {% elif a.action_type == "attach_document" %}
             document_id: {{ a.config.get("document_id", "-") }}
           {% elif a.action_type == "attach_asset" %}
@@ -90,18 +90,13 @@
       {% if not channels %}<div class="field-hint">No channels yet -- create one under <a href="/admin/notification-channels">Admin &gt; Notification Channels</a>.</div>{% endif %}
     </div>
 
-    <div data-action-fields="webhook">
-      <div class="form-row">
-        <div class="field">
-          <label for="webhook_url">Webhook URL</label>
-          <input type="text" id="webhook_url" name="webhook_url" placeholder="https://example.com/hook">
-        </div>
-      </div>
-      <div class="field">
-        <label for="payload_template">Webhook payload (JSON)</label>
-        <textarea id="payload_template" name="payload_template" rows="3" placeholder='{"text": "{{ticket_number}}: {{title}}"}'></textarea>
-        <div class="field-hint">Double-brace placeholders (so they don't collide with the JSON syntax itself): <code>{{ticket_number}}</code>, <code>{{ticket_type}}</code>, <code>{{title}}</code>, <code>{{description}}</code>, <code>{{severity}}</code>, <code>{{status}}</code>. Sent as-is if not valid JSON after substitution.</div>
-      </div>
+    <div class="field" data-action-fields="webhook">
+      <label for="webhook_config_id">Webhook</label>
+      <select id="webhook_config_id" name="webhook_config_id">
+        <option value="">-</option>
+        {% for w in webhooks %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}
+      </select>
+      {% if not webhooks %}<div class="field-hint">No webhooks yet -- create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.</div>{% endif %}
     </div>
 
     <div class="field" data-action-fields="attach_document">

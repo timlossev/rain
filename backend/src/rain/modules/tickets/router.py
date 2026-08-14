@@ -32,6 +32,7 @@ from rain.modules.documents import service as document_service
 from rain.modules.tickets import exporter, platform_events, service
 from rain.modules.tickets.correlation import GROUP_BY_FIELDS
 from rain.modules.tickets.schemas import MATCH_FIELDS, SEVERITIES, TICKET_TYPES
+from rain.modules.webhooks import service as webhook_service
 from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
 from rain.web.safe_redirect import safe_relative_path
@@ -988,6 +989,7 @@ async def platform_event_detail(
     channels = list((await tenant_db.execute(select(NotificationChannel).order_by(NotificationChannel.name))).scalars())
     documents = await document_service.list_documents(tenant_db)
     assets = await asset_service.list_assets(tenant_db)
+    webhooks = await webhook_service.list_webhooks(tenant_db)
     return templates.TemplateResponse(
         request,
         "tickets/platform_event_detail.html",
@@ -1002,6 +1004,8 @@ async def platform_event_detail(
             "channels": channels,
             "documents": documents,
             "assets": assets,
+            "webhooks": webhooks,
+            "webhook_names": {w.id: w.name for w in webhooks},
         },
     )
 
@@ -1043,10 +1047,8 @@ async def platform_event_action_create(
         channel_id = form.get("channel_id")
         config = {"channel_id": int(channel_id)} if channel_id else {}
     elif action_type == "webhook":
-        config = {
-            "url": str(form.get("webhook_url", "")).strip(),
-            "payload_template": str(form.get("payload_template", "")).strip() or "{}",
-        }
+        webhook_id = form.get("webhook_config_id")
+        config = {"webhook_id": int(webhook_id)} if webhook_id else {}
     elif action_type == "attach_document":
         document_id = form.get("document_id")
         config = {"document_id": int(document_id)} if document_id else {}

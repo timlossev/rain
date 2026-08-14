@@ -1,8 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ doc.doc_number }}: {{ doc.title }} - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}A single document's details and, for txt/md files, an inline editor. Shows what tickets/assets it's linked to.{% endblock %}
+{% block help_text %}A single document's details -- description, contents (with an inline editor for txt/md files), auto-update from a webhook, and what it's linked to.{% endblock %}
 {% block content %}
-<div class="panel-row" style="justify-content:flex-end;">
+<div class="panel-row" style="justify-content:space-between; align-items:flex-start;">
+  <div>
+    <div style="font-size:1.25em; font-weight:600;">{{ doc.doc_number }}: {{ doc.title }}</div>
+    <div class="muted">{{ doc.filename }} ({{ (doc.size_bytes / 1024) | round(1) }} KB) -- uploaded {{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</div>
+  </div>
   <div>
     <a class="btn" href="/documents/{{ doc.id }}/download">Download</a>
     <a class="btn" href="/documents/{{ doc.id }}/pdf">Export to PDF</a>
@@ -12,81 +16,115 @@
   </div>
 </div>
 
-<div class="card">
-  <p>{{ doc.description or "No description." }}</p>
-  <table>
-    <tbody>
-      <tr><th>File</th><td class="muted">{{ doc.filename }} ({{ (doc.size_bytes / 1024) | round(1) }} KB)</td></tr>
-      <tr><th>Uploaded</th><td class="muted">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</td></tr>
-    </tbody>
-  </table>
-</div>
+<div class="card" data-tabs>
+  <div class="tab-buttons">
+    <button type="button" class="tab-btn active" data-tab-btn="description">Description</button>
+    {% if body_kind %}
+    <button type="button" class="tab-btn" data-tab-btn="contents">Contents</button>
+    <button type="button" class="tab-btn" data-tab-btn="auto-update">Auto-update</button>
+    {% endif %}
+    <button type="button" class="tab-btn" data-tab-btn="links">Links ({{ doc.links | length }})</button>
+  </div>
 
-{% if body_kind %}
-<div class="card">
-  <div class="card-title">Document body</div>
-  <form method="post" action="/documents/{{ doc.id }}/body" data-md-editor>
-    {% if body_kind == "markdown" %}
-    <div class="tabs" data-tabs>
-      <div class="tab-buttons">
-        <button type="button" class="tab-btn active" data-tab-btn="write">Write</button>
-        <button type="button" class="tab-btn" data-tab-btn="preview" data-md-preview-tab="{{ doc.id }}">Preview</button>
+  <div class="tab-panel active" data-tab-panel="description">
+    <form method="post" action="/documents/{{ doc.id }}/description">
+      <div class="field">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="5" placeholder="No description.">{{ doc.description or '' }}</textarea>
       </div>
-      <div class="tab-panel active" data-tab-panel="write">
-        <textarea name="body" rows="18" class="doc-body-editor" data-md-source>{{ body_text }}</textarea>
-      </div>
-      <div class="tab-panel" data-tab-panel="preview">
-        <div class="card doc-md-preview" data-md-preview-target>
-          <p class="muted">Switch to this tab to render a preview.</p>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </form>
+  </div>
+
+  {% if body_kind %}
+  <div class="tab-panel" data-tab-panel="contents">
+    <form method="post" action="/documents/{{ doc.id }}/body" data-md-editor>
+      {% if body_kind == "markdown" %}
+      <div class="tabs" data-tabs>
+        <div class="tab-buttons">
+          <button type="button" class="tab-btn active" data-tab-btn="write">Write</button>
+          <button type="button" class="tab-btn" data-tab-btn="preview" data-md-preview-tab="{{ doc.id }}">Preview</button>
+        </div>
+        <div class="tab-panel active" data-tab-panel="write">
+          <textarea name="body" rows="18" class="doc-body-editor" data-md-source>{{ body_text }}</textarea>
+        </div>
+        <div class="tab-panel" data-tab-panel="preview">
+          <div class="card doc-md-preview" data-md-preview-target>
+            <p class="muted">Switch to this tab to render a preview.</p>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="field-hint">Markdown -- rendered the same way in the Preview tab and in "Export to PDF".</div>
-    {% else %}
-    <textarea name="body" rows="18" class="doc-body-editor">{{ body_text }}</textarea>
-    {% endif %}
-    <button class="btn btn-primary" type="submit" style="margin-top:10px;">Save</button>
-  </form>
-</div>
-{% endif %}
-
-<div class="card">
-  <div class="card-title">Linked to</div>
-  <table>
-    <thead><tr><th>Type</th><th>ID</th><th></th></tr></thead>
-    <tbody>
-      {% for link in doc.links %}
-      <tr>
-        <td><span class="badge">{{ link.linked_type }}</span></td>
-        <td>
-          {% if link.linked_type == "asset" %}<a href="/assets/{{ link.linked_id }}/edit">#{{ link.linked_id }}</a>
-          {% elif link.linked_type == "ticket" %}<a href="/tickets/{{ link.linked_id }}">#{{ link.linked_id }}</a>
-          {% else %}#{{ link.linked_id }}{% endif %}
-        </td>
-        <td class="actions">
-          <form class="inline" method="post" action="/documents/{{ doc.id }}/unlink/{{ link.id }}" data-confirm="Remove this link?">
-            <button class="btn btn-sm btn-danger" type="submit">Unlink</button>
-          </form>
-        </td>
-      </tr>
+      <div class="field-hint">Markdown -- rendered the same way in the Preview tab and in "Export to PDF".</div>
       {% else %}
-      <tr><td colspan="3" class="muted">Not linked to anything yet.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      <textarea name="body" rows="18" class="doc-body-editor">{{ body_text }}</textarea>
+      {% endif %}
+      <button class="btn btn-primary" type="submit" style="margin-top:10px;">Save</button>
+    </form>
+  </div>
 
-  <form method="post" action="/documents/{{ doc.id }}/link" class="form-row" style="margin-top:12px; align-items:end;">
-    <div class="field" style="margin-bottom:0;">
-      <label for="linked_type">Link to</label>
-      <select id="linked_type" name="linked_type">
-        {% for t in linked_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="field" style="margin-bottom:0;">
-      <label for="linked_id">ID</label>
-      <input type="number" id="linked_id" name="linked_id" required style="width:120px;">
-    </div>
-    <button class="btn btn-sm" type="submit">Add link</button>
-  </form>
+  <div class="tab-panel" data-tab-panel="auto-update">
+    {% if request.query_params.get('refreshed') == '1' %}<div class="flash flash-ok">Refreshed -- content changed.</div>{% endif %}
+    {% if request.query_params.get('refreshed') == '0' %}<div class="flash flash-ok">Refreshed -- no change from webhook response.</div>{% endif %}
+    <form method="post" action="/documents/{{ doc.id }}/webhook-config" class="form-row" style="align-items:end;">
+      <div class="field" style="margin-bottom:0;">
+        <label for="webhook_id">Webhook</label>
+        <select id="webhook_id" name="webhook_id">
+          <option value="">-- none --</option>
+          {% for w in webhooks %}<option value="{{ w.id }}" {% if doc.webhook_id == w.id %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
+        </select>
+        {% if not webhooks %}<div class="field-hint">No webhooks yet -- create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.</div>{% endif %}
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="alert_on_change" {% if doc.alert_on_change %}checked{% endif %}> Emit syslog alert on change</label>
+      </div>
+      <button class="btn btn-sm" type="submit">Save settings</button>
+    </form>
+    {% if doc.webhook_id %}
+    <form method="post" action="/documents/{{ doc.id }}/refresh-from-webhook" style="margin-top:10px;">
+      <button class="btn btn-primary" type="submit">Refresh from webhook</button>
+      <span class="muted">Last refreshed: {{ doc.last_refreshed_at.strftime("%Y-%m-%d %H:%M") if doc.last_refreshed_at else "never" }}</span>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="tab-panel" data-tab-panel="links">
+    <table>
+      <thead><tr><th>Type</th><th>ID</th><th></th></tr></thead>
+      <tbody>
+        {% for link in doc.links %}
+        <tr>
+          <td><span class="badge">{{ link.linked_type }}</span></td>
+          <td>
+            {% if link.linked_type == "asset" %}<a href="/assets/{{ link.linked_id }}/edit">#{{ link.linked_id }}</a>
+            {% elif link.linked_type == "ticket" %}<a href="/tickets/{{ link.linked_id }}">#{{ link.linked_id }}</a>
+            {% else %}#{{ link.linked_id }}{% endif %}
+          </td>
+          <td class="actions">
+            <form class="inline" method="post" action="/documents/{{ doc.id }}/unlink/{{ link.id }}" data-confirm="Remove this link?">
+              <button class="btn btn-sm btn-danger" type="submit">Unlink</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="muted">Not linked to anything yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <form method="post" action="/documents/{{ doc.id }}/link" class="form-row" style="margin-top:12px; align-items:end;">
+      <div class="field" style="margin-bottom:0;">
+        <label for="linked_type">Link to</label>
+        <select id="linked_type" name="linked_type">
+          {% for t in linked_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label for="linked_id">ID</label>
+        <input type="number" id="linked_id" name="linked_id" required style="width:120px;">
+      </div>
+      <button class="btn btn-sm" type="submit">Add link</button>
+    </form>
+  </div>
 </div>
 {% endblock %}

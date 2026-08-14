@@ -153,17 +153,9 @@
 </div>
 {% endif %}
 
-{% if ticket.rule_triggers %}
-<div class="card">
-  <div class="card-title">Platform response rule triggers</div>
-  {% for t in ticket.rule_triggers %}
-  <p style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px;">
-    <span class="muted">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "" }}</span> -
-    <strong>{{ t.rule_name }}</strong>: {{ t.summary }}
-  </p>
-  {% endfor %}
-</div>
-{% endif %}
+{# Platform response rule triggers are logged into the unified Activity
+   feed below (field_name == "platform_rule") rather than a separate card
+   here -- one chronological history instead of two places to check. #}
 
 <div class="card">
   <div class="card-title">Activity</div>
@@ -220,6 +212,8 @@
       renamed this from &ldquo;{{ entry.item.from_value }}&rdquo; to &ldquo;{{ entry.item.to_value }}&rdquo;
       {% elif entry.item.field_name == "document" %}
       {% if entry.item.to_value %}linked document <strong>{{ entry.item.to_value }}</strong>{% else %}unlinked document <strong>{{ entry.item.from_value }}</strong>{% endif %}
+      {% elif entry.item.field_name == "platform_rule" %}
+      Platform Response Rule <strong>{{ entry.item.from_value }}</strong> fired: {{ entry.item.to_value }}
       {% endif %}
     </div>
     {% elif entry.kind == "approval_decision" %}

@@ -57,13 +57,28 @@ async def list_documents(db: AsyncSession, *, search: str | None = None) -> list
 
 
 async def get_document(db: AsyncSession, document_id: int) -> Document | None:
-    stmt = select(Document).where(Document.id == document_id).options(selectinload(Document.links))
+    stmt = (
+        select(Document)
+        .where(Document.id == document_id)
+        .options(selectinload(Document.links), selectinload(Document.webhook))
+    )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 
 
 async def update_body_size(db: AsyncSession, doc: Document, size_bytes: int) -> None:
     doc.size_bytes = size_bytes
+    await db.commit()
+
+
+async def update_description(db: AsyncSession, doc: Document, description: str | None) -> None:
+    doc.description = description
+    await db.commit()
+
+
+async def update_webhook_config(db: AsyncSession, doc: Document, *, webhook_id: int | None, alert_on_change: bool) -> None:
+    doc.webhook_id = webhook_id
+    doc.alert_on_change = alert_on_change
     await db.commit()
 
 

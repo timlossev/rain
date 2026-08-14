@@ -8,6 +8,10 @@
   <tr><th>Title</th><td>{{ doc.title }}</td></tr>
   <tr><th>File</th><td>{{ doc.filename }} ({{ (doc.size_bytes / 1024) | round(1) }} KB)</td></tr>
   <tr><th>Uploaded</th><td>{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</td></tr>
+  {% if doc.webhook_id %}
+  <tr><th>Content source</th><td>Webhook: {{ doc.webhook.name if doc.webhook else "deleted webhook" }}</td></tr>
+  <tr><th>Last updated from webhook</th><td>{{ doc.last_refreshed_at.strftime("%Y-%m-%d %H:%M") if doc.last_refreshed_at else "never" }}</td></tr>
+  {% endif %}
 </table>
 
 <h2 class="pdf-section">Description</h2>

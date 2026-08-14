@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import io
-from datetime import datetime
+from datetime import datetime, timezone
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
@@ -10,9 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
+from rain.db.tenant_models import SyslogEvent
 from rain.modules.documents import service, storage, textbody
 from rain.modules.documents.schemas import LINKED_TYPES, MAX_UPLOAD_BYTES
+from rain.modules.tickets import correlation as ticket_correlation, rules as ticket_rules
 from rain.modules.tickets import service as ticket_service
+from rain.modules.webhooks import service as webhook_service
 from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
 from rain.web.templating import templates
@@ -137,6 +141,7 @@ async def document_detail(
             body_text = textbody.decode_body(storage.get_storage().read(doc.storage_key))
         except FileNotFoundError:
             body_kind = None
+    webhooks = await webhook_service.list_webhooks(tenant_db) if body_kind is not None else []
     return templates.TemplateResponse(
         request,
         "documents/detail.html",
@@ -147,8 +152,22 @@ async def document_detail(
             "linked_types": LINKED_TYPES,
             "body_kind": body_kind,
             "body_text": body_text,
+            "webhooks": webhooks,
         },
     )
+
+
+@router.post("/{document_id:int}/description")
+async def update_document_description(
+    document_id: int,
+    description: str = Form(""),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is not None:
+        await service.update_description(tenant_db, doc, description.strip() or None)
+    return RedirectResponse(f"/documents/{document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{document_id:int}/body")
@@ -167,6 +186,95 @@ async def update_document_body(
     storage.get_storage().save(doc.storage_key, data)
     await service.update_body_size(tenant_db, doc, len(data))
     return RedirectResponse(f"/documents/{document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{document_id:int}/webhook-config")
+async def set_document_webhook_config(
+    document_id: int,
+    webhook_id: str = Form(""),
+    alert_on_change: bool = Form(False),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is not None:
+        await service.update_webhook_config(
+            tenant_db, doc, webhook_id=int(webhook_id) if webhook_id else None, alert_on_change=alert_on_change
+        )
+    return RedirectResponse(f"/documents/{document_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{document_id:int}/refresh-from-webhook")
+async def refresh_document_from_webhook(
+    document_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Calls the document's configured webhook and, if the response text
+    differs from what's currently stored, overwrites the body with it --
+    the point of "populate from webhook" is to keep the document current,
+    not to append history. When it *does* differ and the document opted
+    in (alert_on_change), a syslog event is synthesized and run through
+    the same rule engine real syslog traffic goes through (Event
+    Promotion Policies, Correlation Rules), same pattern as the calendar
+    syslog bridge (rain.modules.calendar.sweep) -- so "this reference
+    doc changed" can auto-file a ticket the same way any other event
+    can, rather than being a second, parallel notification path."""
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is None or doc.webhook_id is None or textbody.body_kind(doc.filename) is None:
+        return RedirectResponse(f"/documents/{document_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+    webhook = await webhook_service.get_webhook(tenant_db, doc.webhook_id)
+    if webhook is None:
+        return RedirectResponse(
+            f"/documents/{document_id}?error={quote('Configured webhook no longer exists')}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    result = await webhook_service.call_webhook(webhook)
+    if not result.success:
+        if webhook.alert_on_failure:
+            await webhook_service.alert_webhook_failure(
+                tenant_db, webhook, result, context=f"document {doc.doc_number} refresh"
+            )
+        detail = result.error or f"HTTP {result.status_code}"
+        return RedirectResponse(
+            f"/documents/{document_id}?error={quote(f'Webhook call failed: {detail}')}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    try:
+        old_text = textbody.decode_body(storage.get_storage().read(doc.storage_key))
+    except FileNotFoundError:
+        old_text = None
+    new_text = result.body
+    changed = new_text != old_text
+
+    if changed:
+        data = new_text.encode("utf-8")
+        storage.get_storage().save(doc.storage_key, data)
+        await service.update_body_size(tenant_db, doc, len(data))
+
+        if doc.alert_on_change:
+            event = SyslogEvent(
+                host="documents",
+                program=doc.doc_number,
+                facility=None,
+                severity=5,  # notice
+                message=f"Document {doc.doc_number} ({doc.title}) content changed via webhook refresh",
+                raw=f"document #{doc.id} webhook refresh diff (webhook: {webhook.name})",
+            )
+            tenant_db.add(event)
+            await tenant_db.commit()
+            matched_rule = await ticket_rules.find_matching_rule(tenant_db, event)
+            if matched_rule is not None:
+                await ticket_rules.apply_rule(tenant_db, matched_rule, event)
+            await ticket_correlation.evaluate_correlation_rules(tenant_db, event)
+
+    doc.last_refreshed_at = datetime.now(timezone.utc)
+    await tenant_db.commit()
+    query = "refreshed=1" if changed else "refreshed=0"
+    return RedirectResponse(f"/documents/{document_id}?{query}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{document_id:int}/preview-markdown", response_class=HTMLResponse)

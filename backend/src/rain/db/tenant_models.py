@@ -611,6 +611,38 @@ class NotificationChannel(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class WebhookConfig(TenantBase):
+    """A centrally-configured outbound webhook -- one definition (Admin >
+    Webhooks), referenced by id from anywhere that needs to call one
+    instead of each place inlining its own URL/headers/payload/timeout:
+    Platform Response Rules' "webhook" action, and a Document's
+    "populate from webhook" setting. payload_template uses the same
+    double-brace ({{key}}) placeholder substitution either caller fills
+    in with its own context (ticket fields, or nothing, for a document
+    refresh) -- it's ignored for GET, which has no body."""
+
+    __tablename__ = "webhook_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    url: Mapped[str] = mapped_column(String(2048))
+    http_method: Mapped[str] = mapped_column(String(10), default="POST", server_default="POST")
+    headers: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    payload_template: Mapped[str] = mapped_column(Text, default="{}", server_default="{}")
+    timeout_seconds: Mapped[int] = mapped_column(Integer, default=10, server_default="10")
+    # Comma-separated list of HTTP status codes that count as success, e.g.
+    # "200,201,204" -- a plain string rather than an int[] column so the
+    # admin form is just one text input, not a dynamic add/remove list.
+    success_codes: Mapped[str] = mapped_column(String(255), default="200,201,202,204", server_default="200,201,202,204")
+    # Opt-in: emit a syslog event (through the same rule engine real syslog
+    # traffic goes through) whenever a call to this webhook fails or times
+    # out, from either caller -- off by default so a webhook that's
+    # expected to occasionally error doesn't become noisy on its own.
+    alert_on_failure: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Document(TenantBase):
     """A DOC-xxxxxx knowledge-base entry. The file itself lives in a
     storage backend (rain.modules.documents.storage -- local volume today,
@@ -632,8 +664,19 @@ class Document(TenantBase):
     updated_at: Mapped[dt.datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    # Populate-from-webhook (text/markdown documents only -- see
+    # rain.modules.documents.textbody.body_kind): webhook_id is which
+    # WebhookConfig to call on "Refresh from webhook"; alert_on_change
+    # opts into emitting a syslog event (through the same rule engine
+    # real syslog traffic goes through) when a refresh's content differs
+    # from what was stored, so it's optional rather than every refresh
+    # being noisy.
+    webhook_id: Mapped[int | None] = mapped_column(ForeignKey("webhook_configs.id", ondelete="SET NULL"), nullable=True)
+    alert_on_change: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    last_refreshed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     links: Mapped[list["DocumentLink"]] = relationship(back_populates="document", cascade="all, delete-orphan")
+    webhook: Mapped["WebhookConfig | None"] = relationship()
 
 
 class DocumentLink(TenantBase):
