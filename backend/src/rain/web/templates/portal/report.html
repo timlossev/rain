@@ -13,10 +13,6 @@
     <div class="muted">Report an incident{% if not user %}. No account needed{% endif %}.</div>
   </div>
 
-  {% if wrong_tenant %}
-  <div class="flash flash-error">Your account isn't associated with {{ tenant.name }}'s incident portal.</div>
-  {% else %}
-
   {% if created %}<div class="flash flash-ok">Submitted as <strong>{{ created }}</strong>.</div>{% endif %}
   {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
@@ -55,7 +51,13 @@
     <tbody>
       {% for row in reported %}
       <tr>
-        <td>{{ row.ticket.ticket_number }}</td>
+        {# The linked page itself requires login (require_login, same as
+           every other ticket detail view) regardless of this tenant's
+           portal_require_auth setting -- and this table only ever
+           renders for a signed-in user to begin with (see the {% if
+           user %} above), so there's no path from here into a ticket
+           without already having a session. #}
+        <td><a href="/tickets/{{ row.ticket.ticket_number }}">{{ row.ticket.ticket_number }}</a></td>
         <td>{{ row.ticket.title }}</td>
         <td><span class="badge severity-{{ row.ticket.severity }}">{{ row.ticket.severity }}</span></td>
         <td class="muted">{{ row.ticket.status }}</td>
@@ -68,8 +70,6 @@
   </table>
   {% else %}
   <p class="muted portal-signin-hint">Sign in to see tickets you've reported.</p>
-  {% endif %}
-
   {% endif %}
 </div>
 {% endblock %}

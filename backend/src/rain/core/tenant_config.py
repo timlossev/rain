@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from rain.db.tenant_models import TenantConfig
@@ -28,19 +29,51 @@ DEFAULTS: dict[str, Any] = {
     "portal_branded": True,
 }
 
+# Distinguishes "caller passed no default" from "caller explicitly passed
+# a falsy default" (False, 0, "") -- `default: Any = None` couldn't tell
+# those apart, so get_tenant_config(db, key, False) would silently ignore
+# the False and fall through to DEFAULTS.get(key) instead. Not hit by any
+# caller before portal_require_auth/portal_branded (the first booleans
+# this module handled), which is exactly the type of value that's often
+# legitimately False.
+_UNSET = object()
 
-async def get_tenant_config(db: AsyncSession, key: str, default: Any = None) -> Any:
+
+async def get_tenant_config(db: AsyncSession, key: str, default: Any = _UNSET) -> Any:
     row = await db.get(TenantConfig, key)
     if row is not None:
         return row.value
-    return default if default is not None else DEFAULTS.get(key)
+    return DEFAULTS.get(key) if default is _UNSET else default
+
+
+async def get_tenant_configs(db: AsyncSession, keys: list[str]) -> dict[str, Any]:
+    """Bulk get_tenant_config -- one query for several keys instead of one
+    round trip each. rain.modules.portal reads its two portal_* flags
+    together on every page load (including the public, unauthenticated-
+    reachable one), and Admin > Branding does the same for the active
+    tenant. A key with no stored row falls back to DEFAULTS, same as the
+    single-key version."""
+    if not keys:
+        return {}
+    result = await db.execute(select(TenantConfig).where(TenantConfig.key.in_(keys)))
+    stored = {row.key: row.value for row in result.scalars()}
+    return {key: stored[key] if key in stored else DEFAULTS.get(key) for key in keys}
 
 
 async def set_tenant_config(db: AsyncSession, key: str, value: Any, *, updated_by: int | None = None) -> None:
-    row = await db.get(TenantConfig, key)
-    if row is None:
-        db.add(TenantConfig(key=key, value=value, updated_by=updated_by))
-    else:
-        row.value = value
-        row.updated_by = updated_by
+    await set_tenant_configs(db, {key: value}, updated_by=updated_by)
+
+
+async def set_tenant_configs(db: AsyncSession, values: dict[str, Any], *, updated_by: int | None = None) -> None:
+    """Bulk set_tenant_config -- upserts every key in one commit instead
+    of one commit per key, so a form that saves more than one setting at
+    once (e.g. the portal's two flags on Admin > Branding) can't be left
+    half-applied by a failure between two separate commits."""
+    for key, value in values.items():
+        row = await db.get(TenantConfig, key)
+        if row is None:
+            db.add(TenantConfig(key=key, value=value, updated_by=updated_by))
+        else:
+            row.value = value
+            row.updated_by = updated_by
     await db.commit()

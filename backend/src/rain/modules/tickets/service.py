@@ -58,6 +58,13 @@ async def create_ticket(
     reporter_user_id: int | None = None,
     reported_anonymously: bool = False,
 ) -> Ticket:
+    # reported_anonymously only means anything when there's no
+    # reporter_user_id to begin with -- normalized here (not just left to
+    # caller discipline) since "Reported by" on both the ticket detail
+    # page and its PDF export check reporter_user_id first, so a caller
+    # passing both would silently get attributed to reporter_user_id
+    # everywhere despite also claiming reported_anonymously=True.
+    reported_anonymously = reported_anonymously and reporter_user_id is None
     ticket = Ticket(
         ticket_number=await _next_ticket_number(db, ticket_type),
         ticket_type=ticket_type,

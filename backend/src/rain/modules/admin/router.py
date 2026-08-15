@@ -1,12 +1,16 @@
 """Admin console: two tiers, split by which RBAC dependency each route
-uses (see rain.core.rbac). Branding/Tenants/Users/Auth Providers/SMTP
-Relay/Syslog Listener are platform-wide (require_internal_admin only).
-Ticket Statuses/Notification Channels/Groups/Approval Flows/Webhooks are
-tenant-scoped (require_admin -- internal_admin for whichever tenant is
-active, or client_admin for their one pinned tenant; Event Promotion
-Policies/Correlation Rules/Platform Response Rules are the same tier but
-live in rain.modules.tickets.router instead, alongside the rest of
-Tickets)."""
+uses (see rain.core.rbac). Tenants/Users/Auth Providers/SMTP Relay/
+Syslog Listener are platform-wide (require_internal_admin only).
+Branding's GET is require_admin -- client_admin can reach the page too,
+but only sees and can save the public-incident-portal section for their
+own tenant; its instance-wide name/color/logo/font stays
+internal_admin-only, both hidden in the template and enforced on its own
+POST route. Ticket Statuses/Notification Channels/Groups/Approval Flows/
+Webhooks are the same require_admin tier (internal_admin for whichever
+tenant is active, or client_admin for their one pinned tenant; Event
+Promotion Policies/Correlation Rules/Platform Response Rules are the same
+tier but live in rain.modules.tickets.router instead, alongside the rest
+of Tickets)."""
 from __future__ import annotations
 
 import asyncio
@@ -25,7 +29,7 @@ from rain.core.pagination import paginate
 from rain.core.rbac import require_admin, require_internal_admin, require_login
 from rain.core.security import hash_password
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
-from rain.core.tenant_config import get_tenant_config, set_tenant_config
+from rain.core.tenant_config import get_tenant_config, get_tenant_configs, set_tenant_config, set_tenant_configs
 from rain.core.user_names import resolve_user_names
 from rain.db.base import control_session, tenant_session
 from rain.db.control_models import AuthProviderConfig, Session as SessionRow, SyslogSourceMap, Tenant, User
@@ -74,11 +78,8 @@ async def _portal_settings(ctx: RequestContext) -> dict:
     if ctx.active_tenant is None:
         return {"portal_require_auth": True, "portal_branded": True, "portal_tenant": None}
     async with tenant_session(ctx.active_tenant.schema_name) as tenant_db:
-        return {
-            "portal_require_auth": await get_tenant_config(tenant_db, "portal_require_auth", True),
-            "portal_branded": await get_tenant_config(tenant_db, "portal_branded", True),
-            "portal_tenant": ctx.active_tenant,
-        }
+        flags = await get_tenant_configs(tenant_db, ["portal_require_auth", "portal_branded"])
+        return {**flags, "portal_tenant": ctx.active_tenant}
 
 
 @router.get("/branding", response_class=HTMLResponse)
@@ -143,8 +144,11 @@ async def branding_portal_submit(
     whole Branding screen on picking one first."""
     if ctx.active_tenant is not None:
         async with tenant_session(ctx.active_tenant.schema_name) as tenant_db:
-            await set_tenant_config(tenant_db, "portal_require_auth", portal_require_auth, updated_by=user.id)
-            await set_tenant_config(tenant_db, "portal_branded", portal_branded, updated_by=user.id)
+            await set_tenant_configs(
+                tenant_db,
+                {"portal_require_auth": portal_require_auth, "portal_branded": portal_branded},
+                updated_by=user.id,
+            )
     return RedirectResponse("/admin/branding?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
