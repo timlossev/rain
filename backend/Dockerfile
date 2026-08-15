@@ -12,6 +12,19 @@ WORKDIR /build
 COPY pyproject.toml ./
 COPY src ./src
 
+# A plain `RUN pip install --upgrade pip` is cached by Docker on the
+# instruction text alone -- once built, every later `docker compose
+# build` would keep reinstalling that SAME pip forever, regardless of
+# what's actually newest on PyPI, unless something upstream of it also
+# happened to change. ADD with a remote URL is the documented exception:
+# Docker re-fetches it on every build and only invalidates the cache
+# from here down when the response actually differs -- i.e. exactly
+# when pip has shipped a new release since the last build, and never
+# otherwise. That's what actually gets "upgrade pip to latest on every
+# build" instead of "upgrade pip to latest the first time, then never
+# again."
+ADD https://pypi.org/pypi/pip/json /tmp/pip-latest.json
+
 RUN python -m venv /venv \
  # >=26.1.2 explicitly, not just --upgrade to "whatever's latest today" --
  # CVE-2026-8643 (pip could extract console_scripts/gui_scripts entry
