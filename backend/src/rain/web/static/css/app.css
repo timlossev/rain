@@ -445,6 +445,13 @@ p { margin: 0 0 1em; }
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
+  /* A <button class="btn"> (e.g. Delete) otherwise picks up the browser's
+     native form-control rendering -- appearance:none strips that so it
+     matches an <a class="btn"> (e.g. Download, Export to PDF) exactly
+     instead of just approximately, even though both already set the
+     same font-size/family below. */
+  appearance: none;
+  -webkit-appearance: none;
   font-family: inherit;
   font-size: 0.88rem;
   font-weight: 600;
@@ -518,6 +525,11 @@ form.inline { display: inline; }
   align-items: center;
   flex-wrap: wrap;
   gap: 14px 18px;
+  /* Its parent .panel-row is a flex container too, and a lone flex item
+     doesn't stretch along the main axis by default -- without this the
+     bar only ever sized to its own content, reading narrower than the
+     full-width .card/table underneath it. */
+  width: 100%;
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
