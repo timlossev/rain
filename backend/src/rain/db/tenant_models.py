@@ -89,6 +89,7 @@ class Asset(TenantBase):
     __table_args__ = (UniqueConstraint("external_id", name="uq_assets_external_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ci_number: Mapped[str] = mapped_column(String(31), unique=True, index=True)  # CI-000123 -- Configuration Item
     asset_type_id: Mapped[int] = mapped_column(ForeignKey("asset_types.id", ondelete="RESTRICT"), index=True)
     name: Mapped[str] = mapped_column(String(255))
     external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)

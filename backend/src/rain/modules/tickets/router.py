@@ -313,12 +313,17 @@ async def search_tickets_assets(
         return []
     stmt = (
         select(Asset)
-        .where((Asset.name.ilike(f"%{q}%")) | (Asset.external_id.ilike(f"%{q}%")))
+        .where(
+            Asset.name.ilike(f"%{q}%") | Asset.external_id.ilike(f"%{q}%") | Asset.ci_number.ilike(f"%{q}%")
+        )
         .order_by(Asset.name)
         .limit(8)
     )
     result = await tenant_db.execute(stmt)
-    return [{"id": a.id, "label": f"{a.name} ({a.external_id})" if a.external_id else a.name} for a in result.scalars()]
+    return [
+        {"id": a.id, "label": f"{a.ci_number}: {a.name}" + (f" ({a.external_id})" if a.external_id else "")}
+        for a in result.scalars()
+    ]
 
 
 @router.post("/{ticket_id:int}/asset")

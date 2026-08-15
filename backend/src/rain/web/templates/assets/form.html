@@ -4,8 +4,9 @@
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 {% if asset %}
-<div class="panel-row" style="justify-content:flex-end;">
-  <a class="btn btn-sm" href="/assets/{{ asset.id }}/pdf">Export to PDF</a>
+<div class="panel-row">
+  <div style="font-size:1.25em; font-weight:600;">{{ asset.ci_number }}: {{ asset.name }}</div>
+  <a class="btn btn-sm" href="/assets/{{ asset.ci_number }}/pdf">Export to PDF</a>
 </div>
 {% endif %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}

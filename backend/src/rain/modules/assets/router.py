@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response, Streamin
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.convertors import Convertor, register_url_convertor
 
 from rain.core.export_columns import merge_profile_columns
 from rain.core.pagination import paginate
@@ -23,6 +24,27 @@ from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
 from rain.web.templating import templates
 from rain.web.uploads import import_stash_path
+
+
+class _AssetRefConvertor(Convertor):
+    """Matches a ci_number ("CI-000123" -- the URL scheme asset detail
+    links use) or, for back-compat with any link/bookmark built before
+    that switch, a bare integer id. See rain.modules.tickets.router's
+    _TicketRefConvertor for why this is a real regex-constrained
+    converter rather than a plain {asset_ref} str -- a bare string param
+    would shadow literal routes registered below it (/new, /types,
+    /fields, /export, /import...) regardless of declaration order."""
+
+    regex = r"CI-\d+|\d+"
+
+    def convert(self, value: str) -> str:
+        return value
+
+    def to_string(self, value: str) -> str:
+        return value
+
+
+register_url_convertor("asset_ref", _AssetRefConvertor())
 
 router = APIRouter(prefix="/assets")
 
@@ -90,6 +112,7 @@ async def create_asset(
 ):
     form = await request.form()
     asset = Asset(
+        ci_number=await service.next_ci_number(tenant_db),
         name=name.strip(),
         asset_type_id=asset_type_id,
         external_id=external_id.strip() or None,
@@ -111,23 +134,23 @@ async def create_asset(
     return RedirectResponse("/assets", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.get("/{asset_id:int}/edit", response_class=HTMLResponse)
+@router.get("/{asset_ref:asset_ref}/edit", response_class=HTMLResponse)
 async def edit_asset_form(
     request: Request,
-    asset_id: int,
+    asset_ref: str,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    asset = await service.get_asset(tenant_db, asset_id)
+    asset = await service.get_asset_by_ref(tenant_db, asset_ref)
     if asset is None:
         return RedirectResponse("/assets", status_code=status.HTTP_303_SEE_OTHER)
     asset_types = await service.list_asset_types(tenant_db)
     fields = await service.fields_for_type(tenant_db, asset.asset_type_id)
     values = {fv.field_id: fv.value for fv in asset.field_values}
-    document_links = await document_service.links_for(tenant_db, "asset", asset_id)
-    linked_tickets = await ticket_service.list_tickets_for_asset(tenant_db, asset_id)
+    document_links = await document_service.links_for(tenant_db, "asset", asset.id)
+    linked_tickets = await ticket_service.list_tickets_for_asset(tenant_db, asset.id)
     return templates.TemplateResponse(
         request,
         "assets/form.html",
@@ -145,19 +168,19 @@ async def edit_asset_form(
     )
 
 
-@router.get("/{asset_id:int}/pdf")
+@router.get("/{asset_ref:asset_ref}/pdf")
 async def asset_pdf(
-    asset_id: int,
+    asset_ref: str,
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
-    asset = await service.get_asset(tenant_db, asset_id)
+    asset = await service.get_asset_by_ref(tenant_db, asset_ref)
     if asset is None:
         return RedirectResponse("/assets", status_code=status.HTTP_303_SEE_OTHER)
     fields = await service.fields_for_type(tenant_db, asset.asset_type_id)
     values = {fv.field_id: fv.value for fv in asset.field_values}
-    document_links = await document_service.links_for(tenant_db, "asset", asset_id)
-    linked_tickets = await ticket_service.list_tickets_for_asset(tenant_db, asset_id)
+    document_links = await document_service.links_for(tenant_db, "asset", asset.id)
+    linked_tickets = await ticket_service.list_tickets_for_asset(tenant_db, asset.id)
     pdf_bytes = render_pdf(
         "pdf/asset.html",
         {
@@ -170,11 +193,10 @@ async def asset_pdf(
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         },
     )
-    safe_name = "".join(c if c.isalnum() or c in "-_" else "-" for c in asset.name).strip("-") or "asset"
     return Response(
         pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="asset-{asset.id}-{safe_name}.pdf"'},
+        headers={"Content-Disposition": f'attachment; filename="{asset.ci_number}.pdf"'},
     )
 
 
@@ -260,6 +282,41 @@ async def create_type(
 ):
     tenant_db.add(AssetType(key=key.strip().lower(), name=name.strip(), icon=icon.strip() or None, description=description.strip() or None))
     await tenant_db.commit()
+    return RedirectResponse("/assets/types", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/types/{asset_type_id:int}/edit")
+async def edit_type(
+    asset_type_id: int,
+    key: str = Form(...),
+    name: str = Form(...),
+    icon: str = Form(""),
+    description: str = Form(""),
+    sort_order: int = Form(0),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    asset_type = await tenant_db.get(AssetType, asset_type_id)
+    if asset_type is not None:
+        asset_type.key = key.strip().lower()
+        asset_type.name = name.strip()
+        asset_type.icon = icon.strip() or None
+        asset_type.description = description.strip() or None
+        asset_type.sort_order = sort_order
+        await tenant_db.commit()
+    return RedirectResponse("/assets/types", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/types/{asset_type_id:int}/toggle")
+async def toggle_type(
+    asset_type_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    asset_type = await tenant_db.get(AssetType, asset_type_id)
+    if asset_type is not None:
+        asset_type.is_active = not asset_type.is_active
+        await tenant_db.commit()
     return RedirectResponse("/assets/types", status_code=status.HTTP_303_SEE_OTHER)
 
 

@@ -13,6 +13,7 @@ from starlette.convertors import Convertor, register_url_convertor
 from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
+from rain.modules.assets import service as asset_service
 from rain.modules.documents import service, storage, textbody
 from rain.modules.documents.schemas import LINKED_TYPES, MAX_UPLOAD_BYTES
 from rain.modules.tickets import service as ticket_service
@@ -195,12 +196,14 @@ async def document_detail(
         except FileNotFoundError:
             body_kind = None
     webhooks = await webhook_service.list_webhooks(tenant_db) if body_kind is not None else []
-    # So the Links tab can show "INC-000123" instead of a bare database id
-    # for ticket-typed links -- DocumentLink is polymorphic and doesn't
-    # eager-load a Ticket, so this is a small bulk lookup rather than
-    # widening the model.
+    # So the Links tab can show "INC-000123"/"CI-000123" instead of a bare
+    # database id for ticket-/asset-typed links -- DocumentLink is
+    # polymorphic and doesn't eager-load a Ticket or Asset, so these are
+    # small bulk lookups rather than widening the model.
     ticket_link_ids = [link.linked_id for link in doc.links if link.linked_type == "ticket"]
     ticket_numbers = await ticket_service.get_ticket_numbers(tenant_db, ticket_link_ids)
+    asset_link_ids = [link.linked_id for link in doc.links if link.linked_type == "asset"]
+    asset_numbers = await asset_service.get_ci_numbers(tenant_db, asset_link_ids)
     return templates.TemplateResponse(
         request,
         "documents/detail.html",
@@ -213,6 +216,7 @@ async def document_detail(
             "body_text": body_text,
             "webhooks": webhooks,
             "ticket_numbers": ticket_numbers,
+            "asset_numbers": asset_numbers,
         },
     )
 
@@ -428,31 +432,37 @@ async def link_existing_document(
             if doc is not None:
                 await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=linked_id, user_id=ctx.user.id)
     if linked_type == "asset":
-        return RedirectResponse(f"/assets/{linked_id}/edit", status_code=status.HTTP_303_SEE_OTHER)
-    return RedirectResponse(f"/tickets/{linked_id}", status_code=status.HTTP_303_SEE_OTHER)
+        asset = await asset_service.get_asset(tenant_db, linked_id)
+        return RedirectResponse(
+            f"/assets/{asset.ci_number if asset else linked_id}/edit", status_code=status.HTTP_303_SEE_OTHER
+        )
+    ticket = await ticket_service.get_ticket(tenant_db, linked_id)
+    return RedirectResponse(
+        f"/tickets/{ticket.ticket_number if ticket else linked_id}", status_code=status.HTTP_303_SEE_OTHER
+    )
 
 
 @router.post("/{document_id:int}/link")
 async def link_document(
     document_id: int,
     linked_type: str = Form(...),
-    linked_id: str = Form(""),
     ticket_ref: str = Form(""),
+    asset_ref: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     doc = await service.get_document(tenant_db, document_id)
-    # Tickets are picked by their pretty number (INC-000123) here, not a
-    # raw database id -- matches how every other ticket reference in the
-    # UI works post-pretty-URLs. Assets don't have an equivalent pretty
-    # ref yet, so that side keeps the plain numeric id field.
+    # Tickets and assets are both picked by their pretty number
+    # (INC-000123 / CI-000123) here, not a raw database id -- matches how
+    # every other reference in the UI works post-pretty-URLs.
     resolved_id: int | None = None
     if linked_type == "ticket":
         ticket = await ticket_service.get_ticket_by_ref(tenant_db, ticket_ref.strip()) if ticket_ref.strip() else None
         resolved_id = ticket.id if ticket is not None else None
-    elif linked_type == "asset" and linked_id.strip().isdigit():
-        resolved_id = int(linked_id)
+    elif linked_type == "asset":
+        asset = await asset_service.get_asset_by_ref(tenant_db, asset_ref.strip()) if asset_ref.strip() else None
+        resolved_id = asset.id if asset is not None else None
 
     if linked_type in LINKED_TYPES and resolved_id is not None:
         await service.add_link(tenant_db, document_id, linked_type, resolved_id, ctx.user.id)

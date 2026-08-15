@@ -24,23 +24,24 @@
   </div>
 
   <table>
-    <thead><tr><th>Name</th><th>Type</th><th>External ID</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Number</th><th>Name</th><th>Type</th><th>External ID</th><th>Status</th><th></th></tr></thead>
     <tbody>
       {% for asset in page.items %}
       <tr>
-        <td><a href="/assets/{{ asset.id }}/edit">{{ asset.name }}</a></td>
+        <td><a href="/assets/{{ asset.ci_number }}/edit">{{ asset.ci_number }}</a></td>
+        <td><a href="/assets/{{ asset.ci_number }}/edit">{{ asset.name }}</a></td>
         <td class="muted">{{ asset.asset_type.name if asset.asset_type else "-" }}</td>
         <td class="muted">{{ asset.external_id or "-" }}</td>
         <td><span class="badge">{{ asset.status }}</span></td>
         <td class="actions">
-          <a class="btn btn-sm" href="/assets/{{ asset.id }}/edit">Edit</a>
+          <a class="btn btn-sm" href="/assets/{{ asset.ci_number }}/edit">Edit</a>
           <form class="inline" method="post" action="/assets/{{ asset.id }}/delete" data-confirm="Delete {{ asset.name }}?">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="5" class="muted">No assets yet. <a href="/assets/new">Add the first one</a>.</td></tr>
+      <tr><td colspan="6" class="muted">No assets yet. <a href="/assets/new">Add the first one</a>.</td></tr>
       {% endfor %}
     </tbody>
   </table>

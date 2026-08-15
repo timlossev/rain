@@ -11,27 +11,54 @@
 
 <div class="card">
   <table>
-    <thead><tr><th>Key</th><th>Name</th><th>Custom fields</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Order</th><th>Key</th><th>Name</th><th>Custom fields</th><th>Status</th><th></th></tr></thead>
     <tbody>
       {% for t in page.items %}
       <tr>
+        <td class="muted">{{ t.sort_order }}</td>
         <td class="muted">{{ t.key }}</td>
         <td>{{ t.name }}</td>
         <td class="muted">{{ field_counts.get(t.id, 0) }}</td>
-        <td>{% if t.is_active %}<span class="badge badge-accent">active</span>{% else %}<span class="badge">inactive</span>{% endif %}</td>
+        <td>
+          <form class="inline" method="post" action="/assets/types/{{ t.id }}/toggle">
+            {% if t.is_active %}<button class="btn btn-sm" type="submit">active</button>
+            {% else %}<button class="btn btn-sm btn-danger" type="submit">inactive</button>{% endif %}
+          </form>
+        </td>
         <td class="actions">
+          {{ modal.trigger_button("asset-type-edit-" ~ t.id, "Edit", variant="btn-sm") }}
           <form class="inline" method="post" action="/assets/types/{{ t.id }}/delete" data-confirm="Delete asset type '{{ t.name }}'? This also deletes its assets.">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="5" class="muted">No asset types yet.</td></tr>
+      <tr><td colspan="6" class="muted">No asset types yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>
   {{ pg.render_pagination(page) }}
 </div>
+
+{# One modal per type -- kept outside the table alongside the "New asset
+   type" modal below, same reason as notification_channels.html's per-row
+   edit modals (a <div> can't legally live inside <tbody>). #}
+{% for t in page.items %}
+{% call modal.modal("asset-type-edit-" ~ t.id, "Edit asset type") %}
+  <form method="post" action="/assets/types/{{ t.id }}/edit">
+    <div class="form-row">
+      <div class="field"><label for="key-{{ t.id }}">Key</label><input type="text" id="key-{{ t.id }}" name="key" value="{{ t.key }}" pattern="[a-z][a-z0-9_]*" required></div>
+      <div class="field"><label for="name-{{ t.id }}">Name</label><input type="text" id="name-{{ t.id }}" name="name" value="{{ t.name }}" required></div>
+      <div class="field" style="flex:0 0 100px;"><label for="sort_order-{{ t.id }}">Order</label><input type="number" id="sort_order-{{ t.id }}" name="sort_order" value="{{ t.sort_order }}"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="icon-{{ t.id }}">Icon (optional)</label><input type="text" id="icon-{{ t.id }}" name="icon" value="{{ t.icon or '' }}" placeholder="server"></div>
+    </div>
+    <div class="field"><label for="description-{{ t.id }}">Description</label><textarea id="description-{{ t.id }}" name="description" rows="2">{{ t.description or '' }}</textarea></div>
+    <button class="btn btn-primary" type="submit">Save changes</button>
+  </form>
+{% endcall %}
+{% endfor %}
 
 {% call modal.modal("asset-type", "New asset type") %}
   <form method="post" action="/assets/types">

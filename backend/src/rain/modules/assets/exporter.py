@@ -14,6 +14,7 @@ from rain.core.xlsx_export import render_xlsx as _render_xlsx
 from rain.modules.assets import service
 
 BUILTIN_SOURCES = [
+    ("ci_number", "CI Number"),
     ("name", "Name"),
     ("external_id", "External ID"),
     ("status", "Status"),

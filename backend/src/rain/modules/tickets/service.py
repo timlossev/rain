@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 
 from sqlalchemy import Sequence, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,12 @@ from rain.db.tenant_models import (
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
 
 _SEQUENCE_NAMES = {"incident": "inc_number_seq", "vulnerability": "vuln_number_seq", "change": "chg_number_seq"}
+
+# Tolerant of a missing or partial zero-pad ("INC-1" as well as
+# "INC-000001") -- every number the app itself ever displays is already
+# zero-padded to 6 digits, but someone typing one from memory (or a
+# link/ticket_ref field) won't necessarily match that exactly.
+_TICKET_REF_RE = re.compile(r"^(INC|VULN|CHG)-(\d+)$", re.IGNORECASE)
 
 
 async def _next_ticket_number(db: AsyncSession, ticket_type: str) -> str:
@@ -181,14 +188,18 @@ async def get_ticket(db: AsyncSession, ticket_id: int) -> Ticket | None:
 
 
 async def get_ticket_by_ref(db: AsyncSession, ref: str) -> Ticket | None:
-    """`ref` is a ticket_number ("INC-000123"/"VULN-000045"/"CHG-000012")
-    -- the URL scheme ticket detail links use -- or, for back-compat with
-    any link/bookmark built before that switch, a bare integer id."""
+    """`ref` is a ticket_number ("INC-000123"/"VULN-000045"/"CHG-000012",
+    or the same with a short/unpadded number like "INC-123") -- the URL
+    scheme ticket detail links use -- or, for back-compat with any link/
+    bookmark built before that switch, a bare integer id."""
+    ref = ref.strip()
     if ref.isdigit():
         ticket = await get_ticket(db, int(ref))
         if ticket is not None:
             return ticket
-    result = await db.execute(_ticket_detail_stmt().where(Ticket.ticket_number == ref))
+    match = _TICKET_REF_RE.match(ref)
+    normalized = f"{match.group(1).upper()}-{int(match.group(2)):06d}" if match else ref
+    result = await db.execute(_ticket_detail_stmt().where(Ticket.ticket_number == normalized))
     return result.scalar_one_or_none()
 
 

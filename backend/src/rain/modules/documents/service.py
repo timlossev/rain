@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -12,6 +13,10 @@ from rain.modules.documents import storage, textbody
 from rain.modules.tickets import correlation as ticket_correlation
 from rain.modules.tickets import rules as ticket_rules
 from rain.modules.webhooks import service as webhook_service
+
+# Tolerant of a missing or partial zero-pad ("DOC-1" as well as
+# "DOC-000001") -- see rain.modules.tickets.service._TICKET_REF_RE.
+_DOC_REF_RE = re.compile(r"^DOC-(\d+)$", re.IGNORECASE)
 
 
 async def _next_doc_number(db: AsyncSession) -> str:
@@ -83,14 +88,18 @@ async def get_document(db: AsyncSession, document_id: int) -> Document | None:
 
 
 async def get_document_by_ref(db: AsyncSession, ref: str) -> Document | None:
-    """`ref` is a doc_number ("DOC-000123") -- the URL scheme document
-    detail links use -- or, for back-compat with any link/bookmark built
-    before that switch, a bare integer id."""
+    """`ref` is a doc_number ("DOC-000123", or the same with a short/
+    unpadded number like "DOC-123") -- the URL scheme document detail
+    links use -- or, for back-compat with any link/bookmark built before
+    that switch, a bare integer id."""
+    ref = ref.strip()
     if ref.isdigit():
         doc = await get_document(db, int(ref))
         if doc is not None:
             return doc
-    result = await db.execute(_document_detail_stmt().where(Document.doc_number == ref))
+    match = _DOC_REF_RE.match(ref)
+    normalized = f"DOC-{int(match.group(1)):06d}" if match else ref
+    result = await db.execute(_document_detail_stmt().where(Document.doc_number == normalized))
     return result.scalar_one_or_none()
 
 

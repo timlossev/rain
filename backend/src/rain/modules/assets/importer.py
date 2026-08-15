@@ -70,6 +70,7 @@ async def commit_import(
 
             if asset is None:
                 asset = Asset(
+                    ci_number=await service.next_ci_number(db),
                     asset_type_id=asset_type_id,
                     name=name,
                     external_id=external_id,

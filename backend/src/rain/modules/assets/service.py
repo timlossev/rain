@@ -2,13 +2,29 @@
 between the HTML router, importer, and exporter."""
 from __future__ import annotations
 
+import re
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import Sequence, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from rain.db.tenant_models import Asset, AssetFieldValue, AssetType, CustomField, ExportProfile
+
+# "CI-000123" -- Configuration Item, the same 6-digit zero-padded scheme
+# INC/VULN/CHG/DOC use (see rain.modules.tickets.service._next_ticket_number).
+_CI_REF_RE = re.compile(r"^CI-(\d+)$", re.IGNORECASE)
+
+
+async def next_ci_number(db: AsyncSession) -> str:
+    """Public (not the leading-underscore convention rain.modules.tickets.
+    service._next_ticket_number and rain.modules.documents.service.
+    _next_doc_number use) because, unlike those, asset creation happens in
+    two different callers -- router.py's create_asset and importer.py's
+    commit_import -- rather than a single create_asset() here."""
+    seq = Sequence("ci_number_seq")
+    next_val = await db.scalar(select(seq.next_value()))
+    return f"CI-{next_val:06d}"
 
 
 async def list_asset_types(db: AsyncSession, *, active_only: bool = False) -> list[AssetType]:
@@ -61,6 +77,34 @@ async def get_asset(db: AsyncSession, asset_id: int) -> Asset | None:
     stmt = asset_list_stmt().where(Asset.id == asset_id)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def get_asset_by_ref(db: AsyncSession, ref: str) -> Asset | None:
+    """`ref` is a ci_number ("CI-000123") -- the URL scheme asset detail
+    links use -- or, for back-compat with any link/bookmark built before
+    that switch, a bare integer id. Also tolerant of a missing or partial
+    zero-pad ("CI-2" as well as "CI-000002"), same as
+    rain.modules.tickets.service.get_ticket_by_ref."""
+    ref = ref.strip()
+    if ref.isdigit():
+        asset = await get_asset(db, int(ref))
+        if asset is not None:
+            return asset
+    match = _CI_REF_RE.match(ref)
+    normalized = f"CI-{int(match.group(1)):06d}" if match else ref
+    result = await db.execute(asset_list_stmt().where(Asset.ci_number == normalized))
+    return result.scalar_one_or_none()
+
+
+async def get_ci_numbers(db: AsyncSession, asset_ids: list[int]) -> dict[int, str]:
+    """Bulk id -> ci_number lookup -- e.g. for rendering a polymorphic
+    document link ("asset", linked_id) as CI-000123 instead of a bare
+    database id, without eager-loading a full Asset per row. See
+    rain.modules.tickets.service.get_ticket_numbers, same idea."""
+    if not asset_ids:
+        return {}
+    result = await db.execute(select(Asset.id, Asset.ci_number).where(Asset.id.in_(asset_ids)))
+    return {row.id: row.ci_number for row in result}
 
 
 async def set_field_values(db: AsyncSession, asset: Asset, values: dict[int, Any]) -> None:
