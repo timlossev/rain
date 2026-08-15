@@ -31,7 +31,7 @@
 
 <div class="card">
   <table>
-    <thead><tr><th>Order</th><th>Action</th><th>Match on</th><th>Pattern</th><th>Regex</th><th></th></tr></thead>
+    <thead><tr><th>Order</th><th>Action</th><th>Match on</th><th>Pattern</th><th>Regex</th><th>Status</th><th></th></tr></thead>
     <tbody>
       {% for s in page.items %}
       <tr>
@@ -40,19 +40,66 @@
         <td class="muted">{{ s.match_field }}</td>
         <td><code>{{ s.pattern }}</code></td>
         <td>{{ "yes" if s.is_regex else "-" }}</td>
+        <td>
+          <form class="inline" method="post" action="/admin/syslog-sources/{{ s.id }}/toggle">
+            {% if s.is_active %}<button class="btn btn-sm" type="submit">active</button>
+            {% else %}<button class="btn btn-sm btn-danger" type="submit">disabled</button>{% endif %}
+          </form>
+        </td>
         <td class="actions">
+          {{ modal.trigger_button("syslog-source-edit-" ~ s.id, "Edit", variant="btn-sm") }}
           <form class="inline" method="post" action="/admin/syslog-sources/{{ s.id }}/delete" data-confirm="Delete this rule?">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted">No rules yet -- every event will be dropped until a routing rule is added.</td></tr>
+      <tr><td colspan="7" class="muted">No rules yet -- every event will be dropped until a routing rule is added.</td></tr>
       {% endfor %}
     </tbody>
   </table>
   {{ pg.render_pagination(page) }}
 </div>
+
+{# One modal per rule -- kept outside the table alongside the "New
+   routing rule" modal below, same reason as notification_channels.html's
+   and assets/types.html's per-row edit modals (a <div> can't legally
+   live inside <tbody>). #}
+{% for s in page.items %}
+{% call modal.modal("syslog-source-edit-" ~ s.id, "Edit rule") %}
+  <form method="post" action="/admin/syslog-sources/{{ s.id }}/edit">
+    <div class="form-row">
+      <div class="field">
+        <label for="action-{{ s.id }}">Action</label>
+        <select id="action-{{ s.id }}" name="action" data-action-type-select>
+          <option value="route" {% if s.action == "route" %}selected{% endif %}>Route to tenant</option>
+          <option value="discard" {% if s.action == "discard" %}selected{% endif %}>Discard (drop matching events)</option>
+        </select>
+      </div>
+      <div class="field" data-action-fields="route">
+        <label for="tenant_id-{{ s.id }}">Tenant</label>
+        <select id="tenant_id-{{ s.id }}" name="tenant_id">
+          {% for t in tenants %}<option value="{{ t.id }}" {% if s.tenant_id == t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="match_field-{{ s.id }}">Match on</label>
+        <select id="match_field-{{ s.id }}" name="match_field">
+          <option value="host" {% if s.match_field == "host" %}selected{% endif %}>host</option>
+          <option value="program" {% if s.match_field == "program" %}selected{% endif %}>program</option>
+          <option value="message" {% if s.match_field == "message" %}selected{% endif %}>message (event body)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="pattern-{{ s.id }}">Pattern</label><input type="text" id="pattern-{{ s.id }}" name="pattern" value="{{ s.pattern }}" required></div>
+      <div class="field" style="flex:0 0 90px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_regex" {% if s.is_regex %}checked{% endif %}> Regex</label></div>
+      <div class="field" style="flex:0 0 90px;"><label for="sort_order-{{ s.id }}">Order</label><input type="number" id="sort_order-{{ s.id }}" name="sort_order" value="{{ s.sort_order }}"></div>
+    </div>
+    <button class="btn btn-primary" type="submit">Save changes</button>
+  </form>
+{% endcall %}
+{% endfor %}
 
 {% call modal.modal("syslog-source", "New rule") %}
   <form method="post" action="/admin/syslog-sources">

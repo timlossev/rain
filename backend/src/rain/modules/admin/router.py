@@ -395,6 +395,41 @@ async def syslog_sources_create(
     return RedirectResponse("/admin/syslog-sources", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.post("/syslog-sources/{source_id:int}/edit")
+async def syslog_sources_edit(
+    source_id: int,
+    action: str = Form("route"),
+    tenant_id: str = Form(""),
+    match_field: str = Form(...),
+    pattern: str = Form(...),
+    is_regex: bool = Form(False),
+    sort_order: int = Form(0),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    action = action if action == "discard" else "route"
+    async with control_session() as session:
+        row = await session.get(SyslogSourceMap, source_id)
+        if row is not None:
+            row.action = action
+            row.tenant_id = int(tenant_id) if action == "route" and tenant_id else None
+            row.match_field = match_field
+            row.pattern = pattern.strip()
+            row.is_regex = is_regex
+            row.sort_order = sort_order
+            await session.commit()
+    return RedirectResponse("/admin/syslog-sources", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/syslog-sources/{source_id:int}/toggle")
+async def syslog_sources_toggle(source_id: int, _: CurrentUser = Depends(require_internal_admin)):
+    async with control_session() as session:
+        row = await session.get(SyslogSourceMap, source_id)
+        if row is not None:
+            row.is_active = not row.is_active
+            await session.commit()
+    return RedirectResponse("/admin/syslog-sources", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.post("/syslog-sources/{source_id:int}/delete")
 async def syslog_sources_delete(source_id: int, _: CurrentUser = Depends(require_internal_admin)):
     async with control_session() as session:
