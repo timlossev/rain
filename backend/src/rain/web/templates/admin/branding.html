@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Branding - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Instance-wide look & feel -- instance name, accent color, logo, and font. Changes apply immediately across every tenant.{% endblock %}
+{% block help_text %}Instance-wide look & feel, and the public incident portal's per-tenant behavior. Instance name/color/logo/font apply immediately across every tenant; the portal settings below apply only to whichever tenant is currently active.{% endblock %}
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+{% if ctx.user.is_internal_admin %}
 <div class="card" style="max-width:520px;">
+  <div class="card-title">Instance branding</div>
   <form method="post" action="/admin/branding" enctype="multipart/form-data">
     <div class="form-row">
       <div class="field">
@@ -32,5 +35,26 @@
     </div>
     <button class="btn btn-primary" type="submit">Save</button>
   </form>
+</div>
+{% endif %}
+
+<div class="card" style="max-width:520px; margin-top:16px;">
+  <div class="card-title">Public incident portal</div>
+  {% if not portal_tenant %}
+  <p class="muted">Select a tenant (Admin &gt; Tenants &gt; Switch to) to configure its portal.</p>
+  {% else %}
+  <p class="field-hint" style="margin-top:0;">For <strong>{{ portal_tenant.name }}</strong>. A bare-bones page anyone with the link can use to file an incident, with no other navigation: <code>/portal/{{ portal_tenant.slug }}</code>.</p>
+  <form method="post" action="/admin/branding/portal">
+    <div class="field">
+      <label class="checkbox-row"><input type="checkbox" name="portal_require_auth" {% if portal_require_auth %}checked{% endif %}> Require sign-in</label>
+      <div class="field-hint">On: only signed-in users of this tenant can file through the portal. Off: anyone with the link can, and the ticket records "an unauthenticated user" as the reporter.</div>
+    </div>
+    <div class="field">
+      <label class="checkbox-row"><input type="checkbox" name="portal_branded" {% if portal_branded %}checked{% endif %}> Show instance branding</label>
+      <div class="field-hint">On: the portal shows this instance's logo, name, and accent color, same as every signed-in page. Off: a plain, unaccented page showing only "{{ portal_tenant.name }}" -- for a portal shared outside your own organization.</div>
+    </div>
+    <button class="btn btn-primary" type="submit">Save</button>
+  </form>
+  {% endif %}
 </div>
 {% endblock %}

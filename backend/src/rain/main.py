@@ -92,6 +92,7 @@ def create_app() -> FastAPI:
     from rain.modules.auth.router import router as auth_router
     from rain.modules.calendar.router import router as calendar_router
     from rain.modules.documents.router import router as documents_router
+    from rain.modules.portal.router import router as portal_router
     from rain.modules.search.router import router as search_router
     from rain.modules.setup.router import router as setup_router
     from rain.modules.tickets.live import router as tickets_live_router
@@ -106,6 +107,7 @@ def create_app() -> FastAPI:
     app.include_router(documents_router)
     app.include_router(calendar_router)
     app.include_router(search_router)
+    app.include_router(portal_router)
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz():

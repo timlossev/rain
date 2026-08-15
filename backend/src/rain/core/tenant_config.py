@@ -20,6 +20,12 @@ DEFAULTS: dict[str, Any] = {
     # like the 12h default is expressible exactly, not rounded to a
     # whole day.
     "event_retention_hours": 12,
+    # rain.modules.portal (the public "/portal/<slug>" incident intake
+    # page). Both default to the locked-down choice -- an admin opts a
+    # tenant *into* anonymous access and *into* dropping instance
+    # branding, not the other way around.
+    "portal_require_auth": True,
+    "portal_branded": True,
 }
 
 

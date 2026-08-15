@@ -56,6 +56,7 @@ async def create_ticket(
     end_date: dt.date | None = None,
     assignee_user_id: int | None = None,
     reporter_user_id: int | None = None,
+    reported_anonymously: bool = False,
 ) -> Ticket:
     ticket = Ticket(
         ticket_number=await _next_ticket_number(db, ticket_type),
@@ -72,6 +73,7 @@ async def create_ticket(
         end_date=end_date,
         assignee_user_id=assignee_user_id,
         reporter_user_id=reporter_user_id,
+        reported_anonymously=reported_anonymously,
     )
     db.add(ticket)
     await db.flush()
@@ -597,3 +599,29 @@ async def list_tickets_for_asset(db: AsyncSession, asset_id: int) -> list[Ticket
         select(Ticket).where(Ticket.asset_id == asset_id).order_by(Ticket.created_at.desc())
     )
     return list(result.scalars())
+
+
+async def list_tickets_reported_by(db: AsyncSession, user_id: int) -> list[dict]:
+    """Backs the incident portal's "Tickets reported by me" table
+    (rain.modules.portal). "Last update" is the more recent of the
+    ticket's own updated_at (bumped by any status/severity/title/
+    assignee/asset change -- see Ticket.updated_at's onupdate) and its
+    newest comment, since a comment alone doesn't touch the ticket row
+    itself; without folding that in, a ticket with only fresh comments
+    and no field changes would read as stale. Deliberately not the full
+    multi-source activity feed ticket detail builds (comments + every
+    change table) -- this is a glance-level preview, not the record."""
+    latest_comment = (
+        select(TicketComment.ticket_id, func.max(TicketComment.created_at).label("latest_comment_at"))
+        .group_by(TicketComment.ticket_id)
+        .subquery()
+    )
+    last_update = func.greatest(Ticket.updated_at, latest_comment.c.latest_comment_at).label("last_update_at")
+    stmt = (
+        select(Ticket, last_update)
+        .outerjoin(latest_comment, latest_comment.c.ticket_id == Ticket.id)
+        .where(Ticket.reporter_user_id == user_id)
+        .order_by(last_update.desc())
+    )
+    result = await db.execute(stmt)
+    return [{"ticket": ticket, "last_update_at": last_update_at} for ticket, last_update_at in result.all()]

@@ -27,7 +27,7 @@ from rain.core.security import hash_password
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.tenant_config import get_tenant_config, set_tenant_config
 from rain.core.user_names import resolve_user_names
-from rain.db.base import control_session
+from rain.db.base import control_session, tenant_session
 from rain.db.control_models import AuthProviderConfig, Session as SessionRow, SyslogSourceMap, Tenant, User
 from rain.db.provisioning import InvalidSlugError, provision_tenant
 from rain.db.tenant_models import (
@@ -61,15 +61,37 @@ async def dashboard(
     return templates.TemplateResponse(request, "admin/dashboard.html", {**nav, "ctx": ctx})
 
 
+async def _portal_settings(ctx: RequestContext) -> dict:
+    """The incident portal's two per-tenant flags (rain.modules.portal),
+    scoped to whichever tenant is currently active -- same "mixed
+    platform-wide + active-tenant" page shape Admin > Syslog Listener
+    already uses for its retention setting. Falls back to the (locked-
+    down) defaults with no tenant_session at all when no tenant is
+    active, rather than making one a hard requirement to even view this
+    page -- unlike every *other* tenant-scoped admin screen, Branding
+    has to stay reachable for an internal_admin who hasn't picked a
+    tenant yet, since it's also where instance-wide branding lives."""
+    if ctx.active_tenant is None:
+        return {"portal_require_auth": True, "portal_branded": True, "portal_tenant": None}
+    async with tenant_session(ctx.active_tenant.schema_name) as tenant_db:
+        return {
+            "portal_require_auth": await get_tenant_config(tenant_db, "portal_require_auth", True),
+            "portal_branded": await get_tenant_config(tenant_db, "portal_branded", True),
+            "portal_tenant": ctx.active_tenant,
+        }
+
+
 @router.get("/branding", response_class=HTMLResponse)
 async def branding_form(
     request: Request,
     ctx: RequestContext = Depends(get_request_context),
-    _: CurrentUser = Depends(require_internal_admin),
+    _: CurrentUser = Depends(require_admin),
 ):
     nav = await build_nav_context(ctx)
     return templates.TemplateResponse(
-        request, "admin/branding.html", {**nav, "ctx": ctx, "error": None, "font_choices": FONT_CHOICES}
+        request,
+        "admin/branding.html",
+        {**nav, "ctx": ctx, "error": None, "font_choices": FONT_CHOICES, **await _portal_settings(ctx)},
     )
 
 
@@ -99,8 +121,30 @@ async def branding_submit(
         except UploadError as exc:
             nav = await build_nav_context(ctx)
             return templates.TemplateResponse(
-                request, "admin/branding.html", {**nav, "ctx": ctx, "error": str(exc)}, status_code=400
+                request,
+                "admin/branding.html",
+                {**nav, "ctx": ctx, "error": str(exc), "font_choices": FONT_CHOICES, **await _portal_settings(ctx)},
+                status_code=400,
             )
+    return RedirectResponse("/admin/branding?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/branding/portal")
+async def branding_portal_submit(
+    portal_require_auth: bool = Form(False),
+    portal_branded: bool = Form(False),
+    ctx: RequestContext = Depends(get_request_context),
+    user: CurrentUser = Depends(require_admin),
+):
+    """Saves rain.modules.portal's two per-tenant flags for whichever
+    tenant is currently active. A no-op (not an error) with no active
+    tenant -- there's nothing to save into -- since the page that posts
+    here already hides this form in that case rather than blocking the
+    whole Branding screen on picking one first."""
+    if ctx.active_tenant is not None:
+        async with tenant_session(ctx.active_tenant.schema_name) as tenant_db:
+            await set_tenant_config(tenant_db, "portal_require_auth", portal_require_auth, updated_by=user.id)
+            await set_tenant_config(tenant_db, "portal_branded", portal_branded, updated_by=user.id)
     return RedirectResponse("/admin/branding?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -133,12 +177,12 @@ async def tenants_create(
     except InvalidSlugError as exc:
         nav = await build_nav_context(ctx)
         async with control_session() as session:
-            result = await session.execute(select(Tenant).order_by(Tenant.name))
-            tenants = list(result.scalars())
+            stmt = select(Tenant).order_by(Tenant.name)
+            tenant_page = await paginate(session, stmt, page=1)
         return templates.TemplateResponse(
             request,
             "admin/tenants.html",
-            {**nav, "ctx": ctx, "tenants": tenants, "error": str(exc)},
+            {**nav, "ctx": ctx, "page": tenant_page, "error": str(exc)},
             status_code=400,
         )
     return RedirectResponse("/admin/tenants", status_code=status.HTTP_303_SEE_OTHER)

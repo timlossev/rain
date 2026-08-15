@@ -126,6 +126,20 @@ nav_registry.register(
                         order=9,
                         roles=_TENANT_ADMIN_ROLES,
                     ),
+                    # Same /admin/branding page Platform Administration's
+                    # own "Branding" entry points at (it shows the
+                    # instance-wide section only to internal_admin) --
+                    # client_admin only here, so they still have a way to
+                    # reach their tenant's portal settings without also
+                    # duplicating an internal_admin's already-existing
+                    # link to the same page above.
+                    NavNode(
+                        key="admin-incident-portal",
+                        label="Incident Portal",
+                        href="/admin/branding",
+                        order=10,
+                        roles=("client_admin",),
+                    ),
                 ],
             ),
         ],

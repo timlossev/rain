@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ tenant.name }}: Report an Incident{% endblock %}
+{% block content_alone %}
+<div class="card auth-card wide portal-card{{ ' portal-unbranded' if not branded else '' }}">
+  {% if branded %}
+  <div class="brand">
+    {% if branding.logo_path %}<img class="brand-logo" src="{{ branding.logo_path }}" alt="">{% endif %}
+    <span class="brand-name">{{ branding.instance_name }}</span>
+  </div>
+  {% endif %}
+  <div style="text-align:center; margin-bottom:20px;">
+    <div style="font-size:1.15rem; font-weight:700;">{{ tenant.name }}</div>
+    <div class="muted">Report an incident{% if not user %}. No account needed{% endif %}.</div>
+  </div>
+
+  {% if wrong_tenant %}
+  <div class="flash flash-error">Your account isn't associated with {{ tenant.name }}'s incident portal.</div>
+  {% else %}
+
+  {% if created %}<div class="flash flash-ok">Submitted as <strong>{{ created }}</strong>.</div>{% endif %}
+  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+  <form method="post" action="/portal/{{ tenant.slug }}/tickets">
+    {% if interactions | length > 1 %}
+    <div class="field">
+      <label for="interaction">What do you need?</label>
+      <select id="interaction" name="interaction">
+        {% for value, label in interactions %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    {% else %}
+    <input type="hidden" name="interaction" value="{{ interactions[0][0] }}">
+    {% endif %}
+    <div class="field">
+      <label for="title">What's happening?</label>
+      <input type="text" id="title" name="title" placeholder="Short summary" required autofocus>
+    </div>
+    <div class="field">
+      <label for="description">Details (optional)</label>
+      <textarea id="description" name="description" rows="5"></textarea>
+    </div>
+    <div class="field">
+      <label for="severity">Criticality</label>
+      <select id="severity" name="severity">
+        {% for s in severities %}<option value="{{ s }}" {% if s == "medium" %}selected{% endif %}>{{ s | capitalize }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit" style="width:100%;">New ticket</button>
+  </form>
+
+  <div class="portal-section-title">Tickets reported by me</div>
+  {% if user %}
+  <table>
+    <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th><th>Last update</th></tr></thead>
+    <tbody>
+      {% for row in reported %}
+      <tr>
+        <td>{{ row.ticket.ticket_number }}</td>
+        <td>{{ row.ticket.title }}</td>
+        <td><span class="badge severity-{{ row.ticket.severity }}">{{ row.ticket.severity }}</span></td>
+        <td class="muted">{{ row.ticket.status }}</td>
+        <td class="muted">{{ row.last_update_at.strftime("%Y-%m-%d %H:%M") if row.last_update_at else "-" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No tickets reported yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted portal-signin-hint">Sign in to see tickets you've reported.</p>
+  {% endif %}
+
+  {% endif %}
+</div>
+{% endblock %}

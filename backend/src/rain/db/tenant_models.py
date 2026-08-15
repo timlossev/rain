@@ -403,6 +403,13 @@ class Ticket(TenantBase):
     is_chronic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     assignee_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reporter_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Set when this ticket was filed through the public incident portal
+    # (rain.modules.portal) by a visitor with no session at all --
+    # reporter_user_id stays null the same as any other unattributed
+    # ticket, but "Reported by" needs to say something more specific than
+    # "-" for this one case. Never true at the same time reporter_user_id
+    # is set (a signed-in portal submission attributes normally).
+    reported_anonymously: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
