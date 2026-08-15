@@ -15,6 +15,11 @@ dependencies = [
     # 49.0.0 fix outright regardless of a fresh `docker build`). Bumped
     # every ceiling to the ~latest available minor/patch line as of that
     # date; see the security-fix commit for the specific CVEs this closed.
+    # cryptography re-bumped 49->50 the same week for CVE-2026-69247
+    # (Bleichenbacher oracle in PKCS#7 EnvelopedData decryption) -- our
+    # own <50 ceiling was the same "excludes the actual fix" mistake
+    # again, caught by a second scan pass rather than by looking harder
+    # the first time.
     "fastapi>=0.141,<0.142",
     "uvicorn>=0.52,<0.53",
     "wsproto>=1.3,<2",
@@ -26,7 +31,7 @@ dependencies = [
     "jinja2>=3.1,<4",
     "python-multipart>=0.0.12,<0.1",
     "argon2-cffi>=25.1,<26",
-    "cryptography>=49,<50",
+    "cryptography>=50,<51",
     "aiosmtplib>=5.1,<6",
     "httpx>=0.28,<0.29",
     "xhtml2pdf>=0.2.17,<0.3",

@@ -13,7 +13,12 @@ COPY pyproject.toml ./
 COPY src ./src
 
 RUN python -m venv /venv \
- && /venv/bin/pip install --no-cache-dir --upgrade pip \
+ # >=26.1.2 explicitly, not just --upgrade to "whatever's latest today" --
+ # CVE-2026-8643 (pip could extract console_scripts/gui_scripts entry
+ # points outside the installation directory) was fixed there, and pip
+ # itself ships inside /venv in the final image (copied wholesale below),
+ # so an unpinned floor could silently regress under image layer caching.
+ && /venv/bin/pip install --no-cache-dir --upgrade "pip>=26.1.2" \
  && /venv/bin/pip install --no-cache-dir .
 
 FROM python:3.12-alpine
