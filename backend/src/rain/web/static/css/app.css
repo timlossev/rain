@@ -117,7 +117,8 @@ p { margin: 0 0 1em; }
 .topbar-user { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; color: var(--text-muted); }
 .search-snippet { font-size: 0.82rem; color: var(--text-muted); margin-top: 3px; }
 .search-snippet mark { background: color-mix(in srgb, var(--accent) 35%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }
-.session-tenant-badge { font-size: 0.8rem; color: var(--text-muted); padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-sunken); white-space: nowrap; }
+.session-tenant-badge { display: inline-flex; font-size: 0.8rem; color: var(--text-muted); padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-sunken); white-space: nowrap; text-decoration: none; }
+.session-tenant-badge:hover { border-color: var(--accent); text-decoration: none; }
 .session-tenant-badge strong { color: var(--text); }
 
 /* Generic click-toggle dropdown (rain.web.static.js.app.js's [data-menu]
@@ -516,7 +517,7 @@ form.inline { display: inline; }
 .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; }
 .panel-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
 /* List-page filter toolbar (Type pills, Status select, My/Unassigned/
-   Only Chronic quick filters, and "+ New ticket") -- one tinted, bordered
+   Only Problematic quick filters, and "+ New ticket") -- one tinted, bordered
    band so every list control -- filtering and the primary action alike --
    reads as a single toolbar instead of being split across disconnected
    rows. */
@@ -922,12 +923,12 @@ td.actions { text-align: right; white-space: nowrap; }
 .ticket-meta input[type=text] { height: 26px; padding: 0 8px; }
 .ticket-meta .btn-sm { height: 26px; }
 
-/* ---------- chronic flag (manually-set "recurring problem" marker) ---------- */
+/* ---------- problematic flag (manually-set "recurring problem" marker) ---------- */
 .ticket-title-cell { display: flex; align-items: center; gap: 6px; }
-.chronic-icon { display: inline-flex; flex-shrink: 0; color: #c2410c; }
-.chronic-icon svg { width: 15px; height: 15px; }
-.chronic-badge { gap: 5px; color: #c2410c; background: #ffedd5; border-color: transparent; }
-.chronic-badge svg { width: 13px; height: 13px; }
+.problematic-icon { display: inline-flex; flex-shrink: 0; color: #c2410c; }
+.problematic-icon svg { width: 15px; height: 15px; }
+.problematic-badge { gap: 5px; color: #c2410c; background: #ffedd5; border-color: transparent; }
+.problematic-badge svg { width: 13px; height: 13px; }
 
 /* Change tickets only: approved/unapproved indicator next to the title. */
 .approval-icon { display: inline-flex; flex-shrink: 0; }
@@ -981,8 +982,14 @@ td.actions { text-align: right; white-space: nowrap; }
    unaffected. */
 .portal-unbranded { --accent: #52525b; }
 .portal-card { width: 100%; max-width: 640px; }
+/* A signed-in visitor gets the wider layout (tabs: Report, Pending my
+   approval, Documents, plus a search bar) -- an anonymous one always sees
+   the original narrow single-purpose form, so this only ever applies
+   alongside markup that's itself gated on {% if user %}. */
+.portal-card.portal-authenticated { max-width: 960px; }
 .portal-section-title { font-size: 1rem; font-weight: 700; margin: 28px 0 12px; }
 .portal-signin-hint { margin-top: 10px; }
+.portal-search { margin-bottom: 20px; }
 
 @media (max-width: 860px) {
   .sidebar { position: fixed; inset: 0 auto 0 0; width: 272px !important; transform: translateX(-100%); transition: transform 0.2s ease; z-index: 20; }

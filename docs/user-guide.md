@@ -112,18 +112,19 @@ list with:
   type you're looking at.
 - A status dropdown that filters to one tenant-defined status.
 - Two quick-filter chips, "Mine" (tickets assigned to you) and
-  "Unassigned", plus a "Chronic" chip that shows only tickets flagged
-  chronic.
+  "Unassigned", plus a "Problematic" chip that shows only tickets
+  flagged problematic.
 - A sortable table: click any column header (Number, Title, Severity,
   Status, Created) to sort by it, click again to reverse direction.
-  Assignee and Asset columns are shown but not sortable.
+  Assignee and Asset columns are shown but not sortable; Asset links to
+  that asset's own page when the ticket has one.
 - A three-dot row menu on every ticket with: Mark closed, Mark/Unmark
-  chronic, Promote to Change (incidents and vulnerabilities only), Mark
-  cancelled (changes only), and Get a hard copy (PDF).
+  problematic, Promote to Change (incidents and vulnerabilities only),
+  Mark cancelled (changes only), and Get a hard copy (PDF).
 
 A change ticket's title in this list carries a small icon showing
-whether it's been approved yet, and any ticket flagged chronic shows a
-recurring-arrow icon next to its title.
+whether it's been approved yet, and any ticket flagged problematic shows
+a recurring-arrow icon next to its title.
 
 ### New ticket
 
@@ -154,13 +155,13 @@ The single-ticket page. At the top is a status stepper: one button per
 tenant-defined status, with the current one highlighted; clicking any
 other status moves the ticket there immediately. Next to it are
 quick actions: "Promote to Change" (incidents/vulnerabilities only),
-"Mark chronic" / "Unmark chronic", and "Export to PDF".
+"Mark problematic" / "Unmark problematic", and "Export to PDF".
 
 Below that is the main card:
 
 - Priority (severity) badge, editable inline: click the pencil icon,
   pick a new severity from the dropdown that appears, Save or Cancel.
-- A chronic badge if the ticket is flagged chronic.
+- A problematic badge if the ticket is flagged problematic.
 - A type badge (Incident/Vulnerability/Change).
 - The title, also editable inline the same way as severity.
 - The description, shown as plain read-only text (edit it via the

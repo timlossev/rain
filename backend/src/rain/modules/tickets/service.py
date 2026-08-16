@@ -7,6 +7,7 @@ from sqlalchemy import Sequence, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from rain.core.user_names import resolve_user_emails
 from rain.db.tenant_models import (
     ApprovalFlow,
     ApprovalFlowStep,
@@ -22,7 +23,9 @@ from rain.db.tenant_models import (
     TicketFieldChange,
     TicketStatus,
     TicketStatusChange,
+    TicketWatcher,
 )
+from rain.modules.tickets import notifications
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
 
 _SEQUENCE_NAMES = {"incident": "inc_number_seq", "vulnerability": "vuln_number_seq", "change": "chg_number_seq"}
@@ -135,7 +138,7 @@ def ticket_list_stmt(
     status: str | None = None,
     assigned_to: int | None = None,
     unassigned: bool = False,
-    chronic_only: bool = False,
+    problematic_only: bool = False,
     sort: str | None = None,
     direction: str = "desc",
 ):
@@ -162,8 +165,8 @@ def ticket_list_stmt(
         stmt = stmt.where(Ticket.assignee_user_id.is_(None))
     elif assigned_to is not None:
         stmt = stmt.where(Ticket.assignee_user_id == assigned_to)
-    if chronic_only:
-        stmt = stmt.where(Ticket.is_chronic.is_(True))
+    if problematic_only:
+        stmt = stmt.where(Ticket.is_problematic.is_(True))
     return stmt
 
 
@@ -222,10 +225,89 @@ async def get_ticket_numbers(db: AsyncSession, ticket_ids: list[int]) -> dict[in
     return {row.id: row.ticket_number for row in result}
 
 
+async def is_watching(db: AsyncSession, ticket_id: int, user_id: int) -> bool:
+    result = await db.execute(
+        select(TicketWatcher).where(TicketWatcher.ticket_id == ticket_id, TicketWatcher.user_id == user_id)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def add_watcher(db: AsyncSession, ticket_id: int, user_id: int) -> None:
+    if await is_watching(db, ticket_id, user_id):
+        return
+    db.add(TicketWatcher(ticket_id=ticket_id, user_id=user_id))
+    await db.commit()
+
+
+async def remove_watcher(db: AsyncSession, ticket_id: int, user_id: int) -> None:
+    result = await db.execute(
+        select(TicketWatcher).where(TicketWatcher.ticket_id == ticket_id, TicketWatcher.user_id == user_id)
+    )
+    watcher = result.scalar_one_or_none()
+    if watcher is not None:
+        await db.delete(watcher)
+        await db.commit()
+
+
+async def _watcher_user_ids(db: AsyncSession, ticket_id: int) -> set[int]:
+    result = await db.execute(select(TicketWatcher.user_id).where(TicketWatcher.ticket_id == ticket_id))
+    return set(result.scalars())
+
+
+async def _notify_watchers(
+    db: AsyncSession, ticket: Ticket, *, exclude_user_id: int | None, subject: str, body: str
+) -> None:
+    """Emails every watcher of ticket except exclude_user_id (the actor who
+    triggered this, if any) -- a silent no-op with no watchers, no
+    resolvable email address, or no SMTP configured (send_email's own
+    guard)."""
+    watcher_ids = await _watcher_user_ids(db, ticket.id)
+    watcher_ids.discard(exclude_user_id)
+    if not watcher_ids:
+        return
+    emails = await resolve_user_emails(watcher_ids)
+    recipients = [e for e in emails.values() if e]
+    if recipients:
+        await notifications.send_email(recipients, subject, body)
+
+
+async def _notify_approvers(db: AsyncSession, ticket: Ticket, step: ApprovalFlowStep) -> None:
+    """Emails the step's approver(s) -- the individual approver_user_id, or
+    every member of approver_group_id -- that a change ticket is waiting on
+    their decision. Same silent-no-op guards as _notify_watchers."""
+    user_ids: set[int] = set()
+    if step.approver_user_id is not None:
+        user_ids.add(step.approver_user_id)
+    elif step.approver_group_id is not None:
+        result = await db.execute(
+            select(GroupMembership.user_id).where(GroupMembership.group_id == step.approver_group_id)
+        )
+        user_ids |= set(result.scalars())
+    if not user_ids:
+        return
+    emails = await resolve_user_emails(user_ids)
+    recipients = [e for e in emails.values() if e]
+    if recipients:
+        await notifications.send_email(
+            recipients,
+            f"[RAIN] Approval needed: {ticket.ticket_number}",
+            f'{ticket.ticket_number}: {ticket.title}\n\nStep "{step.label}" is waiting on your approval.',
+        )
+
+
 async def add_comment(db: AsyncSession, ticket_id: int, author_user_id: int | None, body: str) -> TicketComment:
     comment = TicketComment(ticket_id=ticket_id, author_user_id=author_user_id, body=body)
     db.add(comment)
     await db.commit()
+    ticket = await db.get(Ticket, ticket_id)
+    if ticket is not None:
+        await _notify_watchers(
+            db,
+            ticket,
+            exclude_user_id=author_user_id,
+            subject=f"[RAIN] New comment on {ticket.ticket_number}",
+            body=f"{ticket.ticket_number}: {ticket.title}\n\n{body}",
+        )
     return comment
 
 
@@ -263,6 +345,13 @@ async def update_status(
         )
     )
     await db.commit()
+    await _notify_watchers(
+        db,
+        ticket,
+        exclude_user_id=changed_by_user_id,
+        subject=f"[RAIN] {ticket.ticket_number} status changed",
+        body=f"{ticket.ticket_number}: {ticket.title}\n\nStatus changed from {old_status} to {new_status}.",
+    )
     return True
 
 
@@ -308,7 +397,7 @@ async def log_field_change(
     commit: bool = True,
 ) -> None:
     """Appends a generic field-change activity entry. Public (not just
-    used by update_chronic/update_severity/update_title below, which
+    used by update_problematic/update_severity/update_title below, which
     take a from_value/to_value they've already computed) -- also called
     from outside this module (documents.router, platform_events'
     attach_document action) to log a document link/unlink against a
@@ -334,15 +423,15 @@ async def log_field_change(
         await db.commit()
 
 
-async def update_chronic(
-    db: AsyncSession, ticket: Ticket, is_chronic: bool, *, changed_by_user_id: int | None = None
+async def update_problematic(
+    db: AsyncSession, ticket: Ticket, is_problematic: bool, *, changed_by_user_id: int | None = None
 ) -> None:
-    if is_chronic == ticket.is_chronic:
+    if is_problematic == ticket.is_problematic:
         return
-    old_value, new_value = str(ticket.is_chronic).lower(), str(is_chronic).lower()
-    ticket.is_chronic = is_chronic
+    old_value, new_value = str(ticket.is_problematic).lower(), str(is_problematic).lower()
+    ticket.is_problematic = is_problematic
     await log_field_change(
-        db, ticket.id, "is_chronic", old_value, new_value, changed_by_user_id=changed_by_user_id, commit=False
+        db, ticket.id, "is_problematic", old_value, new_value, changed_by_user_id=changed_by_user_id, commit=False
     )
     await db.commit()
 
@@ -500,6 +589,7 @@ async def start_approval(db: AsyncSession, ticket: Ticket, flow_id: int | None) 
     first_step = min(flow.steps, key=lambda s: s.sort_order)
     db.add(ChangeApproval(ticket_id=ticket.id, flow_id=flow.id, current_step_order=first_step.sort_order))
     await db.commit()
+    await _notify_approvers(db, ticket, first_step)
 
 
 async def is_eligible_approver(db: AsyncSession, step: ApprovalFlowStep, user_id: int) -> bool:
@@ -550,6 +640,7 @@ async def decide_approval_step(
             comment=comment or None,
         )
     )
+    next_step: ApprovalFlowStep | None = None
     if decision == "rejected":
         approval.overall_status = "rejected"
         approval.completed_at = dt.datetime.now(dt.timezone.utc)
@@ -567,6 +658,36 @@ async def decide_approval_step(
         else:
             approval.current_step_order = next_step.sort_order
     await db.commit()
+    if next_step is not None:
+        ticket = await db.get(Ticket, approval.ticket_id)
+        if ticket is not None:
+            await _notify_approvers(db, ticket, next_step)
+
+
+async def list_tickets_pending_approval_for(db: AsyncSession, user_id: int) -> list[Ticket]:
+    """Change tickets whose approval is pending and currently sitting on a
+    step this user is eligible to decide -- named directly
+    (approver_user_id) or reachable via group membership
+    (approver_group_id) -- backing the client portal's "Pending my
+    approval" tab. Same eligibility rule as is_eligible_approver, just
+    evaluated as a set query instead of one step at a time."""
+    member_group_ids = select(GroupMembership.group_id).where(GroupMembership.user_id == user_id)
+    stmt = (
+        select(Ticket)
+        .join(ChangeApproval, ChangeApproval.ticket_id == Ticket.id)
+        .join(
+            ApprovalFlowStep,
+            (ApprovalFlowStep.flow_id == ChangeApproval.flow_id)
+            & (ApprovalFlowStep.sort_order == ChangeApproval.current_step_order),
+        )
+        .where(
+            ChangeApproval.overall_status == "pending",
+            (ApprovalFlowStep.approver_user_id == user_id) | (ApprovalFlowStep.approver_group_id.in_(member_group_ids)),
+        )
+        .order_by(Ticket.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars())
 
 
 async def get_event(db: AsyncSession, event_id: int) -> SyslogEvent | None:

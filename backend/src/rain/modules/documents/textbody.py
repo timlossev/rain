@@ -9,7 +9,11 @@ from pathlib import Path
 
 import markdown as _markdown
 
-TEXT_EXTENSIONS = {".txt", ".text", ".log"}
+#: Anything that just wants a plain textarea (no Markdown rendering) --
+#: XML/JSON included, since a config/manifest/API-response snapshot is
+#: exactly the kind of thing this repository is for and "plain text" is
+#: the right editing experience for it, not prose.
+TEXT_EXTENSIONS = {".txt", ".text", ".log", ".xml", ".json"}
 MARKDOWN_EXTENSIONS = {".md", ".markdown"}
 EDITABLE_EXTENSIONS = TEXT_EXTENSIONS | MARKDOWN_EXTENSIONS
 

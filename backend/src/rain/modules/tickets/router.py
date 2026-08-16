@@ -72,7 +72,7 @@ async def list_tickets(
     ticket_type: str | None = None,
     ticket_status: str | None = None,
     assigned: str | None = None,  # "me" | "unassigned" | None
-    chronic: str | None = None,  # "1" | None
+    problematic: str | None = None,  # "1" | None
     sort: str | None = None,
     dir: str = "desc",
     page: int = 1,
@@ -87,7 +87,7 @@ async def list_tickets(
         status=ticket_status,
         assigned_to=ctx.user.id if assigned == "me" else None,
         unassigned=assigned == "unassigned",
-        chronic_only=bool(chronic),
+        problematic_only=bool(problematic),
         sort=sort,
         direction=dir,
     )
@@ -108,7 +108,7 @@ async def list_tickets(
             "selected_type": ticket_type,
             "selected_status": ticket_status,
             "selected_assigned": assigned,
-            "selected_chronic": bool(chronic),
+            "selected_problematic": bool(problematic),
             "selected_sort": sort if sort in service.SORTABLE_COLUMNS else "created_at",
             "selected_dir": dir,
             "user_names": user_names,
@@ -386,7 +386,7 @@ async def decide_approval(
 
 def _build_activity(ticket: Ticket) -> list[dict]:
     """Comments, status changes, assignment changes, asset changes, field
-    changes (severity/chronic/title), and (change tickets only) approval
+    changes (severity/problematic/title), and (change tickets only) approval
     decisions interleaved into one chronological feed ("Activity"), each
     tagged with its kind so the caller (screen or PDF) can render them
     differently. Shared so the PDF export shows the same unified feed as
@@ -486,6 +486,8 @@ async def ticket_detail(
         elif ticket.approval is None:
             flows = await service.list_approval_flows(tenant_db)
 
+    is_watching = await service.is_watching(tenant_db, ticket.id, ctx.user.id)
+
     return templates.TemplateResponse(
         request,
         "tickets/detail.html",
@@ -504,6 +506,7 @@ async def ticket_detail(
             "can_decide": can_decide,
             "flows": flows,
             "group_names": group_names,
+            "is_watching": is_watching,
         },
     )
 
@@ -577,6 +580,25 @@ async def change_status(
     return RedirectResponse(f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.post("/{ticket_id:int}/watch/toggle")
+async def toggle_watch(
+    ticket_id: int,
+    watching: str = Form(...),  # "1" | "0" -- current value the button already shows, so this is a set not a flip
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is not None:
+        if watching == "1":
+            await service.add_watcher(tenant_db, ticket_id, ctx.user.id)
+        else:
+            await service.remove_watcher(tenant_db, ticket_id, ctx.user.id)
+    return RedirectResponse(
+        f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
 # ---------------------------------------------------- list quick-actions -
 
 # The three actions below back the per-row [...] menu on the tickets list
@@ -587,10 +609,10 @@ async def change_status(
 # by safe_relative_path since it's user-suppliable input.
 
 
-@router.post("/{ticket_id:int}/chronic/toggle")
-async def toggle_chronic(
+@router.post("/{ticket_id:int}/problematic/toggle")
+async def toggle_problematic(
     ticket_id: int,
-    is_chronic: str = Form(...),  # "1" | "0" -- current value the row already shows, so this is a set not a flip
+    is_problematic: str = Form(...),  # "1" | "0" -- current value the row already shows, so this is a set not a flip
     next: str = Form("/tickets"),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
@@ -598,7 +620,7 @@ async def toggle_chronic(
 ):
     ticket = await tenant_db.get(Ticket, ticket_id)
     if ticket is not None:
-        await service.update_chronic(tenant_db, ticket, is_chronic == "1", changed_by_user_id=ctx.user.id)
+        await service.update_problematic(tenant_db, ticket, is_problematic == "1", changed_by_user_id=ctx.user.id)
     return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
 
 

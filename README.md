@@ -55,7 +55,7 @@ JS framework in the browser.
 - A unified, chronological activity feed per ticket -- comments, field
   changes, assignment/asset changes, approval decisions, and rule
   firings, newest- or oldest-first
-- **Chronic flag** for recurring issues, shown in the list and on the
+- **Problematic flag** for recurring issues, shown in the list and on the
   ticket
 - Quick-action menu and filter chips on every ticket list
 - Branded PDF export of any ticket, including its full activity history

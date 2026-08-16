@@ -122,7 +122,7 @@
           <input type="text" name="q" placeholder="Search tickets, documents... or INC-000001" value="{{ q if request.url.path == '/search' else '' }}" aria-label="Search tickets and documents" autocomplete="off">
         </form>
         {% if ctx.active_tenant %}
-        <div class="session-tenant-badge" title="You're working in {{ ctx.active_tenant.name }}">Session for <strong>{{ ctx.active_tenant.name }}</strong></div>
+        <a class="session-tenant-badge" href="/portal/{{ ctx.active_tenant.slug }}" title="Open {{ ctx.active_tenant.name }}'s incident portal">Session for <strong>{{ ctx.active_tenant.name }}</strong></a>
         {% endif %}
         <div class="dropdown-menu" data-menu>
           <button type="button" class="dropdown-menu-btn user-menu-btn" data-menu-toggle aria-haspopup="true" aria-expanded="false" title="{{ ctx.user.display_name }}">

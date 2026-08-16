@@ -12,7 +12,7 @@
   <tr><th>Type</th><td>{{ ticket.ticket_type }}</td></tr>
   <tr><th>Status</th><td>{{ status_labels.get(ticket.status, ticket.status) }}</td></tr>
   <tr><th>Severity</th><td>{{ ticket.severity }}</td></tr>
-  <tr><th>Chronic</th><td>{{ "Yes" if ticket.is_chronic else "No" }}</td></tr>
+  <tr><th>Problematic</th><td>{{ "Yes" if ticket.is_problematic else "No" }}</td></tr>
   <tr><th>Asset</th><td>{{ ticket.asset.name if ticket.asset else "-" }}</td></tr>
   <tr><th>Assignee</th><td>{{ user_names.get(ticket.assignee_user_id, "Unassigned") }}</td></tr>
   <tr><th>Reported by</th><td>
@@ -72,7 +72,7 @@
     <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
     <div>
       {% if entry.item.field_name == "severity" %}Changed priority from {{ entry.item.from_value | capitalize }} to {{ entry.item.to_value | capitalize }}
-      {% elif entry.item.field_name == "is_chronic" %}{{ "Marked this ticket as chronic" if entry.item.to_value == "true" else "Unmarked this ticket as chronic" }}
+      {% elif entry.item.field_name == "is_problematic" %}{{ "Marked this ticket as problematic" if entry.item.to_value == "true" else "Unmarked this ticket as problematic" }}
       {% elif entry.item.field_name == "title" %}Renamed this from "{{ entry.item.from_value }}" to "{{ entry.item.to_value }}"
       {% elif entry.item.field_name == "document" %}{% if entry.item.to_value %}Linked document {{ entry.item.to_value }}{% else %}Unlinked document {{ entry.item.from_value }}{% endif %}
       {% elif entry.item.field_name == "platform_rule" %}Platform Response Rule {{ entry.item.from_value }} fired: {{ entry.item.to_value }}

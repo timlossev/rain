@@ -20,10 +20,14 @@
     {% if ticket.ticket_type in ("incident", "vulnerability") %}
     <a class="btn btn-sm" href="/tickets/new?ticket_type=change&amp;source_ticket_id={{ ticket.id }}">Promote to Change</a>
     {% endif %}
-    <form method="post" action="/tickets/{{ ticket.id }}/chronic/toggle" class="inline">
+    <form method="post" action="/tickets/{{ ticket.id }}/problematic/toggle" class="inline">
       <input type="hidden" name="next" value="/tickets/{{ ticket.ticket_number }}">
-      <input type="hidden" name="is_chronic" value="{{ '0' if ticket.is_chronic else '1' }}">
-      <button type="submit" class="btn btn-sm{% if ticket.is_chronic %} active{% endif %}">{{ "Unmark chronic" if ticket.is_chronic else "Mark chronic" }}</button>
+      <input type="hidden" name="is_problematic" value="{{ '0' if ticket.is_problematic else '1' }}">
+      <button type="submit" class="btn btn-sm{% if ticket.is_problematic %} active{% endif %}">{{ "Unmark problematic" if ticket.is_problematic else "Mark problematic" }}</button>
+    </form>
+    <form method="post" action="/tickets/{{ ticket.id }}/watch/toggle" class="inline">
+      <input type="hidden" name="watching" value="{{ '0' if is_watching else '1' }}">
+      <button type="submit" class="btn btn-sm{% if is_watching %} active{% endif %}">{{ "Stop watching" if is_watching else "Watch" }}</button>
     </form>
     <a class="btn btn-sm" href="/tickets/{{ ticket.id }}/pdf">Export to PDF</a>
   </div>
@@ -47,7 +51,7 @@
           <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
         </form>
       </span>
-      {% if ticket.is_chronic %}<span class="badge chronic-badge">{{ nav_icon("repeat") }} Chronic</span>{% endif %}
+      {% if ticket.is_problematic %}<span class="badge problematic-badge">{{ nav_icon("repeat") }} Problematic</span>{% endif %}
       <span class="badge badge-accent">{{ nav_icon("alert-triangle" if ticket.ticket_type == "incident" else ("shield" if ticket.ticket_type == "vulnerability" else "swap")) }} {{ ticket.ticket_type | capitalize }}</span>
     </div>
     <div class="ticket-title-edit" data-inline-edit>
@@ -209,8 +213,8 @@
       <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
       {% if entry.item.field_name == "severity" %}
       changed priority from <span class="badge severity-{{ entry.item.from_value }}">{{ entry.item.from_value | capitalize }}</span> to <span class="badge severity-{{ entry.item.to_value }}">{{ entry.item.to_value | capitalize }}</span>
-      {% elif entry.item.field_name == "is_chronic" %}
-      {{ "marked this ticket as chronic" if entry.item.to_value == "true" else "unmarked this ticket as chronic" }}
+      {% elif entry.item.field_name == "is_problematic" %}
+      {{ "marked this ticket as problematic" if entry.item.to_value == "true" else "unmarked this ticket as problematic" }}
       {% elif entry.item.field_name == "title" %}
       renamed this from &ldquo;{{ entry.item.from_value }}&rdquo; to &ldquo;{{ entry.item.to_value }}&rdquo;
       {% elif entry.item.field_name == "document" %}

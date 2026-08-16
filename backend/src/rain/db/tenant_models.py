@@ -400,7 +400,7 @@ class Ticket(TenantBase):
     # tickets closely enough to count occurrences without a real risk of
     # false positives (title text and asset alone both under- and
     # over-match in practice), so this stays a human judgment call.
-    is_chronic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    is_problematic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     assignee_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reporter_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Set when this ticket was filed through the public incident portal
@@ -455,6 +455,7 @@ class Ticket(TenantBase):
     approval: Mapped["ChangeApproval | None"] = relationship(
         back_populates="ticket", cascade="all, delete-orphan", uselist=False
     )
+    watchers: Mapped[list["TicketWatcher"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")
 
 
 class TicketComment(TenantBase):
@@ -524,13 +525,13 @@ class TicketAssetChange(TenantBase):
 
 class TicketFieldChange(TenantBase):
     """Generic audit trail entry for a simple field edit (severity,
-    is_chronic, title) that doesn't warrant its own dedicated table the
-    way status/assignee/asset changes do -- one row per edit, shown
+    is_problematic, title) that doesn't warrant its own dedicated table
+    the way status/assignee/asset changes do -- one row per edit, shown
     interleaved in the activity feed as a single "Date - Actor - Changed
     <field> from A to B" line, matching those other change kinds'
     formatting exactly (severity's A/B render as colored pills there,
     same as a status change's). field_name is one of "severity",
-    "is_chronic", "title"."""
+    "is_problematic", "title"."""
 
     __tablename__ = "ticket_field_changes"
 
@@ -543,6 +544,26 @@ class TicketFieldChange(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     ticket: Mapped[Ticket] = relationship(back_populates="field_changes")
+
+
+class TicketWatcher(TenantBase):
+    """A user who opted in to email notifications for a ticket's activity
+    (new comments, status changes) beyond the automatic set (assignee,
+    reporter, pending approvers) -- toggled via the "Watch" button on the
+    ticket detail page. Silent no-op if SMTP isn't configured, same as
+    every other notification path (see notifications.py's module
+    docstring)."""
+
+    __tablename__ = "ticket_watchers"
+    __table_args__ = (UniqueConstraint("ticket_id", "user_id", name="uq_ticket_watchers_ticket_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True)
+    # control.users id -- cross-schema, plain integer (see module docstring).
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    ticket: Mapped[Ticket] = relationship(back_populates="watchers")
 
 
 class ChangeApproval(TenantBase):

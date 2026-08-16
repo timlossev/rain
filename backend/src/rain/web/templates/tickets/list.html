@@ -9,18 +9,18 @@
    its current value except the one(s) passed in -- None means "keep
    current", "" means "explicitly clear". Used by every link in this page
    so clicking one filter/sort control never silently drops another. #}
-{% macro qs(type=none, status=none, assigned=none, chronic=none, sort=none, dir=none) %}
+{% macro qs(type=none, status=none, assigned=none, problematic=none, sort=none, dir=none) %}
 {%- set parts = [] -%}
 {%- set t = type if type is not none else selected_type -%}
 {%- set s = status if status is not none else selected_status -%}
 {%- set a = assigned if assigned is not none else selected_assigned -%}
-{%- set c = chronic if chronic is not none else ("1" if selected_chronic else "") -%}
+{%- set c = problematic if problematic is not none else ("1" if selected_problematic else "") -%}
 {%- set so = sort if sort is not none else selected_sort -%}
 {%- set d = dir if dir is not none else selected_dir -%}
 {%- if t %}{% set _ = parts.append("ticket_type=" ~ t) %}{% endif -%}
 {%- if s %}{% set _ = parts.append("ticket_status=" ~ s) %}{% endif -%}
 {%- if a %}{% set _ = parts.append("assigned=" ~ a) %}{% endif -%}
-{%- if c %}{% set _ = parts.append("chronic=" ~ c) %}{% endif -%}
+{%- if c %}{% set _ = parts.append("problematic=" ~ c) %}{% endif -%}
 {%- if so and so != "created_at" %}{% set _ = parts.append("sort=" ~ so) %}{% endif -%}
 {%- if d and d != "desc" %}{% set _ = parts.append("dir=" ~ d) %}{% endif -%}
 {{- parts | join("&") -}}
@@ -45,7 +45,7 @@
     <form method="get" action="/tickets" class="field" style="margin-bottom:0;">
       <input type="hidden" name="ticket_type" value="{{ selected_type }}">
       {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
-      {% if selected_chronic %}<input type="hidden" name="chronic" value="1">{% endif %}
+      {% if selected_problematic %}<input type="hidden" name="problematic" value="1">{% endif %}
       {% if selected_sort and selected_sort != "created_at" %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
       {% if selected_dir != "desc" %}<input type="hidden" name="dir" value="{{ selected_dir }}">{% endif %}
       <select id="ticket_status" name="ticket_status" onchange="this.form.submit()" aria-label="Status" title="Filter by status">
@@ -62,7 +62,7 @@
       <a class="btn btn-sm {% if selected_assigned == 'me' %}active{% endif %}" href="/tickets?{{ qs(assigned='me') }}">Mine</a>
       <a class="btn btn-sm {% if selected_assigned == 'unassigned' %}active{% endif %}" href="/tickets?{{ qs(assigned='unassigned') }}">Unassigned</a>
       {% if selected_assigned %}<a class="btn btn-sm" href="/tickets?{{ qs(assigned='') }}">All</a>{% endif %}
-      <a class="btn btn-sm {% if selected_chronic %}active{% endif %}" href="/tickets?{{ qs(chronic='' if selected_chronic else '1') }}">Chronic</a>
+      <a class="btn btn-sm {% if selected_problematic %}active{% endif %}" href="/tickets?{{ qs(problematic='' if selected_problematic else '1') }}">Problematic</a>
     </div>
   </div>
 </div>
@@ -87,7 +87,7 @@
         <td><a href="/tickets/{{ t.ticket_number }}">{{ t.ticket_number }}</a></td>
         <td>
           <div class="ticket-title-cell">
-            {% if t.is_chronic %}<span class="chronic-icon" title="Chronic: recurring issue">{{ nav_icon("repeat") }}</span>{% endif %}
+            {% if t.is_problematic %}<span class="problematic-icon" title="Problematic: recurring issue">{{ nav_icon("repeat") }}</span>{% endif %}
             {% if t.ticket_type == "change" %}
               {% if t.approval and t.approval.overall_status == "approved" %}
               <span class="approval-icon approval-icon-approved" title="Approved">{{ nav_icon("check-circle") }}</span>
@@ -104,7 +104,7 @@
         <td><span class="badge severity-{{ t.severity }}">{{ t.severity }}</span></td>
         <td><span class="status-pill" style="--pill-color: {{ status_colors.get(t.status, '#6b7280') }};">{{ t.status }}</span></td>
         <td class="muted">{{ user_names.get(t.assignee_user_id, "Unassigned") }}</td>
-        <td class="muted">{{ t.asset.name if t.asset else "-" }}</td>
+        <td class="muted">{% if t.asset %}<a href="/assets/{{ t.asset.ci_number }}/edit">{{ t.asset.name }}</a>{% else %}-{% endif %}</td>
         <td class="muted">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "-" }}</td>
         <td>
           <div class="dropdown-menu" data-menu>
@@ -116,10 +116,10 @@
                 <input type="hidden" name="next" value="/tickets?{{ qs() }}">
                 <button type="submit" class="row-menu-item">Mark closed</button>
               </form>
-              <form method="post" action="/tickets/{{ t.id }}/chronic/toggle">
+              <form method="post" action="/tickets/{{ t.id }}/problematic/toggle">
                 <input type="hidden" name="next" value="/tickets?{{ qs() }}">
-                <input type="hidden" name="is_chronic" value="{{ '0' if t.is_chronic else '1' }}">
-                <button type="submit" class="row-menu-item">{{ "Unmark chronic" if t.is_chronic else "Mark chronic" }}</button>
+                <input type="hidden" name="is_problematic" value="{{ '0' if t.is_problematic else '1' }}">
+                <button type="submit" class="row-menu-item">{{ "Unmark problematic" if t.is_problematic else "Mark problematic" }}</button>
               </form>
               {% if t.ticket_type in ("incident", "vulnerability") %}
               <a class="row-menu-item" href="/tickets/new?ticket_type=change&amp;source_ticket_id={{ t.id }}">Promote to Change</a>

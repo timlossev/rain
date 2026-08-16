@@ -37,6 +37,7 @@ from rain.core.tenancy import CurrentUser, get_current_user_optional
 from rain.core.tenant_config import get_tenant_configs
 from rain.db.base import control_session, tenant_session
 from rain.db.control_models import Tenant
+from rain.modules.documents import service as document_service
 from rain.modules.tickets import service as ticket_service
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
 from rain.web.templating import templates
@@ -166,6 +167,11 @@ async def portal_form(
         created_ticket = (
             await ticket_service.get_ticket_by_ref(tenant_db, created) if _TICKET_NUMBER_RE.match(created) else None
         )
+        # Only meaningful for a signed-in visitor -- an anonymous one never
+        # sees the tabbed layout these back (report.html gates both behind
+        # {% if user %}), so there's no reason to run either query for one.
+        pending_approval = await ticket_service.list_tickets_pending_approval_for(tenant_db, user.id) if user is not None else []
+        documents = await document_service.list_documents(tenant_db) if user is not None else []
 
     return templates.TemplateResponse(
         request,
@@ -177,6 +183,8 @@ async def portal_form(
             "interactions": PORTAL_INTERACTIONS,
             "severities": SEVERITIES,
             "reported": reported,
+            "pending_approval": pending_approval,
+            "documents": documents,
             "created": created_ticket.ticket_number if created_ticket is not None else "",
             "error": _PORTAL_ERRORS.get(error, ""),
         },

@@ -20,3 +20,15 @@ async def resolve_user_names(user_ids: set[int | None]) -> dict[int, str]:
     async with control_session() as session:
         result = await session.execute(select(User).where(User.id.in_(ids)))
         return {u.id: u.display_name for u in result.scalars()}
+
+
+async def resolve_user_emails(user_ids: set[int | None]) -> dict[int, str]:
+    """Same batched lookup as resolve_user_names, but for email addresses --
+    backs notification-trigger code (approval-pending emails, ticket
+    watchers) that needs a recipient address rather than a display name."""
+    ids = {i for i in user_ids if i is not None}
+    if not ids:
+        return {}
+    async with control_session() as session:
+        result = await session.execute(select(User).where(User.id.in_(ids)))
+        return {u.id: u.email for u in result.scalars()}
