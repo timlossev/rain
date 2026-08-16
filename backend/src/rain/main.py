@@ -15,11 +15,13 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from rain.core.config_store import config_store
+from rain.core.rbac import require_internal_admin
 from rain.core.tenancy import AuthRequiredError, CurrentUser, TenantRequiredError, get_current_user_optional
 from rain.db import migrate, provisioning
 from rain.db.base import dispose_engine
@@ -61,7 +63,12 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="RAIN", lifespan=lifespan, debug=settings.debug)
+    # docs_url/redoc_url/openapi_url=None turns off FastAPI's own public
+    # defaults for these three -- the app's own gated routes below replace
+    # them, behind require_internal_admin like every other platform-wide
+    # setting (rain.core.rbac), rather than leaving the API surface (schema,
+    # every route/param) world-readable to an unauthenticated caller.
+    app = FastAPI(title="RAIN", lifespan=lifespan, debug=settings.debug, docs_url=None, redoc_url=None, openapi_url=None)
 
     uploads_dir = Path(settings.uploads_dir)
     uploads_dir.mkdir(parents=True, exist_ok=True)
@@ -112,6 +119,21 @@ def create_app() -> FastAPI:
     @app.get("/healthz", include_in_schema=False)
     async def healthz():
         return {"status": "ok"}
+
+    # Gated replacements for FastAPI's own /docs, /redoc, /openapi.json
+    # (disabled above) -- internal_admin only, same bar as every other
+    # platform-wide setting (rain.core.rbac.require_internal_admin).
+    @app.get("/openapi.json", include_in_schema=False)
+    async def openapi_spec(_: CurrentUser = Depends(require_internal_admin)):
+        return JSONResponse(app.openapi())
+
+    @app.get("/docs", include_in_schema=False)
+    async def swagger_ui(_: CurrentUser = Depends(require_internal_admin)):
+        return get_swagger_ui_html(openapi_url="/openapi.json", title=f"{app.title} - API docs")
+
+    @app.get("/redoc", include_in_schema=False)
+    async def redoc_ui(_: CurrentUser = Depends(require_internal_admin)):
+        return get_redoc_html(openapi_url="/openapi.json", title=f"{app.title} - API docs")
 
     @app.get("/", include_in_schema=False)
     async def index(user: CurrentUser | None = Depends(get_current_user_optional)):

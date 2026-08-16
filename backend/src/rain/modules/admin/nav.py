@@ -53,6 +53,11 @@ nav_registry.register(
                     # (people/accounts vs. groups of them being far apart
                     # in a flat list was confusing).
                     NavNode(key="admin-users", label="Users", href="/admin/users", order=6, roles=("internal_admin",)),
+                    # The Swagger UI at /docs -- gated the same way as
+                    # every other platform-wide setting (require_internal_
+                    # admin, see rain.main's route for it), not FastAPI's
+                    # own public default.
+                    NavNode(key="admin-api-docs", label="API Documentation", href="/docs", order=7, roles=("internal_admin",)),
                 ],
             ),
             # Tenant-scoped settings -- reachable by internal_admin (for
