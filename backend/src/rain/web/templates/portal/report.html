@@ -1,138 +1,141 @@
 {% extends "base.html" %}
 {% block title %}{{ tenant.name }}: Report an Incident{% endblock %}
 {% block content_alone %}
-<div class="card auth-card wide portal-card{{ ' portal-authenticated' if user else '' }}{{ ' portal-unbranded' if not branded else '' }}">
-  {% if branded %}
-  <div class="brand">
-    {% if branding.logo_path %}<img class="brand-logo" src="{{ branding.logo_path }}" alt="">{% endif %}
-    <span class="brand-name">{{ branding.instance_name }}</span>
-  </div>
-  {% endif %}
-  <div style="text-align:center; margin-bottom:20px;">
-    <div style="font-size:1.15rem; font-weight:700;">{{ tenant.name }}</div>
-    <div class="muted">Report an incident{% if not user %}. No account needed{% endif %}.</div>
-  </div>
-
-  {% if created %}<div class="flash flash-ok">Submitted as <strong>{{ created }}</strong>.</div>{% endif %}
-  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
-
-  {% if user %}
-  {# The signed-in visitor's wider view: a search bar (same markup/route
-     as the authenticated app's topbar search -- works here too, since
-     this visitor already has a real session) and a tabbed layout adding
-     "Pending my approval" and "Documents" alongside the report form and
-     "Reported by me" this page has always had. Never shown to an
-     anonymous visitor -- that visitor gets exactly the original
-     single-purpose form below, untouched. #}
-  <form class="topbar-search portal-search" method="get" action="/search">
-    <span class="nav-icon topbar-search-icon">{{ nav_icon("search") }}</span>
-    <input type="text" name="q" placeholder="Search tickets, documents... or INC-000001" aria-label="Search tickets and documents" autocomplete="off">
-  </form>
-
-  <div data-tabs>
-    <div class="tab-buttons">
-      <button type="button" class="tab-btn active" data-tab-btn="report">Report</button>
-      <button type="button" class="tab-btn" data-tab-btn="approval">Pending my approval{% if pending_approval %} ({{ pending_approval | length }}){% endif %}</button>
-      <button type="button" class="tab-btn" data-tab-btn="documents">Documents</button>
+<div class="portal-shell{{ ' portal-authenticated' if user else '' }}{{ ' portal-unbranded' if not branded else '' }}">
+  <div class="portal-header">
+    {% if branded %}
+    <div class="brand">
+      {% if branding.logo_path %}<img class="brand-logo" src="{{ branding.logo_path }}" alt="">{% endif %}
+      <span class="brand-name">{{ branding.instance_name }}</span>
     </div>
-
-    <div class="tab-panel active" data-tab-panel="report">
-  {% endif %}
-
-  <form method="post" action="/portal/{{ tenant.slug }}/tickets">
-    {% if interactions | length > 1 %}
-    <div class="field">
-      <label for="interaction">What do you need?</label>
-      <select id="interaction" name="interaction">
-        {% for value, label in interactions %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
-      </select>
-    </div>
-    {% else %}
-    <input type="hidden" name="interaction" value="{{ interactions[0][0] }}">
     {% endif %}
-    <div class="field">
-      <label for="title">What's happening?</label>
-      <input type="text" id="title" name="title" placeholder="Short summary" required autofocus>
-    </div>
-    <div class="field">
-      <label for="description">Details (optional)</label>
-      <textarea id="description" name="description" rows="5"></textarea>
-    </div>
-    <div class="field">
-      <label for="severity">Criticality</label>
-      <select id="severity" name="severity">
-        {% for s in severities %}<option value="{{ s }}" {% if s == "medium" %}selected{% endif %}>{{ s | capitalize }}</option>{% endfor %}
-      </select>
-    </div>
-    <button class="btn btn-primary" type="submit" style="width:100%;">New ticket</button>
-  </form>
-
-  <div class="portal-section-title">Tickets reported by me</div>
-  {% if user %}
-  <table>
-    <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th><th>Last update</th></tr></thead>
-    <tbody>
-      {% for row in reported %}
-      <tr>
-        {# The linked page itself requires login (require_login, same as
-           every other ticket detail view) regardless of this tenant's
-           portal_require_auth setting -- and this table only ever
-           renders for a signed-in user to begin with (see the {% if
-           user %} above), so there's no path from here into a ticket
-           without already having a session. #}
-        <td><a href="/tickets/{{ row.ticket.ticket_number }}">{{ row.ticket.ticket_number }}</a></td>
-        <td>{{ row.ticket.title }}</td>
-        <td><span class="badge severity-{{ row.ticket.severity }}">{{ row.ticket.severity }}</span></td>
-        <td class="muted">{{ row.ticket.status }}</td>
-        <td class="muted">{{ row.last_update_at.strftime("%Y-%m-%d %H:%M") if row.last_update_at else "-" }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5" class="muted">No tickets reported yet.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="muted portal-signin-hint">Sign in to see tickets you've reported.</p>
-  {% endif %}
-
-  {% if user %}
-    </div>
-
-    <div class="tab-panel" data-tab-panel="approval">
-      <table>
-        <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th></tr></thead>
-        <tbody>
-          {% for t in pending_approval %}
-          <tr>
-            <td><a href="/tickets/{{ t.ticket_number }}">{{ t.ticket_number }}</a></td>
-            <td>{{ t.title }}</td>
-            <td><span class="badge severity-{{ t.severity }}">{{ t.severity }}</span></td>
-            <td class="muted">{{ t.status }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="4" class="muted">Nothing waiting on your approval.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="tab-panel" data-tab-panel="documents">
-      <table>
-        <thead><tr><th>Number</th><th>Title</th><th>Updated</th></tr></thead>
-        <tbody>
-          {% for d in documents %}
-          <tr>
-            <td><a href="/documents/{{ d.doc_number }}">{{ d.doc_number }}</a></td>
-            <td>{{ d.title }}</td>
-            <td class="muted">{{ d.updated_at.strftime("%Y-%m-%d %H:%M") if d.updated_at else "-" }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="3" class="muted">No documents yet.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <span class="portal-tenant-pill">{{ tenant.name }}</span>
   </div>
-  {% endif %}
+
+  <div class="card portal-card">
+    <div class="muted" style="margin-bottom:20px;">Report an incident{% if not user %}. No account needed{% endif %}.</div>
+
+    {% if created %}<div class="flash flash-ok">Submitted as <strong>{{ created }}</strong>.</div>{% endif %}
+    {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+    {% if user %}
+    {# The signed-in visitor's wider view: a search bar (same markup/route
+       as the authenticated app's topbar search -- works here too, since
+       this visitor already has a real session) and a tabbed layout adding
+       Approvals and Documents alongside Tickets (the report form and
+       "reported by me" this page has always had). Never shown to an
+       anonymous visitor -- that visitor gets exactly the original
+       single-purpose form below, untouched. #}
+    <form class="topbar-search portal-search" method="get" action="/search">
+      <span class="nav-icon topbar-search-icon">{{ nav_icon("search") }}</span>
+      <input type="text" name="q" placeholder="Search tickets, documents... or INC-000001" aria-label="Search tickets and documents" autocomplete="off">
+    </form>
+
+    <div data-tabs>
+      <div class="tab-buttons">
+        <button type="button" class="tab-btn active" data-tab-btn="tickets">Tickets</button>
+        <button type="button" class="tab-btn" data-tab-btn="approvals">Approvals{% if pending_approval %} ({{ pending_approval | length }}){% endif %}</button>
+        <button type="button" class="tab-btn" data-tab-btn="documents">Documents</button>
+      </div>
+
+      <div class="tab-panel active" data-tab-panel="tickets">
+    {% endif %}
+
+    <form method="post" action="/portal/{{ tenant.slug }}/tickets">
+      {% if interactions | length > 1 %}
+      <div class="field">
+        <label for="interaction">What do you need?</label>
+        <select id="interaction" name="interaction">
+          {% for value, label in interactions %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      {% else %}
+      <input type="hidden" name="interaction" value="{{ interactions[0][0] }}">
+      {% endif %}
+      <div class="field">
+        <label for="title">What's happening?</label>
+        <input type="text" id="title" name="title" placeholder="Short summary" required autofocus>
+      </div>
+      <div class="field">
+        <label for="description">Details (optional)</label>
+        <textarea id="description" name="description" rows="5"></textarea>
+      </div>
+      <div class="field">
+        <label for="severity">Criticality</label>
+        <select id="severity" name="severity">
+          {% for s in severities %}<option value="{{ s }}" {% if s == "medium" %}selected{% endif %}>{{ s | capitalize }}</option>{% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">New ticket</button>
+    </form>
+
+    <div class="portal-section-title">Tickets reported by me</div>
+    {% if user %}
+    <table>
+      <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th><th>Last update</th></tr></thead>
+      <tbody>
+        {% for row in reported %}
+        <tr>
+          {# The linked page itself requires login (require_login, same as
+             every other ticket detail view) regardless of this tenant's
+             portal_require_auth setting -- and this table only ever
+             renders for a signed-in user to begin with (see the {% if
+             user %} above), so there's no path from here into a ticket
+             without already having a session. #}
+          <td><a href="/tickets/{{ row.ticket.ticket_number }}">{{ row.ticket.ticket_number }}</a></td>
+          <td>{{ row.ticket.title }}</td>
+          <td><span class="badge severity-{{ row.ticket.severity }}">{{ row.ticket.severity }}</span></td>
+          <td class="muted">{{ row.ticket.status }}</td>
+          <td class="muted">{{ row.last_update_at.strftime("%Y-%m-%d %H:%M") if row.last_update_at else "-" }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="muted">No tickets reported yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted portal-signin-hint">Sign in to see tickets you've reported.</p>
+    {% endif %}
+
+    {% if user %}
+      </div>
+
+      <div class="tab-panel" data-tab-panel="approvals">
+        <table>
+          <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for t in pending_approval %}
+            <tr>
+              <td><a href="/tickets/{{ t.ticket_number }}">{{ t.ticket_number }}</a></td>
+              <td>{{ t.title }}</td>
+              <td><span class="badge severity-{{ t.severity }}">{{ t.severity }}</span></td>
+              <td class="muted">{{ t.status }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="muted">Nothing waiting on your approval.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tab-panel" data-tab-panel="documents">
+        <table>
+          <thead><tr><th>Number</th><th>Title</th><th>Updated</th></tr></thead>
+          <tbody>
+            {% for d in documents %}
+            <tr>
+              <td><a href="/documents/{{ d.doc_number }}">{{ d.doc_number }}</a></td>
+              <td>{{ d.title }}</td>
+              <td class="muted">{{ d.updated_at.strftime("%Y-%m-%d %H:%M") if d.updated_at else "-" }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="muted">No documents yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

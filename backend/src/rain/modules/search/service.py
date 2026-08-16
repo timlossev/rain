@@ -18,14 +18,14 @@ from markupsafe import Markup, escape
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from rain.db.tenant_models import Document, Ticket
+from rain.db.tenant_models import Asset, Document, Ticket
 
-# Recognizes a ticket/document number typed by hand, tolerant of a
+# Recognizes a ticket/document/asset number typed by hand, tolerant of a
 # missing or partial zero-pad (e.g. "inc-1" as well as "INC-000001") --
 # every number the app itself ever displays is already zero-padded to 6
 # digits, but someone typing one from memory won't necessarily match that
 # exactly.
-_NUMBER_RE = re.compile(r"^(INC|VULN|CHG|DOC)-0*(\d+)$", re.IGNORECASE)
+_NUMBER_RE = re.compile(r"^(INC|VULN|CHG|DOC|CI)-0*(\d+)$", re.IGNORECASE)
 
 # Sentinel bytes ts_headline wraps a match in -- swapped for real <mark>
 # tags only *after* escaping the rest of the snippet (see _headline_to_html),
@@ -36,7 +36,7 @@ _HL_START, _HL_STOP = "\x01", "\x02"
 
 @dataclass
 class SearchResult:
-    kind: str  # "ticket" | "document"
+    kind: str  # "ticket" | "document" | "asset"
     id: int
     number: str
     title: str
@@ -52,8 +52,12 @@ def _headline_to_html(raw: str | None) -> Markup | None:
 
 
 async def find_by_number(db: AsyncSession, query: str) -> SearchResult | None:
-    """An exact ticket/document number takes the searcher straight to that
-    one record instead of a results page that could only ever contain it."""
+    """An exact ticket/document/asset number takes the searcher straight to
+    that one record instead of a results page that could only ever contain
+    it. Assets aren't otherwise part of search() below (no search_vector
+    column -- see this module's docstring on what Search covers), but a
+    typed-in CI number is still an exact, unambiguous lookup the same way
+    a ticket/document number is."""
     match = _NUMBER_RE.match(query.strip())
     if not match:
         return None
@@ -66,6 +70,13 @@ async def find_by_number(db: AsyncSession, query: str) -> SearchResult | None:
         if doc is None:
             return None
         return SearchResult(kind="document", id=doc.id, number=doc.doc_number, title=doc.title, snippet=None, href=f"/documents/{doc.doc_number}")
+
+    if prefix == "CI":
+        result = await db.execute(select(Asset).where(Asset.ci_number == number))
+        asset = result.scalar_one_or_none()
+        if asset is None:
+            return None
+        return SearchResult(kind="asset", id=asset.id, number=asset.ci_number, title=asset.name, snippet=None, href=f"/assets/{asset.ci_number}/edit")
 
     result = await db.execute(select(Ticket).where(Ticket.ticket_number == number))
     ticket = result.scalar_one_or_none()

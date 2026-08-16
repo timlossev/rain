@@ -203,6 +203,27 @@ creation. The outbound SMTP relay is instance-wide
 Fernet-encrypted); *who* gets notified is per-tenant
 (`notification_channels`, config Fernet-encrypted the same way).
 
+**Correlation Rules.** `rain.modules.tickets.correlation`, evaluated
+alongside the single-event rule engine above, once per persisted event.
+`CorrelationRule.rule_type` picks one of two ways to decide "this is
+worth a ticket": `threshold` counts matching events in a trailing
+window (a plain bounded SQL query re-run on each new event -- no
+streaming engine, since the new event is the only thing that can ever
+push the count over the line); `ml_anomaly` scores each matching event
+against a per rule+group_key online model (`river.anomaly.HalfSpaceTrees`,
+trained on severity/message-length/hour-of-day -- deliberately small
+and numeric, not an NLP pass over the message) and fires once the score
+clears a threshold, after a warm-up count of events. A model's pickled
+state persists on `CorrelationRuleState.ml_model`, read/written under
+`SELECT ... FOR UPDATE` since scoring-then-training is a read-modify-
+write, not a single atomic statement the way the threshold path's
+last-fired timestamp bump is; the row is only ever written with bytes
+this module just pickled itself, never with anything from a request, so
+unpickling it back isn't a deserialization-of-untrusted-input concern.
+Both rule types share the same cooldown/group-by/asset-link mechanics
+and the same `New rule` modal, split into "Simple repetition" / "ML
+anomalies" tabs.
+
 **Export.** `GET/POST /tickets/export/run` -- fixed-column CSV/JSON
 (tickets don't carry custom fields the way assets do, so this skips the
 Asset Registry exporter's configurable-column picker).

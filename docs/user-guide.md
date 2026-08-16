@@ -264,23 +264,43 @@ creating anything.
 ### Correlation Rules
 
 At Tickets > Correlation Rules. Where a promotion policy reacts to one
-event, a correlation rule reacts to a count of events: when enough
-events matching its pattern land within a trailing time window, one
-ticket is created. Fields, on top of the same
-name/pattern/match-on/severity/ticket-type/order used by promotion
-policies:
+event, a correlation rule reacts across multiple events. The "New rule"
+form splits into two tabs for the two ways a rule can decide that:
+
+**Simple repetition** -- when enough events matching its pattern land
+within a trailing time window, one ticket is created.
 
 - Threshold (events): how many matching events must land within the
   window before a ticket is created.
-- Window (minutes): the trailing window the threshold is measured
-  over.
-- Group by: none, host, or program. "None" correlates across every
-  matching event tenant-wide into one shared count; "host" or "program"
-  gives each distinct value its own count and, if it crosses the
-  threshold, its own ticket.
+
+**ML anomalies** -- an online model learns what this rule's traffic
+normally looks like (from each matching event's severity, message
+length, and time of day) and fires on an event that doesn't fit,
+instead of a fixed count.
+
+- Anomaly score threshold: how unusual (0-1, higher = more unusual) a
+  new event's score must be to fire a ticket.
+- Warm-up events: how many events the model sees before it's allowed to
+  fire at all, so a brand new rule doesn't flag its own cold start as
+  anomalous.
+
+Fields shared by both, on top of the same
+name/pattern/match-on/severity/ticket-type/order used by promotion
+policies:
+
+- Pattern: leave blank to consider every event; narrow it to scope
+  either kind of rule to a slice of traffic first.
+- Window (minutes): for Simple repetition, the trailing window the
+  threshold is measured over; for ML anomalies, the cooldown before the
+  same rule (and group) can fire again.
+- Group by: none, host, or program. "None" correlates (or, for ML
+  anomalies, trains) across every matching event tenant-wide as one;
+  "host" or "program" gives each distinct value its own count/model
+  and, if it fires, its own ticket.
 - Title template, with `{count}`, `{window}`, `{message}`, `{host}`,
   and `{program}` placeholders (the last three come from the most
-  recent contributing event).
+  recent contributing event), plus `{score}` for ML anomalies. Leave
+  blank for a sensible default.
 - Auto-link asset by, same as promotion policies but matched against
   the most recent contributing event.
 
@@ -288,8 +308,8 @@ Once a rule (or a rule and group, if grouped) fires, it re-arms only
 after its window has elapsed, so a single burst of activity produces
 one ticket, not one per event past the threshold. Each rule also has a
 toggle button to enable or disable it without deleting it, and a "New
-rule" form pre-fills from whatever events you had selected if you got
-here via Events' "Correlate these" action.
+rule" form pre-fills the Simple repetition tab from whatever events you
+had selected if you got here via Events' "Correlate these" action.
 
 ### Platform Response Rules
 

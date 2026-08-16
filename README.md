@@ -33,8 +33,12 @@ JS framework in the browser.
   live event feed
 - **Event Promotion Policies**: regex rules that auto-promote a matching
   syslog event into an incident or vulnerability ticket
-- **Correlation Rules**: promote based on how many matching events land
-  within a trailing time window, optionally grouped per host/program
+- **Correlation Rules**: two ways to promote across multiple events
+  instead of just one -- Simple repetition counts how many matching
+  events land within a trailing time window; ML anomalies trains an
+  online model (Python's River, `HalfSpaceTrees`) per rule that learns
+  normal traffic and fires on a genuinely unusual event instead of a
+  fixed count. Both are optionally grouped per host/program
 - **Platform Response Rules**: react to new tickets by notifying Slack or
   email, calling a webhook, or attaching a document or asset -- every
   matching rule fires, and every firing is logged to the ticket

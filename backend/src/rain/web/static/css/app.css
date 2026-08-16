@@ -975,18 +975,45 @@ td.actions { text-align: right; white-space: nowrap; }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
 
 /* ---------- public incident portal (rain.modules.portal) ---------- */
-/* Scoped override, not a change to :root -- only this page's own card
-   (buttons, focus rings, the severity select) should go neutral when a
-   tenant has turned instance branding off for it; every other page's
-   --accent (including this same tenant's authenticated app view) is
-   unaffected. */
-.portal-unbranded { --accent: #52525b; }
-.portal-card { width: 100%; max-width: 640px; }
-/* A signed-in visitor gets the wider layout (tabs: Report, Pending my
-   approval, Documents, plus a search bar) -- an anonymous one always sees
-   the original narrow single-purpose form, so this only ever applies
+/* .content-standalone (base.html's <main> for login/setup/portal alike)
+   is a centered flexbox -- fine for a single fixed-size card, but wrong
+   here: it recenters vertically every time a tab panel's height changes
+   (Tickets vs. Approvals vs. Documents), so switching tabs visibly
+   jumped the whole page. This :has() override (same technique as
+   .shell:has(.sidebar.collapsed) above) drops back to normal top-down
+   block flow only when a .portal-shell is present -- login/setup, the
+   only other .content-standalone users, are untouched -- and
+   .portal-shell's own padding-top holds the header a fixed distance
+   from the top of the viewport regardless of what's below it. */
+.content-standalone:has(.portal-shell) { display: block; padding-top: 56px; }
+.portal-shell { width: 100%; max-width: 640px; margin: 0 auto; }
+/* A signed-in visitor gets the wider layout (tabs: Tickets, Approvals,
+   Documents, plus a search bar) -- an anonymous one always sees the
+   original narrow single-purpose form, so this only ever applies
    alongside markup that's itself gated on {% if user %}. */
-.portal-card.portal-authenticated { max-width: 960px; }
+.portal-shell.portal-authenticated { max-width: 960px; }
+/* Scoped override, not a change to :root -- only this page's own header
+   pill and card (buttons, focus rings, the severity select) should go
+   neutral when a tenant has turned instance branding off for it; every
+   other page's --accent (including this same tenant's authenticated app
+   view) is unaffected. */
+.portal-shell.portal-unbranded { --accent: #52525b; }
+.portal-header { display: flex; align-items: center; margin-bottom: 20px; }
+.portal-header .brand { padding: 0; }
+.portal-header .brand-name { color: var(--text); font-size: 1.1rem; }
+.portal-tenant-pill {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  background: var(--surface);
+  white-space: nowrap;
+}
+.portal-card { width: 100%; }
 .portal-section-title { font-size: 1rem; font-weight: 700; margin: 28px 0 12px; }
 .portal-signin-hint { margin-top: 10px; }
 .portal-search { margin-bottom: 20px; }
