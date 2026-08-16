@@ -39,6 +39,22 @@ services:
       # Never true against a real deployment -- puts full tracebacks
       # (source paths, local variables, SQL text) in 500 responses.
       DEBUG: ${DEBUG:-false}
+      # Document repository storage -- local disk (the rain_uploads
+      # volume below) unless S3_BUCKET is set. See .env.example and
+      # rain.modules.documents.storage.
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      # Folds the worker's syslog listener + rule engine + notifications +
+      # calendar sweep + LDAP sync into this same container -- see
+      # .env.example's "Minimal mode" section and docker-compose.minimal.yml,
+      # which adds the syslog port mapping this container doesn't declare
+      # by default (it would conflict with the separate worker service's
+      # own mapping of the same host port in the normal two-container
+      # topology this is off in).
+      EMBED_WORKER: ${EMBED_WORKER:-false}
     ports:
       - "${APP_PORT:-8000}:${APP_PORT:-8000}"
     volumes:
@@ -58,10 +74,22 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     command: ["rain-worker"]
+    # Off when EMBED_WORKER=true in .env (its own duties folded into the
+    # app container instead -- "minimal mode", see .env.example) -- also
+    # drop "worker" from COMPOSE_PROFILES there when you do.
+    profiles: ["worker"]
     environment:
       DATABASE_URL: ${POSTGRES_URL:-postgresql+asyncpg://${POSTGRES_USER:-rain}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rain}}
       APP_SECRET_KEY: ${APP_SECRET_KEY}
       SYSLOG_PORT: ${SYSLOG_PORT:-5514}
+      # See app's own comment above -- the calendar sweep's "refresh
+      # document from webhook" policy runs here and needs the same
+      # storage backend the app's document routes use.
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
     # Published directly (not through Caddy -- this is raw syslog, not
     # HTTP): point your syslog-ng destination at this host on this port.
     # See docs/architecture.md for the syslog-ng destination snippet.

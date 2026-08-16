@@ -27,6 +27,7 @@ from rain.db import migrate, provisioning
 from rain.db.base import dispose_engine
 from rain.settings import get_settings
 from rain.web.templating import templates
+from rain.worker_runtime import WorkerServices
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rain")
@@ -40,6 +41,7 @@ async def lifespan(app: FastAPI):
     # startup exception (only logs "Application startup failed. Exiting."),
     # which makes failures here needlessly hard to diagnose -- log it
     # ourselves before letting it propagate.
+    worker_services: WorkerServices | None = None
     try:
         logger.info("waiting for database...")
         await migrate.wait_for_database()
@@ -50,6 +52,18 @@ async def lifespan(app: FastAPI):
         logger.info("loading global config...")
         await config_store.load_all()
         await config_store.start_listener()
+        # EMBED_WORKER=true folds the syslog listener + rule engine +
+        # notifications + calendar sweep + LDAP sync into this same
+        # process instead of a separate `worker` container/service --
+        # see docker-compose.yml's "minimal mode" comment and
+        # rain.worker_runtime's own docstring for why this doesn't just
+        # call the same code path the standalone `rain-worker` process
+        # does (that one blocks on its own until killed; this process is
+        # already kept alive by uvicorn's event loop).
+        if get_settings().embed_worker:
+            logger.info("EMBED_WORKER=true -- starting worker services in this process...")
+            worker_services = WorkerServices()
+            await worker_services.start()
         logger.info("RAIN startup complete")
     except Exception:
         logger.exception("RAIN startup failed")
@@ -57,6 +71,8 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        if worker_services is not None:
+            await worker_services.stop()
         await config_store.stop_listener()
         await dispose_engine()
 

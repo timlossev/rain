@@ -46,6 +46,13 @@ dependencies = [
     # stream needs; a river.anomaly.HalfSpaceTrees model's state is
     # pickled into CorrelationRuleState.ml_model between events.
     "river>=0.21,<0.22",
+    # S3-compatible document storage (rain.modules.documents.storage) --
+    # only ever exercised when Settings.s3_bucket is set; the synchronous
+    # client matches the existing (already synchronous) StorageBackend
+    # Protocol, same trade-off local disk I/O already makes in the same
+    # call sites rather than restructuring every caller onto an async
+    # storage interface for this alone.
+    "boto3>=1.40,<2",
 ]
 
 [project.optional-dependencies]

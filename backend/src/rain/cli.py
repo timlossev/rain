@@ -12,6 +12,7 @@ from rain.core.config_store import config_store
 from rain.db import migrate, provisioning
 from rain.db.base import dispose_engine
 from rain.settings import get_settings
+from rain.worker_runtime import WorkerServices
 
 logger = logging.getLogger("rain.cli")
 
@@ -62,28 +63,15 @@ async def _worker_main() -> None:
     await config_store.load_all()
     await config_store.start_listener()
 
-    from rain.modules.auth.ldap_sync import ldap_sync_loop
-    from rain.modules.calendar.sweep import calendar_sweep_loop
-    from rain.modules.tickets.listener import retention_loop, start_listener
-    from rain.modules.tickets.live_bus import live_bus
-
-    await live_bus.start()
-    settings = get_settings()
-    tcp_server, udp_transport = await start_listener(port=settings.syslog_port)
-    retention_task = asyncio.create_task(retention_loop())
-    calendar_task = asyncio.create_task(calendar_sweep_loop())
-    ldap_task = asyncio.create_task(ldap_sync_loop())
-
-    logger.info("rain-worker up: syslog listener + rule engine + notifications + calendar sweep + LDAP sync")
+    services = WorkerServices()
+    await services.start()
     try:
-        async with tcp_server:
-            await tcp_server.serve_forever()
+        # Nothing else keeps this standalone process alive -- unlike an
+        # app process embedding these same services (rain.main's
+        # lifespan), which has uvicorn's own event loop for that.
+        await asyncio.Event().wait()
     finally:
-        retention_task.cancel()
-        calendar_task.cancel()
-        ldap_task.cancel()
-        udp_transport.close()
-        await live_bus.stop()
+        await services.stop()
         await config_store.stop_listener()
         await dispose_engine()
 

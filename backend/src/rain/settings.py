@@ -39,6 +39,32 @@ class Settings(BaseSettings):
     # set DEBUG=true in .env for local development only.
     debug: bool = False
 
+    # Document repository storage (rain.modules.documents.storage) --
+    # local disk (uploads_dir above) unless s3_bucket is set, in which
+    # case every document body reads/writes go to that bucket instead
+    # and the local uploads volume no longer needs to persist them (it's
+    # still used for branding logos and the CSV/JSON import stash, both
+    # deliberately out of scope for this -- see storage.py's docstring).
+    # s3_endpoint_url is what makes this work against any S3-compatible
+    # service (MinIO, etc.), not just real AWS S3 -- leave blank for AWS,
+    # set it for anything self-hosted. s3_access_key_id/s3_secret_access_key
+    # are optional: leave both blank to fall back to boto3's normal
+    # credential chain (an instance/task IAM role, ~/.aws/credentials,
+    # AWS_* env vars) instead of a static pair in .env.
+    s3_bucket: str = ""
+    s3_region: str = ""
+    s3_endpoint_url: str = ""
+    s3_access_key_id: str = ""
+    s3_secret_access_key: str = ""
+
+    # Folds the worker's syslog listener + rule engine + notifications +
+    # calendar sweep + LDAP sync into this same process/container instead
+    # of a separate `worker` service -- see rain.cli.run_web and
+    # docker-compose.yml's "minimal mode" comment. Off by default (the
+    # two-container app+worker split is still the normal recommended
+    # shape); on for a genuinely single-container deployment.
+    embed_worker: bool = False
+
     @field_validator("database_url")
     @classmethod
     def _normalize_driver(cls, value: str) -> str:

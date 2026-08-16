@@ -95,6 +95,10 @@ JS framework in the browser.
 **Document Repository**
 - `DOC-xxxxxx` entries with description, file attachment, and links to
   any asset or ticket
+- Storage is local disk by default, or an S3 (or S3-compatible -- MinIO,
+  etc.) bucket if `S3_BUCKET` is set in `.env` -- no code changes, and no
+  local uploads volume to persist once every document lives in the
+  bucket instead
 - A document's contents can be populated by calling a configured
   webhook, with the new content diffed against what's stored and an
   optional syslog alert when it changes
@@ -165,12 +169,28 @@ status pill, lets you map hosts/programs to tenants (or discard a noisy
 source outright), and sets how long an event that never got promoted
 into a ticket sticks around before being discarded (12 hours by default).
 
-Three more `.env` settings support deploying behind existing infrastructure
-instead of the full default stack: `POSTGRES_URL` points RAIN at an
-external/managed Postgres instead of running its own `db` container;
-`APP_PORT` changes what the app listens on; `WEB_FRONTEND=false` skips the
-Caddy container for deployments that already terminate TLS in front of RAIN
-(e.g. an AWS ALB). See the comments in `.env.example`.
+A few more `.env` settings support deploying behind existing
+infrastructure instead of the full default stack: `POSTGRES_URL` points
+RAIN at an external/managed Postgres instead of running its own `db`
+container; `APP_PORT` changes what the app listens on; `WEB_FRONTEND=false`
+skips the Caddy container for deployments that already terminate TLS in
+front of RAIN (e.g. an AWS ALB); `S3_BUCKET` (+ `S3_REGION`/
+`S3_ENDPOINT_URL`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`) points
+document storage at an S3 (or S3-compatible) bucket instead of the local
+uploads volume. See the comments in `.env.example`.
+
+Combine all of those with `EMBED_WORKER=true` (folds the `worker`
+container's own duties -- syslog listener, rule engine, notifications,
+calendar sweep, LDAP sync -- into the `app` container instead of running
+them separately) for **minimal mode**: one container, no local Postgres,
+no local storage volume, no Caddy.
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.minimal.yml up --build
+```
+
+See `docker-compose.minimal.yml`'s own comments for the exact `.env`
+values this needs.
 
 ## Stack
 
@@ -181,8 +201,8 @@ Caddy container for deployments that already terminate TLS in front of RAIN
 | DB | Postgres with pgvector | Full-text search live now (tsvector/GIN); pgvector enabled and reserved for semantic search once an embedding source exists |
 | Multi-tenancy | Schema-per-tenant | One Postgres instance, isolated per tenant |
 | Auth | Local email/password + optional LDAP + SAML 2.0 | `python3-saml` for SAML (XML signature verification, not hand-rolled) |
-| Ticketing bus | Built-in syslog listener (TCP+UDP) | syslog-ng pushes to it directly, no third-party syslog library |
-| Document storage | Local volume behind a storage abstraction | Swappable for S3 later without touching callers |
+| Ticketing bus | Built-in syslog listener (TCP+UDP) | syslog-ng pushes to it directly, no third-party syslog library; foldable into the app container itself (`EMBED_WORKER=true`) for a single-container deployment |
+| Document storage | Local volume, or S3/S3-compatible (`S3_BUCKET`) | Swappable behind one small abstraction, no caller touches either directly |
 | Exports | CSV, JSON, Excel, PDF, iCalendar | All pure-Python, no extra system dependencies in the image |
 
 `caddy`/`app`/`worker` are multi-stage, Alpine-based builds; `db` uses

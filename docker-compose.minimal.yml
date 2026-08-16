@@ -1,0 +1,31 @@
+# Overlay for single-container ("minimal mode") deployments. Adds the
+# syslog port mapping to `app` that the base docker-compose.yml doesn't
+# declare on it by default -- it would conflict with the separate
+# `worker` service's own mapping of the same host port in the normal
+# two-container topology, which this overlay isn't for.
+#
+# Usage: set EMBED_WORKER=true, POSTGRES_URL=<external Postgres>, and
+# WEB_FRONTEND=false in .env, drop "local-db", "web-frontend", and
+# "worker" from COMPOSE_PROFILES (i.e. leave it empty), then:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.minimal.yml up --build
+#
+# That leaves exactly one container running: `app` serves HTTP directly
+# on APP_PORT, listens for syslog on SYSLOG_PORT itself (EMBED_WORKER
+# folds rain-worker's own duties into this same process -- see
+# rain.worker_runtime), and talks to whatever Postgres POSTGRES_URL
+# points at. Set S3_BUCKET too (see .env.example) if you don't want
+# document uploads living in the container's own local, non-persistent
+# storage -- with EMBED_WORKER on and no separate `db`/`worker`/`caddy`
+# containers, there's no docker-managed volume backing this container at
+# all unless you add one yourself, so anything written to local disk
+# (documents without S3_BUCKET set, or the branding logo either way --
+# see rain.modules.documents.storage's docstring for what's in and out
+# of S3's scope) is lost whenever this container is recreated.
+services:
+  app:
+    environment:
+      SYSLOG_PORT: ${SYSLOG_PORT:-5514}
+    ports:
+      - "${SYSLOG_PORT:-5514}:${SYSLOG_PORT:-5514}/tcp"
+      - "${SYSLOG_PORT:-5514}:${SYSLOG_PORT:-5514}/udp"

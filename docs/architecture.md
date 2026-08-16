@@ -10,8 +10,8 @@ the same foundation rather than re-deriving it. See the repo root
 |---|---|---|
 | `caddy` | `caddy:2-alpine` | Reverse proxy + automatic HTTPS. Only container exposing 80/443. |
 | `app` | `python:3.12-alpine`, multi-stage | FastAPI web app (Uvicorn), server-rendered UI. |
-| `worker` | same image as `app`, different command | The syslog listener (TCP+UDP), rule engine, notifier, and retention sweeper -- see Ticketing below. Publishes its own port (`SYSLOG_PORT`, default 5514) directly, bypassing Caddy since this is raw syslog, not HTTP. |
-| `db` | `pgvector/pgvector:pg17-trixie` (official image) | One Postgres instance; `control` schema plus one `tenant_<slug>` schema per tenant. |
+| `worker` | same image as `app`, different command | The syslog listener (TCP+UDP), rule engine, notifier, and retention sweeper -- see Ticketing below. Publishes its own port (`SYSLOG_PORT`, default 5514) directly, bypassing Caddy since this is raw syslog, not HTTP. Optional: `EMBED_WORKER=true` folds these same duties into the `app` container instead (see "Deployment shapes" below). |
+| `db` | `pgvector/pgvector:pg17-trixie` (official image) | One Postgres instance; `control` schema plus one `tenant_<slug>` schema per tenant. Optional: `POSTGRES_URL` points at an external/managed Postgres instead. |
 
 Only two inputs are needed outside the database: `POSTGRES_PASSWORD` and
 `APP_SECRET_KEY` (session-cookie signing + the Fernet key that encrypts
@@ -20,6 +20,40 @@ config-at-rest, e.g. the SMTP relay password). `bootstrap.py` /
 `RAIN_DOMAIN` is optional and defaults to `localhost` (Caddy's internal CA).
 Everything else lives in Postgres and is edited at runtime through the
 setup wizard and Admin UI.
+
+### Deployment shapes
+
+The default shape is four containers (`caddy`, `app`, `worker`, `db`),
+each independently droppable via a Compose profile + one `.env` flag:
+`local-db` (drop with `POSTGRES_URL` set), `web-frontend` (drop with
+`WEB_FRONTEND=false`), `worker` (drop with `EMBED_WORKER=true`). Nothing
+in the app code branches on "which shape am I" beyond reading the
+relevant `Settings` field -- `rain.main`'s `lifespan` starts
+`rain.worker_runtime.WorkerServices` (the same syslog-listener-plus-
+background-loops object the standalone `rain-worker` process uses,
+factored out specifically so both callers share it -- see that module's
+own docstring) when `embed_worker` is true, and
+`rain.modules.documents.storage.get_storage()` returns an
+`S3StorageBackend` instead of a `LocalStorageBackend` when `s3_bucket`
+is set. Neither of those two settings know about the other, or about
+`POSTGRES_URL`/`WEB_FRONTEND` -- each is an independent axis, combinable
+in any mix.
+
+**Minimal mode** is all four axes flipped at once: `EMBED_WORKER=true`,
+`POSTGRES_URL` set, `WEB_FRONTEND=false`, `S3_BUCKET` set, and
+`COMPOSE_PROFILES=` (empty, dropping `local-db`/`web-frontend`/`worker`
+all at once) -- one `app` container, no other RAIN-managed
+infrastructure. Needs `docker-compose.minimal.yml` layered on top of the
+base file too: the base `app` service doesn't publish `SYSLOG_PORT` by
+default (it would conflict with the separate `worker` service's own
+mapping of that same host port in the normal topology this mode isn't
+running), so the overlay adds it back. Without `S3_BUCKET` set in this
+mode, document uploads (and the branding logo, which stays local-disk-
+only regardless of `S3_BUCKET` -- see `rain.modules.documents.storage`'s
+docstring) live in the container's own writable layer with no volume
+behind it at all, gone the next time the container is recreated -- an
+explicit, documented trade-off for genuine single-container simplicity,
+not an oversight.
 
 ## Multi-tenancy: schema-per-tenant
 
@@ -303,15 +337,36 @@ routes in future milestones.
 ## Document Repository (Milestone 3, full scope)
 
 **Storage.** `rain.modules.documents.storage` is a small `StorageBackend`
-protocol (`save`/`read`/`delete` on an opaque string key) with one
-implementation, `LocalStorageBackend`, writing under
+protocol (`save`/`read`/`delete` on an opaque string key) with two
+implementations: `LocalStorageBackend`, writing under
 `{uploads_dir}/documents/<tenant_schema>/<random-token>-<filename>` on the
-shared `rain_uploads` volume. Swapping in S3 later means implementing the
-same three methods and changing `get_storage()` -- nothing in the router or
-service layer touches the filesystem directly. `make_storage_key()` both
-namespaces by tenant and strips any path components from the uploaded
-filename (`Path(name).name`), so a filename like `../../etc/passwd` can't
-escape the tenant's subtree.
+shared `rain_uploads` volume, and `S3StorageBackend`, writing the same key
+(prefixed `documents/`) as an object in whichever bucket `Settings.s3_bucket`
+names -- `get_storage()` picks one based on that setting; nothing in the
+router or service layer touches the filesystem or an S3 client directly.
+`S3StorageBackend` uses plain (synchronous) `boto3`, not an async wrapper,
+matching `StorageBackend`'s existing signature -- every caller already
+invokes these as blocking calls from inside an async route handler (the
+same trade-off local disk I/O already made), so this doesn't introduce a
+new async/sync split, just a second implementation of the same
+already-synchronous contract. `s3_endpoint_url` is what makes it work
+against any S3-compatible service (MinIO, etc.), not only real AWS S3 --
+verified live against a MinIO instance: save/read/delete all round-trip
+correctly, and a bucket listing after a save/delete shows the object
+appearing and disappearing exactly when expected. `make_storage_key()`
+both namespaces by tenant and strips any path components from the
+uploaded filename (`Path(name).name`), so a filename like
+`../../etc/passwd` can't escape the tenant's subtree (or, for S3, land
+outside the `documents/` prefix) either way.
+
+Branding logos (`rain.web.uploads`) and the CSV/JSON import stash stay on
+local disk regardless of `s3_bucket` -- logos are served straight off the
+local static mount (`/media/branding`), which an S3 object can't be
+without a signed-URL redirect this app doesn't have, and the import stash
+is transient by design (gone once the import finishes). Both are small/
+short-lived enough that this doesn't undercut S3's actual purpose here:
+document bodies, which can be large and numerous, are what "eliminate the
+uploads volume" is actually about.
 
 **Access control.** Documents are *never* served through the static file
 mount. `/media` was previously mounted over the whole `uploads_dir` --
