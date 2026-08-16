@@ -66,20 +66,31 @@ async def dashboard(
 
 
 async def _portal_settings(ctx: RequestContext) -> dict:
-    """The incident portal's two per-tenant flags (rain.modules.portal),
-    scoped to whichever tenant is currently active -- same "mixed
-    platform-wide + active-tenant" page shape Admin > Syslog Listener
-    already uses for its retention setting. Falls back to the (locked-
-    down) defaults with no tenant_session at all when no tenant is
-    active, rather than making one a hard requirement to even view this
-    page -- unlike every *other* tenant-scoped admin screen, Branding
-    has to stay reachable for an internal_admin who hasn't picked a
-    tenant yet, since it's also where instance-wide branding lives."""
+    """The incident portal's per-tenant flags (rain.modules.portal) plus
+    the tenant's escalation webhook (rain.modules.tickets.service.
+    escalate_ticket) -- scoped to whichever tenant is currently active,
+    same "mixed platform-wide + active-tenant" page shape Admin > Syslog
+    Listener already uses for its retention setting. Falls back to the
+    (locked-down) defaults with no tenant_session at all when no tenant
+    is active, rather than making one a hard requirement to even view
+    this page -- unlike every *other* tenant-scoped admin screen,
+    Branding has to stay reachable for an internal_admin who hasn't
+    picked a tenant yet, since it's also where instance-wide branding
+    lives."""
     if ctx.active_tenant is None:
-        return {"portal_require_auth": True, "portal_branded": True, "portal_tenant": None}
+        return {
+            "portal_require_auth": True,
+            "portal_branded": True,
+            "escalation_webhook_id": None,
+            "portal_tenant": None,
+            "webhooks": [],
+        }
     async with tenant_session(ctx.active_tenant.schema_name) as tenant_db:
-        flags = await get_tenant_configs(tenant_db, ["portal_require_auth", "portal_branded"])
-        return {**flags, "portal_tenant": ctx.active_tenant}
+        flags = await get_tenant_configs(
+            tenant_db, ["portal_require_auth", "portal_branded", "escalation_webhook_id"]
+        )
+        webhooks = list((await tenant_db.execute(select(WebhookConfig).order_by(WebhookConfig.name))).scalars())
+        return {**flags, "portal_tenant": ctx.active_tenant, "webhooks": webhooks}
 
 
 @router.get("/branding", response_class=HTMLResponse)
@@ -134,19 +145,25 @@ async def branding_submit(
 async def branding_portal_submit(
     portal_require_auth: bool = Form(False),
     portal_branded: bool = Form(False),
+    escalation_webhook_id: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     user: CurrentUser = Depends(require_admin),
 ):
-    """Saves rain.modules.portal's two per-tenant flags for whichever
-    tenant is currently active. A no-op (not an error) with no active
-    tenant -- there's nothing to save into -- since the page that posts
-    here already hides this form in that case rather than blocking the
-    whole Branding screen on picking one first."""
+    """Saves rain.modules.portal's per-tenant flags, plus the escalation
+    webhook, for whichever tenant is currently active. A no-op (not an
+    error) with no active tenant -- there's nothing to save into --
+    since the page that posts here already hides this form in that case
+    rather than blocking the whole Branding screen on picking one
+    first."""
     if ctx.active_tenant is not None:
         async with tenant_session(ctx.active_tenant.schema_name) as tenant_db:
             await set_tenant_configs(
                 tenant_db,
-                {"portal_require_auth": portal_require_auth, "portal_branded": portal_branded},
+                {
+                    "portal_require_auth": portal_require_auth,
+                    "portal_branded": portal_branded,
+                    "escalation_webhook_id": int(escalation_webhook_id) if escalation_webhook_id else None,
+                },
                 updated_by=user.id,
             )
     return RedirectResponse("/admin/branding?ok=1", status_code=status.HTTP_303_SEE_OTHER)

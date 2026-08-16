@@ -40,8 +40,21 @@ JS framework in the browser.
   normal traffic and fires on a genuinely unusual event instead of a
   fixed count. Both are optionally grouped per host/program
 - **Platform Response Rules**: react to new tickets by notifying Slack or
-  email, calling a webhook, or attaching a document or asset -- every
-  matching rule fires, and every firing is logged to the ticket
+  email, calling a webhook, attaching a document or asset, marking the
+  ticket problematic, or adding a watcher (a system user or a bare
+  email) -- every matching rule fires, and every firing is logged to
+  the ticket
+- **Watchers**: opt in ("Watch" on the ticket detail page) or added
+  automatically (reporter, assignee, or a Platform Response Rule) to get
+  emailed on a ticket's new comments and status changes
+- **Escalate**: a one-click button on every ticket (and, for a
+  signed-in visitor, next to their own tickets in the client portal)
+  that calls a tenant's configured escalation webhook on demand, logged
+  to the ticket's activity feed
+- **Client portal**: a public per-tenant page for filing an incident
+  with no account needed; a signed-in visitor gets a wider view with
+  search, and Tickets/Approvals/Documents tabs, plus a "Today's events"
+  listing pulled from the tenant calendar
 - **Webhooks**: centrally-configured outbound webhooks (Admin >
   Webhooks) -- one definition (URL, headers, payload, timeout, success
   codes) reused wherever a webhook call is needed, with an optional

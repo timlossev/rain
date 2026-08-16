@@ -578,12 +578,30 @@ class TicketFieldChange(TenantBase):
 
 
 class TicketWatcher(TenantBase):
-    """A user who opted in to email notifications for a ticket's activity
-    (new comments, status changes) beyond the automatic set (assignee,
-    reporter, pending approvers) -- toggled via the "Watch" button on the
-    ticket detail page. Silent no-op if SMTP isn't configured, same as
-    every other notification path (see notifications.py's module
-    docstring)."""
+    """Someone who gets emailed on a ticket's activity (new comments,
+    status changes) beyond whoever's actively working it -- either a
+    system user (`user_id`, a control.users id) or a bare `email` for
+    someone with no account at all (e.g. an external stakeholder added
+    via a Platform Response Rule's "Add a watcher" action). Exactly one
+    of the two is ever set, enforced by uq_ticket_watchers_ticket_user_ci
+    /uq_ticket_watchers_ticket_email below (email uniqueness is
+    case-insensitive) rather than a CHECK constraint, since Postgres
+    can't express "exactly one of two nullable columns" as a single
+    UNIQUE index the way it can for each column on its own.
+
+    A user gets a row here from three places: toggling "Watch" on the
+    ticket detail page themselves, being the ticket's reporter (added
+    automatically on creation, unless reported anonymously) or its
+    assignee (added automatically whenever one is set) -- see
+    rain.modules.tickets.service's create_ticket/update_assignee -- or a
+    Platform Response Rule's "Add a watcher" action. Silent no-op if
+    SMTP isn't configured, same as every other notification path (see
+    notifications.py's module docstring).
+
+    Email uniqueness (case-insensitive, per ticket) is enforced by a
+    partial functional unique index created directly in its migration
+    rather than declared here -- not something a plain declarative
+    UniqueConstraint/Index in __table_args__ can express cleanly."""
 
     __tablename__ = "ticket_watchers"
     __table_args__ = (UniqueConstraint("ticket_id", "user_id", name="uq_ticket_watchers_ticket_user"),)
@@ -591,7 +609,8 @@ class TicketWatcher(TenantBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True)
     # control.users id -- cross-schema, plain integer (see module docstring).
-    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     ticket: Mapped[Ticket] = relationship(back_populates="watchers")
@@ -812,6 +831,8 @@ class PlatformEventAction(TenantBase):
       webhook                     -> {"url": str, "payload_template": str}
       attach_document              -> {"document_id": int}
       attach_asset                 -> {"asset_id": int}
+      mark_problematic              -> {} (no config)
+      add_watcher                    -> {"email": str} or {"user_id": int} -- exactly one
     Reuses NotificationChannel for the Slack/email actions rather than
     storing a second copy of webhook URLs/recipient lists."""
 

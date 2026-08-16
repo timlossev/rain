@@ -12,9 +12,18 @@
     <span class="portal-tenant-pill">{{ tenant.name }}</span>
   </div>
 
-  <div class="card portal-card">
-    <div class="muted" style="margin-bottom:20px;">Report an incident{% if not user %}. No account needed{% endif %}.</div>
+  <div class="card portal-card portal-today">
+    <div class="portal-section-title" style="margin-top:0;">Today's events</div>
+    {% if todays_events %}
+    <ul class="portal-today-list">
+      {% for e in todays_events %}<li>{{ e.title }}</li>{% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted" style="margin:0;">None</p>
+    {% endif %}
+  </div>
 
+  <div class="card portal-card">
     {% if created %}<div class="flash flash-ok">Submitted as <strong>{{ created }}</strong>.</div>{% endif %}
     {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
@@ -72,7 +81,7 @@
     <div class="portal-section-title">Tickets reported by me</div>
     {% if user %}
     <table>
-      <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th><th>Last update</th></tr></thead>
+      <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th><th>Last update</th><th></th></tr></thead>
       <tbody>
         {% for row in reported %}
         <tr>
@@ -87,9 +96,17 @@
           <td><span class="badge severity-{{ row.ticket.severity }}">{{ row.ticket.severity }}</span></td>
           <td class="muted">{{ row.ticket.status }}</td>
           <td class="muted">{{ row.last_update_at.strftime("%Y-%m-%d %H:%M") if row.last_update_at else "-" }}</td>
+          <td>
+            {% if can_escalate %}
+            <form method="post" action="/tickets/{{ row.ticket.id }}/escalate" class="inline" data-confirm="Escalate {{ row.ticket.ticket_number }}?">
+              <input type="hidden" name="next" value="/portal/{{ tenant.slug }}">
+              <button type="submit" class="btn btn-sm btn-danger">Escalate</button>
+            </form>
+            {% endif %}
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="muted">No tickets reported yet.</td></tr>
+        <tr><td colspan="6" class="muted">No tickets reported yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>

@@ -5,8 +5,9 @@ worker), this layer reacts *after* a ticket already exists -- of either
 origin, auto-promoted or manually created -- and every active, matching
 rule fires (not just the first), each running one or more actions:
 notify Slack, notify email, call a webhook, attach a document, attach an
-asset. Every firing is logged to platform_event_triggers and shown on the
-ticket detail page, regardless of whether the individual actions
+asset, mark the ticket problematic, or add a watcher (a system user or a
+bare email). Every firing is logged to platform_event_triggers and shown
+on the ticket detail page, regardless of whether the individual actions
 succeeded -- a failed Slack post shouldn't hide the fact the rule matched.
 """
 from __future__ import annotations
@@ -55,6 +56,8 @@ ACTION_TYPES = [
     ("webhook", "Call a webhook"),
     ("attach_document", "Attach a document"),
     ("attach_asset", "Attach an asset"),
+    ("mark_problematic", "Mark problematic"),
+    ("add_watcher", "Add a watcher"),
 ]
 
 _TRIGGER_BY_TICKET_TYPE = {
@@ -228,5 +231,22 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, ticket: Tic
             await db.commit()
             return f"{label}: linked {asset.name}"
         return f"{label}: ticket already has an asset -- left unchanged"
+
+    if action.action_type == "mark_problematic":
+        if ticket.is_problematic:
+            return f"{label}: already problematic"
+        await ticket_service.update_problematic(db, ticket, True)
+        return f"{label}: done"
+
+    if action.action_type == "add_watcher":
+        email = (config.get("email") or "").strip()
+        user_id = config.get("user_id")
+        if email:
+            await ticket_service.add_watcher_by_email(db, ticket.id, email)
+            return f"{label}: {email}"
+        if user_id:
+            await ticket_service.add_watcher(db, ticket.id, user_id)
+            return f"{label}: user #{user_id}"
+        return f"{label}: no email or user configured"
 
     return f"{label}: unknown action type"

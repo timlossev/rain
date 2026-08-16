@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from rain.db.tenant_models import CalendarEntry, Ticket
+from rain.modules.calendar.recurrence import is_due_on
 
 
 def calendar_entries_stmt(*, active_only: bool = False):
@@ -48,6 +49,17 @@ async def delete_entry(db: AsyncSession, entry: CalendarEntry) -> None:
 async def mark_fired(db: AsyncSession, entry: CalendarEntry, on: dt.date) -> None:
     entry.last_fired_date = on
     await db.commit()
+
+
+async def list_entries_due_today(db: AsyncSession) -> list[CalendarEntry]:
+    """Active entries with an occurrence landing on today -- backs the
+    client portal's "Today's events" listing. Reuses the same
+    occurrence math (rain.modules.calendar.recurrence.is_due_on) the
+    month-grid view computes each cell from, rather than a second
+    definition of what "due" means."""
+    entries = await list_entries(db, active_only=True)
+    today = dt.datetime.now(dt.timezone.utc).date()
+    return [e for e in entries if is_due_on(e, today)]
 
 
 async def list_changes_in_range(db: AsyncSession, start: dt.date, end: dt.date) -> list[Ticket]:

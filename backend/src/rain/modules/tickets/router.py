@@ -15,6 +15,7 @@ from rain.core.export_columns import merge_profile_columns
 from rain.core.pagination import paginate
 from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
+from rain.core.tenant_config import get_tenant_config
 from rain.core.user_names import resolve_user_names
 from rain.db.base import control_session
 from rain.db.control_models import User
@@ -27,6 +28,7 @@ from rain.db.tenant_models import (
     PlatformEventRule,
     Ticket,
     TicketRule,
+    WebhookConfig,
 )
 from rain.modules.assets import service as asset_service
 from rain.modules.documents import service as document_service
@@ -487,6 +489,7 @@ async def ticket_detail(
             flows = await service.list_approval_flows(tenant_db)
 
     is_watching = await service.is_watching(tenant_db, ticket.id, ctx.user.id)
+    escalation_webhook_id = await get_tenant_config(tenant_db, "escalation_webhook_id", None)
 
     return templates.TemplateResponse(
         request,
@@ -507,6 +510,7 @@ async def ticket_detail(
             "flows": flows,
             "group_names": group_names,
             "is_watching": is_watching,
+            "can_escalate": escalation_webhook_id is not None,
         },
     )
 
@@ -594,6 +598,37 @@ async def toggle_watch(
             await service.add_watcher(tenant_db, ticket_id, ctx.user.id)
         else:
             await service.remove_watcher(tenant_db, ticket_id, ctx.user.id)
+    return RedirectResponse(
+        f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@router.post("/{ticket_id:int}/escalate")
+async def escalate_ticket(
+    ticket_id: int,
+    next: str = Form(""),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Any signed-in user can escalate any ticket they can already see --
+    unlike Mark closed/problematic (list quick-actions, require_login the
+    same as this), there's no separate permission tier for "this is
+    urgent," and the button is only ever rendered at all when the tenant
+    has an escalation webhook configured (Admin > Branding). `next`
+    lets the portal's per-row Escalate button (which has nowhere else
+    useful to send someone with no session-based nav) return to the
+    portal page instead of a ticket detail page it might not even be
+    allowed to open (portal_require_auth off doesn't imply this visitor
+    can view /tickets/<n> -- that's still require_login)."""
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is not None:
+        webhook_id = await get_tenant_config(tenant_db, "escalation_webhook_id", None)
+        webhook = await tenant_db.get(WebhookConfig, webhook_id) if webhook_id else None
+        if webhook is not None:
+            await service.escalate_ticket(tenant_db, ticket, webhook, actor_user_id=ctx.user.id)
+    if next:
+        return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
     return RedirectResponse(
         f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER
     )
@@ -1122,6 +1157,13 @@ async def platform_event_action_create(
     elif action_type == "attach_asset":
         asset_id = form.get("asset_id")
         config = {"asset_id": int(asset_id)} if asset_id else {}
+    elif action_type == "add_watcher":
+        email = (form.get("watcher_email") or "").strip()
+        watcher_user_id = form.get("watcher_user_id")
+        # Email wins if both were somehow filled in -- matches
+        # add_watcher_by_email/add_watcher's own "email first" order in
+        # platform_events._run_action.
+        config = {"email": email} if email else ({"user_id": int(watcher_user_id)} if watcher_user_id else {})
     else:
         config = {}
     tenant_db.add(PlatformEventAction(rule_id=rule_id, action_type=action_type, config=config))

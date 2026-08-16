@@ -29,6 +29,11 @@
       <input type="hidden" name="watching" value="{{ '0' if is_watching else '1' }}">
       <button type="submit" class="btn btn-sm{% if is_watching %} active{% endif %}">{{ "Stop watching" if is_watching else "Watch" }}</button>
     </form>
+    {% if can_escalate %}
+    <form method="post" action="/tickets/{{ ticket.id }}/escalate" class="inline" data-confirm="Escalate {{ ticket.ticket_number }}?">
+      <button type="submit" class="btn btn-sm btn-danger">Escalate</button>
+    </form>
+    {% endif %}
     <a class="btn btn-sm" href="/tickets/{{ ticket.id }}/pdf">Export to PDF</a>
   </div>
 </div>
@@ -223,6 +228,8 @@
       Platform Response Rule <strong>{{ entry.item.from_value }}</strong> fired: {{ entry.item.to_value }}
       {% elif entry.item.field_name == "approval_reset" %}
       {{ entry.item.to_value }}
+      {% elif entry.item.field_name == "escalated" %}
+      escalated this ticket: {{ entry.item.to_value }}
       {% endif %}
     </div>
     {% elif entry.kind == "approval_decision" %}

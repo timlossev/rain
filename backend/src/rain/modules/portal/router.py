@@ -1,9 +1,13 @@
-"""The public incident portal: a single, deliberately bare-bones page at
-/portal/<tenant slug> for filing an incident without going through the
-full app -- "New ticket" and "Tickets reported by me," nothing else, no
-sidebar/topbar. Reachable with or without a session (rain.core.tenancy.
-get_current_user_optional, not get_current_user), gated per-tenant by
-two TenantConfig flags an admin sets on Admin > Branding:
+"""The public incident portal: a single page at /portal/<tenant slug> for
+filing an incident without going through the full app -- no sidebar/
+topbar. An anonymous visitor gets a deliberately bare-bones form ("New
+ticket" and, once signed in, "Tickets reported by me"), plus "Today's
+events" (rain.modules.calendar), shown to everyone regardless of
+sign-in status. A signed-in visitor additionally gets a search bar and
+two more tabs, Approvals and Documents. Reachable with or without a
+session (rain.core.tenancy.get_current_user_optional, not
+get_current_user), gated per-tenant by TenantConfig flags an admin sets
+on Admin > Branding:
 
   - portal_require_auth: if true, a visitor with no session is bounced
     to /login?next=... instead of being able to submit anonymously.
@@ -34,9 +38,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
 from rain.core.tenancy import CurrentUser, get_current_user_optional
-from rain.core.tenant_config import get_tenant_configs
+from rain.core.tenant_config import get_tenant_config, get_tenant_configs
 from rain.db.base import control_session, tenant_session
 from rain.db.control_models import Tenant
+from rain.modules.calendar import service as calendar_service
 from rain.modules.documents import service as document_service
 from rain.modules.tickets import service as ticket_service
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
@@ -172,6 +177,15 @@ async def portal_form(
         # {% if user %}), so there's no reason to run either query for one.
         pending_approval = await ticket_service.list_tickets_pending_approval_for(tenant_db, user.id) if user is not None else []
         documents = await document_service.list_documents(tenant_db) if user is not None else []
+        # Shown to every visitor, signed in or not -- operational notices
+        # (a maintenance window, a renewal due today) are tenant-wide
+        # information, not tied to one person's account.
+        todays_events = await calendar_service.list_entries_due_today(tenant_db)
+        # Same webhook the ticket detail page's own Escalate button uses
+        # (Admin > Branding); only meaningful once signed in, since the
+        # "Tickets reported by me" table it appears next to only renders
+        # for one.
+        escalation_webhook_id = await get_tenant_config(tenant_db, "escalation_webhook_id", None) if user is not None else None
 
     return templates.TemplateResponse(
         request,
@@ -185,6 +199,8 @@ async def portal_form(
             "reported": reported,
             "pending_approval": pending_approval,
             "documents": documents,
+            "todays_events": todays_events,
+            "can_escalate": escalation_webhook_id is not None,
             "created": created_ticket.ticket_number if created_ticket is not None else "",
             "error": _PORTAL_ERRORS.get(error, ""),
         },

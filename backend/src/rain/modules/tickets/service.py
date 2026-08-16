@@ -24,6 +24,7 @@ from rain.db.tenant_models import (
     TicketStatus,
     TicketStatusChange,
     TicketWatcher,
+    WebhookConfig,
 )
 from rain.modules.tickets import notifications
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
@@ -94,6 +95,15 @@ async def create_ticket(
             event.promoted_ticket_id = ticket.id
 
     await db.commit()
+
+    # The reporter and (if set at creation time) the assignee are always
+    # watchers -- not an opt-in the way the ticket detail page's "Watch"
+    # button is for anyone else. No-op for an anonymous portal submission
+    # (reporter_user_id is None) since there's no account to watch as.
+    if reporter_user_id is not None:
+        await add_watcher(db, ticket.id, reporter_user_id)
+    if assignee_user_id is not None:
+        await add_watcher(db, ticket.id, assignee_user_id)
 
     # Platform event rules (Admin > Platform Events) react to every newly
     # created ticket regardless of origin -- both this function's callers
@@ -239,6 +249,27 @@ async def add_watcher(db: AsyncSession, ticket_id: int, user_id: int) -> None:
     await db.commit()
 
 
+async def add_watcher_by_email(db: AsyncSession, ticket_id: int, email: str) -> None:
+    """Same idea as add_watcher, for a watcher with no system account --
+    backs Platform Response Rules' "Add a watcher" action. Case-
+    insensitive de-dup (matches the DB-level partial unique index on
+    (ticket_id, lower(email)), see TicketWatcher's docstring) so the
+    same address configured on two different rules, or re-added by
+    hand, doesn't produce a duplicate row/duplicate email."""
+    email = email.strip()
+    if not email:
+        return
+    result = await db.execute(
+        select(TicketWatcher).where(
+            TicketWatcher.ticket_id == ticket_id, func.lower(TicketWatcher.email) == email.lower()
+        )
+    )
+    if result.scalar_one_or_none() is not None:
+        return
+    db.add(TicketWatcher(ticket_id=ticket_id, email=email))
+    await db.commit()
+
+
 async def remove_watcher(db: AsyncSession, ticket_id: int, user_id: int) -> None:
     result = await db.execute(
         select(TicketWatcher).where(TicketWatcher.ticket_id == ticket_id, TicketWatcher.user_id == user_id)
@@ -249,9 +280,20 @@ async def remove_watcher(db: AsyncSession, ticket_id: int, user_id: int) -> None
         await db.commit()
 
 
-async def _watcher_user_ids(db: AsyncSession, ticket_id: int) -> set[int]:
-    result = await db.execute(select(TicketWatcher.user_id).where(TicketWatcher.ticket_id == ticket_id))
-    return set(result.scalars())
+async def _watcher_recipients(db: AsyncSession, ticket_id: int, *, exclude_user_id: int | None) -> set[str]:
+    """Every watcher's email address -- resolved from control.users for a
+    user_id row, taken as-is for an email row -- except exclude_user_id
+    (the actor who triggered this, if any; only ever matches a user_id
+    row, an email-only watcher was never "the actor" to begin with)."""
+    result = await db.execute(select(TicketWatcher).where(TicketWatcher.ticket_id == ticket_id))
+    watchers = list(result.scalars())
+    user_ids = {w.user_id for w in watchers if w.user_id is not None}
+    user_ids.discard(exclude_user_id)
+    emails = {w.email for w in watchers if w.email}
+    if user_ids:
+        resolved = await resolve_user_emails(user_ids)
+        emails |= {e for e in resolved.values() if e}
+    return emails
 
 
 async def _notify_watchers(
@@ -261,12 +303,7 @@ async def _notify_watchers(
     triggered this, if any) -- a silent no-op with no watchers, no
     resolvable email address, or no SMTP configured (send_email's own
     guard)."""
-    watcher_ids = await _watcher_user_ids(db, ticket.id)
-    watcher_ids.discard(exclude_user_id)
-    if not watcher_ids:
-        return
-    emails = await resolve_user_emails(watcher_ids)
-    recipients = [e for e in emails.values() if e]
+    recipients = list(await _watcher_recipients(db, ticket.id, exclude_user_id=exclude_user_id))
     if recipients:
         await notifications.send_email(recipients, subject, body)
 
@@ -531,6 +568,11 @@ async def update_assignee(
     )
     await _reset_approval_if_approved(db, ticket, changed_by_user_id=changed_by_user_id)
     await db.commit()
+    # The ticket's owner is always a watcher -- not an opt-in the way the
+    # ticket detail page's "Watch" button is for anyone else (same rule
+    # create_ticket applies for the reporter/an assignee set at creation).
+    if new_assignee_user_id is not None:
+        await add_watcher(db, ticket.id, new_assignee_user_id)
 
 
 async def update_asset(
@@ -552,6 +594,45 @@ async def update_asset(
     )
     await _reset_approval_if_approved(db, ticket, changed_by_user_id=changed_by_user_id)
     await db.commit()
+
+
+async def escalate_ticket(
+    db: AsyncSession, ticket: Ticket, webhook: WebhookConfig, *, actor_user_id: int | None = None
+) -> str:
+    """Fires the tenant's one configured escalation webhook (Admin >
+    Branding > Public incident portal -- reused there since it's already
+    the "portal & ticket-adjacent tenant settings" page) for this single
+    ticket, on demand. Unlike Platform Response Rules' own "Call a
+    webhook" action, this isn't pattern-matched or automatic -- it's the
+    "Escalate" button on the ticket detail page (and, for an
+    authenticated portal visitor, next to their own tickets), fired by a
+    human who decided this one needs attention now. Logs the outcome to
+    the ticket's activity feed the same way a platform-rule firing does,
+    and to the webhook's own alert_on_failure path on a failed call.
+    Returns a short outcome string for the caller to flash back."""
+    # Imported locally to avoid a module-load-time cycle: webhooks.service
+    # imports tickets.correlation and tickets.rules, both of which import
+    # this module -- same reason create_ticket's platform_events import
+    # is local instead of top-level.
+    from rain.modules.webhooks import service as webhook_service
+
+    placeholders = {
+        "ticket_number": ticket.ticket_number,
+        "ticket_type": ticket.ticket_type,
+        "title": ticket.title,
+        "description": ticket.description or "",
+        "severity": ticket.severity,
+        "status": ticket.status,
+    }
+    result = await webhook_service.call_webhook(webhook, placeholders)
+    if not result.success and webhook.alert_on_failure:
+        await webhook_service.alert_webhook_failure(
+            db, webhook, result, context=f"Escalation of {ticket.ticket_number}"
+        )
+    outcome = f"{webhook.name} -> {result.error}" if result.error else f"{webhook.name} -> HTTP {result.status_code}"
+    await log_field_change(db, ticket.id, "escalated", None, outcome, changed_by_user_id=actor_user_id, commit=False)
+    await db.commit()
+    return outcome
 
 
 async def list_approval_flows(db: AsyncSession) -> list[ApprovalFlow]:

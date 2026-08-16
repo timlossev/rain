@@ -1,6 +1,7 @@
 {% extends "base.html" %}
+{% import "_search_picker.html" as picker %}
 {% block title %}{{ rule.name }} - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Manage this Platform Response Rule's actions -- notify Slack/email, call a webhook, attach a document, or attach an asset. All actions run when the rule's pattern matches a new ticket.{% endblock %}
+{% block help_text %}Manage this Platform Response Rule's actions -- notify Slack/email, call a webhook, attach a document or asset, mark the ticket problematic, or add a watcher. All actions run when the rule's pattern matches a new ticket.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <div>
@@ -55,6 +56,8 @@
             document_id: {{ a.config.get("document_id", "-") }}
           {% elif a.action_type == "attach_asset" %}
             asset_id: {{ a.config.get("asset_id", "-") }}
+          {% elif a.action_type == "add_watcher" %}
+            {% if a.config.get("email") %}{{ a.config.get("email") }}{% else %}user_id: {{ a.config.get("user_id", "-") }}{% endif %}
           {% endif %}
         </td>
         <td class="actions">
@@ -112,6 +115,15 @@
         <option value="">-</option>
         {% for a in assets %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}
       </select>
+    </div>
+
+    <div data-action-fields="add_watcher">
+      <div class="field">
+        <label for="watcher_email">Any email</label>
+        <input type="email" id="watcher_email" name="watcher_email" placeholder="someone@example.com">
+      </div>
+      {{ picker.search_picker("watcher_user_id", "/tickets/users/search", label="Or a system user", placeholder="Search by name or email...") }}
+      <div class="field-hint">Fill in one or the other. Either way, they start getting emailed on this ticket's activity the same as anyone who clicked "Watch" on it.</div>
     </div>
 
     <button class="btn btn-primary" type="submit">Add action</button>

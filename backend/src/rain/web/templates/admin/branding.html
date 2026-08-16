@@ -53,6 +53,14 @@
       <label class="checkbox-row"><input type="checkbox" name="portal_branded" {% if portal_branded %}checked{% endif %}> Show instance branding</label>
       <div class="field-hint">On: the portal shows this instance's logo, name, and accent color, same as every signed-in page. Off: a plain, unaccented page showing only "{{ portal_tenant.name }}" -- for a portal shared outside your own organization.</div>
     </div>
+    <div class="field">
+      <label for="escalation_webhook_id">Escalation webhook</label>
+      <select id="escalation_webhook_id" name="escalation_webhook_id">
+        <option value="">Don't show an Escalate button</option>
+        {% for w in webhooks %}<option value="{{ w.id }}" {% if escalation_webhook_id == w.id %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
+      </select>
+      <div class="field-hint">Called by the "Escalate" button on this tenant's tickets -- on the ticket detail page, and next to a signed-in visitor's own tickets in the portal. {% if not webhooks %}No webhooks yet -- create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.{% endif %}</div>
+    </div>
     <button class="btn btn-primary" type="submit">Save</button>
   </form>
   {% endif %}
