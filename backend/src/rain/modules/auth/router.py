@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import re
 from urllib.parse import parse_qs, urlsplit
 
 from fastapi import APIRouter, Depends, Form, Request, status
@@ -27,6 +28,25 @@ from rain.web.templating import templates
 logger = logging.getLogger("rain.auth")
 
 router = APIRouter(tags=["Auth"])
+
+# Same pattern browsers use to validate a bare <input type="email"> (the
+# WHATWG HTML living standard's "willful violation" of RFC 5322 -- covers
+# every punctuation character actually seen in real addresses in the
+# local part: . ! # $ % & ' * + / = ? ^ _ ` { | } ~ - , without the full
+# RFC's quoted-string/comment/IP-literal grammar nobody's inbox actually
+# uses). login.html's email field used to be type="email" and relied on
+# the browser to enforce this client-side -- moved server-side instead
+# (see login_submit) so a malformed address gets an explicit "Not a
+# valid email address" instead of the browser silently refusing to
+# submit the form at all with no message shown anywhere.
+_EMAIL_RE = re.compile(
+    r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?"
+    r"(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$"
+)
+
+
+def _is_valid_email_format(email: str) -> bool:
+    return bool(_EMAIL_RE.match(email.strip()))
 
 
 async def _hinted_tenant_id(session, next_path: str, user: User) -> int | None:
@@ -103,6 +123,21 @@ async def login_submit(
     next: str = Form("/"),
 ):
     async with control_session() as session:
+        # Checked before ever touching the DB -- a malformed address can
+        # never match a User row anyway, but "Invalid email or password"
+        # for e.g. "tewrwer" reads as if the account might just not
+        # exist, when the real problem is the address itself isn't one.
+        # login.html's email field used to catch this client-side
+        # (type="email") before the browser's own silent-refusal-to-
+        # submit turned into its own confusing "nothing happened" bug.
+        if not _is_valid_email_format(email):
+            saml_enabled = await get_saml_config(session) is not None
+            return templates.TemplateResponse(
+                request,
+                "login.html",
+                {"error": "Not a valid email address.", "next": next, "saml_enabled": saml_enabled},
+                status_code=400,
+            )
         user = await authenticate_user(session, email, password)
         if user is None:
             saml_enabled = await get_saml_config(session) is not None
