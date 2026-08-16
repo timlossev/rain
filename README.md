@@ -189,6 +189,25 @@ no local storage volume, no Caddy.
 docker compose -f docker-compose.yml -f docker-compose.minimal.yml up --build
 ```
 
+For a remote/managed Postgres (RDS or similar) and local document
+storage -- no `.env` file, no Compose, not even this repo checked out
+past the image build -- a single `docker run` gets the same one
+container, built straight from `backend/`:
+
+```sh
+docker build -t rain-app ./backend && docker run -d --name rain -p 8000:8000 -p 5514:5514/tcp -p 5514:5514/udp -e DATABASE_URL="postgresql://user:password@your-rds-endpoint:5432/rain" -e APP_SECRET_KEY="$(openssl rand -base64 48)" -e EMBED_WORKER=true rain-app
+```
+
+Serves plain HTTP on 8000 (no Caddy in this shape, so no automatic
+HTTPS -- terminate TLS in front of it yourself if you need it) and
+listens for syslog on 5514, same as `docker-compose.minimal.yml`'s
+overlay. Point `DATABASE_URL` at your own instance -- RDS Postgres
+accepts a plain `postgresql://` DSN as-is unless you've turned on
+`rds.force_ssl`, in which case add `?ssl=require` (asyncpg's own query
+param, not the `sslmode=` one `psql`/libpq use). Add `-e
+S3_BUCKET=... -e S3_REGION=...` (see `.env.example`) if you want
+documents in S3 instead of the container's own non-persistent storage.
+
 See `docker-compose.minimal.yml`'s own comments for the exact `.env`
 values this needs.
 
