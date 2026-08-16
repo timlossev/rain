@@ -40,6 +40,12 @@ dependencies = [
     "ldap3>=2.9,<3",
     "python3-saml>=1.16,<2",
     "pgvector>=0.5,<0.6",
+    # Online/streaming ML for Correlation Rules' "ML anomalies" rule type
+    # (rain.modules.tickets.correlation) -- pure incremental learning (one
+    # event at a time, no batch retraining), which is what a live syslog
+    # stream needs; a river.anomaly.HalfSpaceTrees model's state is
+    # pickled into CorrelationRuleState.ml_model between events.
+    "river>=0.21,<0.22",
 ]
 
 [project.optional-dependencies]

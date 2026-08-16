@@ -31,7 +31,7 @@ from rain.db.tenant_models import (
 from rain.modules.assets import service as asset_service
 from rain.modules.documents import service as document_service
 from rain.modules.tickets import exporter, platform_events, service
-from rain.modules.tickets.correlation import GROUP_BY_FIELDS
+from rain.modules.tickets.correlation import GROUP_BY_FIELDS, RULE_TYPES
 from rain.modules.tickets.schemas import MATCH_FIELDS, SEVERITIES, TICKET_TYPES
 from rain.modules.webhooks import service as webhook_service
 from rain.web.nav import build_nav_context
@@ -887,41 +887,59 @@ async def correlation_rules_list(
             "severities": SEVERITIES,
             "match_fields": MATCH_FIELDS,
             "group_by_fields": GROUP_BY_FIELDS,
+            "rule_types": RULE_TYPES,
             "prefill": prefill,
         },
     )
 
 
+_DEFAULT_TITLE_TEMPLATES = {
+    "threshold": "{count} matching events in {window}m",
+    "ml_anomaly": "Anomalous event detected (score {score})",
+}
+
+
 @router.post("/correlation-rules")
 async def correlation_rules_create(
     name: str = Form(...),
+    rule_type: str = Form("threshold"),
     ticket_type: str = Form(...),
     match_field: str = Form("message"),
     pattern: str = Form(...),
     group_by: str = Form("none"),
     threshold_count: int = Form(5),
     window_minutes: int = Form(5),
-    title_template: str = Form("{count} matching events in {window}m"),
+    title_template: str = Form(""),
     severity: str = Form("medium"),
     asset_match_field: str = Form(""),
     sort_order: int = Form(0),
+    ml_score_threshold: float = Form(0.7),
+    ml_warmup_count: int = Form(250),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
+    if rule_type not in RULE_TYPES:
+        rule_type = "threshold"
     tenant_db.add(
         CorrelationRule(
             name=name.strip(),
+            rule_type=rule_type,
             ticket_type=ticket_type,
             match_field=match_field,
             pattern=pattern,
             group_by=group_by,
             threshold_count=max(2, threshold_count),
             window_minutes=max(1, window_minutes),
-            title_template=title_template or "{count} matching events in {window}m",
+            title_template=title_template.strip() or _DEFAULT_TITLE_TEMPLATES[rule_type],
             severity=severity,
             asset_match_field=asset_match_field or None,
             sort_order=sort_order,
+            # min(1, ...) so a typo/blank field can't produce a threshold
+            # of 0 (every event would be "anomalous") or a warmup of 0
+            # (a rule fires on its very first, baseline-free event).
+            ml_score_threshold=min(1.0, max(0.0, ml_score_threshold)),
+            ml_warmup_count=max(1, ml_warmup_count),
             created_by=ctx.user.id,
         )
     )

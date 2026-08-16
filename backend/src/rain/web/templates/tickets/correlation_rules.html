@@ -2,7 +2,7 @@
 {% import "_pagination.html" as pg %}
 {% import "_modal.html" as modal %}
 {% block title %}Correlation Rules - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Unlike Event Promotion Policies (one event, first match wins), a correlation rule looks across multiple events: when the count of events matching pattern within the trailing time window reaches the threshold, a ticket is created -- e.g. 5 events matching "failed password" from the same host within 2 minutes. Optionally grouped by host or program, so each host/program breaching the threshold gets its own ticket. Once fired, a rule+group re-arms after the window elapses.{% endblock %}
+{% block help_text %}Unlike Event Promotion Policies (one event, first match wins), a correlation rule looks across multiple events. Simple repetition: when the count of events matching pattern within the trailing time window reaches the threshold, a ticket is created -- e.g. 5 events matching "failed password" from the same host within 2 minutes. ML anomalies: an online model scores every matching event and fires once its anomaly score clears the threshold, after enough events to learn a baseline. Both kinds can be grouped by host or program, so each one gets its own count/model and its own ticket, and both re-arm after the window elapses once fired.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   {{ modal.trigger_button("correlation-rule", "+ New rule") }}
@@ -10,15 +10,16 @@
 
 <div class="card">
   <table>
-    <thead><tr><th>Order</th><th>Name</th><th>Type</th><th>Pattern</th><th>Threshold</th><th>Window</th><th>Group by</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Order</th><th>Name</th><th>Type</th><th>Rule</th><th>Pattern</th><th>Threshold</th><th>Window</th><th>Group by</th><th>Status</th><th></th></tr></thead>
     <tbody>
       {% for r in page.items %}
       <tr>
         <td class="muted">{{ r.sort_order }}</td>
         <td>{{ r.name }}</td>
         <td><span class="badge">{{ r.ticket_type }}</span></td>
+        <td class="muted">{{ "ML anomalies" if r.rule_type == "ml_anomaly" else "Simple repetition" }}</td>
         <td class="muted">{{ r.match_field }}: <code>{{ r.pattern }}</code></td>
-        <td class="muted">{{ r.threshold_count }} events</td>
+        <td class="muted">{% if r.rule_type == "ml_anomaly" %}score &ge; {{ r.ml_score_threshold }}{% else %}{{ r.threshold_count }} events{% endif %}</td>
         <td class="muted">{{ r.window_minutes }}m</td>
         <td class="muted">{{ r.group_by }}</td>
         <td>
@@ -34,7 +35,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="9" class="muted">No correlation rules yet.</td></tr>
+      <tr><td colspan="10" class="muted">No correlation rules yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -66,7 +67,11 @@
           {% for f in match_fields %}<option value="{{ f }}" {% if prefill and prefill.match_field == f %}selected{% endif %}>{{ f }}</option>{% endfor %}
         </select>
       </div>
-      <div class="field"><label for="pattern">Pattern (regex)</label><input type="text" id="pattern" name="pattern" value="{{ prefill.pattern if prefill else '' }}" placeholder="failed password" required></div>
+      <div class="field">
+        <label for="pattern">Pattern (regex)</label>
+        <input type="text" id="pattern" name="pattern" value="{{ prefill.pattern if prefill else '' }}" placeholder="failed password">
+        <div class="field-hint">For ML anomalies, leave as <code>.*</code> (or blank) to score every event instead of narrowing to a pattern first.</div>
+      </div>
       <div class="field" style="flex:0 0 100px;"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="0"></div>
     </div>
     <div class="form-row">
@@ -75,15 +80,49 @@
         <select id="group_by" name="group_by">
           {% for g in group_by_fields %}<option value="{{ g }}" {% if prefill and prefill.group_by == g %}selected{% endif %}>{{ g }}</option>{% endfor %}
         </select>
-        <div class="field-hint">"none" correlates across all matching events tenant-wide; "host"/"program" gives each value its own count and its own ticket.</div>
+        <div class="field-hint">"none" correlates (or, for ML anomalies, trains one model) across all matching events tenant-wide; "host"/"program" gives each value its own count/model and its own ticket.</div>
       </div>
-      <div class="field" style="flex:0 0 140px;"><label for="threshold_count">Threshold (events)</label><input type="number" id="threshold_count" name="threshold_count" value="{{ prefill.threshold if prefill else 5 }}" min="2" required></div>
-      <div class="field" style="flex:0 0 140px;"><label for="window_minutes">Window (minutes)</label><input type="number" id="window_minutes" name="window_minutes" value="5" min="1" required></div>
+      <div class="field" style="flex:0 0 140px;"><label for="window_minutes">Window / cooldown (minutes)</label><input type="number" id="window_minutes" name="window_minutes" value="5" min="1" required></div>
     </div>
+
+    {# Simple repetition is the tab shown active on open (also matches what
+       every "Correlate these" prefill from tickets/live is for), so this
+       hidden field's initial value has to agree -- kept in sync from then
+       on by each tab button's onclick above. #}
+    <input type="hidden" id="rule_type_field" name="rule_type" value="threshold">
+    <div class="tabs" data-tabs>
+      <div class="tab-buttons">
+        <button type="button" class="tab-btn active" data-tab-btn="simple" onclick="document.getElementById('rule_type_field').value='threshold'">Simple repetition</button>
+        <button type="button" class="tab-btn" data-tab-btn="ml" onclick="document.getElementById('rule_type_field').value='ml_anomaly'">ML anomalies</button>
+      </div>
+      <div class="tab-panel active" data-tab-panel="simple">
+        <div class="field" style="flex:0 0 140px;">
+          <label for="threshold_count">Threshold (events)</label>
+          <input type="number" id="threshold_count" name="threshold_count" value="{{ prefill.threshold if prefill else 5 }}" min="2">
+        </div>
+        <div class="field-hint">Fires once this many matching events land within the window above.</div>
+      </div>
+      <div class="tab-panel" data-tab-panel="ml">
+        <div class="form-row">
+          <div class="field" style="flex:0 0 200px;">
+            <label for="ml_score_threshold">Anomaly score threshold</label>
+            <input type="number" id="ml_score_threshold" name="ml_score_threshold" value="0.7" min="0" max="1" step="0.05">
+          </div>
+          <div class="field" style="flex:0 0 200px;">
+            <label for="ml_warmup_count">Warm-up events</label>
+            <input type="number" id="ml_warmup_count" name="ml_warmup_count" value="250" min="1">
+          </div>
+        </div>
+        <div class="field-hint">
+          An online model (river.anomaly.HalfSpaceTrees) trained on every matching event's severity, message length, and hour of day -- no fixed count/window rule to write, it learns this rule+group's normal baseline as events arrive. Scores range 0-1 (higher = more anomalous); it won't fire until it's seen at least the warm-up count of events, so a brand new rule doesn't flag its own cold start.
+        </div>
+      </div>
+    </div>
+
     <div class="field">
       <label for="title_template">Title template</label>
-      <input type="text" id="title_template" name="title_template" value="{count} matching events in {window}m" placeholder="{count} matching events in {window}m">
-      <div class="field-hint">Available placeholders: <code>{count}</code>, <code>{window}</code>, <code>{message}</code>, <code>{host}</code>, <code>{program}</code> (the last three come from the most recent contributing event).</div>
+      <input type="text" id="title_template" name="title_template" placeholder="{count} matching events in {window}m -- or, for ML anomalies, Anomalous event detected (score {score})">
+      <div class="field-hint">Leave blank for a sensible default. Available placeholders: <code>{count}</code>, <code>{window}</code>, <code>{message}</code>, <code>{host}</code>, <code>{program}</code> (from the most recent contributing event), and for ML anomalies, <code>{score}</code>.</div>
     </div>
     <div class="field">
       <label for="asset_match_field">Auto-link asset by</label>

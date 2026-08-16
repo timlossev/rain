@@ -19,6 +19,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     FetchedValue,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -205,24 +206,36 @@ class TicketRule(TenantBase):
 class CorrelationRule(TenantBase):
     """Multi-event correlation, evaluated once per newly-persisted event
     (rain.modules.tickets.correlation), alongside -- not instead of --
-    TicketRule's single-event promotion. `rule_type` is a forward-looking
-    discriminator: "threshold" (the only kind implemented) counts events
-    matching `match_field`/`pattern` within a trailing `window_minutes`
-    window, optionally grouped by `group_by` (a distinct correlation
-    "instance" per group-key value, e.g. per host), and fires once that
-    count reaches `threshold_count`. A future "sequence" rule_type (A
-    then B within T, or absence-of-B-after-A) could reuse this same
-    table/nav/evaluation entry point without a schema change to this
-    table beyond whatever its own config needs -- deliberately not
-    designed yet, since threshold correlation alone already covers the
-    common case (rate/frequency-based alerting) real correlation rules
-    in practice mostly are.
+    TicketRule's single-event promotion. `rule_type` picks which of two
+    ways a rule decides "this is worth a ticket":
 
-    No continuous streaming engine behind this (compare: Esper/Norikra) --
-    the count is a plain, bounded SQL query against syslog_events run at
-    the moment a new event arrives, which is sufficient because the only
-    thing that can ever push a threshold rule over its line is the event
-    that was just persisted."""
+    - "threshold" counts events matching `match_field`/`pattern` within a
+      trailing `window_minutes` window, optionally grouped by `group_by`
+      (a distinct correlation "instance" per group-key value, e.g. per
+      host), and fires once that count reaches `threshold_count`. No
+      continuous streaming engine behind this (compare: Esper/Norikra) --
+      the count is a plain, bounded SQL query against syslog_events run
+      at the moment a new event arrives, which is sufficient because the
+      only thing that can ever push a threshold rule over its line is
+      the event that was just persisted.
+    - "ml_anomaly" scores every event matching `match_field`/`pattern`
+      (blank/`.*` to mean "every event") against a per rule+group_key
+      river.anomaly.HalfSpaceTrees model (an online/incremental learner
+      -- no batch retraining, one event at a time, matching a live
+      syslog stream), fed by rain.modules.tickets.correlation._ml_features.
+      `ml_score_threshold` (0-1, higher = more anomalous) is the score a
+      new event's anomaly score must clear to fire a ticket;
+      `ml_warmup_count` is how many events a group's model sees before
+      it's allowed to fire at all, so a freshly-created rule doesn't
+      flag its own cold-start baseline as anomalous. Still respects
+      `window_minutes` as the same re-arm cooldown "threshold" uses, and
+      `group_by`/`asset_match_field` the same way -- an ML rule is a
+      different scoring method for the same overall "detect and fire"
+      shape, not a different pipeline.
+
+    A future "sequence" rule_type (A then B within T, or absence-of-B-
+    after-A) could reuse this same table/nav/evaluation entry point
+    without a schema change beyond whatever its own config needs."""
 
     __tablename__ = "correlation_rules"
 
@@ -244,18 +257,34 @@ class CorrelationRule(TenantBase):
     severity: Mapped[str] = mapped_column(String(15), default="medium", server_default="medium")
     asset_match_field: Mapped[str | None] = mapped_column(String(15), nullable=True)  # host|program, matched to Asset.external_id
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # ml_anomaly only -- ignored by "threshold" rules.
+    ml_score_threshold: Mapped[float] = mapped_column(Float, default=0.7, server_default="0.7")
+    ml_warmup_count: Mapped[int] = mapped_column(Integer, default=250, server_default="250")
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class CorrelationRuleState(TenantBase):
     """One row per (rule, group-key) actually seen -- e.g. one row per
-    host for a rule grouped by host. Tracks when that group last fired a
-    ticket so a threshold that stays breached doesn't spawn a new ticket
-    on every subsequent matching event; it re-arms once `window_minutes`
-    has elapsed since the last trigger (not once the count drops back
-    under the threshold -- simpler to reason about and to implement
-    without keeping a live count outside of the DB query itself).
+    host for a rule grouped by host. For a "threshold" rule, tracks when
+    that group last fired a ticket so a threshold that stays breached
+    doesn't spawn a new ticket on every subsequent matching event; it
+    re-arms once `window_minutes` has elapsed since the last trigger
+    (not once the count drops back under the threshold -- simpler to
+    reason about and to implement without keeping a live count outside
+    of the DB query itself). `last_triggered_at` is null until a
+    group's first fire (both rule types) or, for "ml_anomaly", simply
+    while its model is still warming up.
+
+    For an "ml_anomaly" rule, this is also where that group's model
+    lives between events: `ml_model` is a pickled
+    river.anomaly.HalfSpaceTrees (see CorrelationRule's docstring) and
+    `ml_event_count` is how many events it's been fed, checked against
+    the rule's ml_warmup_count. Only rain.modules.tickets.correlation
+    ever writes ml_model, and only with bytes it just produced by
+    pickling its own in-memory model -- never with anything read from a
+    request -- so unpickling it back here doesn't cross a trust boundary
+    the way unpickling arbitrary user input would.
 
     `group_key` is `""` (never NULL) for an ungrouped (group_by="none")
     rule -- Postgres unique constraints treat every NULL as distinct from
@@ -269,7 +298,9 @@ class CorrelationRuleState(TenantBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     rule_id: Mapped[int] = mapped_column(ForeignKey("correlation_rules.id", ondelete="CASCADE"), index=True)
     group_key: Mapped[str] = mapped_column(String(255), default="", server_default="")
-    last_triggered_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    last_triggered_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ml_model: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    ml_event_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class Group(TenantBase):
