@@ -95,6 +95,20 @@ the two roles is asking, so there's no query path there that could reach
 another tenant's rows. The Admin nav mirrors this split into two
 submenus, Platform Administration and Tenant Administration.
 
+**API spec.** FastAPI's own `/docs`, `/redoc`, `/openapi.json` are
+disabled (`docs_url=None` etc. on the `FastAPI()` constructor) and
+replaced with equivalents behind `require_internal_admin` -- the
+generated spec covers every route/parameter/response shape, which
+shouldn't be world-readable to an unauthenticated caller any more than
+any other platform-wide setting is. Linked from Admin > Platform
+Administration > API Documentation. Every router registers a `tags=`
+so the generated docs group by module (Tickets, Assets, Admin, Portal,
+...) instead of listing every route flat. There's no separate JSON/
+REST API for external integration -- this spec documents the same
+server-rendered routes the web UI itself calls; Webhooks + Platform
+Response Rules are the supported way to react to RAIN's events from
+outside the app.
+
 ## Tree navigation
 
 `rain.core.nav_registry` is a registry modules add nodes to at import time
@@ -202,6 +216,41 @@ creation. The outbound SMTP relay is instance-wide
 (`control.global_config`, set once in Admin > SMTP Relay, password
 Fernet-encrypted); *who* gets notified is per-tenant
 (`notification_channels`, config Fernet-encrypted the same way).
+
+**Watchers.** `TicketWatcher` -- emailed on a ticket's new comments and
+status changes, on top of whoever's actively working it. A row is
+either `user_id` (a control.users id) or a bare `email` for someone
+with no account, never both; email uniqueness per ticket is
+case-insensitive, enforced by a partial functional unique index rather
+than a plain column constraint. Three ways to end up watching:
+toggling "Watch" on the ticket detail page yourself; being the
+reporter (added automatically on creation, skipped for an anonymous
+portal submission) or the assignee (added automatically on every
+(re)assignment, `rain.modules.tickets.service.create_ticket`/
+`update_assignee`); or a Platform Response Rule's "Add a watcher"
+action, below.
+
+**Platform Response Rules.** `rain.modules.tickets.platform_events`, a
+second, independent rule layer on top of ticket creation -- reacts
+*after* a ticket already exists (auto-promoted or manual), and every
+active, pattern-matching rule fires, not just the first (unlike the
+single-event rule engine above). Actions: notify Slack/email (reusing
+`NotificationChannel`), call a webhook, attach a document or asset,
+mark the ticket problematic, or add a watcher (email or system user,
+see above). Every firing -- and each action's individual outcome, even
+a failed one -- is logged to `platform_event_triggers` and the
+ticket's own activity feed, so a failed Slack post doesn't hide the
+fact the rule matched.
+
+**Escalation.** A per-tenant "escalation webhook" (one `WebhookConfig`,
+picked on Admin > Branding next to the portal's own settings, stored as
+`tenant_config["escalation_webhook_id"]`) backs a manual "Escalate"
+button shown on every ticket detail page -- and next to a signed-in
+portal visitor's own tickets -- whenever a tenant has one configured,
+absent otherwise. Unlike a Platform Response Rule's webhook action,
+this isn't pattern-matched or automatic: `rain.modules.tickets.service.
+escalate_ticket` fires it for one ticket, on demand, logged to that
+ticket's activity feed the same way a rule firing is.
 
 **Correlation Rules.** `rain.modules.tickets.correlation`, evaluated
 alongside the single-event rule engine above, once per persisted event.
@@ -324,10 +373,13 @@ replaces the sentinels with real `<mark>` tags -- so a highlighted
 snippet can never smuggle in unescaped HTML from a ticket/document's own
 (user-authored, never sanitized) title or description.
 
-**Number shortcut.** Typing a ticket/document number (`INC-000001`,
-`DOC-000004`, tolerant of a missing zero-pad) redirects straight to that
-record via `find_by_number()` instead of showing a results page that
-could only ever contain it.
+**Number shortcut.** Typing a ticket/document/asset number (`INC-000001`,
+`DOC-000004`, `CI-000001`, tolerant of a missing zero-pad) redirects
+straight to that record via `find_by_number()` instead of showing a
+results page that could only ever contain it. Assets aren't otherwise
+part of `search()` -- no `search_vector` column -- but a typed-in CI
+number is still an exact, unambiguous lookup the same way a ticket/
+document number is.
 
 **Reserved for later.** `control` enables the `vector` extension once,
 database-wide (`CREATE EXTENSION IF NOT EXISTS vector`, control migration
@@ -358,6 +410,58 @@ all-digits) -- a couple of harder polymorphic spots (a document's
 "linked ticket" display, which only stores a bare `linked_id`, not a
 loaded `Ticket`) were deliberately left on that fallback rather than
 force a bigger data-model change for one display link.
+
+## Client Portal
+
+`rain.modules.portal`, a single page at `/portal/<tenant slug>` with no
+sidebar/topbar -- reachable with or without a session
+(`get_current_user_optional`, not `get_current_user`), unlike every
+other tenant-scoped route in the app. Tenant resolution here is purely
+from the URL slug, not the session (`_resolve_portal_tenant`), which is
+the whole reason this is its own module instead of a route on
+`rain.modules.tickets.router`: it can't use `get_request_context`/
+`get_tenant_db`, both of which assume a session already picked a
+tenant. `_resolve_portal_access` is the single choke point both the
+GET and POST route share for tenant resolution and the wrong-tenant/
+require-auth gate, so the two can't silently drift on what's allowed
+through.
+
+**Gating.** Two `TenantConfig` flags an admin sets on Admin > Branding:
+`portal_require_auth` (off: anyone with the link can file anonymously,
+the ticket records "an unauthenticated user" as the reporter) and
+`portal_branded` (off: a plain, unaccented page showing only the
+tenant's own name, for a portal shared outside the organization). A
+signed-in visitor whose own tenant isn't the one in the URL is always
+turned away with a plain 403, regardless of `portal_require_auth` --
+that flag controls whether *an* account is required, not whether an
+account for a *different* tenant is accepted.
+
+**Two views, one template.** An anonymous visitor gets exactly the
+original bare-bones form (new ticket +, once signed in, "Tickets
+reported by me") plus "Today's events" -- every visitor's page,
+regardless of sign-in status, since it's tenant-wide operational
+information (`rain.modules.calendar.service.list_entries_due_today`,
+reusing the month-grid view's own occurrence math). A signed-in visitor
+additionally gets a wider layout (`.portal-shell.portal-authenticated`)
+with a search bar and three tabs -- Tickets, Approvals (backed by
+`rain.modules.tickets.service.list_tickets_pending_approval_for`, the
+same eligibility rule `is_eligible_approver` uses, evaluated as a set
+query), and Documents. `.content-standalone` (base.html's `<main>` for
+login/setup/portal alike) is a centered flexbox; overridden to normal
+top-down block flow specifically when a `.portal-shell` is present
+(`.content-standalone:has(.portal-shell)`, same `:has()` technique as
+the sidebar-collapse override) so switching between tabs of different
+heights doesn't recenter -- and visibly jump -- the whole page.
+
+**Escalate.** Next to a signed-in visitor's own tickets in the Tickets
+tab, whenever the tenant has an escalation webhook configured -- same
+feature as the ticket detail page's own Escalate button, see
+Ticketing's Escalation section above. Posts to the same
+`/tickets/{id}/escalate` route `require_login` already gates, with a
+`next` field so it returns to the portal instead of a ticket detail
+page this visitor might not even be allowed to open on its own
+(`portal_require_auth` off doesn't imply this visitor can view
+`/tickets/<n>` -- that's still `require_login`).
 
 ## Lessons from the first real Docker run
 

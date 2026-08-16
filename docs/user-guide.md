@@ -155,7 +155,12 @@ The single-ticket page. At the top is a status stepper: one button per
 tenant-defined status, with the current one highlighted; clicking any
 other status moves the ticket there immediately. Next to it are
 quick actions: "Promote to Change" (incidents/vulnerabilities only),
-"Mark problematic" / "Unmark problematic", and "Export to PDF".
+"Mark problematic" / "Unmark problematic", "Watch" / "Stop watching"
+(get emailed on this ticket's new comments and status changes -- you're
+watching automatically if you reported it or it's assigned to you, this
+button is for anyone else), "Escalate" (only shown once your tenant has
+an escalation webhook configured -- Admin > Branding -- fires it for
+this one ticket on demand), and "Export to PDF".
 
 Below that is the main card:
 
@@ -197,9 +202,9 @@ everything that's happened to the ticket. Add a plain-text comment from
 the box at the top, and toggle Newest first / Oldest first to change
 the feed's sort order. Besides comments, the feed automatically shows
 every status change, every assignee/asset change, every title/severity
-edit, every approval decision, every document link/unlink, and every
-Platform Response Rule that fired because of this ticket, each entry
-naming who or what caused it and when.
+edit, every approval decision, every document link/unlink, every
+Escalate click, and every Platform Response Rule that fired because of
+this ticket, each entry naming who or what caused it and when.
 
 ### Events (live feed)
 
@@ -338,6 +343,12 @@ and an Active checkbox stay editable at the top. Below that, an
 - Attach a document: pick a document to link to the matching ticket.
 - Attach an asset: pick an asset to set as the ticket's affected asset,
   if it doesn't already have one.
+- Mark problematic: flags the matching ticket problematic, same as the
+  ticket detail page's own quick action.
+- Add a watcher: fill in either an email address (for someone with no
+  account in RAIN) or search for a system user, not both -- they start
+  getting emailed on the ticket's activity the same as anyone who
+  clicked "Watch" on it themselves.
 
 Every firing of a rule, and the outcome of each of its actions, is
 logged both to that rule's own history and to the matching ticket's
@@ -551,6 +562,53 @@ highlighted snippet of the matching text), or a "no matches" message if
 nothing was found. Leaving the search box empty shows a prompt instead
 of an empty results table.
 
+## Client Portal
+
+A separate, tenant-specific page at `/portal/<tenant slug>` for filing
+an incident without navigating the full app -- no sidebar or topbar,
+just this page. Whoever you share the link with sees one of two views:
+
+**Anonymous** (or when the tenant requires sign-in, before you sign in)
+-- a bare form: what you need, what's happening, details, criticality,
+a "New ticket" button, and "Today's events" (see below). Once you've
+submitted, "Tickets reported by me" appears too, once you sign in.
+
+**Signed in** -- the same form, plus a search bar and three tabs:
+
+- **Tickets**: the report form and "Tickets reported by me," same as
+  the anonymous view, plus an Escalate button per ticket if your tenant
+  has an escalation webhook configured.
+- **Approvals**: change tickets currently waiting on your decision --
+  same list as clicking through to each one's own Approval card would
+  show.
+- **Documents**: every document in the tenant's repository, linking out
+  to each one's own page.
+
+**Today's events**, above the form, lists anything due on the tenant
+calendar today (recurring or one-time), or "None" if nothing is. Shown
+to every visitor regardless of sign-in status.
+
+Three settings control this page, all under Admin > Branding > "Public
+incident portal" (client_admin can reach this section for their own
+tenant; internal_admin needs to switch to a tenant first):
+
+- **Require sign-in**: on, only signed-in users of this tenant can file
+  through the portal; off, anyone with the link can, and the ticket
+  records "an unauthenticated user" as the reporter.
+- **Show instance branding**: on, the portal shows this instance's
+  logo/name/accent color, same as every signed-in page; off, a plain,
+  unaccented page showing only the tenant's own name -- for a portal
+  shared outside your own organization.
+- **Escalation webhook**: which of this tenant's configured webhooks
+  (Admin > Webhooks) the Escalate button calls, on the ticket detail
+  page and here. Leave unset and no Escalate button shows anywhere for
+  this tenant.
+
+A signed-in visitor of a *different* tenant than the one in the URL is
+always turned away with a 403, regardless of the require-sign-in
+setting -- that setting controls whether an account is required at
+all, not whether an account for the wrong tenant is accepted.
+
 ## Roles and permissions
 
 RAIN has three roles, assigned per user under Admin > Users:
@@ -653,6 +711,13 @@ password field, since sync overwrites their name, tenant, and active
 status on every run; their role is not touched by sync, so a manual
 role change here sticks.
 
+**API Documentation.** A Swagger UI listing every route the web app
+itself exposes, grouped by area (Tickets, Assets, Admin, Portal, ...),
+for reference -- there's no separate API key or token to request,
+since this documents the same server-rendered routes the UI already
+calls rather than a distinct integration API. To react to RAIN's events
+from outside the app, use Webhooks and Platform Response Rules instead.
+
 ### Tenant Administration
 
 Reachable by both Internal Admin (for whichever tenant is currently
@@ -708,8 +773,9 @@ Rules.** Covered in full under Automation above; the Admin menu links
 straight to the same pages Tickets links to.
 
 **Webhooks.** Centrally-defined outbound HTTP calls, reused by Platform
-Response Rules, document auto-update, and notification channels,
-instead of entering a URL separately in each of those. The list shows
+Response Rules, document auto-update, notification channels, and the
+Escalate button (Admin > Branding picks which one), instead of entering
+a URL separately in each of those. The list shows
 Name, Method, URL, Timeout, and Success codes, with a "+ New webhook"
 form covering: Name, HTTP Method (POST, GET, PUT, or PATCH), URL,
 Timeout in seconds, Success codes (a comma-separated list of HTTP

@@ -46,7 +46,7 @@ class _AssetRefConvertor(Convertor):
 
 register_url_convertor("asset_ref", _AssetRefConvertor())
 
-router = APIRouter(prefix="/assets")
+router = APIRouter(prefix="/assets", tags=["Assets"])
 
 
 # ---------------------------------------------------------------- assets --

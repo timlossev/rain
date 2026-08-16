@@ -41,7 +41,7 @@ class _DocRefConvertor(Convertor):
 
 register_url_convertor("doc_ref", _DocRefConvertor())
 
-router = APIRouter(prefix="/documents")
+router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
 def _filename_slug(title: str) -> str:

@@ -47,7 +47,7 @@ from rain.modules.tickets import service as ticket_service
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
 from rain.web.templating import templates
 
-router = APIRouter(prefix="/portal")
+router = APIRouter(prefix="/portal", tags=["Portal"])
 
 # A registry, not a single hardcoded ticket_type, so a future bare-bones
 # service catalog (docs/architecture.md's roadmap) can add more request

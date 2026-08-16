@@ -54,7 +54,7 @@ from rain.web.nav import build_nav_context
 from rain.web.templating import templates
 from rain.web.uploads import UploadError, save_logo_upload
 
-router = APIRouter(prefix="/admin")
+router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
 @router.get("", response_class=HTMLResponse)

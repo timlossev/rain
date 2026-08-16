@@ -14,7 +14,7 @@ from rain.modules.documents import service as document_service
 from rain.web.nav import build_nav_context
 from rain.web.templating import templates
 
-router = APIRouter(prefix="/calendar")
+router = APIRouter(prefix="/calendar", tags=["Calendar"])
 
 
 def _month_bounds(year: int, month: int) -> tuple[dt.date, dt.date]:

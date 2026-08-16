@@ -15,7 +15,7 @@ from rain.modules.search import service
 from rain.web.nav import build_nav_context
 from rain.web.templating import templates
 
-router = APIRouter(prefix="/search")
+router = APIRouter(prefix="/search", tags=["Search"])
 
 
 @router.get("", response_class=HTMLResponse)

@@ -62,7 +62,7 @@ class _TicketRefConvertor(Convertor):
 
 register_url_convertor("ticket_ref", _TicketRefConvertor())
 
-router = APIRouter(prefix="/tickets")
+router = APIRouter(prefix="/tickets", tags=["Tickets"])
 
 
 # ------------------------------------------------------------- tickets ---

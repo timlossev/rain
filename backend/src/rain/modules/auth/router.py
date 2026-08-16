@@ -26,7 +26,7 @@ from rain.web.templating import templates
 
 logger = logging.getLogger("rain.auth")
 
-router = APIRouter()
+router = APIRouter(tags=["Auth"])
 
 
 async def _hinted_tenant_id(session, next_path: str, user: User) -> int | None:

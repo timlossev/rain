@@ -27,7 +27,7 @@ from rain.db.provisioning import InvalidSlugError, provision_tenant
 from rain.web.templating import templates
 from rain.web.uploads import UploadError, save_logo_upload
 
-router = APIRouter()
+router = APIRouter(tags=["Setup"])
 logger = logging.getLogger("rain.setup")
 
 

@@ -68,7 +68,23 @@ def create_app() -> FastAPI:
     # them, behind require_internal_admin like every other platform-wide
     # setting (rain.core.rbac), rather than leaving the API surface (schema,
     # every route/param) world-readable to an unauthenticated caller.
-    app = FastAPI(title="RAIN", lifespan=lifespan, debug=settings.debug, docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(
+        title="RAIN",
+        description=(
+            "Response to Asynchronous Interactions in Networks -- a self-hosted, "
+            "multi-tenant IT system of record (asset registry, syslog-driven "
+            "ticketing, document repository). This spec covers every server-"
+            "rendered route the web UI itself calls; RAIN has no separate JSON/"
+            "REST API for external integration today -- see /admin/webhooks and "
+            "Platform Response Rules for the supported way to react to events "
+            "from outside the app."
+        ),
+        lifespan=lifespan,
+        debug=settings.debug,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
 
     uploads_dir = Path(settings.uploads_dir)
     uploads_dir.mkdir(parents=True, exist_ok=True)

@@ -105,8 +105,8 @@ JS framework in the browser.
 - A global search bar (every page) for keyword search across ticket and
   document titles/descriptions/numbers, Postgres full-text ranked, with
   match highlighting
-- Typing a ticket or document number (`INC-000001`, `DOC-000004`) jumps
-  straight to that record instead of a results page
+- Typing a ticket, document, or asset number (`INC-000001`, `DOC-000004`,
+  `CI-000001`) jumps straight to that record instead of a results page
 - Ticket and document detail pages live at that same human-readable
   number (`/tickets/INC-000001`, `/documents/DOC-000004`)
 
@@ -128,6 +128,11 @@ JS framework in the browser.
   on screen
 - The user menu shows the current database schema build number
 - Contextual help on every page, and pagination on every list screen
+- A generated API spec (Swagger UI, grouped by area) at `/docs`, gated
+  behind `internal_admin` like every other platform-wide setting --
+  reference for the same server-rendered routes the UI itself calls,
+  not a separate integration API (use Webhooks and Platform Response
+  Rules for that)
 
 See [`docs/user-guide.md`](docs/user-guide.md) for a task-oriented guide
 to using RAIN day to day, and [`docs/architecture.md`](docs/architecture.md)

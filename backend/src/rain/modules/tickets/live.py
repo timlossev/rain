@@ -32,7 +32,7 @@ from rain.web.templating import templates
 
 logger = logging.getLogger("rain.live")
 
-router = APIRouter(prefix="/tickets")
+router = APIRouter(prefix="/tickets", tags=["Tickets"])
 
 
 def _event_payload(event) -> str:
