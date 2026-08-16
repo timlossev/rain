@@ -1,0 +1,23 @@
+apiVersion: v2
+name: rain
+description: >-
+  RAIN (Response to Asynchronous Interactions in Networks) -- a self-hosted,
+  multi-tenant IT system of record: asset registry, syslog-driven ticketing,
+  document repository. Covers the same deployment shapes as this repo's
+  docker-compose.yml/docker-compose.minimal.yml -- see values.yaml's own
+  comments and docs/architecture.md's "Deployment shapes" section for how
+  the two map onto each other.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/timlossev/rain
+sources:
+  - https://github.com/timlossev/rain
+keywords:
+  - itsm
+  - ticketing
+  - asset-management
+  - syslog
+  - self-hosted
+maintainers:
+  - name: RAIN

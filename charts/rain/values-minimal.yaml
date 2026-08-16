@@ -1,0 +1,45 @@
+# Example overlay for "minimal mode" -- the same deployment shape
+# docker-compose.minimal.yml gives you: one workload instead of two
+# (worker folded into app), an external/managed database (no embedded
+# StatefulSet), and no local storage volume (S3, or fully ephemeral if
+# you skip that too). Kubernetes doesn't have Docker's literal
+# one-container constraint -- there's still a Service/Ingress alongside
+# the single Deployment -- so this is "one workload, no bundled
+# infrastructure" rather than "one Pod total."
+#
+# Usage:
+#   helm install rain ./charts/rain -f charts/rain/values-minimal.yaml \
+#     --set database.url=postgresql://user:password@your-rds-endpoint:5432/rain \
+#     --set appSecretKey=$(openssl rand -base64 48) \
+#     --set storage.s3.bucket=my-rain-documents \
+#     --set storage.s3.region=us-east-1
+
+worker:
+  embedded: true
+
+database:
+  # Set via --set above (or fill in here) -- an external/managed
+  # Postgres. Deliberately left blank in this file itself so a real
+  # connection string never accidentally ends up committed somewhere.
+  url: ""
+  embedded:
+    enabled: false
+
+storage:
+  s3:
+    enabled: true
+    # bucket/region set via --set above, or fill in here.
+  persistence:
+    # Ignored once s3.enabled is true, but set false explicitly anyway
+    # so no PVC gets created if you flip s3 back off later without
+    # revisiting this file.
+    enabled: false
+
+# Drop Ingress for a bare eval/internal namespace -- add it back (or
+# override just this block) once you have a real hostname/cert-manager
+# issuer to point at.
+ingress:
+  enabled: false
+
+service:
+  type: ClusterIP

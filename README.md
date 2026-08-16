@@ -231,7 +231,8 @@ port) are published to the host.
 ## Repository layout
 
 ```
-docker-compose.yml, Caddyfile, db/Dockerfile   -- infra
+docker-compose.yml, docker-compose.minimal.yml, Caddyfile, db/Dockerfile   -- infra
+charts/rain/                                    -- Helm chart, same deployment shapes as the two compose files
 backend/
   Dockerfile, pyproject.toml
   alembic.ini, migrations/{control,tenant}/    -- two independent migration chains
@@ -243,6 +244,8 @@ backend/
     web/                   -- Jinja2 templates, hand-written CSS/JS
   tests/
 ```
+
+For Kubernetes instead of Compose, see [`charts/rain/README.md`](charts/rain/README.md) -- same deployment shapes (default two-workload, or a minimal single-workload mode), one Helm chart.
 
 ## Development
 

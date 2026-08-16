@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rain.fullname" . }}-syslog
+  labels:
+    {{- include "rain.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ if .Values.worker.embedded }}app{{ else }}worker{{ end }}
+  {{- with .Values.syslog.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  # Point your syslog-ng destination at this Service's external address
+  # on syslog.port -- see docs/architecture.md for the syslog-ng
+  # destination snippet (same protocol/framing regardless of which
+  # workload ends up serving it here).
+  type: {{ .Values.syslog.service.type }}
+  # Selects the app pods when worker.embedded is true (it's serving the
+  # listener itself then) or the worker pods otherwise -- same
+  # EMBED_WORKER-driven choice deployment-app.yaml/deployment-worker.yaml
+  # make about which one runs rain.worker_runtime.WorkerServices.
+  selector:
+    {{- include "rain.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ if .Values.worker.embedded }}app{{ else }}worker{{ end }}
+  ports:
+    - name: syslog-tcp
+      port: {{ .Values.syslog.port }}
+      targetPort: syslog-tcp
+      protocol: TCP
+    - name: syslog-udp
+      port: {{ .Values.syslog.port }}
+      targetPort: syslog-udp
+      protocol: UDP

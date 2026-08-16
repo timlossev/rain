@@ -1,0 +1,69 @@
+RAIN is deploying.
+
+{{- if .Values.ingress.enabled }}
+
+Once the app pod is ready and DNS for {{ .Values.ingress.host | default .Values.domain }}
+points at your ingress controller, visit:
+
+  https://{{ .Values.ingress.host | default .Values.domain }}
+
+{{- else }}
+
+No Ingress is enabled (ingress.enabled=false). Reach the app Service
+directly:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "rain.fullname" . }}-app {{ .Values.app.port }}:{{ .Values.app.port }}
+
+then visit http://localhost:{{ .Values.app.port }} -- or, if
+service.type is LoadBalancer/NodePort, whatever address that assigns.
+{{- end }}
+
+The first visit runs a setup wizard: instance name, accent color, an
+optional logo, your first tenant, and the first internal admin account.
+Everything else is configured afterwards from the Admin console.
+
+{{- if .Values.worker.embedded }}
+
+worker.embedded is true -- the syslog listener, rule engine,
+notifications, calendar sweep, and LDAP sync are all running inside the
+app Deployment's own pods (EMBED_WORKER=true), not a separate worker
+Deployment.
+{{- else }}
+
+The syslog listener runs in the {{ include "rain.fullname" . }}-worker
+Deployment.
+{{- end }}
+
+Point your syslog-ng destination at:
+
+  kubectl -n {{ .Release.Namespace }} get svc {{ include "rain.fullname" . }}-syslog
+
+for the external address to send to on port {{ .Values.syslog.port }}
+(TCP or UDP) -- see docs/architecture.md in the RAIN repo for the
+syslog-ng destination snippet.
+
+{{- if not .Values.database.url }}
+{{- if .Values.database.embedded.enabled }}
+
+database.embedded.enabled is true -- a single-replica Postgres is
+running in this release too (no HA, no managed backups; fine for a
+dev/eval namespace, not for anything you'd be upset to lose). Point
+database.url at a real managed instance instead when you're ready for
+that.
+{{- else }}
+
+WARNING: neither database.url nor database.embedded.enabled is set --
+the app has nothing to connect to and will not start. Set one or the
+other.
+{{- end }}
+{{- end }}
+
+{{- if not .Values.storage.s3.enabled }}
+{{- if not .Values.storage.persistence.enabled }}
+
+WARNING: storage.persistence.enabled is false and storage.s3.enabled is
+false -- document uploads (and the branding logo) have no durable
+storage at all and will be lost on every pod restart. Set one of the
+two if that's not intentional.
+{{- end }}
+{{- end }}

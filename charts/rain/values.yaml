@@ -1,0 +1,147 @@
+# Default values for the rain chart. Mirrors this repo's
+# docker-compose.yml/docker-compose.minimal.yml -- every axis one of
+# those two toggles maps onto one value here, so "the same deployment
+# models" (default four-piece topology, and single-pod minimal mode)
+# are both just different values.yaml files against this one chart, not
+# two separate charts. See docs/architecture.md's "Deployment shapes"
+# section for the same axes explained on the Compose side.
+
+image:
+  # No public registry image is published -- build backend/Dockerfile
+  # yourself (`docker build -t <repo>/rain-app ./backend`) and push it
+  # somewhere this cluster can pull from, same image for both app and
+  # worker (see docker-compose.yml's own comment on that).
+  repository: rain-app
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# Required, no safe default -- signs session cookies and derives the
+# Fernet key that encrypts config-at-rest (e.g. the SMTP relay
+# password). Generate with `openssl rand -base64 48`, same as
+# bootstrap.py does for the Compose deployment; do not reuse across
+# environments. Stored in a Secret (templates/secret.yaml), never a
+# ConfigMap.
+appSecretKey: ""
+
+# Public domain the app is reached at. Only used to fill in
+# ingress.host below if you leave that blank -- unlike RAIN_DOMAIN in
+# the Compose deployment (which Caddy uses to request an ACME
+# certificate), nothing in the app itself reads this; TLS here is
+# whatever your ingress controller/cert-manager setup already does.
+domain: rain.example.com
+
+database:
+  # The recommended path for anything beyond a quick eval, same as
+  # POSTGRES_URL in .env -- an external/managed Postgres (RDS, Cloud
+  # SQL, ...). Plain `postgresql://user:pass@host:5432/rain` -- the app
+  # normalizes that to the asyncpg driver URL itself, same as the
+  # Compose deployment's Settings._normalize_driver. Takes priority
+  # over embedded.* below when set.
+  url: ""
+  # Set database.url above blank and enable this instead for a bundled,
+  # single-replica Postgres (pgvector/pgvector:pg17-trixie -- the same
+  # image db/Dockerfile in this repo uses, no build step) -- fine for a
+  # dev/eval namespace, same caveat docker-compose.yml's own "local-db"
+  # profile carries: no HA, no managed backups, your responsibility to
+  # add a real backup strategy before trusting it with real data.
+  embedded:
+    enabled: false
+    user: rain
+    password: ""
+    database: rain
+    storage:
+      size: 10Gi
+      storageClassName: ""
+
+# Document repository storage (rain.modules.documents.storage). Leave
+# s3.enabled false to use the persistence.* PVC below instead -- same
+# "local disk unless S3_BUCKET is set" choice Settings.s3_bucket makes
+# for the Compose deployment.
+storage:
+  s3:
+    enabled: false
+    bucket: ""
+    region: ""
+    # What points this at a self-hosted S3-compatible service (MinIO,
+    # etc.) instead of real AWS S3 -- leave blank for AWS.
+    endpointUrl: ""
+    # Leave both blank on real AWS to use an IRSA/instance-profile role
+    # instead of a static key pair (same as the Compose deployment's
+    # own credential-chain fallback) -- most self-hosted S3-compatible
+    # services need the pair set explicitly, stored in a Secret.
+    accessKeyId: ""
+    secretAccessKey: ""
+  # PVC for local document storage (+ the branding logo and CSV/JSON
+  # import stash, which stay local-disk-only regardless of s3.enabled
+  # -- see rain.modules.documents.storage's own docstring on why).
+  # Ignored when s3.enabled is true. Set to false for a genuinely
+  # ephemeral pod (mirrors docker-compose.minimal.yml's own "no volume
+  # unless S3_BUCKET is set" trade-off) -- anything written to local
+  # disk is then lost on pod restart.
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClassName: ""
+    accessMode: ReadWriteOnce
+
+app:
+  replicas: 1
+  port: 8000
+  resources: {}
+  # Never true against a real deployment -- puts full tracebacks (source
+  # paths, local variables, SQL text) in 500 responses.
+  debug: false
+
+# The syslog listener + rule engine + notifications + calendar sweep +
+# LDAP sync. embedded: true folds all of that into the app Deployment
+# itself (EMBED_WORKER=true, same as the Compose deployment's minimal
+# mode) instead of a separate Deployment -- there's no single-pod
+# constraint forcing this in Kubernetes the way there is for Docker's
+# literal single-container ask, but the same knob is here for parity,
+# and for genuinely wanting one fewer Deployment/Service pair to manage.
+worker:
+  embedded: false
+  replicas: 1
+  resources: {}
+
+# TCP+UDP port the syslog listener binds to, whichever workload (app or
+# worker, depending on worker.embedded) ends up running it. Exposed via
+# its own Service (LoadBalancer by default -- syslog-ng traffic
+# normally originates outside the cluster, unlike ingress-routed HTTP).
+syslog:
+  port: 5514
+  service:
+    type: LoadBalancer
+    annotations: {}
+
+# HTTP entry point. Disable and set service.type below to LoadBalancer/
+# NodePort instead for a cluster that already terminates TLS in front
+# of RAIN some other way (mirrors WEB_FRONTEND=false skipping Caddy in
+# the Compose deployment).
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  host: ""  # defaults to .domain above when blank
+  tls:
+    enabled: true
+    secretName: ""  # defaults to "<release-name>-tls" when blank
+
+# Only consulted when ingress.enabled is false.
+service:
+  type: ClusterIP
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podSecurityContext: {}
+securityContext: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

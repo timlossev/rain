@@ -1,0 +1,86 @@
+{{- if and .Values.database.embedded.enabled (not .Values.database.url) }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "rain.fullname" . }}-postgres
+  labels:
+    {{- include "rain.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  serviceName: {{ include "rain.fullname" . }}-postgres
+  # Single replica by design -- this is the eval/dev path (same "no HA,
+  # your own backup strategy" caveat docker-compose.yml's own "local-db"
+  # profile carries), not a real HA Postgres setup. Point database.url
+  # at a real managed instance instead for anything beyond that.
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "rain.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "rain.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+    spec:
+      containers:
+        - name: postgres
+          # Same image db/Dockerfile in this repo uses (pgvector's
+          # official build, Debian-based since pgvector doesn't publish
+          # Alpine variants) -- no build step, drop-in for postgres:17.
+          image: pgvector/pgvector:pg17-trixie
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.database.embedded.user | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.database.embedded.database | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "rain.fullname" . }}
+                  key: postgres-password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.database.embedded.user | quote }}, "-d", {{ .Values.database.embedded.database | quote }}]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.database.embedded.user | quote }}, "-d", {{ .Values.database.embedded.database | quote }}]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.database.embedded.storage.storageClassName }}
+        storageClassName: {{ .Values.database.embedded.storage.storageClassName }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.database.embedded.storage.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rain.fullname" . }}-postgres
+  labels:
+    {{- include "rain.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  clusterIP: None
+  selector:
+    {{- include "rain.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+{{- end }}

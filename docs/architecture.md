@@ -55,6 +55,16 @@ behind it at all, gone the next time the container is recreated -- an
 explicit, documented trade-off for genuine single-container simplicity,
 not an oversight.
 
+**Kubernetes.** `charts/rain/` is a Helm chart covering the same two
+shapes, translated onto the same underlying `Settings` fields (an
+Ingress instead of Caddy, a `worker.embedded` value instead of
+`EMBED_WORKER`/`COMPOSE_PROFILES`, `storage.s3.*`/`storage.persistence.*`
+instead of `S3_BUCKET`/the `rain_uploads` volume) rather than a second,
+independently-maintained deployment story -- see `charts/rain/README.md`.
+Not installed against a real cluster as part of building it (none was
+available); rendered and reviewed by hand against the exact env vars the
+app expects instead.
+
 ## Multi-tenancy: schema-per-tenant
 
 - `control` schema (always present): `tenants`, `users`, `sessions`,

@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rain.fullname" . }}-app
+  labels:
+    {{- include "rain.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+spec:
+  # >1 replica means >1 pod independently running the same startup-time
+  # migration step (rain.main's lifespan) -- idempotent, same as the
+  # Compose deployment's app+worker both doing it already, but not
+  # actually concurrency-safe against a large migration landing at the
+  # same moment two pods start together. Fine at the default of 1; scale
+  # up deliberately, not as a reflex.
+  replicas: {{ .Values.app.replicas }}
+  selector:
+    matchLabels:
+      {{- include "rain.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
+  template:
+    metadata:
+      labels:
+        {{- include "rain.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: app
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "rain.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["rain-web"]
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.app.port }}
+              protocol: TCP
+            {{- if .Values.worker.embedded }}
+            - name: syslog-tcp
+              containerPort: {{ .Values.syslog.port }}
+              protocol: TCP
+            - name: syslog-udp
+              containerPort: {{ .Values.syslog.port }}
+              protocol: UDP
+            {{- end }}
+          env:
+            {{- include "rain.commonEnv" . | nindent 12 }}
+            - name: EMBED_WORKER
+              value: {{ .Values.worker.embedded | quote }}
+          # Migrations run automatically on every startup (rain.main's
+          # lifespan) -- no separate init container/Job needed, same as
+          # the Compose deployment.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- if and .Values.storage.persistence.enabled (not .Values.storage.s3.enabled) }}
+          volumeMounts:
+            - name: uploads
+              mountPath: /data/uploads
+          {{- end }}
+          {{- with .Values.app.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- if and .Values.storage.persistence.enabled (not .Values.storage.s3.enabled) }}
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: {{ include "rain.fullname" . }}-uploads
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

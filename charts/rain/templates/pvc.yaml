@@ -1,0 +1,26 @@
+{{- if and .Values.storage.persistence.enabled (not .Values.storage.s3.enabled) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "rain.fullname" . }}-uploads
+  labels:
+    {{- include "rain.labels" . | nindent 4 }}
+spec:
+  # Mounted by both the app and worker Deployments (branding logo +
+  # local document storage on the app side, the calendar sweep's
+  # "refresh document from webhook" writes on the worker side -- same
+  # rain_uploads volume both containers share in docker-compose.yml).
+  # ReadWriteOnce is fine as long as every pod that mounts it lands on
+  # the same node, which is only guaranteed at app.replicas=1/
+  # worker.replicas=1 (the chart's own default) -- scaling either past
+  # 1, or running app and worker on different nodes, needs a storage
+  # class that supports ReadWriteMany instead.
+  accessModes:
+    - {{ .Values.storage.persistence.accessMode }}
+  {{- if .Values.storage.persistence.storageClassName }}
+  storageClassName: {{ .Values.storage.persistence.storageClassName }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.persistence.size }}
+{{- end }}
