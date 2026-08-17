@@ -973,6 +973,7 @@ td.actions { text-align: right; white-space: nowrap; }
 .auth-card .brand { justify-content: center; padding-bottom: 24px; }
 .auth-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; color: var(--text-muted); font-size: 0.8rem; }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+.auth-build { text-align: center; font-size: 0.75rem; margin-top: 20px; }
 
 /* ---------- public incident portal (rain.modules.portal) ---------- */
 /* .content-standalone (base.html's <main> for login/setup/portal alike)

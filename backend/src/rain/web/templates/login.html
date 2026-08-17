@@ -23,5 +23,6 @@
   <div class="auth-divider"><span>or</span></div>
   <a class="btn" style="width:100%; justify-content:center;" href="/auth/saml/login?next={{ next | urlencode }}">Sign in with SSO</a>
   {% endif %}
+  <div class="muted auth-build" title="Current database schema revision">Build {{ db_build }}</div>
 </div>
 {% endblock %}
