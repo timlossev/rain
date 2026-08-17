@@ -160,7 +160,9 @@ quick actions: "Promote to Change" (incidents/vulnerabilities only),
 watching automatically if you reported it or it's assigned to you, this
 button is for anyone else), "Escalate" (only shown once your tenant has
 an escalation webhook configured -- Admin > Branding -- fires it for
-this one ticket on demand), and "Export to PDF".
+this one ticket on demand, filling in that webhook's placeholders from
+this exact ticket -- see "Placeholders reference" under Webhooks below),
+and "Export to PDF".
 
 Below that is the main card:
 
@@ -786,6 +788,29 @@ same double-brace placeholders as notification channels where the
 caller supports them, and an "Emit syslog alert on failure" checkbox
 (off by default) that raises a syslog event whenever a call using this
 webhook fails or times out, wherever it's called from.
+
+**Placeholders reference.** Two independent placeholder systems exist,
+used in different template fields -- the wrong syntax in the wrong
+field is left as literal, unsubstituted text rather than an error, so
+it's worth knowing which is which:
+
+- Double braces (`{{ticket_number}}`) -- a webhook's Payload template
+  and a notification channel's Message/Subject template. Both fill in
+  `{{ticket_number}}`, `{{ticket_type}}`, `{{title}}`, `{{description}}`,
+  `{{severity}}`, and `{{status}}` from whichever ticket triggered the
+  call: a Platform Response Rule's "Call a webhook"/"Notify Slack"/
+  "Notify Email" action, or the ticket detail page's "Escalate" button.
+  A document's "Refresh from webhook" (and the calendar's matching
+  auto-update policy) calls with none of these -- a payload template
+  used there should be static, since none of the placeholders resolve.
+- Single braces (`{message}`) -- an Event Promotion Policy's or
+  Correlation Rule's Title template (plain Python string formatting,
+  deliberately different from the double-brace syntax above, which
+  would otherwise misparse a JSON payload's own braces). Event
+  Promotion Policies get `{message}`, `{host}`, and `{program}` from
+  the one event that matched; Correlation Rules get those same three
+  (from the most recent contributing event) plus `{count}` and
+  `{window}`, and ML anomalies rules also get `{score}`.
 
 **Asset Types.** Covered under Assets above; reached from here since
 defining the asset schema is treated as an admin task.

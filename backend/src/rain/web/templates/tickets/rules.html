@@ -2,7 +2,7 @@
 {% import "_pagination.html" as pg %}
 {% import "_modal.html" as modal %}
 {% block title %}Event Promotion Policies - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}A syslog event whose match_field matches pattern (regex) is automatically promoted into a ticket of the selected type. Policies are evaluated in order; the first match wins.{% endblock %}
+{% block help_text %}{% raw %}A syslog event whose match_field matches pattern (regex) is automatically promoted into a ticket of the selected type. Policies are evaluated in order; the first match wins. The title template fills in {message}, {host}, and {program} from that one matching event -- single braces (Python's plain string formatting), not the double-brace {{...}} placeholders webhook payloads and notification channel templates use.{% endraw %}{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   {{ modal.trigger_button("event-policy", "+ New policy") }}

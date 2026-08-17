@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ "Edit" if webhook else "New" }} Webhook - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}{% raw %}Define an outbound webhook once, then reference it by name wherever a webhook call is needed. The payload template is ignored for GET (no body). Placeholders available depend on the caller -- a Platform Response Rule fills in ticket fields ({{ticket_number}}, {{title}}, ...); a document refresh calls with none, so a payload template there should be static.{% endraw %}{% endblock %}
+{% block help_text %}{% raw %}Define an outbound webhook once, then reference it by name wherever a webhook call is needed. The payload template is ignored for GET (no body). Placeholders available depend on the caller: a Platform Response Rule's "Call a webhook"/"Notify Slack"/"Notify Email" action, and the ticket detail page's "Escalate" button, all fill in {{ticket_number}}, {{ticket_type}}, {{title}}, {{description}}, {{severity}}, and {{status}} from the ticket that triggered the call -- double braces, JSON-escaped automatically. A document's "Refresh from webhook" (and the calendar's matching auto-update policy) calls with no placeholders at all, so a payload template used there should be static.{% endraw %}{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <a class="btn btn-sm" href="/admin/webhooks">&larr; All webhooks</a>
