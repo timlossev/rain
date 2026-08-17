@@ -65,8 +65,14 @@ asking anyone to rip out a detection stack that already works.
 ## Capabilities
 
 **Asset Registry**
-- Custom asset types with per-type custom fields (text, number, boolean,
-  date, URL, email, select)
+- Ships with no pre-defined asset types -- a server tracking physical
+  attributes and configuration, a container tracking its build
+  lifecycle, an access credential tracking expiration and clearance, a
+  contact with associated contact methods, or anything else your
+  organization tracks, is just a type plus custom fields (text, number,
+  boolean, date, URL, email, select) you define yourself. No prescribed
+  methodology -- RAIN isn't Agile or ITIL out of the box, on purpose, so
+  the constructs and the workflow are yours to decide
 - CSV / JSON / Excel import and export, with reusable column/header/order
   profiles
 - Tickets linked to an asset show on that asset's own page and PDF export
