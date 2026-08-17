@@ -17,6 +17,8 @@ or config files once it's running), and every image is a minimal,
 Alpine-based build with no Node/SPA toolchain and no third-party
 JS framework in the browser.
 
+![RAIN screenshot](RAIN%20screenshot.png)
+
 ## Motivation
 
 Compliance frameworks -- FedRAMP, ISO 27001, PCI-DSS, SOX, and their
