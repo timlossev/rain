@@ -1,13 +1,13 @@
 # Controls Requiring IT Service Management Practices
 
-> **FedRAMP High Authorization Package — Reference Analysis**
+> FedRAMP High Authorization Package — Reference Analysis
 > This document identifies the controls in a FedRAMP High package where a structured system of record — ticketing, change management workflows, incident records, CMDB, or formal approval processes — is not merely helpful but is the only credible mechanism for satisfying the control requirement. It includes background on FedRAMP, NIST 800-53, and the authorization tiers to establish the compliance context.
 
 ---
 
 ## Background: NIST 800-53 and Why It Exists
 
-**NIST Special Publication 800-53** (currently Revision 5, published 2020) is the foundational security and privacy controls catalog published by the National Institute of Standards and Technology. It is the technical backbone of U.S. federal information security. The catalog contains **1,189 individual controls and control enhancements** organized into 20 control families (AC, AU, CM, IR, etc.), covering everything from access control and configuration management to supply chain risk and privacy.
+NIST Special Publication 800-53 (currently Revision 5, published 2020) is the foundational security and privacy controls catalog published by the National Institute of Standards and Technology. It is the technical backbone of U.S. federal information security. The catalog contains 1,189 individual controls and control enhancements organized into 20 control families (AC, AU, CM, IR, etc.), covering everything from access control and configuration management to supply chain risk and privacy.
 
 800-53 does not prescribe *how* you implement a control — it defines *what* outcome you must achieve and *what evidence* demonstrates you achieved it. That distinction matters: the burden of proof always falls on the system owner to show the control is satisfied in a way an independent assessor can verify. For many controls, especially those requiring authorization, documentation, tracking, and accountability, the only mechanism that generates the required evidence at scale is a system of record with structured workflows.
 
@@ -15,31 +15,31 @@
 
 ## Background: FedRAMP — What It Is
 
-**FedRAMP (Federal Risk and Authorization Management Program)** is the U.S. government's standardized framework for authorizing cloud services for federal agency use. Established in 2011 and significantly modernized by the **FedRAMP Authorization Act of 2022**, it requires that any cloud product or service used by a federal agency either hold a FedRAMP authorization or be in the process of obtaining one.
+FedRAMP (Federal Risk and Authorization Management Program) is the U.S. government's standardized framework for authorizing cloud services for federal agency use. Established in 2011 and significantly modernized by the FedRAMP Authorization Act of 2022, it requires that any cloud product or service used by a federal agency either hold a FedRAMP authorization or be in the process of obtaining one.
 
-FedRAMP takes the NIST 800-53 control catalog and applies it in three scoped tiers based on the **sensitivity of the data being processed or stored**, defined by FIPS 199 impact levels:
+FedRAMP takes the NIST 800-53 control catalog and applies it in three scoped tiers based on the sensitivity of the data being processed or stored, defined by FIPS 199 impact levels:
 
 | Tier | Impact Level | Required Controls | Typical Use Case |
 |---|---|---|---|
-| **FedRAMP Low** | Low | ~156 controls | Public-facing, non-sensitive data |
-| **FedRAMP Moderate** | Moderate | ~323 controls | Most federal SaaS, CUI, PII |
-| **FedRAMP High** | High | ~421 controls | National security, law enforcement, financial, health data |
+| FedRAMP Low | Low | ~156 controls | Public-facing, non-sensitive data |
+| FedRAMP Moderate | Moderate | ~323 controls | Most federal SaaS, CUI, PII |
+| FedRAMP High | High | ~421 controls | National security, law enforcement, financial, health data |
 
-**The reference package analyzed here is authorized at FedRAMP High**, the most demanding tier. It contains **409 implemented controls and enhancements** across 18 control families, with the additional controls above Moderate primarily focused on stricter access control, more rigorous configuration management, enhanced incident response capabilities, and tighter audit requirements.
+The reference package analyzed here is authorized at FedRAMP High, the most demanding tier. It contains 409 implemented controls and enhancements across 18 control families, with the additional controls above Moderate primarily focused on stricter access control, more rigorous configuration management, enhanced incident response capabilities, and tighter audit requirements.
 
 ---
 
 ## FedRAMP's New Authorization Tiers ("Class" Designations)
 
-FedRAMP underwent significant restructuring under the **FedRAMP Authorization Act of 2022** and subsequent OMB policy updates. The program introduced a new tiered designation model sometimes referred to informally by authorization pathway and data sensitivity class:
+FedRAMP underwent significant restructuring under the FedRAMP Authorization Act of 2022 and subsequent OMB policy updates. The program introduced a new tiered designation model sometimes referred to informally by authorization pathway and data sensitivity class:
 
 ### FedRAMP Rev 5 Authorization Pathways
 
 | Designation | Description |
 |---|---|
-| **Agency Authorization** | A single federal agency sponsors and authorizes the CSP. Authorization is granted by that agency's AO (Authorizing Official) and the ATO is reusable by other agencies via the FedRAMP Marketplace. |
-| **JAB P-ATO (Program Authorization)** | The Joint Authorization Board — composed of DoD, DHS, and GSA CIOs — reviews and grants a Provisional ATO. This was the highest-prestige path. The JAB was **sunset in 2023** under the new model. |
-| **FedRAMP Equivalency** | New pathway (2024+) for DoD-specific cloud services under DoD IL guidance — allows DoD IL2/IL4/IL5/IL6 authorizations to be recognized as FedRAMP-equivalent under certain conditions. |
+| Agency Authorization | A single federal agency sponsors and authorizes the CSP. Authorization is granted by that agency's AO (Authorizing Official) and the ATO is reusable by other agencies via the FedRAMP Marketplace. |
+| JAB P-ATO (Program Authorization) | The Joint Authorization Board — composed of DoD, DHS, and GSA CIOs — reviews and grants a Provisional ATO. This was the highest-prestige path. The JAB was sunset in 2023 under the new model. |
+| FedRAMP Equivalency | New pathway (2024+) for DoD-specific cloud services under DoD IL guidance — allows DoD IL2/IL4/IL5/IL6 authorizations to be recognized as FedRAMP-equivalent under certain conditions. |
 
 ### Impact-Level Classes (Data Sensitivity Tiers)
 
@@ -47,13 +47,13 @@ The informal "class" terminology maps to FIPS 199 impact levels for confidential
 
 | Class | FIPS 199 Level | FedRAMP Tier | Examples |
 |---|---|---|---|
-| **Class A / Low** | Low | FedRAMP Low | Non-sensitive public data, training content |
-| **Class B / Moderate** | Moderate | FedRAMP Moderate | Most agency operational data, CUI, PII |
-| **Class C / High** | High | FedRAMP High | Law enforcement, financial systems, health records, national security |
-| **Class D / DoD IL4-IL5** | High+ | DoD IL Authorization | Controlled Unclassified Information for DoD; sensitive compartmented operations |
-| **Class E / IL6** | Secret | DoD IL6 / Secret Cloud | Classified information at the SECRET level; requires IC-specific cloud infrastructure |
+| Class A / Low | Low | FedRAMP Low | Non-sensitive public data, training content |
+| Class B / Moderate | Moderate | FedRAMP Moderate | Most agency operational data, CUI, PII |
+| Class C / High | High | FedRAMP High | Law enforcement, financial systems, health records, national security |
+| Class D / DoD IL4-IL5 | High+ | DoD IL Authorization | Controlled Unclassified Information for DoD; sensitive compartmented operations |
+| Class E / IL6 | Secret | DoD IL6 / Secret Cloud | Classified information at the SECRET level; requires IC-specific cloud infrastructure |
 
-**The reference package operates at FedRAMP High (Class C)**, which means it is authorized to process the most sensitive unclassified federal data — data whose loss, corruption, or unauthorized disclosure could cause severe or catastrophic harm to agency operations, individuals, or national security.
+The reference package operates at FedRAMP High (Class C), which means it is authorized to process the most sensitive unclassified federal data — data whose loss, corruption, or unauthorized disclosure could cause severe or catastrophic harm to agency operations, individuals, or national security.
 
 ---
 
@@ -81,40 +81,40 @@ The reference FedRAMP High package contains the following implemented controls b
 | AT | Awareness and Training | 6 |
 | MP | Media Protection | 10 |
 | SR | Supply Chain Risk Management | 14 |
-| **Total** | | **409** |
+| Total | | 409 |
 
 ---
 
 ## ITSM Coverage Analysis: Where a System of Record Is Required
 
-Of the 409 controls in this reference implementation, **33 controls and enhancements** have implementation statements that explicitly require or depend on a structured system of record — a ticketing platform, CMDB, or workflow-driven approval system — to generate the audit evidence the control demands.
+Of the 409 controls in this reference implementation, 33 controls and enhancements have implementation statements that explicitly require or depend on a structured system of record — a ticketing platform, CMDB, or workflow-driven approval system — to generate the audit evidence the control demands.
 
 ### Coverage Numbers
 
 | Metric | Count | % of Package |
 |---|---|---|
 | Total controls/enhancements in package | 409 | 100% |
-| Controls requiring a system of record | **33** | **~8%** |
-| Controls where ITSM is the *primary* mechanism | **22** | **~5.4%** |
-| Controls where ITSM is a *supporting* mechanism | **11** | **~2.7%** |
+| Controls requiring a system of record | 33 | ~8% |
+| Controls where ITSM is the *primary* mechanism | 22 | ~5.4% |
+| Controls where ITSM is a *supporting* mechanism | 11 | ~2.7% |
 
-> **Why this percentage matters more than it looks:** These 33 controls are not evenly distributed. They are concentrated in the highest-risk, highest-scrutiny control families — Configuration Management, Incident Response, and Access Control — which are the families that receive the most attention from Third-Party Assessment Organizations (3PAOs) during annual assessments. A finding in any of these controls can result in a POA&M (Plan of Action and Milestones), which delays or conditions the Authorization to Operate (ATO). Conversely, demonstrating systematic, tool-enforced compliance through a system of record is the most direct way to achieve "Implemented" status across all 33.
+> Why this percentage matters more than it looks: These 33 controls are not evenly distributed. They are concentrated in the highest-risk, highest-scrutiny control families — Configuration Management, Incident Response, and Access Control — which are the families that receive the most attention from Third-Party Assessment Organizations (3PAOs) during annual assessments. A finding in any of these controls can result in a POA&M (Plan of Action and Milestones), which delays or conditions the Authorization to Operate (ATO). Conversely, demonstrating systematic, tool-enforced compliance through a system of record is the most direct way to achieve "Implemented" status across all 33.
 
 ### ITSM Controls by Family
 
 | Family | ITSM Controls | Count | % of That Family |
 |---|---|---|---|
-| CM — Configuration Management | CM-2, CM-2(2), CM-3, CM-3(1), CM-3(2), CM-8, CM-8(2), CM-9 | 8 | **24%** |
-| IR — Incident Response | IR-4, IR-5, IR-5(1), IR-7, IR-7(1) | 5 | **21%** |
-| AC — Access Control | AC-2, AC-3, AC-4, AC-6(5), AC-6(7) | 5 | **10%** |
-| MA — Maintenance | MA-2, MA-5, MA-5(1) | 3 | **25%** |
-| AU — Audit and Accountability | AU-5, AU-5(2), AU-12(3) | 3 | **11%** |
-| PS — Personnel Security | PS-4, PS-4(2), PS-5 | 3 | **27%** |
-| SI — System and Information Integrity | SI-2, SI-5, SI-6 | 3 | **9%** |
-| SA — System and Services Acquisition | SA-10, SA-4(9) | 2 | **8%** |
-| SC — System and Communications Protection | SC-7(4) | 1 | **3%** |
+| CM — Configuration Management | CM-2, CM-2(2), CM-3, CM-3(1), CM-3(2), CM-8, CM-8(2), CM-9 | 8 | 24% |
+| IR — Incident Response | IR-4, IR-5, IR-5(1), IR-7, IR-7(1) | 5 | 21% |
+| AC — Access Control | AC-2, AC-3, AC-4, AC-6(5), AC-6(7) | 5 | 10% |
+| MA — Maintenance | MA-2, MA-5, MA-5(1) | 3 | 25% |
+| AU — Audit and Accountability | AU-5, AU-5(2), AU-12(3) | 3 | 11% |
+| PS — Personnel Security | PS-4, PS-4(2), PS-5 | 3 | 27% |
+| SI — System and Information Integrity | SI-2, SI-5, SI-6 | 3 | 9% |
+| SA — System and Services Acquisition | SA-10, SA-4(9) | 2 | 8% |
+| SC — System and Communications Protection | SC-7(4) | 1 | 3% |
 
-The **Maintenance (MA)** and **Personnel Security (PS)** families have the highest proportional dependency on ITSM workflows — over a quarter of each family's controls require structured records. **Configuration Management (CM)** has the highest absolute count, with nearly one in four CM controls requiring a change ticket, CMDB, or approval workflow.
+The Maintenance (MA) and Personnel Security (PS) families have the highest proportional dependency on ITSM workflows — over a quarter of each family's controls require structured records. Configuration Management (CM) has the highest absolute count, with nearly one in four CM controls requiring a change ticket, CMDB, or approval workflow.
 
 ---
 
@@ -128,17 +128,17 @@ These controls demand that nothing changes on the system without a formal, docum
 
 | Control | Title | Why a ticket is required |
 |---|---|---|
-| **CM-3** | Configuration Change Control | Every change must be proposed, justified, tested, and approved in an auditable record before production. The ticket ties together the requester, approving board, assigned implementer, test evidence, and final disposition in a single traceable record. |
-| **CM-3(1)** | Automated Documentation, Notification, and Prohibition of Changes | A workflow-driven change ticket enforces approval gates automatically — it cannot be closed without required sign-offs and generates automatic notifications at each state transition, mechanically enforcing the "prohibition until approval" requirement. |
-| **CM-3(2)** | Testing, Validation, and Documentation of Changes | Attaching test results and security impact assessments within the change record creates an auditable package proving the change was not deployed until testing was completed and documented. |
-| **CM-2** | Baseline Configuration | Deviations from the approved baseline must be authorized — a change ticket through the approval board creates the formal approval trail proving the baseline was only changed with explicit authorization. |
-| **CM-2(2)** | Automation Support for Accuracy and Currency | The CHG record is the audit trail. Every modification is stamped with who requested, who reviewed, who approved, and when implemented — directly supporting accuracy and currency of the recorded baseline. |
-| **CM-9** | Configuration Management Plan | Change requests as structured records, combined with a defined inventory of configuration items, operationalize the plan — they demonstrate the process exists and is being followed in practice, not just on paper. |
-| **SA-10** | Developer Configuration Management | Developer changes to system components are configuration-controlled. Routing all such changes through a ticketing-based CAB process ensures source code, schemas, and deployment configurations are treated as managed configuration items with full review and audit trail. |
-| **SA-4(9)** | Functions, Ports, Protocols, and Services in Use | PPS changes directly affect the attack surface. Requiring TRB approval through a change ticket ensures no new ports or services are opened without security review, and the ticket documents what was approved, why, and by whom. |
-| **SC-7(4)** | External Telecommunications Services (Boundary Protection) | Every traffic exception must be CAB-approved before the firewall rule is created. Remediation tickets submitted when unnecessary PPS are found during periodic reviews convert review findings into actual changes rather than just documentation. |
-| **AU-12(3)** | Changes by Authorized Individuals | Changes to audit scope are security-sensitive and could be used to suppress visibility into malicious activity. Requiring a TRB-approved change ticket ensures no one can quietly reduce logging without a formal, multi-person review and an auditable record. |
-| **SI-2** | Flaw Remediation | Vulnerability scanner findings are converted to time-bound remediation tickets with CAB approval required before production patching, providing a single artifact demonstrating the entire lifecycle from discovery to closure for every flaw. |
+| CM-3 | Configuration Change Control | Every change must be proposed, justified, tested, and approved in an auditable record before production. The ticket ties together the requester, approving board, assigned implementer, test evidence, and final disposition in a single traceable record. |
+| CM-3(1) | Automated Documentation, Notification, and Prohibition of Changes | A workflow-driven change ticket enforces approval gates automatically — it cannot be closed without required sign-offs and generates automatic notifications at each state transition, mechanically enforcing the "prohibition until approval" requirement. |
+| CM-3(2) | Testing, Validation, and Documentation of Changes | Attaching test results and security impact assessments within the change record creates an auditable package proving the change was not deployed until testing was completed and documented. |
+| CM-2 | Baseline Configuration | Deviations from the approved baseline must be authorized — a change ticket through the approval board creates the formal approval trail proving the baseline was only changed with explicit authorization. |
+| CM-2(2) | Automation Support for Accuracy and Currency | The CHG record is the audit trail. Every modification is stamped with who requested, who reviewed, who approved, and when implemented — directly supporting accuracy and currency of the recorded baseline. |
+| CM-9 | Configuration Management Plan | Change requests as structured records, combined with a defined inventory of configuration items, operationalize the plan — they demonstrate the process exists and is being followed in practice, not just on paper. |
+| SA-10 | Developer Configuration Management | Developer changes to system components are configuration-controlled. Routing all such changes through a ticketing-based CAB process ensures source code, schemas, and deployment configurations are treated as managed configuration items with full review and audit trail. |
+| SA-4(9) | Functions, Ports, Protocols, and Services in Use | PPS changes directly affect the attack surface. Requiring TRB approval through a change ticket ensures no new ports or services are opened without security review, and the ticket documents what was approved, why, and by whom. |
+| SC-7(4) | External Telecommunications Services (Boundary Protection) | Every traffic exception must be CAB-approved before the firewall rule is created. Remediation tickets submitted when unnecessary PPS are found during periodic reviews convert review findings into actual changes rather than just documentation. |
+| AU-12(3) | Changes by Authorized Individuals | Changes to audit scope are security-sensitive and could be used to suppress visibility into malicious activity. Requiring a TRB-approved change ticket ensures no one can quietly reduce logging without a formal, multi-person review and an auditable record. |
+| SI-2 | Flaw Remediation | Vulnerability scanner findings are converted to time-bound remediation tickets with CAB approval required before production patching, providing a single artifact demonstrating the entire lifecycle from discovery to closure for every flaw. |
 
 ---
 
@@ -148,9 +148,9 @@ These controls require an authoritative inventory of system components — only 
 
 | Control | Title | Why a CMDB is required |
 |---|---|---|
-| **CM-8** | System Component Inventory | Requires a maintained inventory of all hardware, software, and firmware components throughout the lifecycle. A CMDB is the purpose-built record system for this — it stores component identity, relationships, ownership, and status as the authoritative source of truth auditors expect to see. |
-| **CM-8(2)** | Automated Maintenance | Automated discovery feeding directly into a CMDB provides continuous, machine-verified accuracy. Alerts on discrepancies between discovered assets and CMDB records operationalize the "detect unauthorized components" requirement without manual effort. |
-| **CM-9** | Configuration Management Plan | Configuration items must be formally defined and placed under management throughout the system development lifecycle. The CMDB is the registry that makes this requirement operational. |
+| CM-8 | System Component Inventory | Requires a maintained inventory of all hardware, software, and firmware components throughout the lifecycle. A CMDB is the purpose-built record system for this — it stores component identity, relationships, ownership, and status as the authoritative source of truth auditors expect to see. |
+| CM-8(2) | Automated Maintenance | Automated discovery feeding directly into a CMDB provides continuous, machine-verified accuracy. Alerts on discrepancies between discovered assets and CMDB records operationalize the "detect unauthorized components" requirement without manual effort. |
+| CM-9 | Configuration Management Plan | Configuration items must be formally defined and placed under management throughout the system development lifecycle. The CMDB is the registry that makes this requirement operational. |
 
 ---
 
@@ -160,11 +160,11 @@ These controls require structured tracking of security events from detection thr
 
 | Control | Title | Why a ticket is required |
 |---|---|---|
-| **IR-4** | Incident Handling | Each phase of incident handling (detection, analysis, containment, eradication, recovery) must be coordinated, timed, and documented. An incident ticket creates the single record tracking all activity from initial detection through closure, capturing timestamps and preserving the chain of custody evidence. |
-| **IR-5** | Incident Monitoring | "Track and document" incidents on an ongoing basis is the literal definition of what an incident management ticket provides. Each incident gets a unique record with status, priority, assigned owner, resolution notes, and timestamps. |
-| **IR-5(1)** | Automated Tracking, Data Collection, and Analysis | SIEM-to-ticketing integrations that automatically generate an incident record when an alert fires satisfy the "automated tracking" requirement, enabling analysis of trends, SLA compliance, and recurring issues across the incident corpus. |
-| **IR-7** | Incident Response Assistance | The NIST control guidance itself names "automated ticketing systems to open and track incident response tickets" as a canonical example of an incident response support resource. |
-| **IR-7(1)** | Automation Support for Availability of Information and Support | Automated incident ticket creation from SIEM alerts, with SLA-enforced escalations, ensures incident response support is always available — the ticket triggers the escalation chain automatically so no incident stalls waiting for a human to notice it. |
+| IR-4 | Incident Handling | Each phase of incident handling (detection, analysis, containment, eradication, recovery) must be coordinated, timed, and documented. An incident ticket creates the single record tracking all activity from initial detection through closure, capturing timestamps and preserving the chain of custody evidence. |
+| IR-5 | Incident Monitoring | "Track and document" incidents on an ongoing basis is the literal definition of what an incident management ticket provides. Each incident gets a unique record with status, priority, assigned owner, resolution notes, and timestamps. |
+| IR-5(1) | Automated Tracking, Data Collection, and Analysis | SIEM-to-ticketing integrations that automatically generate an incident record when an alert fires satisfy the "automated tracking" requirement, enabling analysis of trends, SLA compliance, and recurring issues across the incident corpus. |
+| IR-7 | Incident Response Assistance | The NIST control guidance itself names "automated ticketing systems to open and track incident response tickets" as a canonical example of an incident response support resource. |
+| IR-7(1) | Automation Support for Availability of Information and Support | Automated incident ticket creation from SIEM alerts, with SLA-enforced escalations, ensures incident response support is always available — the ticket triggers the escalation chain automatically so no incident stalls waiting for a human to notice it. |
 
 ---
 
@@ -174,11 +174,11 @@ These controls require explicit, documented authorization before any access is p
 
 | Control | Title | Why a ticket is required |
 |---|---|---|
-| **AC-2** | Account Management | Every account lifecycle event (create, modify, disable, remove) must have an approval record. A structured access request ticket captures the requester, business justification, approver identity, and date of approval — the auditable record that proves each action was intentional and sanctioned. |
-| **AC-3** | Access Enforcement | VPN access and privileged OS accounts require explicit approval from a designated responsible owner before provisioning. The ticket creates the three-party documented chain (requester → approver → implementer) that proves enforcement rather than just policy. |
-| **AC-4** | Information Flow Enforcement | Firewall rule changes modify the authorized flow boundary. A change ticket through the approval board ensures every exception is reviewed for security impact before implementation, proving the exception was authorized rather than an undocumented ad-hoc rule. |
-| **AC-6(5)** | Privileged Accounts | Every privileged account must be explicitly justified, approved by a designated responsible owner, and provisioned only after that approval — creating a per-account evidence trail that reviewers need to verify least privilege is maintained. |
-| **AC-6(7)** | Review of User Privileges | Submitting a remediation ticket to remove unnecessary access converts the finding into a tracked, assignable work item with a due date, ensuring it is actually completed rather than just noted in a review spreadsheet that is never acted upon. |
+| AC-2 | Account Management | Every account lifecycle event (create, modify, disable, remove) must have an approval record. A structured access request ticket captures the requester, business justification, approver identity, and date of approval — the auditable record that proves each action was intentional and sanctioned. |
+| AC-3 | Access Enforcement | VPN access and privileged OS accounts require explicit approval from a designated responsible owner before provisioning. The ticket creates the three-party documented chain (requester → approver → implementer) that proves enforcement rather than just policy. |
+| AC-4 | Information Flow Enforcement | Firewall rule changes modify the authorized flow boundary. A change ticket through the approval board ensures every exception is reviewed for security impact before implementation, proving the exception was authorized rather than an undocumented ad-hoc rule. |
+| AC-6(5) | Privileged Accounts | Every privileged account must be explicitly justified, approved by a designated responsible owner, and provisioned only after that approval — creating a per-account evidence trail that reviewers need to verify least privilege is maintained. |
+| AC-6(7) | Review of User Privileges | Submitting a remediation ticket to remove unnecessary access converts the finding into a tracked, assignable work item with a due date, ensuring it is actually completed rather than just noted in a review spreadsheet that is never acted upon. |
 
 ---
 
@@ -188,9 +188,9 @@ These controls require that maintenance events are authorized, escorted, and doc
 
 | Control | Title | Why a ticket is required |
 |---|---|---|
-| **MA-2** | Controlled Maintenance | A maintenance ticket captures what work was done, by whom, deadlines, and approval — distinguishing "controlled maintenance" from unplanned, undocumented work on production systems and satisfying the formal scheduling, approval, and documentation requirements. |
-| **MA-5** | Maintenance Personnel | When a vendor or external technician is engaged, a ticket documents who was given access, who escorted them, what work they performed, and when access was terminated — the personnel accountability record proving escort and oversight requirements were met. |
-| **MA-5(1)** | Individuals Without Appropriate Access | The access and repair ticket is reviewed at closure to confirm all required actions (escort assigned, equipment sanitized, access revoked) were completed before the ticket was resolved — converting the procedural requirement into a verifiable checklist. |
+| MA-2 | Controlled Maintenance | A maintenance ticket captures what work was done, by whom, deadlines, and approval — distinguishing "controlled maintenance" from unplanned, undocumented work on production systems and satisfying the formal scheduling, approval, and documentation requirements. |
+| MA-5 | Maintenance Personnel | When a vendor or external technician is engaged, a ticket documents who was given access, who escorted them, what work they performed, and when access was terminated — the personnel accountability record proving escort and oversight requirements were met. |
+| MA-5(1) | Individuals Without Appropriate Access | The access and repair ticket is reviewed at closure to confirm all required actions (escort assigned, equipment sanitized, access revoked) were completed before the ticket was resolved — converting the procedural requirement into a verifiable checklist. |
 
 ---
 
@@ -200,9 +200,9 @@ These controls require that audit failures generate tracked, actionable work ite
 
 | Control | Title | Why a ticket is required |
 |---|---|---|
-| **AU-5** | Response to Audit Logging Process Failures | Automatically generating a ticket when an audit failure alert fires creates an assignable, SLA-bound work item that forces a response. The ticket provides evidence that required personnel were notified and corrective action was taken. |
-| **AU-5(2)** | Real-time Alerts | Real-time alert routing into automated ticket creation satisfies both immediacy (real-time) and accountability (someone must acknowledge and resolve) simultaneously. The ticket requires a human to close it, proving the alert was received and acted upon. |
-| **AU-12(3)** | Changes by Authorized Individuals | *(See Change Tickets section above — also applies here as an audit control.)* |
+| AU-5 | Response to Audit Logging Process Failures | Automatically generating a ticket when an audit failure alert fires creates an assignable, SLA-bound work item that forces a response. The ticket provides evidence that required personnel were notified and corrective action was taken. |
+| AU-5(2) | Real-time Alerts | Real-time alert routing into automated ticket creation satisfies both immediacy (real-time) and accountability (someone must acknowledge and resolve) simultaneously. The ticket requires a human to close it, proving the alert was received and acted upon. |
+| AU-12(3) | Changes by Authorized Individuals | *(See Change Tickets section above — also applies here as an audit control.)* |
 
 ---
 
@@ -212,9 +212,9 @@ These controls require checklisted, multi-team workflows that cannot be reliably
 
 | Control | Title | Why a ticket is required |
 |---|---|---|
-| **PS-4** | Personnel Termination | Off-boarding spans multiple teams and systems. A parent off-boarding record with child tasks assigned to each responsible team creates a checklist-driven workflow where every access point is verifiably revoked and evidence is attached. |
-| **PS-4(2)** | Automated Actions | An automated off-boarding ticket generated upon termination triggers the notification email to all operational and security distribution lists automatically, creating the task record with a deadline — removing the human-dependency lag that is the most common failure mode in access termination. |
-| **PS-5** | Personnel Transfer | A structured transfer ticket with a checklist of access items to revoke and new items to provision ensures role changes are treated with the same rigor as new hires or terminations, preventing accumulation of stale entitlements. |
+| PS-4 | Personnel Termination | Off-boarding spans multiple teams and systems. A parent off-boarding record with child tasks assigned to each responsible team creates a checklist-driven workflow where every access point is verifiably revoked and evidence is attached. |
+| PS-4(2) | Automated Actions | An automated off-boarding ticket generated upon termination triggers the notification email to all operational and security distribution lists automatically, creating the task record with a deadline — removing the human-dependency lag that is the most common failure mode in access termination. |
+| PS-5 | Personnel Transfer | A structured transfer ticket with a checklist of access items to revoke and new items to provision ensures role changes are treated with the same rigor as new hires or terminations, preventing accumulation of stale entitlements. |
 
 ---
 
@@ -224,9 +224,9 @@ These controls require that security findings, advisories, and verification fail
 
 | Control | Title | Why a ticket is required |
 |---|---|---|
-| **SI-2** | Flaw Remediation | *(See Change Tickets section above — also applies here as an integrity control.)* |
-| **SI-5** | Security Alerts, Advisories, and Directives | An automatic ticket generated per government security advisory ensures every directive is formally assigned for review and the outcome is recorded. Without a tracked work item, there is no way to demonstrate each advisory received attention rather than being silently ignored. |
-| **SI-6** | Security Function Verification | When a security function verification failure is detected (e.g., an AV coverage gap), the ticket formally assigns corrective work to the responsible team with a deadline — converting the SOC observation into an obligation with a traceable resolution. |
+| SI-2 | Flaw Remediation | *(See Change Tickets section above — also applies here as an integrity control.)* |
+| SI-5 | Security Alerts, Advisories, and Directives | An automatic ticket generated per government security advisory ensures every directive is formally assigned for review and the outcome is recorded. Without a tracked work item, there is no way to demonstrate each advisory received attention rather than being silently ignored. |
+| SI-6 | Security Function Verification | When a security function verification failure is detected (e.g., an AV coverage gap), the ticket formally assigns corrective work to the responsible team with a deadline — converting the SOC observation into an obligation with a traceable resolution. |
 
 ---
 
@@ -236,15 +236,38 @@ Across 33 controls in this FedRAMP High package, the compliance requirement cann
 
 | ITSM Capability | Controls Dependent | What Happens Without It |
 |---|---|---|
-| **Change tickets with CAB/TRB approval** | 11 controls | Changes made without documented approval → findings on CM-3, SI-2, AC-4, SA-10 |
-| **CMDB / Configuration item registry** | 3 controls | No authoritative asset inventory → findings on CM-8, CM-9 |
-| **Incident tickets with lifecycle tracking** | 5 controls | No proof incidents were handled, tracked, or resolved → findings on IR-4, IR-5, IR-7 |
-| **Access request tickets with approval chain** | 5 controls | No evidence access was explicitly authorized → findings on AC-2, AC-3, AC-6 |
-| **Maintenance records with escort/work detail** | 3 controls | No proof maintenance was controlled or personnel were vetted → findings on MA-2, MA-5 |
-| **Alert-to-ticket automation** | 2 controls | Alerts acknowledged but not actioned → findings on AU-5 |
-| **Personnel workflow tickets (on/off-boarding)** | 3 controls | Access not verifiably revoked → findings on PS-4, PS-5 |
+| Change tickets with CAB/TRB approval | 11 controls | Changes made without documented approval → findings on CM-3, SI-2, AC-4, SA-10 |
+| CMDB / Configuration item registry | 3 controls | No authoritative asset inventory → findings on CM-8, CM-9 |
+| Incident tickets with lifecycle tracking | 5 controls | No proof incidents were handled, tracked, or resolved → findings on IR-4, IR-5, IR-7 |
+| Access request tickets with approval chain | 5 controls | No evidence access was explicitly authorized → findings on AC-2, AC-3, AC-6 |
+| Maintenance records with escort/work detail | 3 controls | No proof maintenance was controlled or personnel were vetted → findings on MA-2, MA-5 |
+| Alert-to-ticket automation | 2 controls | Alerts acknowledged but not actioned → findings on AU-5 |
+| Personnel workflow tickets (on/off-boarding) | 3 controls | Access not verifiably revoked → findings on PS-4, PS-5 |
 
 FedRAMP High assessors (3PAOs) do not accept verbal attestation or policy references as evidence for these controls. They require artifacts: ticket numbers, timestamps, approval records, closure notes, and trend data. A structured IT service management platform is the mechanism that generates those artifacts continuously and at scale, making the difference between a clean annual assessment and a POA&M backlog that conditions the ATO.
+
+---
+
+## Moderate and Low Baselines
+
+The 33-control figure above is specific to this High package's implementation statements. Structurally, most of these are base controls (19 of 33), not enhancements, and base controls tend to survive down into the smaller baselines even as enhancements drop away. Estimated direct dependency by baseline (enhancement-level placement not verified against 800-53B, treat as directional):
+
+| Baseline | Total Controls | ITSM-Dependent | Approx. % |
+|---|---|---|---|
+| Low | ~156 | ~14 (base controls only: AC-2, AC-3, CM-2, CM-8, IR-4/5/7, MA-2/5, AU-5, PS-4/5, SI-2/5) | ~9% |
+| Moderate | ~323 | ~25-27 (adds AC-4, CM-3, CM-9, SI-6, SA-10, plus roughly half the enhancements) | ~8% |
+| High | 409 | 33 | ~8% |
+
+The proportion holds steady across all three — this isn't a High-specific dependency. Low even comes out slightly ahead of it since the technical/cryptographic controls that dilute the percentage at higher tiers aren't in Low's baseline to begin with.
+
+## Indirect Coverage
+
+A second set of controls, outside the 33, aren't ticket-shaped by nature but can use RAIN's ticket/document/calendar primitives as their evidence mechanism with some implementation judgment:
+
+- CA-5 (POA&M) — a POA&M item is structurally a ticket (finding, owner, due date, closure); the strongest indirect fit here.
+- RA-5 / RA-7 (Vulnerability Scanning / Risk Response) — RAIN is the remediation-tracking half, not the scanner.
+- PL-2 (System Security Plan) — stored and version-tracked as a document, linked to the tickets/assets it references.
+- CP-4 (Contingency Plan Testing), PE-3 / PE-6 (Physical/Visitor Access), SR-2 / SR-6 (Supply Chain Reviews), MP-6 (Media Sanitization) — each loggable as a ticket or recurring calendar entry, same pattern as MA-5(1)'s escort/sanitization tracking in the direct 33.
 
 ---
 
@@ -260,15 +283,15 @@ The sections below map the ITSM categories in this document to their equivalents
 
 #### Germany — BSI IT-Grundschutz (Federal Office for Information Security)
 
-Germany's **BSI IT-Grundschutz** (IT Baseline Protection) is one of the most rigorous national frameworks in Europe, published and maintained by the Bundesamt für Sicherheit in der Informationstechnik (BSI). It is mandatory for German federal agencies and widely adopted by German critical infrastructure operators and financial institutions.
+Germany's BSI IT-Grundschutz (IT Baseline Protection) is one of the most rigorous national frameworks in Europe, published and maintained by the Bundesamt für Sicherheit in der Informationstechnik (BSI). It is mandatory for German federal agencies and widely adopted by German critical infrastructure operators and financial institutions.
 
 | ITSM Practice | IT-Grundschutz Equivalent |
 |---|---|
-| Change tickets / CAB approval | **OPS.1.1.3** (Patch and Change Management) — requires documented change requests, impact assessment, and approval before implementation |
-| CMDB / Asset inventory | **ORP.4** (Identity and Permission Management) + **SYS family** modules — require maintained inventories of all systems and components |
-| Incident tickets | **DER.2.1** (Incident Management) — requires systematic detection, reporting, and tracking of security incidents through a defined process |
-| Access request workflows | **ORP.4** — requires formal provisioning and revocation processes with documented authorization |
-| Personnel lifecycle tickets | **ORP.2** (Personnel) — requires documented procedures for onboarding, transfer, and offboarding with tracked access revocation |
+| Change tickets / CAB approval | OPS.1.1.3 (Patch and Change Management) — requires documented change requests, impact assessment, and approval before implementation |
+| CMDB / Asset inventory | ORP.4 (Identity and Permission Management) + SYS family modules — require maintained inventories of all systems and components |
+| Incident tickets | DER.2.1 (Incident Management) — requires systematic detection, reporting, and tracking of security incidents through a defined process |
+| Access request workflows | ORP.4 — requires formal provisioning and revocation processes with documented authorization |
+| Personnel lifecycle tickets | ORP.2 (Personnel) — requires documented procedures for onboarding, transfer, and offboarding with tracked access revocation |
 
 IT-Grundschutz takes a "building block" approach where each module maps directly to a process area. The change management, incident management, and identity management building blocks all explicitly require that evidence of the process be generated and retained — the same evidentiary requirement driving ITSM use in FedRAMP.
 
@@ -276,10 +299,10 @@ IT-Grundschutz takes a "building block" approach where each module maps directly
 
 #### France — ANSSI SecNumCloud and RGS
 
-France's national cybersecurity agency, **ANSSI** (Agence nationale de la sécurité des systèmes d'information), publishes two primary frameworks:
+France's national cybersecurity agency, ANSSI (Agence nationale de la sécurité des systèmes d'information), publishes two primary frameworks:
 
-- **SecNumCloud** — the qualification standard for cloud service providers handling sensitive government data, roughly analogous to FedRAMP High
-- **RGS** (Référentiel Général de Sécurité) — the baseline security framework for French public administration
+- SecNumCloud — the qualification standard for cloud service providers handling sensitive government data, roughly analogous to FedRAMP High
+- RGS (Référentiel Général de Sécurité) — the baseline security framework for French public administration
 
 | ITSM Practice | ANSSI Framework Equivalent |
 |---|---|
@@ -294,7 +317,7 @@ SecNumCloud qualification requires third-party audit of these processes. Assesso
 
 #### Netherlands — BIO (Baseline Informatiebeveiliging Overheid)
 
-The **BIO** is the Dutch government's unified information security baseline, mandatory across all layers of Dutch public administration (central government, municipalities, provinces, and water boards). It is based directly on **ISO/IEC 27001/27002** and maps its controls to that standard.
+The BIO is the Dutch government's unified information security baseline, mandatory across all layers of Dutch public administration (central government, municipalities, provinces, and water boards). It is based directly on ISO/IEC 27001/27002 and maps its controls to that standard.
 
 | ITSM Practice | BIO / ISO 27002:2022 Equivalent |
 |---|---|
@@ -310,15 +333,15 @@ Because BIO maps directly to ISO 27001, any organization certified to ISO 27001 
 
 #### Spain — ENS (Esquema Nacional de Seguridad)
 
-Spain's **ENS** (National Security Framework), governed by Royal Decree 311/2022, is mandatory for all Spanish public administration bodies and cloud service providers that process public administration data. It defines three security levels (Basic, Medium, High) roughly analogous to FedRAMP's Low/Moderate/High tiers.
+Spain's ENS (National Security Framework), governed by Royal Decree 311/2022, is mandatory for all Spanish public administration bodies and cloud service providers that process public administration data. It defines three security levels (Basic, Medium, High) roughly analogous to FedRAMP's Low/Moderate/High tiers.
 
 | ITSM Practice | ENS Equivalent |
 |---|---|
-| Change tickets / CAB | **op.exp.5** (Change Management) — requires formal documentation, approval, and traceability for all changes to production systems |
-| Incident tickets | **op.exp.7** (Incident Management) — requires systematic recording, classification, and tracking of security incidents |
-| CMDB | **op.inv.1** (Asset Inventory) — requires a current, accurate inventory of all assets within the security boundary |
-| Access workflows | **op.acc.4** (Access Rights Management) — requires documented access provisioning and revocation with an audit trail |
-| Personnel lifecycle | **mp.per.3** (Personnel Departure) — requires revocation of credentials and access upon departure with documented evidence |
+| Change tickets / CAB | op.exp.5 (Change Management) — requires formal documentation, approval, and traceability for all changes to production systems |
+| Incident tickets | op.exp.7 (Incident Management) — requires systematic recording, classification, and tracking of security incidents |
+| CMDB | op.inv.1 (Asset Inventory) — requires a current, accurate inventory of all assets within the security boundary |
+| Access workflows | op.acc.4 (Access Rights Management) — requires documented access provisioning and revocation with an audit trail |
+| Personnel lifecycle | mp.per.3 (Personnel Departure) — requires revocation of credentials and access upon departure with documented evidence |
 
 At ENS High level — the tier applicable to systems processing sensitive government data — assessors require evidence artifacts, not just policy declarations. The framework explicitly states that "procedures must be capable of being verified."
 
@@ -326,7 +349,7 @@ At ENS High level — the tier applicable to systems processing sensitive govern
 
 #### Poland — KSC (Ustawa o Krajowym Systemie Cyberbezpieczeństwa)
 
-Poland's **KSC Act** (Act on the National Cybersecurity System, 2018), implementing the EU NIS Directive, establishes security requirements for operators of essential services and digital service providers. It references both **ISO/IEC 27001** and **NIST CSF** as acceptable implementation frameworks.
+Poland's KSC Act (Act on the National Cybersecurity System, 2018), implementing the EU NIS Directive, establishes security requirements for operators of essential services and digital service providers. It references both ISO/IEC 27001 and NIST CSF as acceptable implementation frameworks.
 
 | ITSM Practice | KSC / NIS2 Equivalent |
 |---|---|
@@ -335,7 +358,7 @@ Poland's **KSC Act** (Act on the National Cybersecurity System, 2018), implement
 | CMDB | KSC Art. 8(1)(b) — requires identification and management of all systems and assets within the security scope |
 | Access workflows | KSC Art. 8(1)(d) — requires access control with documented authorization and revocation |
 
-Notably, the **EU NIS2 Directive** (2022/2555), which supersedes NIS and which all EU member states — including Germany, France, the Netherlands, Spain, and Poland — must implement, explicitly requires in Article 21 that covered entities employ "incident handling," "business continuity," "supply chain security," and "access control" measures with evidence of implementation. NIS2 applies to a significantly broader set of organizations than NIS1 and carries administrative fines of up to €10 million or 2% of global turnover for non-compliance.
+Notably, the EU NIS2 Directive (2022/2555), which supersedes NIS and which all EU member states — including Germany, France, the Netherlands, Spain, and Poland — must implement, explicitly requires in Article 21 that covered entities employ "incident handling," "business continuity," "supply chain security," and "access control" measures with evidence of implementation. NIS2 applies to a significantly broader set of organizations than NIS1 and carries administrative fines of up to €10 million or 2% of global turnover for non-compliance.
 
 ---
 
@@ -343,9 +366,9 @@ Notably, the **EU NIS2 Directive** (2022/2555), which supersedes NIS and which a
 
 #### Government of Canada — ITSG-33 / GC PBMM
 
-The Treasury Board of Canada Secretariat (TBS) publishes **ITSG-33** (IT Security Risk Management: A Lifecycle Approach) as the foundational security control framework for Canadian federal departments. The control catalog is derived directly from NIST 800-53, making the mapping between frameworks nearly one-to-one.
+The Treasury Board of Canada Secretariat (TBS) publishes ITSG-33 (IT Security Risk Management: A Lifecycle Approach) as the foundational security control framework for Canadian federal departments. The control catalog is derived directly from NIST 800-53, making the mapping between frameworks nearly one-to-one.
 
-For cloud services, the Government of Canada uses the **Protected B, Medium Integrity, Medium Availability (PBMM)** profile as the baseline for most departmental cloud workloads — roughly equivalent to FedRAMP Moderate — and a **Protected B High** profile for sensitive workloads.
+For cloud services, the Government of Canada uses the Protected B, Medium Integrity, Medium Availability (PBMM) profile as the baseline for most departmental cloud workloads — roughly equivalent to FedRAMP Moderate — and a Protected B High profile for sensitive workloads.
 
 | ITSM Practice | ITSG-33 / GC Equivalent |
 |---|---|
@@ -355,9 +378,9 @@ For cloud services, the Government of Canada uses the **Protected B, Medium Inte
 | Access workflows | AC-2, AC-3 (directly inherited) — identical account management and access enforcement requirements |
 | Personnel lifecycle | PS-4, PS-5 (directly inherited) — identical personnel termination and transfer requirements |
 
-Because ITSG-33 mirrors NIST 800-53, any organization that has implemented ITSM-backed compliance for FedRAMP has effectively satisfied the corresponding Canadian federal requirements with the same tooling and the same artifacts. The **Canadian Centre for Cyber Security (CCCS)** cloud assessment process specifically requests evidence of automated change management and incident tracking as part of cloud service provider assessments.
+Because ITSG-33 mirrors NIST 800-53, any organization that has implemented ITSM-backed compliance for FedRAMP has effectively satisfied the corresponding Canadian federal requirements with the same tooling and the same artifacts. The Canadian Centre for Cyber Security (CCCS) cloud assessment process specifically requests evidence of automated change management and incident tracking as part of cloud service provider assessments.
 
-Additionally, the **Office of the Superintendent of Financial Institutions (OSFI)** Guideline B-13 (Technology and Cyber Risk Management, effective 2023) requires federally regulated financial institutions — banks, insurers, pension funds — to maintain formal change management processes, incident management with defined response timelines, and asset inventories. OSFI B-13 assessments require artifact evidence, not narrative descriptions.
+Additionally, the Office of the Superintendent of Financial Institutions (OSFI) Guideline B-13 (Technology and Cyber Risk Management, effective 2023) requires federally regulated financial institutions — banks, insurers, pension funds — to maintain formal change management processes, incident management with defined response timelines, and asset inventories. OSFI B-13 assessments require artifact evidence, not narrative descriptions.
 
 ---
 
@@ -367,7 +390,7 @@ Additionally, the **Office of the Superintendent of Financial Institutions (OSFI
 
 Singapore operates two major frameworks relevant to ITSM-backed compliance:
 
-**MAS TRM (Monetary Authority of Singapore — Technology Risk Management Guidelines)** applies to all financial institutions in Singapore and is one of the most prescriptive financial sector frameworks in Asia.
+MAS TRM (Monetary Authority of Singapore — Technology Risk Management Guidelines) applies to all financial institutions in Singapore and is one of the most prescriptive financial sector frameworks in Asia.
 
 | ITSM Practice | MAS TRM Equivalent |
 |---|---|
@@ -379,7 +402,7 @@ Singapore operates two major frameworks relevant to ITSM-backed compliance:
 
 MAS TRM requires financial institutions to submit incident reports for significant technology incidents within defined timeframes (1 hour for initial notification), which is only operationally achievable with automated incident ticketing that captures onset time, notification time, and escalation records.
 
-**CSA CCCS (Cyber Security Agency — Cloud Computing Security Framework)** is Singapore's government cloud security framework, used for assessing cloud service providers for government use. It maps to ISO 27001 and FedRAMP, with explicit requirements for change management records, incident logs, and access provisioning evidence.
+CSA CCCS (Cyber Security Agency — Cloud Computing Security Framework) is Singapore's government cloud security framework, used for assessing cloud service providers for government use. It maps to ISO 27001 and FedRAMP, with explicit requirements for change management records, incident logs, and access provisioning evidence.
 
 ---
 
@@ -387,30 +410,30 @@ MAS TRM requires financial institutions to submit incident reports for significa
 
 Japan's primary ITSM-relevant frameworks:
 
-**METI Cybersecurity Management Guidelines** (経済産業省 サイバーセキュリティ経営ガイドライン, Ver 3.0, 2023) — published by the Ministry of Economy, Trade and Industry, applies to corporations with significant IT dependencies. It requires senior management accountability for cybersecurity and explicitly calls for:
+METI Cybersecurity Management Guidelines (経済産業省 サイバーセキュリティ経営ガイドライン, Ver 3.0, 2023) — published by the Ministry of Economy, Trade and Industry, applies to corporations with significant IT dependencies. It requires senior management accountability for cybersecurity and explicitly calls for:
 
 - Documented change management processes with approval records
 - Incident management with detection-to-resolution tracking
 - Asset inventory maintained as a living document
 - Access lifecycle management with records
 
-**FISC Security Guidelines** (Center for Financial Industry Information Systems) — mandatory guidance for Japanese financial institutions. FISC Chapter 3 (Operations Management) requires formal change management with CAB-equivalent review, and Chapter 5 (Incident Management) requires ticketed incident tracking with defined escalation paths and regulatory reporting timelines.
+FISC Security Guidelines (Center for Financial Industry Information Systems) — mandatory guidance for Japanese financial institutions. FISC Chapter 3 (Operations Management) requires formal change management with CAB-equivalent review, and Chapter 5 (Incident Management) requires ticketed incident tracking with defined escalation paths and regulatory reporting timelines.
 
 ---
 
 #### Australia — Essential Eight and IRAP / ISM
 
-Australia's **Australian Cyber Security Centre (ACSC)** publishes two frameworks:
+Australia's Australian Cyber Security Centre (ACSC) publishes two frameworks:
 
-**The Essential Eight** is a prioritized set of eight mitigation strategies. While relatively concise, several directly require ITSM capabilities:
+The Essential Eight is a prioritized set of eight mitigation strategies. While relatively concise, several directly require ITSM capabilities:
 
 | Essential Eight Strategy | ITSM Dependency |
 |---|---|
-| **Patch applications** (ML1–ML3) | Requires tracked, time-bound patch remediation — operationalized through change/remediation tickets with SLA enforcement |
-| **Restrict administrative privileges** (ML1–ML3) | Requires documented justification and approval for privileged accounts — operationalized through access request tickets |
-| **Application control** | Changes to approved application lists must be formally managed — operationalized through change tickets |
+| Patch applications (ML1–ML3) | Requires tracked, time-bound patch remediation — operationalized through change/remediation tickets with SLA enforcement |
+| Restrict administrative privileges (ML1–ML3) | Requires documented justification and approval for privileged accounts — operationalized through access request tickets |
+| Application control | Changes to approved application lists must be formally managed — operationalized through change tickets |
 
-**ISM (Information Security Manual)** — the full Australian government security framework, mandatory for government agencies and used by the IRAP (Infosec Registered Assessors Program) assessment process. The ISM contains over 800 controls across change management (ISM-1406, ISM-1219), incident management (ISM-0140, ISM-0576), asset management (ISM-1401), and access control (ISM-0430, ISM-0441) that parallel the FedRAMP controls in this document almost exactly. IRAP assessors require documentary evidence of each control, not policy references.
+ISM (Information Security Manual) — the full Australian government security framework, mandatory for government agencies and used by the IRAP (Infosec Registered Assessors Program) assessment process. The ISM contains over 800 controls across change management (ISM-1406, ISM-1219), incident management (ISM-0140, ISM-0576), asset management (ISM-1401), and access control (ISM-0430, ISM-0441) that parallel the FedRAMP controls in this document almost exactly. IRAP assessors require documentary evidence of each control, not policy references.
 
 ---
 
@@ -418,59 +441,59 @@ Australia's **Australian Cyber Security Centre (ACSC)** publishes two frameworks
 
 #### PCI-DSS v4.0 (Payment Card Industry Data Security Standard)
 
-**PCI-DSS** applies to any organization that stores, processes, or transmits payment card data. Version 4.0 (effective March 2025) significantly strengthened evidence requirements across change management and access control. It is assessed by Qualified Security Assessors (QSAs) who require artifact evidence.
+PCI-DSS applies to any organization that stores, processes, or transmits payment card data. Version 4.0 (effective March 2025) significantly strengthened evidence requirements across change management and access control. It is assessed by Qualified Security Assessors (QSAs) who require artifact evidence.
 
 | ITSM Practice | PCI-DSS v4.0 Requirement |
 |---|---|
-| **Change tickets / CAB** | **Req 6.5** (Changes to all system components are managed securely) — requires a formal change management process including documented change requests, security impact analysis, approval by authorized parties, testing, and rollback procedures. Each change must have a documented record. |
-| **CMDB / Asset inventory** | **Req 12.5.1** — requires a documented inventory of all system components in scope, kept current. |
-| **Incident tickets** | **Req 12.10** (Implement an incident response plan) — requires documented incident response with defined roles, timelines, and evidence of response actions taken. Req 12.10.2 requires the plan be reviewed and tested at least annually, with evidence. |
-| **Access request workflows** | **Req 7.2.2** — requires formal user access request and approval processes, with access provisioned only after documented authorization. Req 7.2.4 requires all user accounts and access privileges to be reviewed at least once every 6 months. |
-| **Personnel lifecycle tickets** | **Req 8.3.4** — invalid authentication attempts must be locked; **Req 8.8** — requires all access policies for terminated users to be managed and documented. |
+| Change tickets / CAB | Req 6.5 (Changes to all system components are managed securely) — requires a formal change management process including documented change requests, security impact analysis, approval by authorized parties, testing, and rollback procedures. Each change must have a documented record. |
+| CMDB / Asset inventory | Req 12.5.1 — requires a documented inventory of all system components in scope, kept current. |
+| Incident tickets | Req 12.10 (Implement an incident response plan) — requires documented incident response with defined roles, timelines, and evidence of response actions taken. Req 12.10.2 requires the plan be reviewed and tested at least annually, with evidence. |
+| Access request workflows | Req 7.2.2 — requires formal user access request and approval processes, with access provisioned only after documented authorization. Req 7.2.4 requires all user accounts and access privileges to be reviewed at least once every 6 months. |
+| Personnel lifecycle tickets | Req 8.3.4 — invalid authentication attempts must be locked; Req 8.8 — requires all access policies for terminated users to be managed and documented. |
 
-PCI-DSS v4.0 introduced the concept of a **"customized approach"** — organizations can implement alternative controls, but must provide documented evidence of risk analysis and compensating control effectiveness to their QSA. In all cases, evidence generation is non-negotiable. A QSA will request change records, access provisioning tickets, and incident logs as primary evidence during a Report on Compliance (RoC) assessment.
+PCI-DSS v4.0 introduced the concept of a "customized approach" — organizations can implement alternative controls, but must provide documented evidence of risk analysis and compensating control effectiveness to their QSA. In all cases, evidence generation is non-negotiable. A QSA will request change records, access provisioning tickets, and incident logs as primary evidence during a Report on Compliance (RoC) assessment.
 
 ---
 
 #### SOX — Sarbanes-Oxley Act (IT General Controls)
 
-**SOX** applies to all publicly traded companies in the United States (and foreign private issuers listed on U.S. exchanges). While SOX is a financial reporting law, its **IT General Controls (ITGCs)** — assessed under frameworks like COBIT and tested by external auditors under PCAOB AS 2201 — overlap significantly with the ITSM requirements in this document.
+SOX applies to all publicly traded companies in the United States (and foreign private issuers listed on U.S. exchanges). While SOX is a financial reporting law, its IT General Controls (ITGCs) — assessed under frameworks like COBIT and tested by external auditors under PCAOB AS 2201 — overlap significantly with the ITSM requirements in this document.
 
 The four ITGC domains most relevant to ITSM are:
 
 | ITGC Domain | ITSM Dependency |
 |---|---|
-| **Change Management** | External auditors test that all changes to financial systems went through a formal, documented approval process. Evidence required: change tickets showing request, approval, testing sign-off, and implementation date. A change implemented without a ticket is an automatic finding. |
-| **Logical Access Controls** | Auditors test that user access is provisioned based on formal requests with documented approval, that access is removed promptly upon termination, and that privileged access is reviewed periodically. Evidence required: access request tickets, off-boarding records, and user access review outputs. |
-| **Computer Operations** | Auditors test that production incidents affecting financial reporting systems are detected, tracked, and resolved in a documented manner. Evidence required: incident records with timestamps, assigned owners, and resolution notes. |
-| **Program Development** | Auditors test that new systems or significant changes went through a documented SDLC with security review and approval. Evidence required: change/project tickets with approval gates. |
+| Change Management | External auditors test that all changes to financial systems went through a formal, documented approval process. Evidence required: change tickets showing request, approval, testing sign-off, and implementation date. A change implemented without a ticket is an automatic finding. |
+| Logical Access Controls | Auditors test that user access is provisioned based on formal requests with documented approval, that access is removed promptly upon termination, and that privileged access is reviewed periodically. Evidence required: access request tickets, off-boarding records, and user access review outputs. |
+| Computer Operations | Auditors test that production incidents affecting financial reporting systems are detected, tracked, and resolved in a documented manner. Evidence required: incident records with timestamps, assigned owners, and resolution notes. |
+| Program Development | Auditors test that new systems or significant changes went through a documented SDLC with security review and approval. Evidence required: change/project tickets with approval gates. |
 
-SOX ITGC findings (deficiencies) must be disclosed in the company's annual report. A **material weakness** in ITGCs — such as changes to financial systems made without documented approval — can trigger SEC scrutiny, require restatement of financials, and result in personal liability for the CEO and CFO who certify the controls under Sections 302 and 906. This makes SOX ITGC compliance one of the highest-stakes drivers of enterprise change management and access control tooling adoption.
+SOX ITGC findings (deficiencies) must be disclosed in the company's annual report. A material weakness in ITGCs — such as changes to financial systems made without documented approval — can trigger SEC scrutiny, require restatement of financials, and result in personal liability for the CEO and CFO who certify the controls under Sections 302 and 906. This makes SOX ITGC compliance one of the highest-stakes drivers of enterprise change management and access control tooling adoption.
 
 ---
 
 #### ISO/IEC 27001:2022 — International Standard for Information Security Management Systems
 
-**ISO 27001** is the globally recognized certification standard for information security management. It is certifiable, meaning organizations undergo third-party audit by an accredited certification body and receive a formal certificate valid for three years with annual surveillance audits. It is recognized or mandated in the EU (via NIS2 as an accepted compliance path), the UK, Canada, Australia, Japan, Singapore, and dozens of other jurisdictions.
+ISO 27001 is the globally recognized certification standard for information security management. It is certifiable, meaning organizations undergo third-party audit by an accredited certification body and receive a formal certificate valid for three years with annual surveillance audits. It is recognized or mandated in the EU (via NIS2 as an accepted compliance path), the UK, Canada, Australia, Japan, Singapore, and dozens of other jurisdictions.
 
 Annex A of ISO 27001:2022 contains 93 controls organized into four themes. The following map directly to the ITSM practices in this document:
 
 | ITSM Practice | ISO 27001:2022 Annex A Control |
 |---|---|
-| Change tickets / CAB | **8.32 Change Management** — formal change management process with documented requests, risk assessment, approval, and review |
-| CMDB | **5.9 Inventory of Information and Other Associated Assets** — maintained, accurate, current asset inventory |
-| Incident tickets | **5.26 Response to Information Security Incidents** — documented incident response with evidence of actions taken; **5.27 Learning from Incidents** — requires incident records to enable trend analysis |
-| Access workflows | **5.18 Access Rights** — formal provisioning, modification, and revocation of access rights with documented authorization |
-| Personnel lifecycle | **6.5 Responsibilities After Termination** — access revocation upon departure or role change with documented evidence |
-| Alert-to-ticket automation | **8.16 Monitoring Activities** — anomalies must be evaluated and responded to; response must be documented |
+| Change tickets / CAB | 8.32 Change Management — formal change management process with documented requests, risk assessment, approval, and review |
+| CMDB | 5.9 Inventory of Information and Other Associated Assets — maintained, accurate, current asset inventory |
+| Incident tickets | 5.26 Response to Information Security Incidents — documented incident response with evidence of actions taken; 5.27 Learning from Incidents — requires incident records to enable trend analysis |
+| Access workflows | 5.18 Access Rights — formal provisioning, modification, and revocation of access rights with documented authorization |
+| Personnel lifecycle | 6.5 Responsibilities After Termination — access revocation upon departure or role change with documented evidence |
+| Alert-to-ticket automation | 8.16 Monitoring Activities — anomalies must be evaluated and responded to; response must be documented |
 
-ISO 27001 certification auditors conduct **evidence sampling**: they will select a random sample of changes, incidents, access provisioning events, and off-boarding events and ask to see the corresponding records. An organization that says "we have a change management process" but cannot produce change records for sampled events will receive a nonconformity. This is the same evidentiary standard applied by FedRAMP 3PAOs, PCI QSAs, and SOX auditors — and it is why a system of record is not optional under any of these frameworks.
+ISO 27001 certification auditors conduct evidence sampling: they will select a random sample of changes, incidents, access provisioning events, and off-boarding events and ask to see the corresponding records. An organization that says "we have a change management process" but cannot produce change records for sampled events will receive a nonconformity. This is the same evidentiary standard applied by FedRAMP 3PAOs, PCI QSAs, and SOX auditors — and it is why a system of record is not optional under any of these frameworks.
 
 ---
 
 ### The Universal Principle
 
-Across all of the frameworks above — U.S. federal, European, Canadian, Asia-Pacific, and commercial — the same underlying principle applies: **compliance is not demonstrated by having a policy; it is demonstrated by producing evidence that the policy was followed, at the moment it needed to be followed, for every instance in scope.** A policy document that describes a change management process is not evidence that a specific change was approved. A ticket record is. An incident response plan is not evidence that a specific incident was handled correctly. An incident record with timestamps, assigned owners, and resolution notes is.
+Across all of the frameworks above — U.S. federal, European, Canadian, Asia-Pacific, and commercial — the same underlying principle applies: compliance is not demonstrated by having a policy; it is demonstrated by producing evidence that the policy was followed, at the moment it needed to be followed, for every instance in scope. A policy document that describes a change management process is not evidence that a specific change was approved. A ticket record is. An incident response plan is not evidence that a specific incident was handled correctly. An incident record with timestamps, assigned owners, and resolution notes is.
 
 This is why a system of record is the convergence point for compliance across frameworks. The specific control identifiers differ — CM-3 in NIST, 8.32 in ISO 27001, Req 6.5 in PCI-DSS, op.exp.5 in ENS — but the evidence artifact they all require is the same: a structured, timestamped, approval-chain-bearing record of what was proposed, who authorized it, what was done, and when it was closed.
 
