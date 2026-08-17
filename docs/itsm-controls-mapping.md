@@ -57,7 +57,7 @@ The informal "class" terminology maps to FIPS 199 impact levels for confidential
 
 ---
 
-## This Package: Control Count Summary
+## Reference Implementation: Control Count Summary
 
 The reference FedRAMP High package contains the following implemented controls by family:
 
@@ -87,7 +87,7 @@ The reference FedRAMP High package contains the following implemented controls b
 
 ## ITSM Coverage Analysis: Where a System of Record Is Required
 
-Of the 409 controls in this package, **33 controls and enhancements** have implementation statements that explicitly require or depend on a structured system of record — a ticketing platform, CMDB, or workflow-driven approval system — to generate the audit evidence the control demands.
+Of the 409 controls in this reference implementation, **33 controls and enhancements** have implementation statements that explicitly require or depend on a structured system of record — a ticketing platform, CMDB, or workflow-driven approval system — to generate the audit evidence the control demands.
 
 ### Coverage Numbers
 
@@ -245,6 +245,234 @@ Across 33 controls in this FedRAMP High package, the compliance requirement cann
 | **Personnel workflow tickets (on/off-boarding)** | 3 controls | Access not verifiably revoked → findings on PS-4, PS-5 |
 
 FedRAMP High assessors (3PAOs) do not accept verbal attestation or policy references as evidence for these controls. They require artifacts: ticket numbers, timestamps, approval records, closure notes, and trend data. A structured IT service management platform is the mechanism that generates those artifacts continuously and at scale, making the difference between a clean annual assessment and a POA&M backlog that conditions the ATO.
+
+---
+
+## Cross-Framework Applicability: These Requirements Are Not Unique to FedRAMP
+
+The ITSM practices described in this document — change tickets, incident records, CMDB, access request workflows, and personnel lifecycle tracking — are not artifacts of U.S. federal policy. They are the universal operational evidence layer demanded by virtually every major information security and compliance framework worldwide. The requirement for a system of record is a global constant. What varies is the name of the framework and the specific control identifier, not the underlying obligation.
+
+The sections below map the ITSM categories in this document to their equivalents across major commercial and international regulatory frameworks.
+
+---
+
+### European Union
+
+#### Germany — BSI IT-Grundschutz (Federal Office for Information Security)
+
+Germany's **BSI IT-Grundschutz** (IT Baseline Protection) is one of the most rigorous national frameworks in Europe, published and maintained by the Bundesamt für Sicherheit in der Informationstechnik (BSI). It is mandatory for German federal agencies and widely adopted by German critical infrastructure operators and financial institutions.
+
+| ITSM Practice | IT-Grundschutz Equivalent |
+|---|---|
+| Change tickets / CAB approval | **OPS.1.1.3** (Patch and Change Management) — requires documented change requests, impact assessment, and approval before implementation |
+| CMDB / Asset inventory | **ORP.4** (Identity and Permission Management) + **SYS family** modules — require maintained inventories of all systems and components |
+| Incident tickets | **DER.2.1** (Incident Management) — requires systematic detection, reporting, and tracking of security incidents through a defined process |
+| Access request workflows | **ORP.4** — requires formal provisioning and revocation processes with documented authorization |
+| Personnel lifecycle tickets | **ORP.2** (Personnel) — requires documented procedures for onboarding, transfer, and offboarding with tracked access revocation |
+
+IT-Grundschutz takes a "building block" approach where each module maps directly to a process area. The change management, incident management, and identity management building blocks all explicitly require that evidence of the process be generated and retained — the same evidentiary requirement driving ITSM use in FedRAMP.
+
+---
+
+#### France — ANSSI SecNumCloud and RGS
+
+France's national cybersecurity agency, **ANSSI** (Agence nationale de la sécurité des systèmes d'information), publishes two primary frameworks:
+
+- **SecNumCloud** — the qualification standard for cloud service providers handling sensitive government data, roughly analogous to FedRAMP High
+- **RGS** (Référentiel Général de Sécurité) — the baseline security framework for French public administration
+
+| ITSM Practice | ANSSI Framework Equivalent |
+|---|---|
+| Change tickets / CAB | SecNumCloud §10 (Change Management) — requires a formal change management process with traceability from request to closure |
+| Incident tickets | SecNumCloud §13 (Incident Management) — requires a ticketed, tracked incident lifecycle with defined escalation paths and reporting timelines |
+| CMDB | SecNumCloud §8 (Asset Management) — requires a continuously maintained inventory of all assets in scope |
+| Access workflows | SecNumCloud §9 (Access Control) — requires documented provisioning and revocation with approval records |
+
+SecNumCloud qualification requires third-party audit of these processes. Assessors specifically look for evidence of tooling — a process described in a policy document without an operational system of record generating artifacts will not pass qualification.
+
+---
+
+#### Netherlands — BIO (Baseline Informatiebeveiliging Overheid)
+
+The **BIO** is the Dutch government's unified information security baseline, mandatory across all layers of Dutch public administration (central government, municipalities, provinces, and water boards). It is based directly on **ISO/IEC 27001/27002** and maps its controls to that standard.
+
+| ITSM Practice | BIO / ISO 27002:2022 Equivalent |
+|---|---|
+| Change tickets / CAB | ISO 27002 §8.32 (Change Management) — requires formal change request, risk assessment, approval, and post-implementation review |
+| CMDB | ISO 27002 §5.9 (Inventory of Information and Other Associated Assets) — requires maintained, accurate asset inventory |
+| Incident tickets | ISO 27002 §5.26 (Response to Information Security Incidents) — requires documented incident response with evidence of containment, eradication, and recovery |
+| Access workflows | ISO 27002 §5.18 (Access Rights) — requires formal provisioning, review, and revocation processes with documented authorization |
+| Personnel lifecycle | ISO 27002 §6.5 (Responsibilities After Termination or Change of Employment) — requires timely, documented revocation of access on departure or role change |
+
+Because BIO maps directly to ISO 27001, any organization certified to ISO 27001 is simultaneously satisfying the Dutch BIO requirements — and ISO 27001 certification auditors will specifically sample change records, incident tickets, and access provisioning evidence during Stage 2 audits.
+
+---
+
+#### Spain — ENS (Esquema Nacional de Seguridad)
+
+Spain's **ENS** (National Security Framework), governed by Royal Decree 311/2022, is mandatory for all Spanish public administration bodies and cloud service providers that process public administration data. It defines three security levels (Basic, Medium, High) roughly analogous to FedRAMP's Low/Moderate/High tiers.
+
+| ITSM Practice | ENS Equivalent |
+|---|---|
+| Change tickets / CAB | **op.exp.5** (Change Management) — requires formal documentation, approval, and traceability for all changes to production systems |
+| Incident tickets | **op.exp.7** (Incident Management) — requires systematic recording, classification, and tracking of security incidents |
+| CMDB | **op.inv.1** (Asset Inventory) — requires a current, accurate inventory of all assets within the security boundary |
+| Access workflows | **op.acc.4** (Access Rights Management) — requires documented access provisioning and revocation with an audit trail |
+| Personnel lifecycle | **mp.per.3** (Personnel Departure) — requires revocation of credentials and access upon departure with documented evidence |
+
+At ENS High level — the tier applicable to systems processing sensitive government data — assessors require evidence artifacts, not just policy declarations. The framework explicitly states that "procedures must be capable of being verified."
+
+---
+
+#### Poland — KSC (Ustawa o Krajowym Systemie Cyberbezpieczeństwa)
+
+Poland's **KSC Act** (Act on the National Cybersecurity System, 2018), implementing the EU NIS Directive, establishes security requirements for operators of essential services and digital service providers. It references both **ISO/IEC 27001** and **NIST CSF** as acceptable implementation frameworks.
+
+| ITSM Practice | KSC / NIS2 Equivalent |
+|---|---|
+| Incident tickets | KSC Art. 8 — requires systematic incident detection, handling, and reporting; incidents must be recorded and reported to the national CSIRT within defined timeframes |
+| Change tickets | ISO 27001 Annex A 8.32 (as referenced by KSC) — formal change management with documented approval |
+| CMDB | KSC Art. 8(1)(b) — requires identification and management of all systems and assets within the security scope |
+| Access workflows | KSC Art. 8(1)(d) — requires access control with documented authorization and revocation |
+
+Notably, the **EU NIS2 Directive** (2022/2555), which supersedes NIS and which all EU member states — including Germany, France, the Netherlands, Spain, and Poland — must implement, explicitly requires in Article 21 that covered entities employ "incident handling," "business continuity," "supply chain security," and "access control" measures with evidence of implementation. NIS2 applies to a significantly broader set of organizations than NIS1 and carries administrative fines of up to €10 million or 2% of global turnover for non-compliance.
+
+---
+
+### Canada
+
+#### Government of Canada — ITSG-33 / GC PBMM
+
+The Treasury Board of Canada Secretariat (TBS) publishes **ITSG-33** (IT Security Risk Management: A Lifecycle Approach) as the foundational security control framework for Canadian federal departments. The control catalog is derived directly from NIST 800-53, making the mapping between frameworks nearly one-to-one.
+
+For cloud services, the Government of Canada uses the **Protected B, Medium Integrity, Medium Availability (PBMM)** profile as the baseline for most departmental cloud workloads — roughly equivalent to FedRAMP Moderate — and a **Protected B High** profile for sensitive workloads.
+
+| ITSM Practice | ITSG-33 / GC Equivalent |
+|---|---|
+| Change tickets / CAB | CM-3 (directly inherited from NIST 800-53) — identical requirement for formal change control with documented approval |
+| CMDB | CM-8 (directly inherited) — identical system component inventory requirement |
+| Incident tickets | IR-4, IR-5 (directly inherited) — identical incident handling and monitoring requirements |
+| Access workflows | AC-2, AC-3 (directly inherited) — identical account management and access enforcement requirements |
+| Personnel lifecycle | PS-4, PS-5 (directly inherited) — identical personnel termination and transfer requirements |
+
+Because ITSG-33 mirrors NIST 800-53, any organization that has implemented ITSM-backed compliance for FedRAMP has effectively satisfied the corresponding Canadian federal requirements with the same tooling and the same artifacts. The **Canadian Centre for Cyber Security (CCCS)** cloud assessment process specifically requests evidence of automated change management and incident tracking as part of cloud service provider assessments.
+
+Additionally, the **Office of the Superintendent of Financial Institutions (OSFI)** Guideline B-13 (Technology and Cyber Risk Management, effective 2023) requires federally regulated financial institutions — banks, insurers, pension funds — to maintain formal change management processes, incident management with defined response timelines, and asset inventories. OSFI B-13 assessments require artifact evidence, not narrative descriptions.
+
+---
+
+### Asia-Pacific
+
+#### Singapore — MAS TRM Guidelines and CSA CCCS
+
+Singapore operates two major frameworks relevant to ITSM-backed compliance:
+
+**MAS TRM (Monetary Authority of Singapore — Technology Risk Management Guidelines)** applies to all financial institutions in Singapore and is one of the most prescriptive financial sector frameworks in Asia.
+
+| ITSM Practice | MAS TRM Equivalent |
+|---|---|
+| Change tickets / CAB | MAS TRM §7.2 (Change Management) — requires a formal change management process with risk assessment, approval, testing, and post-implementation review; changes must be traceable |
+| CMDB | MAS TRM §6.1 (IT Asset Management) — requires a complete, current inventory of all IT assets |
+| Incident tickets | MAS TRM §11 (Cyber Incident Response and Management) — requires a documented incident response process with records of each incident, actions taken, and lessons learned |
+| Access workflows | MAS TRM §9.1 (Access Control) — requires formal access request, approval, provisioning, and revocation with an audit trail |
+| Personnel lifecycle | MAS TRM §10.2 (User Access Review) — requires periodic access reviews and immediate revocation upon role change or departure |
+
+MAS TRM requires financial institutions to submit incident reports for significant technology incidents within defined timeframes (1 hour for initial notification), which is only operationally achievable with automated incident ticketing that captures onset time, notification time, and escalation records.
+
+**CSA CCCS (Cyber Security Agency — Cloud Computing Security Framework)** is Singapore's government cloud security framework, used for assessing cloud service providers for government use. It maps to ISO 27001 and FedRAMP, with explicit requirements for change management records, incident logs, and access provisioning evidence.
+
+---
+
+#### Japan — METI Cybersecurity Management Guidelines and FISC
+
+Japan's primary ITSM-relevant frameworks:
+
+**METI Cybersecurity Management Guidelines** (経済産業省 サイバーセキュリティ経営ガイドライン, Ver 3.0, 2023) — published by the Ministry of Economy, Trade and Industry, applies to corporations with significant IT dependencies. It requires senior management accountability for cybersecurity and explicitly calls for:
+
+- Documented change management processes with approval records
+- Incident management with detection-to-resolution tracking
+- Asset inventory maintained as a living document
+- Access lifecycle management with records
+
+**FISC Security Guidelines** (Center for Financial Industry Information Systems) — mandatory guidance for Japanese financial institutions. FISC Chapter 3 (Operations Management) requires formal change management with CAB-equivalent review, and Chapter 5 (Incident Management) requires ticketed incident tracking with defined escalation paths and regulatory reporting timelines.
+
+---
+
+#### Australia — Essential Eight and IRAP / ISM
+
+Australia's **Australian Cyber Security Centre (ACSC)** publishes two frameworks:
+
+**The Essential Eight** is a prioritized set of eight mitigation strategies. While relatively concise, several directly require ITSM capabilities:
+
+| Essential Eight Strategy | ITSM Dependency |
+|---|---|
+| **Patch applications** (ML1–ML3) | Requires tracked, time-bound patch remediation — operationalized through change/remediation tickets with SLA enforcement |
+| **Restrict administrative privileges** (ML1–ML3) | Requires documented justification and approval for privileged accounts — operationalized through access request tickets |
+| **Application control** | Changes to approved application lists must be formally managed — operationalized through change tickets |
+
+**ISM (Information Security Manual)** — the full Australian government security framework, mandatory for government agencies and used by the IRAP (Infosec Registered Assessors Program) assessment process. The ISM contains over 800 controls across change management (ISM-1406, ISM-1219), incident management (ISM-0140, ISM-0576), asset management (ISM-1401), and access control (ISM-0430, ISM-0441) that parallel the FedRAMP controls in this document almost exactly. IRAP assessors require documentary evidence of each control, not policy references.
+
+---
+
+### Commercial Frameworks
+
+#### PCI-DSS v4.0 (Payment Card Industry Data Security Standard)
+
+**PCI-DSS** applies to any organization that stores, processes, or transmits payment card data. Version 4.0 (effective March 2025) significantly strengthened evidence requirements across change management and access control. It is assessed by Qualified Security Assessors (QSAs) who require artifact evidence.
+
+| ITSM Practice | PCI-DSS v4.0 Requirement |
+|---|---|
+| **Change tickets / CAB** | **Req 6.5** (Changes to all system components are managed securely) — requires a formal change management process including documented change requests, security impact analysis, approval by authorized parties, testing, and rollback procedures. Each change must have a documented record. |
+| **CMDB / Asset inventory** | **Req 12.5.1** — requires a documented inventory of all system components in scope, kept current. |
+| **Incident tickets** | **Req 12.10** (Implement an incident response plan) — requires documented incident response with defined roles, timelines, and evidence of response actions taken. Req 12.10.2 requires the plan be reviewed and tested at least annually, with evidence. |
+| **Access request workflows** | **Req 7.2.2** — requires formal user access request and approval processes, with access provisioned only after documented authorization. Req 7.2.4 requires all user accounts and access privileges to be reviewed at least once every 6 months. |
+| **Personnel lifecycle tickets** | **Req 8.3.4** — invalid authentication attempts must be locked; **Req 8.8** — requires all access policies for terminated users to be managed and documented. |
+
+PCI-DSS v4.0 introduced the concept of a **"customized approach"** — organizations can implement alternative controls, but must provide documented evidence of risk analysis and compensating control effectiveness to their QSA. In all cases, evidence generation is non-negotiable. A QSA will request change records, access provisioning tickets, and incident logs as primary evidence during a Report on Compliance (RoC) assessment.
+
+---
+
+#### SOX — Sarbanes-Oxley Act (IT General Controls)
+
+**SOX** applies to all publicly traded companies in the United States (and foreign private issuers listed on U.S. exchanges). While SOX is a financial reporting law, its **IT General Controls (ITGCs)** — assessed under frameworks like COBIT and tested by external auditors under PCAOB AS 2201 — overlap significantly with the ITSM requirements in this document.
+
+The four ITGC domains most relevant to ITSM are:
+
+| ITGC Domain | ITSM Dependency |
+|---|---|
+| **Change Management** | External auditors test that all changes to financial systems went through a formal, documented approval process. Evidence required: change tickets showing request, approval, testing sign-off, and implementation date. A change implemented without a ticket is an automatic finding. |
+| **Logical Access Controls** | Auditors test that user access is provisioned based on formal requests with documented approval, that access is removed promptly upon termination, and that privileged access is reviewed periodically. Evidence required: access request tickets, off-boarding records, and user access review outputs. |
+| **Computer Operations** | Auditors test that production incidents affecting financial reporting systems are detected, tracked, and resolved in a documented manner. Evidence required: incident records with timestamps, assigned owners, and resolution notes. |
+| **Program Development** | Auditors test that new systems or significant changes went through a documented SDLC with security review and approval. Evidence required: change/project tickets with approval gates. |
+
+SOX ITGC findings (deficiencies) must be disclosed in the company's annual report. A **material weakness** in ITGCs — such as changes to financial systems made without documented approval — can trigger SEC scrutiny, require restatement of financials, and result in personal liability for the CEO and CFO who certify the controls under Sections 302 and 906. This makes SOX ITGC compliance one of the highest-stakes drivers of enterprise change management and access control tooling adoption.
+
+---
+
+#### ISO/IEC 27001:2022 — International Standard for Information Security Management Systems
+
+**ISO 27001** is the globally recognized certification standard for information security management. It is certifiable, meaning organizations undergo third-party audit by an accredited certification body and receive a formal certificate valid for three years with annual surveillance audits. It is recognized or mandated in the EU (via NIS2 as an accepted compliance path), the UK, Canada, Australia, Japan, Singapore, and dozens of other jurisdictions.
+
+Annex A of ISO 27001:2022 contains 93 controls organized into four themes. The following map directly to the ITSM practices in this document:
+
+| ITSM Practice | ISO 27001:2022 Annex A Control |
+|---|---|
+| Change tickets / CAB | **8.32 Change Management** — formal change management process with documented requests, risk assessment, approval, and review |
+| CMDB | **5.9 Inventory of Information and Other Associated Assets** — maintained, accurate, current asset inventory |
+| Incident tickets | **5.26 Response to Information Security Incidents** — documented incident response with evidence of actions taken; **5.27 Learning from Incidents** — requires incident records to enable trend analysis |
+| Access workflows | **5.18 Access Rights** — formal provisioning, modification, and revocation of access rights with documented authorization |
+| Personnel lifecycle | **6.5 Responsibilities After Termination** — access revocation upon departure or role change with documented evidence |
+| Alert-to-ticket automation | **8.16 Monitoring Activities** — anomalies must be evaluated and responded to; response must be documented |
+
+ISO 27001 certification auditors conduct **evidence sampling**: they will select a random sample of changes, incidents, access provisioning events, and off-boarding events and ask to see the corresponding records. An organization that says "we have a change management process" but cannot produce change records for sampled events will receive a nonconformity. This is the same evidentiary standard applied by FedRAMP 3PAOs, PCI QSAs, and SOX auditors — and it is why a system of record is not optional under any of these frameworks.
+
+---
+
+### The Universal Principle
+
+Across all of the frameworks above — U.S. federal, European, Canadian, Asia-Pacific, and commercial — the same underlying principle applies: **compliance is not demonstrated by having a policy; it is demonstrated by producing evidence that the policy was followed, at the moment it needed to be followed, for every instance in scope.** A policy document that describes a change management process is not evidence that a specific change was approved. A ticket record is. An incident response plan is not evidence that a specific incident was handled correctly. An incident record with timestamps, assigned owners, and resolution notes is.
+
+This is why a system of record is the convergence point for compliance across frameworks. The specific control identifiers differ — CM-3 in NIST, 8.32 in ISO 27001, Req 6.5 in PCI-DSS, op.exp.5 in ENS — but the evidence artifact they all require is the same: a structured, timestamped, approval-chain-bearing record of what was proposed, who authorized it, what was done, and when it was closed.
 
 ---
 
