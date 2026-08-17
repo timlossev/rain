@@ -17,6 +17,30 @@ or config files once it's running), and every image is a minimal,
 Alpine-based build with no Node/SPA toolchain and no third-party
 JS framework in the browser.
 
+## Motivation
+
+Compliance frameworks -- FedRAMP, ISO 27001, PCI-DSS, SOX, and their
+international counterparts (Germany's BSI IT-Grundschutz, France's
+SecNumCloud, Canada's ITSG-33, Singapore's MAS TRM, and others) -- don't
+accept a policy document as evidence that a control is satisfied. They
+require an artifact: a change ticket showing who approved what and when,
+an incident record with a full timeline, a CMDB entry proving an asset
+was tracked, an access request with a documented approval chain. A
+structured system of record is the only mechanism that generates that
+evidence continuously, at scale, in a form a third-party assessor can
+sample and verify -- a policy that says "we review access" is not
+evidence that any particular access was reviewed; a ticket is.
+
+That's what RAIN is for. In a reference FedRAMP High authorization
+package, 33 of 409 implemented controls -- concentrated in the
+highest-scrutiny families (Configuration Management, Incident Response,
+Access Control) -- have implementation statements that depend on exactly
+this: ticketing, change approval workflows, and a configuration item
+registry. See [`docs/itsm-controls-mapping.md`](docs/itsm-controls-mapping.md)
+for the full control-by-control breakdown, plus the same mapping against
+ISO 27001, PCI-DSS, SOX, and a dozen national frameworks across the EU,
+Canada, and Asia-Pacific.
+
 ## Capabilities
 
 **Asset Registry**
@@ -139,9 +163,11 @@ JS framework in the browser.
   Rules for that)
 
 See [`docs/user-guide.md`](docs/user-guide.md) for a task-oriented guide
-to using RAIN day to day, and [`docs/architecture.md`](docs/architecture.md)
+to using RAIN day to day, [`docs/architecture.md`](docs/architecture.md)
 for the detailed design, lessons from real deployment testing, and the
-current roadmap.
+current roadmap, and [`docs/itsm-controls-mapping.md`](docs/itsm-controls-mapping.md)
+for the compliance-control analysis behind why this project exists in
+the first place (see Motivation above).
 
 ## Quickstart
 
