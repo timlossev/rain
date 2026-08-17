@@ -1,11 +1,11 @@
 # RAIN
 
-**RAIN** (Response to Asynchronous Interactions in Networks) **is a
-self-hosted IT system of record built for environments that
-can't (or won't) depend on a SaaS vendor** -- air-gapped networks,
-classified or controlled-unclassified enclaves, and any organization that
-needs its asset inventory, incident/vulnerability/change tickets, and
-compliance documentation to live entirely on infrastructure it controls.
+**RAIN** (Response to Asynchronous Interactions in Networks) is a
+self-hosted IT system of record built for environments that can't (or
+won't) depend on a SaaS vendor -- air-gapped networks, classified or
+controlled-unclassified enclaves, and any organization that needs its
+asset inventory, incident/vulnerability/change tickets, and compliance
+documentation to live entirely on infrastructure it controls.
 One `docker compose up` stands up the whole stack -- reverse proxy with
 automatic HTTPS, application, background worker, and database -- with no
 external service to reach, no telemetry phoning home, and no license
@@ -36,10 +36,14 @@ package, 33 of 409 implemented controls -- concentrated in the
 highest-scrutiny families (Configuration Management, Incident Response,
 Access Control) -- have implementation statements that depend on exactly
 this: ticketing, change approval workflows, and a configuration item
-registry. See [`docs/itsm-controls-mapping.md`](docs/itsm-controls-mapping.md)
-for the full control-by-control breakdown, plus the same mapping against
-ISO 27001, PCI-DSS, SOX, and a dozen national frameworks across the EU,
-Canada, and Asia-Pacific.
+registry. That proportion (~8%) holds fairly steady at Moderate and Low
+too, not just High, and a second tier of controls outside that 33 --
+POA&M tracking chief among them -- can lean on the same ticket/document/
+calendar primitives as indirect evidence. See
+[`docs/itsm-controls-mapping.md`](docs/itsm-controls-mapping.md) for the
+full control-by-control breakdown, the per-baseline estimates, and the
+same mapping against ISO 27001, PCI-DSS, SOX, and a dozen national
+frameworks across the EU, Canada, and Asia-Pacific.
 
 Those tickets and incident records have to originate from somewhere,
 which is why RAIN is deliberately "bring your own" for detection --
@@ -223,7 +227,7 @@ uploads volume. See the comments in `.env.example`.
 Combine all of those with `EMBED_WORKER=true` (folds the `worker`
 container's own duties -- syslog listener, rule engine, notifications,
 calendar sweep, LDAP sync -- into the `app` container instead of running
-them separately) for **minimal mode**: one container, no local Postgres,
+them separately) for minimal mode: one container, no local Postgres,
 no local storage volume, no Caddy.
 
 ```sh
