@@ -41,6 +41,21 @@ for the full control-by-control breakdown, plus the same mapping against
 ISO 27001, PCI-DSS, SOX, and a dozen national frameworks across the EU,
 Canada, and Asia-Pacific.
 
+Those tickets and incident records have to originate from somewhere,
+which is why RAIN is deliberately "bring your own" for detection --
+monitoring, SIEM, XDR, antivirus, whatever's already watching the
+environment (Wazuh, Elastic, Splunk, CrowdStrike, Suricata, or anything
+else). RAIN isn't trying to replace any of that or be integrated with
+it one vendor API at a time; all it needs is an event, and just about
+every monitoring or security product built in the last thirty years
+already knows how to emit one over Syslog, natively or with minimal
+forwarder config. That's why the event bus is a built-in Syslog
+listener rather than a growing list of bespoke integrations: point
+whatever's already generating alerts at RAIN, and Event Promotion
+Policies / Correlation Rules turn that stream into the tickets and
+incident records the frameworks above actually require -- without
+asking anyone to rip out a detection stack that already works.
+
 ## Capabilities
 
 **Asset Registry**
