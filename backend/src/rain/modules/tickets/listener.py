@@ -22,6 +22,7 @@ from rain.db.base import control_session, tenant_session
 from rain.db.control_models import Tenant
 from rain.db.tenant_models import SyslogEvent
 from rain.modules.tickets import correlation, rules
+from rain.modules.tickets.event_formats import detect_and_parse, summarize
 from rain.modules.tickets.live_bus import live_bus
 from rain.modules.tickets.routing import resolve_tenant_for_event
 from rain.modules.tickets.syslog_parser import parse_line, severity_label
@@ -48,9 +49,18 @@ async def handle_raw_line(raw_line: str) -> None:
 
         parsed = parse_line(raw_line)
 
+        # CEF/JSON/kv-shaped message bodies (most SIEMs/EDRs -- Wazuh
+        # included -- can emit any of the three) get recognized here and
+        # turned into a readable summary + the fields their own parser
+        # extracted, rather than staying an opaque blob. Standard syslog
+        # text (event_format == "plain") is untouched -- same behavior
+        # as before this existed.
+        event_format, parsed_fields = detect_and_parse(parsed.message)
+        message = summarize(event_format, parsed_fields, parsed.message) if parsed_fields else parsed.message
+
         async with control_session() as control_db:
             tenant = await resolve_tenant_for_event(
-                control_db, host=parsed.host, program=parsed.program, message=parsed.message
+                control_db, host=parsed.host, program=parsed.program, message=message
             )
         if tenant is None:
             logger.debug("no tenant matched host=%s program=%s; dropping event", parsed.host, parsed.program)
@@ -62,8 +72,10 @@ async def handle_raw_line(raw_line: str) -> None:
                 program=parsed.program,
                 facility=parsed.facility,
                 severity=parsed.severity,
-                message=parsed.message[:8000],
+                message=message[:8000],
                 raw=parsed.raw[:8000],
+                event_format=event_format,
+                parsed_fields=parsed_fields,
             )
             db.add(event)
             await db.commit()
@@ -84,6 +96,7 @@ async def handle_raw_line(raw_line: str) -> None:
                         "severity": event.severity,
                         "severity_label": severity_label(event.severity),
                         "message": event.message[:500],
+                        "event_format": event.event_format,
                     }
                 ),
             )

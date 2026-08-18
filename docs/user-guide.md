@@ -218,6 +218,13 @@ shown: a free-text filter matched against host, program, and message,
 and a minimum-severity dropdown (All / Info and up / Warning and up /
 Error and up / Alert and up, using syslog severity levels).
 
+A source doesn't have to send plain syslog text -- CEF, JSON, and
+Splunk-style key=value message bodies are all recognized and parsed
+automatically, no configuration needed. When one is, a small badge
+(CEF / JSON / KV) appears next to the message, which is itself a
+readable one-line summary pulled from whatever that format's own
+"this is what happened" field was, rather than the raw structured text.
+
 Check the boxes next to one or more events to reveal a selection menu
 with four bulk actions: "Turn these into incidents", "Turn these into
 vulnerabilities", "Correlate these" (jumps to Correlation Rules with a

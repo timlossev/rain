@@ -177,8 +177,20 @@ class SyslogEvent(TenantBase):
     program: Mapped[str | None] = mapped_column(String(255), nullable=True)
     facility: Mapped[int | None] = mapped_column(Integer, nullable=True)
     severity: Mapped[int | None] = mapped_column(Integer, nullable=True)  # syslog severity 0 (emerg) - 7 (debug)
+    # message is what rain.modules.tickets.event_formats produced: the
+    # envelope-stripped text as-is for plain syslog, or a human-readable
+    # summary (CEF's Name, a JSON payload's message/rule.description,
+    # a kv payload's msg=) when the message body turned out to be CEF/
+    # JSON/key-value. event_format records which of those happened
+    # ("plain" otherwise); parsed_fields holds everything that format's
+    # parser extracted (CEF's header + Extension, the full JSON object,
+    # or every key=value pair) for anything beyond that one summary
+    # line -- never used for tenant routing or rule matching today, just
+    # preserved so it isn't lost.
     message: Mapped[str] = mapped_column(Text)
     raw: Mapped[str] = mapped_column(Text)
+    event_format: Mapped[str] = mapped_column(String(15), default="plain", server_default="plain")
+    parsed_fields: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     promoted_ticket_id: Mapped[int | None] = mapped_column(ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True)
 
 

@@ -215,6 +215,28 @@ destination d_rain {
 log { source(s_src); destination(d_rain); };
 ```
 
+**Message format detection.** `syslog_parser` only strips the RFC
+envelope (PRI, timestamp, host, tag) -- what's left, the message body
+itself, isn't always plain text. `rain.modules.tickets.event_formats`
+recognizes CEF (`CEF:...`, what most SIEMs/EDRs can emit, Wazuh
+included), a JSON object, or loose Splunk-style `key=value` pairs, and
+parses whichever it finds; a message that's none of those is left
+exactly as `syslog_parser` produced it ("plain"). A recognized body's
+extracted fields (CEF's header + Extension, the full JSON object, or
+every key=value pair) are stored on `SyslogEvent.parsed_fields`, and
+`SyslogEvent.message` becomes a human-readable one-line summary (CEF's
+Name field, a JSON payload's `message`/`msg`/`rule.description`/
+`full_log`, or a kv payload's `msg=`/`message=`/`description=`) instead
+of the raw structured text -- so the live viewer, a promoted ticket's
+title, and Event Promotion Policy/Correlation Rule matching against
+`message` all see something legible regardless of source format.
+Detection order is deliberately CEF, then JSON, then key=value last:
+each is checked by its own marker (CEF's prefix, JSON's brace-wrapped-
+and-actually-parses), while key=value is the loosest heuristic (needs
+2+ pairs) and would false-positive on a CEF extension's own body if
+checked first. `host`/`program`/`facility`/`severity` are untouched
+either way -- they already came from the envelope, not the message body.
+
 **Tenant routing.** The tenant isn't known yet at the point an event
 arrives, so `control.syslog_source_map` (host/program pattern → tenant,
 evaluated in order, first match wins) has to live in `control`, not a

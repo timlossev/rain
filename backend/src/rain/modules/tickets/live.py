@@ -45,6 +45,7 @@ def _event_payload(event) -> str:
             "severity": event.severity,
             "severity_label": severity_label(event.severity),
             "message": event.message[:500],
+            "event_format": event.event_format,
         }
     )
 

@@ -59,13 +59,21 @@
     row.dataset.message = evt.message || "";
 
     const time = new Date(evt.received_at).toLocaleTimeString();
+    // event_format is "plain" for standard syslog text (the common
+    // case) -- only CEF/JSON/kv-recognized bodies (see
+    // rain.modules.tickets.event_formats) get a badge at all, so this
+    // stays quiet for most events instead of labeling every row.
+    const formatBadge =
+      evt.event_format && evt.event_format !== "plain"
+        ? `<span class="badge live-format" title="Message body recognized as ${escapeHtml(evt.event_format.toUpperCase())} and summarized">${escapeHtml(evt.event_format.toUpperCase())}</span>`
+        : "";
     row.innerHTML = `
       <input type="checkbox" class="live-select" data-live-select aria-label="Select this event">
       <span class="live-time">${time}</span>
       <span class="badge live-sev sev-${sevClass}">${sevClass}</span>
       <span class="live-host">${escapeHtml(evt.host || "-")}</span>
       <span class="live-program">${escapeHtml(evt.program || "-")}</span>
-      <span class="live-message">${escapeHtml(evt.message || "")}</span>
+      <span class="live-message">${formatBadge}${escapeHtml(evt.message || "")}</span>
     `;
     return row;
   }

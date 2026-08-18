@@ -965,6 +965,12 @@ td.actions { text-align: right; white-space: nowrap; }
 .live-sev.sev-emerg, .live-sev.sev-alert, .live-sev.sev-crit { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
 .live-sev.sev-err { background: #ffedd5; color: #9a3412; border-color: transparent; }
 .live-sev.sev-warning { background: #fef9c3; color: #854d0e; border-color: transparent; }
+/* Only shown for a message body event_formats.py recognized as CEF/
+   JSON/kv and summarized -- not a severity indicator, so kept visually
+   distinct (accent, not a sev-* color) and inline with the message
+   text it precedes rather than its own grid column (most events are
+   "plain" and would leave that column empty). */
+.live-format { background: color-mix(in srgb, var(--accent) 14%, white); color: var(--accent); border-color: transparent; font-size: 0.65rem; padding: 1px 6px; margin-right: 6px; vertical-align: middle; }
 
 /* ---------- standalone (login / setup) ---------- */
 .auth-card { width: 100%; max-width: 420px; }

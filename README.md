@@ -62,6 +62,13 @@ Policies / Correlation Rules turn that stream into the tickets and
 incident records the frameworks above actually require -- without
 asking anyone to rip out a detection stack that already works.
 
+Not every one of those tools puts the same thing inside the syslog
+message body, though -- some send plain text, some send CEF (Wazuh
+included, among many others), some send JSON, some send loose
+Splunk-style key=value pairs. RAIN's listener recognizes and parses
+all four automatically, per event, with nothing to configure -- see
+Ticketing below.
+
 ## Capabilities
 
 **Asset Registry**
@@ -81,7 +88,9 @@ asking anyone to rip out a detection stack that already works.
 - Three ticket types -- incident, vulnerability, and change -- sharing
   one record, one activity feed, and one export pipeline
 - A built-in syslog listener turns any syslog-ng-fed event stream into a
-  live event feed
+  live event feed -- auto-detects and parses CEF, JSON, and Splunk-style
+  key=value message bodies alongside plain syslog text, no per-source
+  configuration needed
 - **Event Promotion Policies**: regex rules that auto-promote a matching
   syslog event into an incident or vulnerability ticket
 - **Correlation Rules**: two ways to promote across multiple events
