@@ -214,6 +214,14 @@ python bootstrap.py      # or bootstrap.ps1 / bootstrap.sh -- generates .env onc
 docker compose up --build
 ```
 
+`bootstrap` generates strong random secrets either way, then asks a
+handful of deployment questions -- built-in vs external Postgres (with
+a live connection test), local disk vs S3 document storage, and a
+separate worker container vs merging it into `app` -- defaulting to
+the setup above if you just press Enter, or skipping the questions
+entirely (same defaults) when run non-interactively, e.g. in CI. It
+only ever runs once; a `.env` that already exists is left untouched.
+
 Then visit `https://localhost` (Caddy issues a certificate automatically --
 from its internal CA for `localhost`, or via public ACME if you set
 `RAIN_DOMAIN` in `.env` to a real, publicly-resolvable domain first).

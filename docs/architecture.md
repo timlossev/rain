@@ -16,7 +16,12 @@ the same foundation rather than re-deriving it. See the repo root
 Only two inputs are needed outside the database: `POSTGRES_PASSWORD` and
 `APP_SECRET_KEY` (session-cookie signing + the Fernet key that encrypts
 config-at-rest, e.g. the SMTP relay password). `bootstrap.py` /
-`bootstrap.ps1` / `bootstrap.sh` generate both into `.env` on first run.
+`bootstrap.ps1` / `bootstrap.sh` generate both into `.env` on first run,
+and interactively ask (with a working-default fast path, and skipped
+outright when run non-interactively) which of the deployment shapes
+below to set up -- built-in vs external Postgres, tested live before
+being saved, with an explicit override if the test fails; local disk
+vs S3 document storage; separate `worker` vs `EMBED_WORKER=true`.
 `RAIN_DOMAIN` is optional and defaults to `localhost` (Caddy's internal CA).
 Everything else lives in Postgres and is edited at runtime through the
 setup wizard and Admin UI.
