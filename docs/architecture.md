@@ -528,26 +528,36 @@ turned away with a plain 403, regardless of `portal_require_auth` --
 that flag controls whether *an* account is required, not whether an
 account for a *different* tenant is accepted.
 
-**Two views, one template.** An anonymous visitor gets exactly the
-original bare-bones form (new ticket +, once signed in, "Tickets
-reported by me") plus "Today's events" -- every visitor's page,
-regardless of sign-in status, since it's tenant-wide operational
-information (`rain.modules.calendar.service.list_entries_due_today`,
-reusing the month-grid view's own occurrence math). A signed-in visitor
-additionally gets a wider layout (`.portal-shell.portal-authenticated`)
-with a search bar and three tabs -- Tickets, Approvals (backed by
-`rain.modules.tickets.service.list_tickets_pending_approval_for`, the
-same eligibility rule `is_eligible_approver` uses, evaluated as a set
-query), and Documents. `.content-standalone` (base.html's `<main>` for
+**One tabbed layout, for every visitor.** Every visitor -- signed in or
+not -- gets the same `.portal-shell.portal-wide` layout: a tab bar
+(labels are visitor-facing copy, not the underlying concept -- "Request
+Something" is the catalog tab, "Report Something" the incident-report
+tab) plus "Today's events" above it, tenant-wide operational information
+shown regardless of sign-in status
+(`rain.modules.calendar.service.list_entries_due_today`, reusing the
+month-grid view's own occurrence math). Request Something and Report
+Something are both open with or without a session -- gated only by
+`portal_require_auth` below, same as ticket filing always was, since
+`rain.modules.catalog.service.submit_catalog_item`'s
+`reported_anonymously` flows straight through to
+`ticket_service.create_ticket` exactly like the plain incident form's
+already did. A signed-in visitor additionally gets a search bar and two
+more tabs -- Pending Actions (backed by `rain.modules.tickets.service.
+list_tickets_pending_approval_for`, the same eligibility rule
+`is_eligible_approver` uses, evaluated as a set query) and Document
+Archive -- both of which stay session-gated (`{% if user %}` around
+their tab button and panel alike, not just their content), since neither
+an approval decision nor the document repository was ever meant to be
+reachable anonymously. `.content-standalone` (base.html's `<main>` for
 login/setup/portal alike) is a centered flexbox; overridden to normal
 top-down block flow specifically when a `.portal-shell` is present
 (`.content-standalone:has(.portal-shell)`, same `:has()` technique as
 the sidebar-collapse override) so switching between tabs of different
 heights doesn't recenter -- and visibly jump -- the whole page.
 
-**Escalate.** Next to a signed-in visitor's own tickets in the Tickets
-tab, whenever the tenant has an escalation webhook configured -- same
-feature as the ticket detail page's own Escalate button, see
+**Escalate.** Next to a signed-in visitor's own tickets in the Report
+Something tab, whenever the tenant has an escalation webhook configured
+-- same feature as the ticket detail page's own Escalate button, see
 Ticketing's Escalation section above. Posts to the same
 `/tickets/{id}/escalate` route `require_login` already gates, with a
 `next` field so it returns to the portal instead of a ticket detail
@@ -569,8 +579,10 @@ routes, same "server pre-renders `MAX_CATALOG_FIELDS` rows, a blank
 builder, including the identical `[data-step-field]` JS).
 
 **Two client-facing entry points, one shared service layer.** `/catalog`
-(main app, under Records Authority) and the client portal's own Catalog
-tab both list active items and post through `rain.modules.catalog.
+(main app, under Records Authority, require_login) and the client
+portal's own Request Something tab (open to every visitor, portal_require_
+auth permitting -- see Client Portal below) both list active items and
+post through `rain.modules.catalog.
 service.submit_catalog_item` -- required-field validation, then `rain.
 modules.tickets.service.create_ticket(source_catalog_item_id=item.id)`,
 then `start_approval` if the item requires one. A submission is
@@ -586,21 +598,33 @@ order, serialized per the item's `payload_format` -- `json`
 `username=jdoe\ndomain=IBM\nuser_type=normal`). A blank optional answer
 is pruned entirely rather than serialized as `null`/empty.
 
-**Approval isn't change-exclusive here.** `ChangeApproval`/`ApprovalFlow`
-were already generic over "the thing being approved" in the model layer
-(no `ticket_type` constraint anywhere in that schema) -- only the ticket
-detail page's own template and `tickets.router.ticket_detail` gated the
-Approval card and its current-step/can-decide computation to `ticket_
-type == "change"`. Both were widened to `ticket.ticket_type == "change"
-or ticket.approval` (detail page) / off `ticket.approval` directly
-(current-step computation), so a Service Catalog item can attach an
-approval flow to an incident or vulnerability ticket just as well, and
-it shows up and is actionable the same way a change's does. The manual
-"attach a flow" affordance for a ticket with none yet stays change-only,
-though -- that's specifically changes' own "must have an approval flow"
-rule (enforced at both manual creation and here: a "change" item must
-have `requires_approval` and a flow selected to save at all), not
-something an ordinary incident should invite.
+**The ticket detail page's Approval card isn't change-exclusive, even
+though the Service Catalog admin form only ever offers approval for a
+"change" service.** `ChangeApproval`/`ApprovalFlow` were already generic
+over "the thing being approved" in the model layer (no `ticket_type`
+constraint anywhere in that schema) -- only the ticket detail page's own
+template and `tickets.router.ticket_detail` gated the Approval card and
+its current-step/can-decide computation to `ticket_type == "change"`.
+Both were widened to `ticket.ticket_type == "change" or ticket.approval`
+(detail page) / off `ticket.approval` directly (current-step
+computation), so *if* a ticket somehow has an approval attached despite
+not being a change, it still shows up and is actionable there. In
+practice nothing produces that combination any more: an incident or
+vulnerability has no approval concept by design (a plain incident being
+"pending approval" made no sense to a requester), so `admin/catalog_
+item_form.html`'s Requires-approval/Approval-flow section is hidden
+outright -- not just left unchecked -- for anything but "change" (the
+same `#ticket_type` + `[data-change-fields]` show/hide the manual New
+Ticket form already used for its own change-only fields), and `admin.
+router`'s create/edit routes force requires_approval/approval_flow_id
+back to false/None server-side whenever Produces isn't "change",
+regardless of what a bypassed client might submit -- HTML's `hidden`
+attribute only stops a field from being *seen*, not submitted. The
+ticket-detail-page widening stays in place as the more general, still-
+correct fix underneath; the admin form is just where the "changes
+require approval, nothing else has one" *policy* actually lives now,
+including the pre-existing rule that a "change" item must have
+`requires_approval` and a flow selected to save at all.
 
 **A field's value can come from a Document.** `ServiceCatalogField.
 source_document_id`/`source_mode`/`source_expression`, resolved by

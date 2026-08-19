@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ tenant.name }}: {{ item.name }}{% endblock %}
 {% block content_alone %}
-<div class="portal-shell portal-authenticated{{ ' portal-unbranded' if not branded else '' }}">
+<div class="portal-shell portal-wide{{ ' portal-unbranded' if not branded else '' }}">
   <div class="portal-header">
     {% if branded %}
     <div class="brand">

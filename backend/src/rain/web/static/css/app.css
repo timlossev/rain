@@ -492,6 +492,34 @@ input[type=checkbox] { width: auto; margin-right: 6px; }
 .checkbox-row { display: flex; align-items: center; font-weight: 400; color: var(--text); }
 .form-row { display: flex; gap: 16px; }
 .form-row > .field { flex: 1; }
+/* A form-row whose fields have unequal-height content (e.g. one field's
+   label wraps to two lines, or one field is a multi-row textarea next to
+   single-line inputs) reads as visually "floating" out of line with
+   align-items' default (stretch, which grows each .field div to match
+   the row's height without repositioning its own label/control inside
+   it -- fine on its own, but the *next* row down then starts from
+   whatever ragged bottom edge that left). .form-row-top pins every
+   field to the row's own top edge instead, so labels always start level
+   with each other regardless of what's below them. */
+.form-row-top { align-items: flex-start; }
+/* A same-row control with no label of its own (e.g. a "Remove"/"Preview"
+   button sitting next to labeled fields) -- an invisible label the same
+   height as a real one, so the button still lines up with the *fields*
+   below its neighbors' labels rather than the labels themselves. Used
+   together with .form-row-top; on a plain align-items:flex-end row (no
+   multi-height sibling) the button's own bottom edge already does this
+   without needing it. */
+.field-label-spacer { visibility: hidden; }
+
+/* Light grouping for a "busy" form with many fields -- a tinted,
+   rounded band per logical group (e.g. Approval Flows' own per-step
+   rows and Service Catalog's per-question rows already use this same
+   --surface-sunken tint one level deeper; this is the same idea one
+   level up, grouping *rows* of a flat form instead of repeating rows of
+   a list) so the eye has a boundary to rest on instead of one long
+   unbroken column of fields. */
+.form-section { background: var(--surface-sunken); border-radius: var(--radius-sm); padding: 14px 16px 2px; margin-bottom: 16px; }
+.form-section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 12px; }
 form.inline { display: inline; }
 
 /* ---------- tabs (list / create pairs on the same screen) ---------- */
@@ -1004,11 +1032,13 @@ td.actions { text-align: right; white-space: nowrap; }
    from the top of the viewport regardless of what's below it. */
 .content-standalone:has(.portal-shell) { display: block; padding-top: 56px; }
 .portal-shell { width: 100%; max-width: 640px; margin: 0 auto; }
-/* A signed-in visitor gets the wider layout (tabs: Tickets, Approvals,
-   Documents, plus a search bar) -- an anonymous one always sees the
-   original narrow single-purpose form, so this only ever applies
-   alongside markup that's itself gated on {% if user %}. */
-.portal-shell.portal-authenticated { max-width: 960px; }
+/* The tabbed layout (Request Something, Report Something -- both open to
+   every visitor -- plus Pending Actions/Document Archive once signed in)
+   needs more room than the old single-purpose form did; report.html and
+   the standalone catalog_form.html both always carry this now that tabs
+   (or, for catalog_form.html, a form that can be arbitrarily long) are
+   never conditional on sign-in status the way they used to be. */
+.portal-shell.portal-wide { max-width: 960px; }
 /* Scoped override, not a change to :root -- only this page's own header
    pill and card (buttons, focus rings, the severity select) should go
    neutral when a tenant has turned instance branding off for it; every

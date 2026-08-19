@@ -10,102 +10,139 @@
 
 <div class="card">
   <form method="post" action="{{ '/admin/catalog/' ~ item.id ~ '/edit' if item else '/admin/catalog' }}">
-    <div class="form-row">
-      <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" value="{{ item.name if item else '' }}" placeholder="Provision a new user" required autofocus></div>
-      <div class="field"><label for="key">Key (used in its URL)</label><input type="text" id="key" name="key" value="{{ item.key if item else '' }}" placeholder="provision-user" pattern="[a-z][a-z0-9_-]*" required></div>
-      <div class="field" style="flex:0 0 140px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_active" {% if item is none or item.is_active %}checked{% endif %}> Active</label></div>
-    </div>
-    <div class="field"><label for="description">Description (shown on the catalog list)</label><textarea id="description" name="description" rows="2">{{ item.description or '' if item else '' }}</textarea></div>
-
-    <div class="form-row">
-      <div class="field">
-        <label for="ticket_type">Produces</label>
-        <select id="ticket_type" name="ticket_type">
-          {% for t in ticket_types %}<option value="{{ t }}" {% if (item.ticket_type if item else 'incident') == t %}selected{% endif %}>{{ t | capitalize }}</option>{% endfor %}
-        </select>
+    <div class="form-section">
+      <div class="form-section-title">Basic info</div>
+      <div class="form-row">
+        <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" value="{{ item.name if item else '' }}" placeholder="Provision a new user" required autofocus></div>
+        <div class="field"><label for="key">Key (used in its URL)</label><input type="text" id="key" name="key" value="{{ item.key if item else '' }}" placeholder="provision-user" pattern="[a-z][a-z0-9_-]*" required></div>
+        <div class="field" style="flex:0 0 100px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_active" {% if item is none or item.is_active %}checked{% endif %}> Active</label></div>
       </div>
-      <div class="field">
-        <label for="default_severity">Severity</label>
-        <select id="default_severity" name="default_severity">
-          {% for s in severities %}<option value="{{ s }}" {% if (item.default_severity if item else 'medium') == s %}selected{% endif %}>{{ s | capitalize }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="field">
-        <label for="payload_format">Payload format</label>
-        <select id="payload_format" name="payload_format">
-          {% for f in payload_formats %}<option value="{{ f }}" {% if (item.payload_format if item else 'json') == f %}selected{% endif %}>{{ f | upper }}{% if f == 'kv' %} (key=value lines){% endif %}</option>{% endfor %}
-        </select>
-      </div>
+      <div class="field"><label for="description">Description (shown on the catalog list)</label><textarea id="description" name="description" rows="2">{{ item.description or '' if item else '' }}</textarea></div>
     </div>
 
-    <div class="form-row" style="align-items:flex-end;">
-      <div class="field" style="flex:0 0 200px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="requires_approval" {% if item and item.requires_approval %}checked{% endif %}> Requires approval</label></div>
-      <div class="field">
-        <label for="approval_flow_id">Approval flow</label>
-        <select id="approval_flow_id" name="approval_flow_id">
-          <option value="">-</option>
-          {% for f in flows %}<option value="{{ f.id }}" {% if item and item.approval_flow_id == f.id %}selected{% endif %}>{{ f.name }}</option>{% endfor %}
-        </select>
-      </div>
-    </div>
-    <p class="field-hint">A "Change" service must require approval, with a flow selected -- same rule the manual New Ticket form enforces for changes.
-      {% if not flows %}No approval flows exist yet -- <a href="/admin/approval-flows/new">create one</a> first if this service needs one.{% endif %}</p>
-
-    <h3>Questions, in order</h3>
-    <p class="field-hint">field_key becomes both this question's form field and the key/name used in the produced ticket's payload.</p>
-
-    {% set initial_visible = [(field_prefill | length), 1] | max %}
-    <div data-step-field data-step-min="0" data-step-max="{{ field_range | length }}">
-    <div data-step-rows>
-      {% for i in field_range %}
-      {% set prefill = field_prefill.get(i) %}
-      <div class="card" data-step-row data-catalog-field-row style="background:var(--surface-sunken); margin-bottom:10px; padding:14px;" {% if i > initial_visible %}hidden{% endif %}>
-        <div class="form-row" style="margin-bottom:8px; align-items:flex-end;">
-          <div class="field" style="flex:0 0 50px;">
-            <label>#</label>
-            <div style="padding-top:8px; font-weight:700; color:var(--text-muted);">{{ i }}</div>
-          </div>
-          <div class="field"><label for="field_key_{{ i }}">field_key</label><input type="text" id="field_key_{{ i }}" name="field_key_{{ i }}" value="{{ prefill.field_key if prefill else '' }}" placeholder="username" pattern="[a-z][a-z0-9_]*"></div>
-          <div class="field"><label for="label_{{ i }}">Question</label><input type="text" id="label_{{ i }}" name="label_{{ i }}" value="{{ prefill.label if prefill else '' }}" placeholder="Username"></div>
-          <div class="field" style="flex:0 0 140px;">
-            <label for="field_type_{{ i }}">Type</label>
-            <select id="field_type_{{ i }}" name="field_type_{{ i }}" data-catalog-field-type>
-              {% for ft in ["text", "number", "boolean", "date", "url", "email", "select"] %}
-              <option value="{{ ft }}" {% if (prefill.field_type if prefill else "text") == ft %}selected{% endif %}>{{ "Yes / No" if ft == "boolean" else ft | capitalize }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="field"><label for="select_options_{{ i }}">Options (comma-separated, if type = Select)</label><input type="text" id="select_options_{{ i }}" name="select_options_{{ i }}" value="{{ prefill.select_options | join(', ') if prefill and prefill.select_options else '' }}" placeholder="normal, admin, service"></div>
-          <div class="field" style="flex:0 0 90px;">
-            <label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_required_{{ i }}" {% if prefill and prefill.is_required %}checked{% endif %}> Required</label>
-          </div>
-          <div class="field" style="flex:0 0 auto;">
-            <button type="button" class="btn btn-sm btn-danger" data-remove-step-btn>Remove</button>
-          </div>
+    <div class="form-section">
+      <div class="form-section-title">Ticket settings</div>
+      <div class="form-row">
+        <div class="field">
+          <label for="ticket_type">Produces</label>
+          <select id="ticket_type" name="ticket_type">
+            {% for t in ticket_types %}<option value="{{ t }}" {% if (item.ticket_type if item else 'incident') == t %}selected{% endif %}>{{ t | capitalize }}</option>{% endfor %}
+          </select>
         </div>
-
-        <div class="form-row" style="margin-bottom:0; align-items:flex-end;">
-          {{ picker.search_picker("source_document_id_" ~ i, "/documents/search", label="Source document (optional)", initial_value=prefill.source_document_id if prefill else none, initial_label=(prefill.source_document.doc_number ~ ": " ~ prefill.source_document.title) if prefill and prefill.source_document else "", placeholder="Search documents...") }}
-          <div class="field" style="flex:0 0 140px;">
-            <label for="source_mode_{{ i }}">Source mode</label>
-            <select id="source_mode_{{ i }}" name="source_mode_{{ i }}" data-catalog-source-mode>
-              <option value="">Free-form entry</option>
-              {% for m in source_modes %}<option value="{{ m }}" {% if prefill and prefill.source_mode == m %}selected{% endif %}>{{ m | capitalize }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="field">
-            <label for="source_expression_{{ i }}">Regex / JSONPath (ignored for Content)</label>
-            <textarea id="source_expression_{{ i }}" name="source_expression_{{ i }}" rows="2" data-catalog-source-expression placeholder="^user: (.+)$  or  $.users[*].name">{{ prefill.source_expression if prefill and prefill.source_expression else '' }}</textarea>
-          </div>
-          <div class="field" style="flex:0 0 auto;">
-            <button type="button" class="btn btn-sm" data-catalog-preview-btn>Preview</button>
-          </div>
+        <div class="field">
+          <label for="default_severity">Severity</label>
+          <select id="default_severity" name="default_severity">
+            {% for s in severities %}<option value="{{ s }}" {% if (item.default_severity if item else 'medium') == s %}selected{% endif %}>{{ s | capitalize }}</option>{% endfor %}
+          </select>
         </div>
-        <div data-catalog-preview-target></div>
+        <div class="field">
+          <label for="payload_format">Payload format</label>
+          <select id="payload_format" name="payload_format">
+            {% for f in payload_formats %}<option value="{{ f }}" {% if (item.payload_format if item else 'json') == f %}selected{% endif %}>{{ f | upper }}{% if f == 'kv' %} (key=value lines){% endif %}</option>{% endfor %}
+          </select>
+        </div>
       </div>
-      {% endfor %}
     </div>
-    <button type="button" class="btn btn-sm" data-add-step-btn style="margin-bottom:16px;">+ Add question</button>
+
+    {# Change-only, same reasoning and the exact same #ticket_type + [data-
+       change-fields] JS hook as the manual New Ticket form's own change
+       window/approval section (app.js) -- an incident or vulnerability has
+       no approval concept, so offering the controls for one at all (even
+       unchecked) was its own kind of inconsistency, not just something to
+       leave optional. Hidden here isn't just cosmetic: admin.router's
+       create/edit routes also force requires_approval/approval_flow_id
+       back to false/None server-side whenever ticket_type isn't "change",
+       regardless of what a bypassed client might submit. #}
+    <div class="form-section" data-change-fields hidden>
+      <div class="form-section-title">Approval</div>
+      <div class="form-row">
+        <div class="field" style="flex:0 0 200px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="requires_approval" {% if item and item.requires_approval %}checked{% endif %}> Requires approval</label></div>
+        <div class="field">
+          <label for="approval_flow_id">Approval flow</label>
+          <select id="approval_flow_id" name="approval_flow_id">
+            <option value="">-</option>
+            {% for f in flows %}<option value="{{ f.id }}" {% if item and item.approval_flow_id == f.id %}selected{% endif %}>{{ f.name }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <p class="field-hint">A "Change" service must require approval, with a flow selected -- same rule the manual New Ticket form enforces for changes.
+        {% if not flows %}No approval flows exist yet -- <a href="/admin/approval-flows/new">create one</a> first if this service needs one.{% endif %}</p>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Questions, in order</div>
+      <p class="field-hint">field_key becomes both this question's form field and the key/name used in the produced ticket's payload.</p>
+
+      {% set initial_visible = [(field_prefill | length), 1] | max %}
+      <div data-step-field data-step-min="0" data-step-max="{{ field_range | length }}">
+      <div data-step-rows>
+        {% for i in field_range %}
+        {% set prefill = field_prefill.get(i) %}
+        {# No background override here (unlike Approval Flow's own step
+           rows, which sit directly on the page and tint themselves
+           --surface-sunken) -- .card already defaults to --surface, and
+           these rows sit inside a tinted .form-section, so leaving that
+           default alone is what makes each plain/white question card
+           stand out against the section's tint instead of blending into
+           it (a --surface-sunken row here would be the same color as its
+           surroundings, leaving only the border/shadow to tell them apart). #}
+        <div class="card" data-step-row data-catalog-field-row style="margin-bottom:10px; padding:14px;" {% if i > initial_visible %}hidden{% endif %}>
+          <div class="form-row" style="margin-bottom:8px; align-items:flex-end;">
+            <div class="field" style="flex:0 0 50px;">
+              <label>#</label>
+              <div style="padding-top:8px; font-weight:700; color:var(--text-muted);">{{ i }}</div>
+            </div>
+            <div class="field"><label for="field_key_{{ i }}">field_key</label><input type="text" id="field_key_{{ i }}" name="field_key_{{ i }}" value="{{ prefill.field_key if prefill else '' }}" placeholder="username" pattern="[a-z][a-z0-9_]*"></div>
+            <div class="field"><label for="label_{{ i }}">Question</label><input type="text" id="label_{{ i }}" name="label_{{ i }}" value="{{ prefill.label if prefill else '' }}" placeholder="Username"></div>
+            <div class="field" style="flex:0 0 140px;">
+              <label for="field_type_{{ i }}">Type</label>
+              <select id="field_type_{{ i }}" name="field_type_{{ i }}" data-catalog-field-type>
+                {% for ft in ["text", "number", "boolean", "date", "url", "email", "select"] %}
+                <option value="{{ ft }}" {% if (prefill.field_type if prefill else "text") == ft %}selected{% endif %}>{{ "Yes / No" if ft == "boolean" else ft | capitalize }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field"><label for="select_options_{{ i }}">Options (comma-separated, if type = Select)</label><input type="text" id="select_options_{{ i }}" name="select_options_{{ i }}" value="{{ prefill.select_options | join(', ') if prefill and prefill.select_options else '' }}" placeholder="normal, admin, service"></div>
+            <div class="field" style="flex:0 0 90px;">
+              <label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_required_{{ i }}" {% if prefill and prefill.is_required %}checked{% endif %}> Required</label>
+            </div>
+            <div class="field" style="flex:0 0 auto;">
+              <button type="button" class="btn btn-sm btn-danger" data-remove-step-btn>Remove</button>
+            </div>
+          </div>
+
+          {# .form-row-top (not align-items:flex-end): the expression
+             textarea is two rows tall, taller than its single-line
+             siblings, and flex-end was bottom-aligning every field to
+             *its* bottom edge -- which pushed the shorter fields' labels
+             down out of line with each other (confirmed live -- Source
+             document/Source mode visibly floated below Regex/JSONPath's
+             label). Pinning every field to the row's top edge instead
+             keeps every label level regardless of what's below it. #}
+          <div class="form-row form-row-top" style="margin-bottom:0;">
+            {{ picker.search_picker("source_document_id_" ~ i, "/documents/search", label="Source document (optional)", initial_value=prefill.source_document_id if prefill else none, initial_label=(prefill.source_document.doc_number ~ ": " ~ prefill.source_document.title) if prefill and prefill.source_document else "", placeholder="Search documents...") }}
+            <div class="field" style="flex:0 0 140px;">
+              <label for="source_mode_{{ i }}">Source mode</label>
+              <select id="source_mode_{{ i }}" name="source_mode_{{ i }}" data-catalog-source-mode>
+                <option value="">Free-form entry</option>
+                {% for m in source_modes %}<option value="{{ m }}" {% if prefill and prefill.source_mode == m %}selected{% endif %}>{{ m | capitalize }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label for="source_expression_{{ i }}">Regex / JSONPath (ignored for Content)</label>
+              <textarea id="source_expression_{{ i }}" name="source_expression_{{ i }}" rows="2" data-catalog-source-expression placeholder="^user: (.+)$  or  $.users[*].name">{{ prefill.source_expression if prefill and prefill.source_expression else '' }}</textarea>
+            </div>
+            <div class="field" style="flex:0 0 auto;">
+              <label class="field-label-spacer">Preview</label>
+              <button type="button" class="btn btn-sm" data-catalog-preview-btn>Preview</button>
+            </div>
+          </div>
+          <div data-catalog-preview-target></div>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-sm" data-add-step-btn style="margin-bottom:16px;">+ Add question</button>
+      </div>
     </div>
 
     <button class="btn btn-primary" type="submit">{{ "Save changes" if item else "Create service" }}</button>

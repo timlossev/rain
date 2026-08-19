@@ -247,15 +247,18 @@ with a "Load" link.
 ### Service Catalog
 
 At Records Authority > Service Catalog (also on the client portal's own
-Catalog tab, for a signed-in visitor). A list of requestable services --
-"Provision a new user," "Request VPN access," whatever your tenant has
-defined -- each one a short form. Fill it in (fields marked * are
-required) and submit; that creates an incident, vulnerability, or change
-ticket, with your answers as its description (either JSON or `key=value`
-lines, depending on how the service was configured), and -- if the
-service requires it -- an approval flow already attached, just like a
-change ticket's. The ticket detail page shows which service produced it
-under "Service Catalog request."
+Request Something tab -- there, open to every visitor, signed in or
+not). A list of requestable services -- "Provision a new user," "Request
+VPN access," whatever your tenant has defined -- each one a short form.
+Fill it in (fields marked * are required) and submit; that creates an
+incident, vulnerability, or change ticket, with your answers as its
+description (either JSON or `key=value` lines, depending on how the
+service was configured -- e.g. a "Provision a new user" service with
+Username/Domain/User type questions produces a ticket whose description
+is just `username=jdoe`, `domain=IBM`, `user_type=normal`, one per
+line), and -- if it's a change service -- an approval flow already
+attached, just like a change ticket created manually. The ticket detail
+page shows which service produced it under "Service Catalog request."
 
 Defining a service is a Tenant Administration task -- see Service
 Catalog under Admin below.
@@ -589,29 +592,36 @@ of an empty results table.
 
 ## Client Portal
 
-A separate, tenant-specific page at `/portal/<tenant slug>` for filing
-an incident without navigating the full app -- no sidebar or topbar,
-just this page. Whoever you share the link with sees one of two views:
+A separate, tenant-specific page at `/portal/<tenant slug>` for filing a
+request without navigating the full app -- no sidebar or topbar, just
+this page. Every visitor, signed in or not, sees a tabbed layout:
 
-**Anonymous** (or when the tenant requires sign-in, before you sign in)
--- a bare form: what you need, what's happening, details, criticality,
-a "New ticket" button, and "Today's events" (see below). Once you've
-submitted, "Tickets reported by me" appears too, once you sign in.
+- **Request Something** (shown first/active by default): the same
+  [Service Catalog](#service-catalog) the main app's Records Authority
+  menu has, for requesting a service without navigating there.
+- **Report Something**: the incident report form (what you need, what's
+  happening, details, criticality, a "New ticket" button) and "Tickets
+  reported by me," which only lists anything once you've signed in.
 
-**Signed in** -- the same form, plus a search bar and four tabs:
+Both tabs accept a submission with or without a session -- gated by
+this tenant's own `portal_require_auth` setting (see below), not by
+whether you happen to be signed in; a request filed with no session
+records "an unauthenticated user" as its reporter, same as an anonymous
+incident always has.
 
-- **Tickets**: the report form and "Tickets reported by me," same as
-  the anonymous view, plus an Escalate button per ticket if your tenant
-  has an escalation webhook configured.
-- **Approvals**: tickets currently waiting on your decision -- same list
-  as clicking through to each one's own Approval card would show.
-- **Catalog**: the same [Service Catalog](#service-catalog) the main
-  app's Records Authority menu has, for requesting a service without
-  navigating there.
-- **Documents**: every document in the tenant's repository, linking out
-  to each one's own page.
+**Signed in** additionally gets a search bar and two more tabs:
 
-**Today's events**, above the form, lists anything due on the tenant
+- **Pending Actions**: tickets currently waiting on your decision --
+  same list as clicking through to each one's own Approval card would
+  show.
+- **Document Archive**: every document in the tenant's repository,
+  linking out to each one's own page.
+
+Report Something's ticket table also gains an Escalate button per
+ticket, once signed in, if your tenant has an escalation webhook
+configured.
+
+**Today's events**, above the tabs, lists anything due on the tenant
 calendar today (recurring or one-time), or "None" if nothing is. Shown
 to every visitor regardless of sign-in status.
 
@@ -806,9 +816,11 @@ question count, and an active toggle. "+ New service" gives you:
   **Payload format** -- JSON or `key=value` lines, for how the submitted
   answers become the created ticket's description.
 - **Requires approval** plus an **Approval flow** picker, reusing the
-  same flows Change tickets use (see Approval Flows above). A "Change"
-  service must require approval, with a flow selected, to save at all --
-  same rule the manual New Ticket form enforces.
+  same flows Change tickets use (see Approval Flows above) -- shown only
+  once Produces is set to "Change" (an incident or vulnerability has no
+  approval concept). A Change service must require approval, with a flow
+  selected, to save at all -- same rule the manual New Ticket form
+  enforces.
 - **Questions, in order** -- up to 10, each with a **field_key** (also
   the name/key the produced ticket's payload uses for that answer), the
   **Question** text shown to the requester, a **Type** (Text, Number,

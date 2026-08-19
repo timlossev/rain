@@ -111,19 +111,20 @@ Ticketing below.
   signed-in visitor, next to their own tickets in the client portal)
   that calls a tenant's configured escalation webhook on demand, logged
   to the ticket's activity feed
-- **Client portal**: a public per-tenant page for filing an incident
-  with no account needed; a signed-in visitor gets a wider view with
-  search, and Tickets/Approvals/Catalog/Documents tabs, plus a "Today's
-  events" listing pulled from the tenant calendar
+- **Client portal**: a public per-tenant page with no account needed --
+  "Request Something" (Service Catalog) and "Report Something" (file an
+  incident) are open to every visitor; sign in for a search bar plus
+  "Pending Actions" and "Document Archive" tabs, and a "Today's events"
+  listing pulled from the tenant calendar
 - **Service Catalog**: tenant-defined, requestable forms (Admin > Service
-  Catalog, and on /catalog or the client portal's own Catalog tab) --
-  each one up to 10 questions (text, number, date, URL, email, yes/no, or
-  a dropdown) that produce an incident, vulnerability, or change ticket
-  on submission, its description the answers serialized as JSON or
-  `key=value` lines, optionally routed through an approval flow. A
-  question's value can also come from an existing Document instead of
-  free-form entry -- used as-is, or narrowed with a regex or a JSONPath,
-  with a live Preview while designing the form
+  Catalog, and on /catalog or the client portal's own Request Something
+  tab) -- each one up to 10 questions (text, number, date, URL, email,
+  yes/no, or a dropdown) that produce an incident, vulnerability, or
+  change ticket on submission, its description the answers serialized as
+  JSON or `key=value` lines, a change optionally routed through an
+  approval flow. A question's value can also come from an existing
+  Document instead of free-form entry -- used as-is, or narrowed with a
+  regex or a JSONPath, with a live Preview while designing the form
 - **Webhooks**: centrally-configured outbound webhooks (Admin >
   Webhooks) -- one definition (URL, headers, payload, timeout, success
   codes) reused wherever a webhook call is needed, with an optional

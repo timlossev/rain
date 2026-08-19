@@ -1244,6 +1244,17 @@ async def catalog_item_create(
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
+    # An incident/vulnerability has no approval concept -- normalized here
+    # rather than trusting the client, which only ever hides (not
+    # disables) the requires_approval/approval_flow_id controls for a
+    # non-"change" Produces via CSS -- HTML's hidden attribute doesn't
+    # stop a field from still being submitted, so a stale checked box
+    # left over from switching Produces away from "change" (or a request
+    # built by hand) would otherwise still save.
+    if ticket_type != "change":
+        requires_approval = False
+        approval_flow_id = ""
+
     error = _catalog_item_form_error(ticket_type, requires_approval, approval_flow_id)
     if error:
         return RedirectResponse(f"/admin/catalog/new?error={quote(error)}", status_code=status.HTTP_303_SEE_OTHER)
@@ -1311,6 +1322,12 @@ async def catalog_item_edit(
     item = await catalog_service.get_catalog_item(tenant_db, item_id)
     if item is None:
         return RedirectResponse("/admin/catalog", status_code=status.HTTP_303_SEE_OTHER)
+
+    # See catalog_item_create's identical normalization for why this
+    # can't just rely on the form hiding these controls client-side.
+    if ticket_type != "change":
+        requires_approval = False
+        approval_flow_id = ""
 
     error = _catalog_item_form_error(ticket_type, requires_approval, approval_flow_id)
     if error:

@@ -173,12 +173,17 @@ async def portal_form(
         created_ticket = (
             await ticket_service.get_ticket_by_ref(tenant_db, created) if _TICKET_NUMBER_RE.match(created) else None
         )
-        # Only meaningful for a signed-in visitor -- an anonymous one never
-        # sees the tabbed layout these back (report.html gates both behind
-        # {% if user %}), so there's no reason to run either query for one.
+        # Pending Actions and Document Archive stay signed-in-only --
+        # report.html gates both tabs behind {% if user %}, so there's no
+        # reason to run either query for an anonymous visitor. Request
+        # Something (catalog_items) is not: that tab, like Report
+        # Something, is open to every visitor regardless of sign-in
+        # status (gated only by this tenant's own portal_require_auth,
+        # same as tickets always were -- see portal_catalog_form/submit
+        # below), so it's fetched unconditionally.
         pending_approval = await ticket_service.list_tickets_pending_approval_for(tenant_db, user.id) if user is not None else []
         documents = await document_service.list_documents(tenant_db) if user is not None else []
-        catalog_items = await catalog_service.list_catalog_items(tenant_db, active_only=True) if user is not None else []
+        catalog_items = await catalog_service.list_catalog_items(tenant_db, active_only=True)
         # Shown to every visitor, signed in or not -- operational notices
         # (a maintenance window, a renewal due today) are tenant-wide
         # information, not tied to one person's account.
@@ -260,15 +265,11 @@ async def portal_catalog_form(
     if not isinstance(access, tuple):
         return access
     tenant, flags = access
-    # Signed-in-only regardless of portal_require_auth -- that flag only
-    # governs whether the plain incident form above can be filed
-    # anonymously; a service catalog request always needs an accountable
-    # requester (rain.modules.tickets.service.create_ticket's reporter_
-    # user_id, not reported_anonymously).
-    if user is None:
-        return RedirectResponse(
-            f"/login?next=/portal/{tenant_slug}/catalog/{item_key}", status_code=status.HTTP_303_SEE_OTHER
-        )
+    # Not signed-in-only -- gated by this tenant's own portal_require_auth
+    # (already enforced by _resolve_portal_access above), the same as the
+    # plain incident form. A catalog submission with no session attributes
+    # the same way an anonymous ticket already does (reported_anonymously,
+    # see portal_catalog_submit below).
 
     async with tenant_session(tenant.schema_name) as tenant_db:
         item = await catalog_service.get_catalog_item_by_key(tenant_db, item_key)
@@ -302,10 +303,6 @@ async def portal_catalog_submit(
     if not isinstance(access, tuple):
         return access
     tenant, flags = access
-    if user is None:
-        return RedirectResponse(
-            f"/login?next=/portal/{tenant_slug}/catalog/{item_key}", status_code=status.HTTP_303_SEE_OTHER
-        )
 
     async with tenant_session(tenant.schema_name) as tenant_db:
         item = await catalog_service.get_catalog_item_by_key(tenant_db, item_key)
@@ -313,7 +310,13 @@ async def portal_catalog_submit(
             return RedirectResponse(f"/portal/{tenant_slug}", status_code=status.HTTP_303_SEE_OTHER)
 
         form = await request.form()
-        result = await catalog_service.submit_catalog_item(tenant_db, item, form, reporter_user_id=user.id)
+        # Same attribution rule as portal_create_ticket just above: a
+        # signed-in visitor's answer to reporter_user_id, an anonymous
+        # one's to reported_anonymously (submit_catalog_item passes that
+        # straight through to ticket_service.create_ticket).
+        result = await catalog_service.submit_catalog_item(
+            tenant_db, item, form, reporter_user_id=user.id if user is not None else None, reported_anonymously=user is None
+        )
         if result.errors:
             rendered = await catalog_service.render_fields(tenant_db, item)
             submitted = {f.field_key: form.get(f"answer_{f.field_key}", "") for f in item.fields}
