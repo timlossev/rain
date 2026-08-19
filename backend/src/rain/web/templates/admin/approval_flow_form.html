@@ -25,7 +25,21 @@
       {% for i in step_range %}
       {% set prefill = step_prefill.get(i) %}
       <div class="card" data-step-row style="background:var(--surface-sunken); margin-bottom:10px; padding:14px;" {% if i > initial_visible %}hidden{% endif %}>
-        <div class="form-row" style="margin-bottom:0; align-items:flex-end;">
+        {# .form-row-top (not align-items:flex-end): "or an individual
+           user" is long enough to wrap to two lines in this column's
+           share of the row, taller than Label/Group's own single-line
+           labels -- flex-end was bottom-aligning every field to *its*
+           bottom edge, which pushed those shorter-label fields' inputs
+           down out of line with each other (same class of bug as
+           Service Catalog's question rows, see that fix's own
+           comment). Pinning every field to the row's top edge instead
+           keeps every label level regardless of whether a neighbor's
+           wraps. Remove has no label of its own to anchor it the way
+           its neighbors' do, so it gets an invisible one the same
+           height as a real label, to line the button up with the
+           *fields* below its neighbors' labels rather than the labels
+           themselves. #}
+        <div class="form-row form-row-top" style="margin-bottom:0;">
           <div class="field" style="flex:0 0 60px;">
             <label>Step</label>
             <div style="padding-top:8px; font-weight:700; color:var(--text-muted);">{{ i }}</div>
@@ -43,6 +57,7 @@
           </div>
           {{ picker.search_picker("step_user_" ~ i, "/tickets/users/search", label="or an individual user", initial_value=prefill.user_id if prefill else none, initial_label=prefill.user_label if prefill else "", placeholder="Search by name or email...") }}
           <div class="field" style="flex:0 0 auto;">
+            <label class="field-label-spacer">Remove</label>
             <button type="button" class="btn btn-sm btn-danger" data-remove-step-btn>Remove</button>
           </div>
         </div>
