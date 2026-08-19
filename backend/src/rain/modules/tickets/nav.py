@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from rain.core.nav_registry import NavNode, nav_registry
 from rain.core.tenancy import RequestContext
 from rain.db.base import tenant_session
-from rain.db.tenant_models import SyslogEvent, Ticket, TicketStatus
+from rain.db.tenant_models import ServiceCatalogItem, SyslogEvent, Ticket, TicketStatus
 
 
 async def _event_count(ctx: RequestContext) -> int | None:
@@ -15,6 +15,13 @@ async def _event_count(ctx: RequestContext) -> int | None:
         return None
     async with tenant_session(ctx.active_tenant.schema_name) as db:
         return await db.scalar(select(func.count(SyslogEvent.id)))
+
+
+async def _active_catalog_item_count(ctx: RequestContext) -> int | None:
+    if ctx.active_tenant is None:
+        return None
+    async with tenant_session(ctx.active_tenant.schema_name) as db:
+        return await db.scalar(select(func.count(ServiceCatalogItem.id)).where(ServiceCatalogItem.is_active.is_(True)))
 
 
 async def _active_ticket_count(ctx: RequestContext, *, ticket_type: str) -> int | None:
@@ -62,7 +69,18 @@ nav_registry.register(
                 order=4,
                 count_provider=partial(_active_ticket_count, ticket_type="change"),
             ),
-            NavNode(key="tickets-export", label="Export", href="/tickets/export/run", order=5),
+            # rain.modules.catalog: a self-service form that produces a
+            # ticket on submission -- lives under Records Authority rather
+            # than standing alone, same reason Export does, since it's
+            # just another way of producing one of these.
+            NavNode(
+                key="tickets-catalog",
+                label="Service Catalog",
+                href="/catalog",
+                order=5,
+                count_provider=_active_catalog_item_count,
+            ),
+            NavNode(key="tickets-export", label="Export", href="/tickets/export/run", order=6),
         ],
     )
 )

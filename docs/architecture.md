@@ -555,6 +555,78 @@ page this visitor might not even be allowed to open on its own
 (`portal_require_auth` off doesn't imply this visitor can view
 `/tickets/<n>` -- that's still `require_login`).
 
+## Service Catalog
+
+`rain.modules.catalog`. `ServiceCatalogItem` (name, description, ticket_
+type, default_severity, payload_format, requires_approval/approval_flow_
+id, is_active) plus up to 10 `ServiceCatalogField` rows per item (field_
+key, label, field_type -- the same set `rain.modules.assets.schemas.
+FieldType` already defines, reused rather than duplicated -- select_
+options, is_required, sort_order). Configured under Admin > Tenant
+Administration > Service Catalog (`admin.router`'s `/admin/catalog*`
+routes, same "server pre-renders `MAX_CATALOG_FIELDS` rows, a blank
+`field_key` is skipped on submit" shape as Approval Flows' own step
+builder, including the identical `[data-step-field]` JS).
+
+**Two client-facing entry points, one shared service layer.** `/catalog`
+(main app, under Records Authority) and the client portal's own Catalog
+tab both list active items and post through `rain.modules.catalog.
+service.submit_catalog_item` -- required-field validation, then `rain.
+modules.tickets.service.create_ticket(source_catalog_item_id=item.id)`,
+then `start_approval` if the item requires one. A submission is
+therefore a completely ordinary ticket afterward: Platform Response
+Rules, notifications, the activity feed, and export all see it exactly
+like any other. `Ticket.source_catalog_item_id` (SET NULL on the item's
+own deletion) backs a "Service Catalog request" row on the ticket detail
+page, linked back to `/catalog/{key}` when the item is still active.
+
+**The produced ticket's description** is the submitted answers, in field
+order, serialized per the item's `payload_format` -- `json`
+(`json.dumps(..., indent=2)`) or `kv` (`key=value`, one per line, e.g.
+`username=jdoe\ndomain=IBM\nuser_type=normal`). A blank optional answer
+is pruned entirely rather than serialized as `null`/empty.
+
+**Approval isn't change-exclusive here.** `ChangeApproval`/`ApprovalFlow`
+were already generic over "the thing being approved" in the model layer
+(no `ticket_type` constraint anywhere in that schema) -- only the ticket
+detail page's own template and `tickets.router.ticket_detail` gated the
+Approval card and its current-step/can-decide computation to `ticket_
+type == "change"`. Both were widened to `ticket.ticket_type == "change"
+or ticket.approval` (detail page) / off `ticket.approval` directly
+(current-step computation), so a Service Catalog item can attach an
+approval flow to an incident or vulnerability ticket just as well, and
+it shows up and is actionable the same way a change's does. The manual
+"attach a flow" affordance for a ticket with none yet stays change-only,
+though -- that's specifically changes' own "must have an approval flow"
+rule (enforced at both manual creation and here: a "change" item must
+have `requires_approval` and a flow selected to save at all), not
+something an ordinary incident should invite.
+
+**A field's value can come from a Document.** `ServiceCatalogField.
+source_document_id`/`source_mode`/`source_expression`, resolved by
+`catalog.service.resolve_field_source` against `rain.modules.documents.
+textbody`'s already-existing text/Markdown/JSON body reader (the same
+one the inline document editor and PDF export use) -- never a new way of
+reading a document's content, just a new consumer of the existing one.
+Three modes: `content` (the whole body -- each line an option, for a
+select field, else the whole body as a prefill), `regex` (Python `re`,
+`MULTILINE` only -- deliberately not also `DOTALL`, which would let a
+greedy `.*` in a per-line pattern like `^(us-.*)$` cross newlines and
+swallow the rest of the document as one match instead of one match per
+line; caught live before shipping, see the fix's own comment in
+`catalog.service`), and `jsonpath` (`jsonpath-ng`, body parsed as JSON
+first). A select field gets every match/result as its option list
+(falling back to the field's own static `select_options` if that comes
+up empty); any other field type gets the first one as a prefilled but
+still-editable default. Resolution is best-effort everywhere except the
+admin's own Preview button: a missing document, a bad pattern, or
+invalid JSON never breaks the end-user form (falls back to blank/static
+config), but does surface as an inline error where an admin is actively
+designing the field (`POST /admin/catalog/fields/preview`, same fetch-
+and-inject-a-fragment shape as the Markdown body editor's own Preview
+tab), so a mistake is visible before it's saved rather than only once a
+requester hits it.
+
 ## Lessons from the first real Docker run
 
 Everything above was verified through Milestone 3 by static checks only
@@ -637,10 +709,3 @@ response.
   interface, not a schema change.
 - **Multiple LDAP/SAML sources**: currently one of each, syncing/signing
   into exactly one target tenant, instance-wide.
-- **Service catalog**: a tenant-defined catalog of requestable services/
-  items (e.g. "new laptop", "VPN access"), each optionally routed through
-  an approval flow -- the natural next consumer of the same Approval Flow
-  machinery Change tickets already use (`rain.modules.tickets.service`'s
-  `ApprovalFlow`/`ChangeApproval` machinery is already generic over "the
-  thing being approved" in spirit, just not yet wired to anything but a
-  change ticket).

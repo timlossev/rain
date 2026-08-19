@@ -244,6 +244,22 @@ the whole column layout under a name so you can re-run the same export
 later without reconfiguring it; saved profiles appear in a list below
 with a "Load" link.
 
+### Service Catalog
+
+At Records Authority > Service Catalog (also on the client portal's own
+Catalog tab, for a signed-in visitor). A list of requestable services --
+"Provision a new user," "Request VPN access," whatever your tenant has
+defined -- each one a short form. Fill it in (fields marked * are
+required) and submit; that creates an incident, vulnerability, or change
+ticket, with your answers as its description (either JSON or `key=value`
+lines, depending on how the service was configured), and -- if the
+service requires it -- an approval flow already attached, just like a
+change ticket's. The ticket detail page shows which service produced it
+under "Service Catalog request."
+
+Defining a service is a Tenant Administration task -- see Service
+Catalog under Admin below.
+
 ## Automation
 
 Three kinds of rules turn the raw syslog stream and ticket activity
@@ -582,14 +598,16 @@ just this page. Whoever you share the link with sees one of two views:
 a "New ticket" button, and "Today's events" (see below). Once you've
 submitted, "Tickets reported by me" appears too, once you sign in.
 
-**Signed in** -- the same form, plus a search bar and three tabs:
+**Signed in** -- the same form, plus a search bar and four tabs:
 
 - **Tickets**: the report form and "Tickets reported by me," same as
   the anonymous view, plus an Escalate button per ticket if your tenant
   has an escalation webhook configured.
-- **Approvals**: change tickets currently waiting on your decision --
-  same list as clicking through to each one's own Approval card would
-  show.
+- **Approvals**: tickets currently waiting on your decision -- same list
+  as clicking through to each one's own Approval card would show.
+- **Catalog**: the same [Service Catalog](#service-catalog) the main
+  app's Records Authority menu has, for requesting a service without
+  navigating there.
 - **Documents**: every document in the tenant's repository, linking out
   to each one's own page.
 
@@ -776,6 +794,37 @@ step" / "Remove" to resize), each with a Label, a Group, and an
 individual user (via type-to-search); a step needs one or the other,
 and if both are filled in, the group wins. A step doesn't open for
 decisions until the one before it clears.
+
+**Service Catalog.** The list shows each service's Name, Key (its URL), what it Produces
+(incident/vulnerability/change), payload Format, Approval flow (if any),
+question count, and an active toggle. "+ New service" gives you:
+
+- **Name**, **Key** (used in its URL, e.g. `provision-user`),
+  **Description** (shown on the catalog list), whether it's **Active**.
+- **Produces** (which ticket type a submission creates), **Severity**
+  (fixed for every submission -- the requester doesn't choose it), and
+  **Payload format** -- JSON or `key=value` lines, for how the submitted
+  answers become the created ticket's description.
+- **Requires approval** plus an **Approval flow** picker, reusing the
+  same flows Change tickets use (see Approval Flows above). A "Change"
+  service must require approval, with a flow selected, to save at all --
+  same rule the manual New Ticket form enforces.
+- **Questions, in order** -- up to 10, each with a **field_key** (also
+  the name/key the produced ticket's payload uses for that answer), the
+  **Question** text shown to the requester, a **Type** (Text, Number,
+  Yes/No, Date, URL, Email, or Select), **Options** (comma-separated, for
+  Select), and **Required**. Use "+ Add question" / "Remove" to resize
+  the form from 0 to 10 questions.
+- Optionally, a question's **Source document**: pick an existing
+  document and a **Source mode** to pull its value from that document
+  instead of (or as a starting point for) free-form entry --
+  **Content** uses the whole document (each line becomes an option, for
+  a Select question), **Regex** or **JSONPath** extract from it (a
+  regex's first capturing group if it has one, else the whole match; a
+  JSONPath's every result). A Select question gets every match/result as
+  its option list; any other type gets the first one as a prefilled but
+  still-editable default. Click **Preview** next to a question to check
+  what a pattern currently resolves to before saving.
 
 **Event Promotion Policies, Correlation Rules, Platform Response
 Rules.** Covered in full under Automation above; the Admin menu links

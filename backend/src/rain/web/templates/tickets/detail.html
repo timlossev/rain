@@ -3,8 +3,11 @@
 {% block title %}{{ ticket.ticket_number }}: {{ ticket.title }} - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}A single ticket's status, metadata, linked documents, and full activity history (comments, status/assignee/asset changes).{% endblock %}
 {% block content %}
-{% set approval_will_reset = ticket.ticket_type == "change" and ticket.approval and ticket.approval.overall_status == "approved" %}
-{% set approval_reset_warning = "Editing this change will nullify its collected approvals -- it will need to be re-approved. Continue?" %}
+{# Not change-exclusive: a Service Catalog submission can attach an
+   approval to any ticket type -- see tickets/router.py's ticket_detail
+   for the full reasoning. #}
+{% set approval_will_reset = ticket.approval and ticket.approval.overall_status == "approved" %}
+{% set approval_reset_warning = "Editing this will nullify its collected approvals -- it will need to be re-approved. Continue?" %}
 <div class="panel-row">
   <div class="status-stepper">
     {% for s in statuses %}
@@ -102,6 +105,9 @@
       {% if ticket.source_ticket %}
       <tr><th>Promoted from</th><td class="muted"><a href="/tickets/{{ ticket.source_ticket.ticket_number }}">{{ ticket.source_ticket.ticket_number }}: {{ ticket.source_ticket.title }}</a></td></tr>
       {% endif %}
+      {% if ticket.source_catalog_item %}
+      <tr><th>Service Catalog request</th><td class="muted">{% if ticket.source_catalog_item.is_active %}<a href="/catalog/{{ ticket.source_catalog_item.key }}">{{ ticket.source_catalog_item.name }}</a>{% else %}{{ ticket.source_catalog_item.name }} (no longer active){% endif %}</td></tr>
+      {% endif %}
       {% if ticket.ticket_type == "change" %}
       <tr><th>Change window</th><td class="muted">{{ ticket.start_date.strftime("%Y-%m-%d %H:%M") if ticket.start_date else "?" }} &rarr; {{ ticket.end_date.strftime("%Y-%m-%d %H:%M") if ticket.end_date else "?" }}</td></tr>
       {% endif %}
@@ -114,7 +120,7 @@
   {% endwith %}
 </div>
 
-{% if ticket.ticket_type == "change" %}
+{% if ticket.ticket_type == "change" or ticket.approval %}
 <div class="card">
   <div class="card-title">Approval</div>
   {% if ticket.approval %}

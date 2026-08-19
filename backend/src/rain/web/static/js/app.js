@@ -555,8 +555,19 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     };
     const clearRow = (row) => {
-      row.querySelectorAll("input[type=text], input[type=hidden]").forEach((el) => { el.value = ""; });
+      // input[type=checkbox] and textarea: added for Service Catalog's
+      // question rows (is_required, source_expression) -- harmless for
+      // Approval Flow's own steps too, which have neither. Not load-
+      // bearing either way: a removed row's field_key (type=text, always
+      // cleared) is what actually makes the server skip it on submit
+      // (see admin.router._replace_approval_steps and rain.modules.
+      // catalog.service.replace_catalog_fields), this is just tidiness so
+      // a re-added row doesn't resurface stale leftovers.
+      row.querySelectorAll("input[type=text], input[type=hidden], textarea").forEach((el) => { el.value = ""; });
       row.querySelectorAll("select").forEach((el) => { el.value = ""; });
+      row.querySelectorAll("input[type=checkbox]").forEach((el) => { el.checked = false; });
+      const previewTarget = row.querySelector("[data-catalog-preview-target]");
+      if (previewTarget) previewTarget.innerHTML = "";
     };
 
     addBtn.addEventListener("click", () => {
@@ -574,5 +585,40 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
     refresh();
+  });
+
+  // Service Catalog question builder's "Preview" button -- same fetch ->
+  // inject-fragment shape as the Markdown body editor's Preview tab
+  // above, just scoped to one [data-catalog-field-row] instead of a
+  // whole document. Resolves against the live document with nothing
+  // saved yet (rain.modules.admin.router.catalog_field_preview), so an
+  // admin can check a regex/JSONPath before committing to it.
+  document.querySelectorAll("[data-catalog-preview-btn]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const row = btn.closest("[data-catalog-field-row]");
+      const target = row && row.querySelector("[data-catalog-preview-target]");
+      if (!row || !target) return;
+      const docIdInput = row.querySelector("[data-user-picker-value]");
+      const modeSelect = row.querySelector("[data-catalog-source-mode]");
+      const exprInput = row.querySelector("[data-catalog-source-expression]");
+      const typeSelect = row.querySelector("[data-catalog-field-type]");
+      target.innerHTML = "<p class=\"muted\">Checking...</p>";
+      try {
+        const body = new URLSearchParams({
+          source_document_id: (docIdInput && docIdInput.value) || "",
+          source_mode: (modeSelect && modeSelect.value) || "",
+          source_expression: (exprInput && exprInput.value) || "",
+          field_type: (typeSelect && typeSelect.value) || "text",
+        });
+        const resp = await fetch("/admin/catalog/fields/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: body.toString(),
+        });
+        target.innerHTML = resp.ok ? await resp.text() : "<p class=\"muted\">Preview failed.</p>";
+      } catch (err) {
+        target.innerHTML = "<p class=\"muted\">Preview failed.</p>";
+      }
+    });
   });
 });

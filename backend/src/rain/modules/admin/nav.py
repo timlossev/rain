@@ -131,6 +131,17 @@ nav_registry.register(
                         order=9,
                         roles=_TENANT_ADMIN_ROLES,
                     ),
+                    # Defines what shows up on /catalog and the portal's
+                    # own Catalog tab (rain.modules.catalog) -- same
+                    # "designing the schema is an admin function" reasoning
+                    # as Asset Types above.
+                    NavNode(
+                        key="admin-service-catalog",
+                        label="Service Catalog",
+                        href="/admin/catalog",
+                        order=10,
+                        roles=_TENANT_ADMIN_ROLES,
+                    ),
                     # Same /admin/branding page Platform Administration's
                     # own "Branding" entry points at (it shows the
                     # instance-wide section only to internal_admin) --
@@ -142,7 +153,7 @@ nav_registry.register(
                         key="admin-incident-portal",
                         label="Incident Portal",
                         href="/admin/branding",
-                        order=10,
+                        order=11,
                         roles=("client_admin",),
                     ),
                 ],

@@ -1,0 +1,14 @@
+{# Shared by catalog/list.html (main app) and portal/report.html's own
+   Catalog tab -- `base_href` is "/catalog" or "/portal/<slug>/catalog". #}
+<div class="catalog-grid">
+  {% for item in items %}
+  <a class="card catalog-item-card" href="{{ base_href }}/{{ item.key }}">
+    <div class="catalog-item-title">{{ item.name }}</div>
+    {% if item.description %}<p class="muted catalog-item-desc">{{ item.description }}</p>{% endif %}
+    <span class="badge">{{ item.ticket_type | capitalize }}</span>
+    {% if item.requires_approval %}<span class="badge badge-accent">Approval required</span>{% endif %}
+  </a>
+  {% else %}
+  <p class="muted">No services published yet.</p>
+  {% endfor %}
+</div>

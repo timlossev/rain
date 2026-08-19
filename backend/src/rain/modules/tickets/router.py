@@ -480,13 +480,21 @@ async def ticket_detail(
     current_step = None
     can_decide = False
     flows = []
-    if ticket.ticket_type == "change":
-        if ticket.approval and ticket.approval.overall_status == "pending":
-            current_step = await service.current_approval_step(tenant_db, ticket.approval)
-            if current_step is not None:
-                can_decide = await service.is_eligible_approver(tenant_db, current_step, ctx.user.id)
-        elif ticket.approval is None:
-            flows = await service.list_approval_flows(tenant_db)
+    # ticket.approval isn't change-exclusive -- a Service Catalog item can
+    # attach one to an incident/vulnerability just as well (rain.modules.
+    # catalog.service.submit_catalog_item), so this computes current_step/
+    # can_decide off ticket.approval itself, not ticket_type. The manual
+    # "attach a flow" affordance below stays change-only, though: that's
+    # specifically changes' own "must have an approval flow" UX (enforced
+    # at creation, see create_ticket below) -- an ordinary incident with
+    # no approval shouldn't suddenly invite attaching one from its detail
+    # page.
+    if ticket.approval and ticket.approval.overall_status == "pending":
+        current_step = await service.current_approval_step(tenant_db, ticket.approval)
+        if current_step is not None:
+            can_decide = await service.is_eligible_approver(tenant_db, current_step, ctx.user.id)
+    elif ticket.ticket_type == "change" and ticket.approval is None:
+        flows = await service.list_approval_flows(tenant_db)
 
     is_watching = await service.is_watching(tenant_db, ticket.id, ctx.user.id)
     escalation_webhook_id = await get_tenant_config(tenant_db, "escalation_webhook_id", None)

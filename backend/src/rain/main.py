@@ -130,6 +130,7 @@ def create_app() -> FastAPI:
     from rain.modules.assets.router import router as assets_router
     from rain.modules.auth.router import router as auth_router
     from rain.modules.calendar.router import router as calendar_router
+    from rain.modules.catalog.router import router as catalog_router
     from rain.modules.documents.router import router as documents_router
     from rain.modules.portal.router import router as portal_router
     from rain.modules.search.router import router as search_router
@@ -143,6 +144,7 @@ def create_app() -> FastAPI:
     app.include_router(assets_router)
     app.include_router(tickets_router)
     app.include_router(tickets_live_router)
+    app.include_router(catalog_router)
     app.include_router(documents_router)
     app.include_router(calendar_router)
     app.include_router(search_router)

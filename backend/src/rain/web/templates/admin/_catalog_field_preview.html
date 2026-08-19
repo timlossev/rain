@@ -1,0 +1,12 @@
+{# rain.modules.admin.router.catalog_field_preview's response -- injected
+   into the field row's [data-catalog-preview-target] by app.js's
+   [data-catalog-preview-btn] handler. #}
+{% if not resolved.ok %}
+<p class="field-hint" style="color:var(--danger);">{{ resolved.error }}</p>
+{% elif resolved.document_label is none %}
+<p class="field-hint">Pick a source document and a mode above first.</p>
+{% elif is_select %}
+<p class="field-hint">{{ resolved.document_label }} -- {{ resolved.options | length }} option{{ "s" if resolved.options | length != 1 else "" }}{% if resolved.options %}: {{ resolved.options | join(", ") }}{% endif %}</p>
+{% else %}
+<p class="field-hint">{{ resolved.document_label }} -- {% if resolved.value %}resolves to: <strong>{{ resolved.value }}</strong>{% else %}no match.{% endif %}</p>
+{% endif %}

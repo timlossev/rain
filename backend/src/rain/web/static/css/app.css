@@ -515,6 +515,16 @@ form.inline { display: inline; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
 .card + .card { margin-top: 16px; }
 .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; }
+
+/* Service Catalog's browse page (rain.modules.catalog, and the customer
+   portal's own Catalog tab) -- a grid of requestable items, each a plain
+   .card made clickable. */
+.catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.catalog-grid .card + .card { margin-top: 0; } /* override the generic stacked-card rule -- these sit in a grid, not a column */
+.catalog-item-card { display: block; text-decoration: none; color: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+.catalog-item-card:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.catalog-item-title { font-weight: 700; margin-bottom: 6px; }
+.catalog-item-desc { margin: 0 0 10px; }
 .panel-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
 /* List-page filter toolbar (Type pills, Status select, My/Unassigned/
    Only Problematic quick filters, and "+ New ticket") -- one tinted, bordered

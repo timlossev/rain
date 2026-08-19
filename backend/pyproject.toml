@@ -53,6 +53,12 @@ dependencies = [
     # call sites rather than restructuring every caller onto an async
     # storage interface for this alone.
     "boto3>=1.40,<2",
+    # JSONPath evaluation for Service Catalog fields sourced from a
+    # document (rain.modules.catalog.service.resolve_field_source) -- pure
+    # Python, no compiled extension, so it's fine on the alpine base image
+    # without a musllinux wheel concern (same reasoning as argon2-cffi's
+    # own comment, just the opposite conclusion: nothing to compile here).
+    "jsonpath-ng>=1.6,<2",
 ]
 
 [project.optional-dependencies]

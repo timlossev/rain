@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ item.name }} - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Fields marked * are required. Submitting creates a {{ item.ticket_type }} ticket{% if item.requires_approval %}, routed through {{ item.approval_flow.name if item.approval_flow else "an approval flow" }} before it's actioned{% endif %}.{% endblock %}
+{% block content %}
+<div class="panel-row" style="justify-content:flex-end;">
+  <a class="btn btn-sm" href="{{ back }}">&larr; Service Catalog</a>
+</div>
+
+<div class="card" style="max-width:640px;">
+  <div class="card-title">{{ item.name }}</div>
+  {% if item.description %}<p class="muted">{{ item.description }}</p>{% endif %}
+
+  {% if errors %}
+  <div class="flash flash-error">
+    <ul style="margin:0; padding-left:18px;">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <form method="post" action="/catalog/{{ item.key }}">
+    {% include "catalog/_answers_fragment.html" %}
+    <button class="btn btn-primary" type="submit">Submit request</button>
+  </form>
+</div>
+{% endblock %}

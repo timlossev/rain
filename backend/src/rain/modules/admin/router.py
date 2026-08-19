@@ -40,14 +40,17 @@ from rain.db.tenant_models import (
     Group,
     GroupMembership,
     NotificationChannel,
+    ServiceCatalogItem,
     TicketStatus,
     WebhookConfig,
 )
 from rain.modules.auth import saml_config
 from rain.modules.auth.ldap_config import get_provider_row, get_raw_config, save_ldap_config
 from rain.modules.auth.ldap_sync import run_ldap_sync
+from rain.modules.catalog import service as catalog_service
+from rain.modules.catalog.schemas import MAX_CATALOG_FIELDS, PAYLOAD_FORMATS, SOURCE_MODES
 from rain.modules.tickets import notifications
-from rain.modules.tickets.schemas import CHANNEL_TYPES
+from rain.modules.tickets.schemas import CHANNEL_TYPES, SEVERITIES, TICKET_TYPES
 from rain.modules.webhooks import service as webhook_service
 from rain.settings import get_settings
 from rain.web.nav import build_nav_context
@@ -1163,6 +1166,218 @@ async def approval_flows_set_default(
         row.is_default = True
         await tenant_db.commit()
     return RedirectResponse("/admin/approval-flows", status_code=status.HTTP_303_SEE_OTHER)
+
+
+# ----------------------------------------------------- service catalog ---
+# Per-tenant. Each item is an up-to-MAX_CATALOG_FIELDS-question form
+# (rain.modules.catalog.schemas) that produces a ticket on submission --
+# see rain.modules.catalog.service for the shared create/submit logic both
+# /catalog (main app, Records Authority) and the customer portal's Catalog
+# tab call, so a submission behaves identically either way. The form
+# pre-renders MAX_CATALOG_FIELDS rows, reusing the exact same [data-step-
+# field] JS show/hide Approval Flows' step builder uses above -- a row
+# with no field_key is simply skipped on submit (see catalog_service.
+# replace_catalog_fields), so an item can have 0-10 questions regardless
+# of which rows the add/remove buttons left visible.
+
+
+def _catalog_item_form_error(ticket_type: str, requires_approval: bool, approval_flow_id: str) -> str | None:
+    if ticket_type == "change" and not (requires_approval and approval_flow_id):
+        return "Change requests must require approval, with a flow selected."
+    return None
+
+
+async def _catalog_form_context(tenant_db: AsyncSession, ctx: RequestContext, *, item: ServiceCatalogItem | None) -> dict:
+    nav = await build_nav_context(ctx)
+    flows_result = await tenant_db.execute(select(ApprovalFlow).order_by(ApprovalFlow.name))
+    field_prefill = {i + 1: f for i, f in enumerate(sorted(item.fields, key=lambda f: f.sort_order))} if item else {}
+    return {
+        **nav,
+        "ctx": ctx,
+        "item": item,
+        "flows": list(flows_result.scalars()),
+        "ticket_types": TICKET_TYPES,
+        "payload_formats": PAYLOAD_FORMATS,
+        "source_modes": SOURCE_MODES,
+        "severities": SEVERITIES,
+        "field_range": range(1, MAX_CATALOG_FIELDS + 1),
+        "field_prefill": field_prefill,
+    }
+
+
+@router.get("/catalog", response_class=HTMLResponse)
+async def catalog_items_list(
+    request: Request,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    nav = await build_nav_context(ctx)
+    items = await catalog_service.list_catalog_items(tenant_db)
+    return templates.TemplateResponse(request, "admin/catalog_items.html", {**nav, "ctx": ctx, "items": items})
+
+
+@router.get("/catalog/new", response_class=HTMLResponse)
+async def catalog_item_new_form(
+    request: Request,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    context = await _catalog_form_context(tenant_db, ctx, item=None)
+    return templates.TemplateResponse(request, "admin/catalog_item_form.html", context)
+
+
+@router.post("/catalog")
+async def catalog_item_create(
+    request: Request,
+    name: str = Form(...),
+    key: str = Form(...),
+    description: str = Form(""),
+    ticket_type: str = Form("incident"),
+    default_severity: str = Form("medium"),
+    payload_format: str = Form("json"),
+    requires_approval: bool = Form(False),
+    approval_flow_id: str = Form(""),
+    is_active: bool = Form(False),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    error = _catalog_item_form_error(ticket_type, requires_approval, approval_flow_id)
+    if error:
+        return RedirectResponse(f"/admin/catalog/new?error={quote(error)}", status_code=status.HTTP_303_SEE_OTHER)
+
+    form = await request.form()
+    item = ServiceCatalogItem(
+        name=name.strip(),
+        key=key.strip().lower(),
+        description=description.strip() or None,
+        ticket_type=ticket_type,
+        default_severity=default_severity,
+        payload_format=payload_format,
+        requires_approval=requires_approval,
+        approval_flow_id=int(approval_flow_id) if requires_approval and approval_flow_id else None,
+        is_active=is_active,
+        created_by=ctx.user.id,
+        updated_by=ctx.user.id,
+    )
+    # add() before replace_catalog_fields, not flush() -- item is only
+    # "pending" at that point (in the session, not yet a real row), and
+    # its never-touched .fields collection stays safe to read/populate
+    # purely in-memory either way. A *flush* first would make it
+    # persistent-but-unloaded instead, and replace_catalog_fields reading
+    # that collection would then need to lazy-load it from the DB, which
+    # fails synchronously under asyncpg's async driver (MissingGreenlet,
+    # confirmed live) -- see that function's own docstring.
+    tenant_db.add(item)
+    await catalog_service.replace_catalog_fields(tenant_db, item, form, max_fields=MAX_CATALOG_FIELDS)
+    await tenant_db.commit()
+    return RedirectResponse("/admin/catalog", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/catalog/{item_id:int}/edit", response_class=HTMLResponse)
+async def catalog_item_edit_form(
+    request: Request,
+    item_id: int,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    item = await catalog_service.get_catalog_item(tenant_db, item_id)
+    if item is None:
+        return RedirectResponse("/admin/catalog", status_code=status.HTTP_303_SEE_OTHER)
+    context = await _catalog_form_context(tenant_db, ctx, item=item)
+    return templates.TemplateResponse(request, "admin/catalog_item_form.html", context)
+
+
+@router.post("/catalog/{item_id:int}/edit")
+async def catalog_item_edit(
+    request: Request,
+    item_id: int,
+    name: str = Form(...),
+    key: str = Form(...),
+    description: str = Form(""),
+    ticket_type: str = Form("incident"),
+    default_severity: str = Form("medium"),
+    payload_format: str = Form("json"),
+    requires_approval: bool = Form(False),
+    approval_flow_id: str = Form(""),
+    is_active: bool = Form(False),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    item = await catalog_service.get_catalog_item(tenant_db, item_id)
+    if item is None:
+        return RedirectResponse("/admin/catalog", status_code=status.HTTP_303_SEE_OTHER)
+
+    error = _catalog_item_form_error(ticket_type, requires_approval, approval_flow_id)
+    if error:
+        return RedirectResponse(f"/admin/catalog/{item_id}/edit?error={quote(error)}", status_code=status.HTTP_303_SEE_OTHER)
+
+    form = await request.form()
+    item.name = name.strip()
+    item.key = key.strip().lower()
+    item.description = description.strip() or None
+    item.ticket_type = ticket_type
+    item.default_severity = default_severity
+    item.payload_format = payload_format
+    item.requires_approval = requires_approval
+    item.approval_flow_id = int(approval_flow_id) if requires_approval and approval_flow_id else None
+    item.is_active = is_active
+    item.updated_by = ctx.user.id
+    await catalog_service.replace_catalog_fields(tenant_db, item, form, max_fields=MAX_CATALOG_FIELDS)
+    await tenant_db.commit()
+    return RedirectResponse("/admin/catalog", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/catalog/{item_id:int}/delete")
+async def catalog_item_delete(
+    item_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
+):
+    item = await tenant_db.get(ServiceCatalogItem, item_id)
+    if item is not None:
+        await catalog_service.delete_catalog_item(tenant_db, item)
+    return RedirectResponse("/admin/catalog", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/catalog/{item_id:int}/toggle")
+async def catalog_item_toggle(
+    item_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
+):
+    item = await tenant_db.get(ServiceCatalogItem, item_id)
+    if item is not None:
+        await catalog_service.set_active(tenant_db, item, not item.is_active)
+    return RedirectResponse("/admin/catalog", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/catalog/fields/preview", response_class=HTMLResponse)
+async def catalog_field_preview(
+    request: Request,
+    source_document_id: str = Form(""),
+    source_mode: str = Form(""),
+    source_expression: str = Form(""),
+    field_type: str = Form("text"),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    """Backs the "Preview" button on each field row while designing a
+    catalog item's form -- resolves against the live document with
+    nothing saved yet, same as how /assets/fields-for-type/{id} previews
+    against live data mid-form. Requires only require_admin (not a
+    specific item), since a field row being previewed might not belong to
+    a saved item at all yet (a brand-new "New service" form)."""
+    resolved = await catalog_service.resolve_field_source(
+        tenant_db,
+        document_id=int(source_document_id) if source_document_id else None,
+        mode=source_mode or None,
+        expression=source_expression or None,
+        is_select=(field_type == "select"),
+    )
+    return templates.TemplateResponse(
+        request, "admin/_catalog_field_preview.html", {"resolved": resolved, "is_select": field_type == "select"}
+    )
 
 
 # ------------------------------------------------------------ webhooks ---

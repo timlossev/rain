@@ -44,6 +44,7 @@
       <div class="tab-buttons">
         <button type="button" class="tab-btn active" data-tab-btn="tickets">Tickets</button>
         <button type="button" class="tab-btn" data-tab-btn="approvals">Approvals{% if pending_approval %} ({{ pending_approval | length }}){% endif %}</button>
+        <button type="button" class="tab-btn" data-tab-btn="catalog">Catalog</button>
         <button type="button" class="tab-btn" data-tab-btn="documents">Documents</button>
       </div>
 
@@ -133,6 +134,10 @@
             {% endfor %}
           </tbody>
         </table>
+      </div>
+
+      <div class="tab-panel" data-tab-panel="catalog">
+        {% with items = catalog_items, base_href = "/portal/" ~ tenant.slug ~ "/catalog" %}{% include "catalog/_grid_fragment.html" %}{% endwith %}
       </div>
 
       <div class="tab-panel" data-tab-panel="documents">

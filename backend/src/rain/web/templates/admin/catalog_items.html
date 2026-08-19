@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Service Catalog - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Requestable items shown on /catalog and the customer portal's Catalog tab. Each one is an up-to-10-question form that produces a ticket on submission -- optionally routed through an Approval Flow, and its answers can be pre-filled or turned into a dropdown's options from an existing Document (regex or JSONPath).{% endblock %}
+{% block content %}
+<div class="panel-row" style="justify-content:flex-end;">
+  <a class="btn btn-primary" href="/admin/catalog/new">+ New service</a>
+</div>
+
+<div class="card">
+  <table>
+    <thead><tr><th>Name</th><th>Key</th><th>Produces</th><th>Format</th><th>Approval</th><th>Questions</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>{{ item.name }}</td>
+        <td class="muted">{{ item.key }}</td>
+        <td><span class="badge">{{ item.ticket_type | capitalize }}</span></td>
+        <td class="muted">{{ item.payload_format | upper }}</td>
+        <td class="muted">{% if item.requires_approval %}{{ item.approval_flow.name if item.approval_flow else "(flow deleted)" }}{% else %}-{% endif %}</td>
+        <td class="muted">{{ item.fields | length }}</td>
+        <td>
+          <form class="inline" method="post" action="/admin/catalog/{{ item.id }}/toggle">
+            {% if item.is_active %}<button class="btn btn-sm" type="submit">active</button>
+            {% else %}<button class="btn btn-sm btn-danger" type="submit">inactive</button>{% endif %}
+          </form>
+        </td>
+        <td class="actions">
+          <a class="btn btn-sm" href="/admin/catalog/{{ item.id }}/edit">Edit</a>
+          <form class="inline" method="post" action="/admin/catalog/{{ item.id }}/delete" data-confirm="Delete service '{{ item.name }}'? Tickets already created from it keep existing.">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="muted">No services defined yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

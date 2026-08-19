@@ -430,6 +430,13 @@ class Ticket(TenantBase):
     # delete rather than CASCADE -- losing the origin ticket shouldn't take
     # the promoted one down with it.
     source_ticket_id: Mapped[int | None] = mapped_column(ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True)
+    # Set when this ticket was produced by submitting a Service Catalog
+    # form (rain.modules.catalog) -- SET NULL rather than blocking/cascading
+    # deletion of the catalog item so a request already filed keeps
+    # existing regardless of what happens to the catalog entry afterward.
+    source_catalog_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("service_catalog_items.id", ondelete="SET NULL"), nullable=True
+    )
     # change tickets only -- the maintenance/implementation window, with a
     # time of day (not just a day -- <input type="datetime-local">).
     # Shown on the tenant calendar alongside CalendarEntry rows, which
@@ -479,6 +486,7 @@ class Ticket(TenantBase):
     source_rule: Mapped["TicketRule | None"] = relationship()
     source_correlation_rule: Mapped[CorrelationRule | None] = relationship()
     source_ticket: Mapped["Ticket | None"] = relationship(remote_side=[id])
+    source_catalog_item: Mapped["ServiceCatalogItem | None"] = relationship()
     comments: Mapped[list["TicketComment"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")
     status_changes: Mapped[list["TicketStatusChange"]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan", order_by="TicketStatusChange.created_at"
@@ -809,6 +817,96 @@ class DocumentLink(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     document: Mapped[Document] = relationship(back_populates="links")
+
+
+class ServiceCatalogItem(TenantBase):
+    """One requestable "service" in the tenant's self-service catalog
+    (e.g. "Provision a new user", "Request VPN access") -- rendered as a
+    form on /catalog (main app, under Records Authority) and the customer
+    portal's Catalog tab. Submitting it creates a ticket of ticket_type
+    whose description is the submitted answers serialized per
+    payload_format (see ServiceCatalogField and rain.modules.catalog.
+    service.render_payload). Optionally routed through an ApprovalFlow at
+    submission time -- the same ChangeApproval/ApprovalFlow machinery
+    Change tickets use, generalized here to any ticket_type (see
+    rain.modules.tickets.service.start_approval, already generic over
+    "the thing being approved")."""
+
+    __tablename__ = "service_catalog_items"
+    __table_args__ = (UniqueConstraint("key", name="uq_service_catalog_items_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(63))
+    name: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    icon: Mapped[str | None] = mapped_column(String(63), nullable=True)
+    # incident | vulnerability | change -- rain.modules.tickets.schemas.TICKET_TYPES.
+    ticket_type: Mapped[str] = mapped_column(String(15), default="incident", server_default="incident")
+    default_severity: Mapped[str] = mapped_column(String(15), default="medium", server_default="medium")
+    # json | kv -- how a submission's answers are serialized into the
+    # created ticket's description (rain.modules.catalog.service.render_payload).
+    payload_format: Mapped[str] = mapped_column(String(7), default="json", server_default="json")
+    requires_approval: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    approval_flow_id: Mapped[int | None] = mapped_column(ForeignKey("approval_flows.id", ondelete="SET NULL"), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    updated_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    approval_flow: Mapped[ApprovalFlow | None] = relationship()
+    fields: Mapped[list["ServiceCatalogField"]] = relationship(
+        back_populates="catalog_item", cascade="all, delete-orphan", order_by="ServiceCatalogField.sort_order"
+    )
+
+
+class ServiceCatalogField(TenantBase):
+    """One question on a ServiceCatalogItem's form -- up to 10 per item
+    (enforced at the app layer, rain.modules.catalog.router/service, same
+    "cap enforced above the DB" trade-off as _MAX_APPROVAL_STEPS).
+    field_key becomes both the submitted form field's name and the
+    key/name used in the produced ticket's JSON/key=value payload, so it
+    doubles as the machine-readable name the resulting ticket exposes,
+    not just a UI label.
+
+    A field can optionally pull its value from an existing Document
+    instead of (or as a starting/fallback point for) free-form entry --
+    source_mode "content" uses the document's whole text body (each line
+    becomes an option, for a select field); "regex" evaluates
+    source_expression (Python re, MULTILINE -- ^/$ anchor per line) against that body,
+    taking each match's first capturing group if the pattern has one,
+    else the whole match; "jsonpath" parses the body as JSON and
+    evaluates source_expression as a JSONPath. A select field gets every
+    match/result as its option list (falling back to select_options if
+    that comes up empty); any other field type gets the first one as a
+    prefilled but still-editable default. See rain.modules.catalog.
+    service.resolve_field_source, also used by the admin form's live
+    Preview button before a field is ever saved."""
+
+    __tablename__ = "service_catalog_fields"
+    __table_args__ = (UniqueConstraint("catalog_item_id", "field_key", name="uq_service_catalog_fields_item_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    catalog_item_id: Mapped[int] = mapped_column(ForeignKey("service_catalog_items.id", ondelete="CASCADE"), index=True)
+    field_key: Mapped[str] = mapped_column(String(63))
+    label: Mapped[str] = mapped_column(String(255))
+    # text | number | boolean | date | url | email | select -- same set as
+    # rain.modules.assets.schemas.FieldType, reused rather than duplicated.
+    field_type: Mapped[str] = mapped_column(String(15), default="text", server_default="text")
+    select_options: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    is_required: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    source_document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
+    # content | regex | jsonpath -- null means "not document-sourced", the
+    # plain static field described above.
+    source_mode: Mapped[str | None] = mapped_column(String(15), nullable=True)
+    # The regex pattern or JSONPath expression; unused (and ignored) for
+    # source_mode "content".
+    source_expression: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    catalog_item: Mapped[ServiceCatalogItem] = relationship(back_populates="fields")
+    source_document: Mapped[Document | None] = relationship()
 
 
 class PlatformEventRule(TenantBase):

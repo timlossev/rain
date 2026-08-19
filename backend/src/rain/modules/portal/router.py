@@ -42,6 +42,7 @@ from rain.core.tenant_config import get_tenant_config, get_tenant_configs
 from rain.db.base import control_session, tenant_session
 from rain.db.control_models import Tenant
 from rain.modules.calendar import service as calendar_service
+from rain.modules.catalog import service as catalog_service
 from rain.modules.documents import service as document_service
 from rain.modules.tickets import service as ticket_service
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
@@ -177,6 +178,7 @@ async def portal_form(
         # {% if user %}), so there's no reason to run either query for one.
         pending_approval = await ticket_service.list_tickets_pending_approval_for(tenant_db, user.id) if user is not None else []
         documents = await document_service.list_documents(tenant_db) if user is not None else []
+        catalog_items = await catalog_service.list_catalog_items(tenant_db, active_only=True) if user is not None else []
         # Shown to every visitor, signed in or not -- operational notices
         # (a maintenance window, a renewal due today) are tenant-wide
         # information, not tied to one person's account.
@@ -199,6 +201,7 @@ async def portal_form(
             "reported": reported,
             "pending_approval": pending_approval,
             "documents": documents,
+            "catalog_items": catalog_items,
             "todays_events": todays_events,
             "can_escalate": escalation_webhook_id is not None,
             "created": created_ticket.ticket_number if created_ticket is not None else "",
@@ -243,4 +246,91 @@ async def portal_create_ticket(
 
     return RedirectResponse(
         f"/portal/{tenant_slug}?created={ticket.ticket_number}", status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@router.get("/{tenant_slug}/catalog/{item_key}", response_class=HTMLResponse)
+async def portal_catalog_form(
+    request: Request,
+    tenant_slug: str,
+    item_key: str,
+    user: CurrentUser | None = Depends(get_current_user_optional),
+):
+    access = await _resolve_portal_access(request, tenant_slug, user)
+    if not isinstance(access, tuple):
+        return access
+    tenant, flags = access
+    # Signed-in-only regardless of portal_require_auth -- that flag only
+    # governs whether the plain incident form above can be filed
+    # anonymously; a service catalog request always needs an accountable
+    # requester (rain.modules.tickets.service.create_ticket's reporter_
+    # user_id, not reported_anonymously).
+    if user is None:
+        return RedirectResponse(
+            f"/login?next=/portal/{tenant_slug}/catalog/{item_key}", status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    async with tenant_session(tenant.schema_name) as tenant_db:
+        item = await catalog_service.get_catalog_item_by_key(tenant_db, item_key)
+        if item is None or not item.is_active:
+            return RedirectResponse(f"/portal/{tenant_slug}", status_code=status.HTTP_303_SEE_OTHER)
+        rendered = await catalog_service.render_fields(tenant_db, item)
+
+    return templates.TemplateResponse(
+        request,
+        "portal/catalog_form.html",
+        {
+            "tenant": tenant,
+            "user": user,
+            "branded": flags["portal_branded"],
+            "item": item,
+            "rendered_fields": rendered,
+            "submitted": {},
+            "errors": [],
+        },
+    )
+
+
+@router.post("/{tenant_slug}/catalog/{item_key}")
+async def portal_catalog_submit(
+    request: Request,
+    tenant_slug: str,
+    item_key: str,
+    user: CurrentUser | None = Depends(get_current_user_optional),
+):
+    access = await _resolve_portal_access(request, tenant_slug, user)
+    if not isinstance(access, tuple):
+        return access
+    tenant, flags = access
+    if user is None:
+        return RedirectResponse(
+            f"/login?next=/portal/{tenant_slug}/catalog/{item_key}", status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    async with tenant_session(tenant.schema_name) as tenant_db:
+        item = await catalog_service.get_catalog_item_by_key(tenant_db, item_key)
+        if item is None or not item.is_active:
+            return RedirectResponse(f"/portal/{tenant_slug}", status_code=status.HTTP_303_SEE_OTHER)
+
+        form = await request.form()
+        result = await catalog_service.submit_catalog_item(tenant_db, item, form, reporter_user_id=user.id)
+        if result.errors:
+            rendered = await catalog_service.render_fields(tenant_db, item)
+            submitted = {f.field_key: form.get(f"answer_{f.field_key}", "") for f in item.fields}
+            return templates.TemplateResponse(
+                request,
+                "portal/catalog_form.html",
+                {
+                    "tenant": tenant,
+                    "user": user,
+                    "branded": flags["portal_branded"],
+                    "item": item,
+                    "rendered_fields": rendered,
+                    "submitted": submitted,
+                    "errors": result.errors,
+                },
+            )
+
+    return RedirectResponse(
+        f"/portal/{tenant_slug}?created={result.ticket.ticket_number}", status_code=status.HTTP_303_SEE_OTHER
     )

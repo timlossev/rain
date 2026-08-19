@@ -1,0 +1,37 @@
+{# Shared by catalog/form.html (main app) and portal/catalog_form.html (the
+   customer portal's own Catalog tab) -- same field_type -> input mapping
+   as assets/_fields_fragment.html, plus a document-sourced field's
+   options/prefill (rendered_fields, from rain.modules.catalog.service.
+   render_fields) and, on a validation-failure re-render, whatever the
+   visitor already typed (submitted) taking priority over that prefill so
+   a rejected submission doesn't lose their answers. #}
+{% for rf in rendered_fields %}
+{% set f = rf.field %}
+{% set val = submitted.get(f.field_key, rf.prefill) %}
+<div class="field">
+  <label for="answer_{{ f.field_key }}">{{ f.label }}{% if f.is_required %} *{% endif %}</label>
+  {% if f.field_type == "boolean" %}
+    <label class="checkbox-row"><input type="checkbox" id="answer_{{ f.field_key }}" name="answer_{{ f.field_key }}" {% if val and val|lower in ("1", "true", "on", "yes") %}checked{% endif %}> Yes</label>
+  {% elif f.field_type == "select" %}
+    <select id="answer_{{ f.field_key }}" name="answer_{{ f.field_key }}" {% if f.is_required %}required{% endif %}>
+      <option value="">-</option>
+      {% for opt in rf.options %}
+      <option value="{{ opt }}" {% if val == opt %}selected{% endif %}>{{ opt }}</option>
+      {% endfor %}
+    </select>
+  {% elif f.field_type == "date" %}
+    <input type="date" id="answer_{{ f.field_key }}" name="answer_{{ f.field_key }}" value="{{ val }}" {% if f.is_required %}required{% endif %}>
+  {% elif f.field_type == "number" %}
+    <input type="number" step="any" id="answer_{{ f.field_key }}" name="answer_{{ f.field_key }}" value="{{ val }}" {% if f.is_required %}required{% endif %}>
+  {% elif f.field_type == "url" %}
+    <input type="url" id="answer_{{ f.field_key }}" name="answer_{{ f.field_key }}" value="{{ val }}" {% if f.is_required %}required{% endif %}>
+  {% elif f.field_type == "email" %}
+    <input type="email" id="answer_{{ f.field_key }}" name="answer_{{ f.field_key }}" value="{{ val }}" {% if f.is_required %}required{% endif %}>
+  {% else %}
+    <input type="text" id="answer_{{ f.field_key }}" name="answer_{{ f.field_key }}" value="{{ val }}" {% if f.is_required %}required{% endif %}>
+  {% endif %}
+  {% if f.source_document %}<p class="field-hint">From {{ f.source_document.doc_number }}: {{ f.source_document.title }}</p>{% endif %}
+</div>
+{% else %}
+<p class="muted">This request has no questions -- submitting creates the ticket as-is.</p>
+{% endfor %}
