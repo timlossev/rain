@@ -10,8 +10,23 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _normalize_postgres_driver(value: str) -> str:
+    """A bare "postgresql://"/"postgres://" DSN (what an external
+    POSTGRES_URL typically arrives as) becomes asyncpg-specific. A plain
+    function, not a method, so both database_url's own field_validator
+    and Settings._use_postgres_url_fallback (which needs to apply the
+    same normalization to a value pulled from a *different* field, after
+    field-level validation has already run) can call it directly --
+    calling a @field_validator-wrapped classmethod outside pydantic's own
+    validation pipeline isn't a safe/documented thing to rely on."""
+    for bare_scheme in ("postgresql://", "postgres://"):
+        if value.startswith(bare_scheme):
+            return "postgresql+asyncpg://" + value[len(bare_scheme) :]
+    return value
 
 
 class Settings(BaseSettings):
@@ -26,6 +41,13 @@ class Settings(BaseSettings):
     # so the driver segment is normalized below rather than pushing that
     # detail onto whoever sets POSTGRES_URL.
     database_url: str = "postgresql+asyncpg://rain:rain@localhost:5432/rain"
+    # Same field .env/.env.example carries (see the comment above and
+    # postgres_url's own docstring below) -- present here too so a bare
+    # `docker run --env-file .env` (no docker-compose.yml in the loop to
+    # do the ${POSTGRES_URL:-...} substitution into DATABASE_URL itself)
+    # still resolves the database correctly, not just the Compose path.
+    # _use_postgres_url_fallback below is what actually applies it.
+    postgres_url: str = ""
     app_secret_key: str = "insecure-dev-key-change-me"
     rain_domain: str = "localhost"
     uploads_dir: str = "/data/uploads"
@@ -85,10 +107,25 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _normalize_driver(cls, value: str) -> str:
-        for bare_scheme in ("postgresql://", "postgres://"):
-            if value.startswith(bare_scheme):
-                return "postgresql+asyncpg://" + value[len(bare_scheme) :]
-        return value
+        return _normalize_postgres_driver(value)
+
+    @model_validator(mode="after")
+    def _use_postgres_url_fallback(self) -> "Settings":
+        # Mirrors docker-compose.yml's DATABASE_URL: ${POSTGRES_URL:-...}
+        # at the app level instead of relying solely on Compose to do
+        # that substitution -- a bare `docker run --env-file .env` (the
+        # single-container path, no docker-compose.yml involved at all)
+        # otherwise had no way to make POSTGRES_URL take effect, forcing
+        # DATABASE_URL to be set redundantly alongside it even though
+        # .env already carries POSTGRES_URL for exactly this purpose.
+        # "database_url" not in model_fields_set means DATABASE_URL
+        # itself was never explicitly set (only the class default
+        # applied) -- an explicit DATABASE_URL (the normal Compose path,
+        # which always sets it) still wins outright, same precedence the
+        # Compose-level substitution already has.
+        if "database_url" not in self.model_fields_set and self.postgres_url:
+            self.database_url = _normalize_postgres_driver(self.postgres_url)
+        return self
 
 
 @lru_cache

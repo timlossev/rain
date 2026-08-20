@@ -35,6 +35,11 @@ def _set(text: str, key: str, value: str) -> str:
     return re.sub(_LINE_RE.format(key=re.escape(key)), f"{key}={value}", text, count=1, flags=re.MULTILINE)
 
 
+def _get(text: str, key: str, *, default: str = "") -> str:
+    match = re.search(_LINE_RE.format(key=re.escape(key)), text, flags=re.MULTILINE)
+    return match.group()[len(key) + 1 :] if match else default
+
+
 def _interactive() -> bool:
     return sys.stdin.isatty()
 
@@ -182,8 +187,32 @@ def main() -> None:
 
     ENV_PATH.write_text(text, encoding="utf-8")
     print(f"\nWrote {ENV_PATH}.")
-    print("Edit RAIN_DOMAIN in .env if you have a public DNS name for automatic ACME certs.")
-    print("Next: docker compose up --build")
+
+    # EMBED_WORKER=true + WEB_FRONTEND=false is what actually makes this a
+    # single-container deployment (see .env.example's "Minimal mode")
+    # -- docker compose still works for that shape (with the
+    # docker-compose.minimal.yml overlay), but a bare `docker build` +
+    # `docker run --env-file .env` needs nothing this repo doesn't
+    # already have checked out, and -- unlike hand-writing a `docker run
+    # -e KEY=value` for every setting -- reuses the .env just written
+    # instead of re-typing POSTGRES_URL/APP_SECRET_KEY/etc. a second
+    # time. Falls back to the recommended docker compose path otherwise.
+    if _get(text, "EMBED_WORKER") == "true" and _get(text, "WEB_FRONTEND") == "false":
+        app_port = _get(text, "APP_PORT", default="8000")
+        syslog_port = _get(text, "SYSLOG_PORT", default="5514")
+        print("\nThis is a single-container deployment (EMBED_WORKER=true, WEB_FRONTEND=false).")
+        print("If another RAIN instance (this repo's own docker compose stack, or an earlier")
+        print(f"run of this same command) is already using port {app_port} or {syslog_port}, stop it first --")
+        print("Docker will fail to start this one with \"port is already allocated\" otherwise.")
+        print("Next:")
+        print("  docker build -t rain-app ./backend")
+        print(
+            f"  docker run -d --name rain --env-file .env -p {app_port}:{app_port} "
+            f"-p {syslog_port}:{syslog_port}/tcp -p {syslog_port}:{syslog_port}/udp rain-app"
+        )
+    else:
+        print("Edit RAIN_DOMAIN in .env if you have a public DNS name for automatic ACME certs.")
+        print("Next: docker compose up --build")
 
 
 if __name__ == "__main__":

@@ -47,6 +47,13 @@ function Set-EnvValue([string]$Text, [string]$Key, [string]$Value) {
     return [regex]::Replace($Text, $pattern, { param($m) "$Key=$Value" })
 }
 
+function Get-EnvValue([string]$Text, [string]$Key, [string]$Default = "") {
+    $pattern = "(?m)^$([regex]::Escape($Key))=(.*)$"
+    $match = [regex]::Match($Text, $pattern)
+    if ($match.Success) { return $match.Groups[1].Value }
+    return $Default
+}
+
 function Read-YesNo([string]$Prompt, [bool]$Default) {
     $suffix = if ($Default) { "Y/n" } else { "y/N" }
     $answer = Read-Host "$Prompt [$suffix]"
@@ -174,5 +181,33 @@ Set-Content -Path $envPath -Value $text -NoNewline -Encoding utf8
 
 Write-Host ""
 Write-Host "Wrote $envPath."
-Write-Host "Edit RAIN_DOMAIN in .env if you have a public DNS name for automatic ACME certs."
-Write-Host "Next: docker compose up --build"
+
+# EMBED_WORKER=true + WEB_FRONTEND=false is what actually makes this a
+# single-container deployment (see .env.example's "Minimal mode") --
+# docker compose still works for that shape (with the
+# docker-compose.minimal.yml overlay), but a bare `docker build` +
+# `docker run --env-file .env` needs nothing this repo doesn't already
+# have checked out, and -- unlike hand-writing a `docker run -e
+# KEY=value` for every setting -- reuses the .env just written instead
+# of re-typing POSTGRES_URL/APP_SECRET_KEY/etc. a second time. Read back
+# from $text (not the interactive answers themselves) so this reflects
+# what's actually in the file even if a later change adds another way
+# to set either. Falls back to the recommended docker compose path
+# otherwise.
+$writtenEmbedWorker = Get-EnvValue $text "EMBED_WORKER"
+$writtenWebFrontend = Get-EnvValue $text "WEB_FRONTEND"
+if ($writtenEmbedWorker -eq "true" -and $writtenWebFrontend -eq "false") {
+    $writtenAppPort = Get-EnvValue $text "APP_PORT" "8000"
+    $writtenSyslogPort = Get-EnvValue $text "SYSLOG_PORT" "5514"
+    Write-Host ""
+    Write-Host "This is a single-container deployment (EMBED_WORKER=true, WEB_FRONTEND=false)."
+    Write-Host "If another RAIN instance (this repo's own docker compose stack, or an earlier"
+    Write-Host "run of this same command) is already using port $writtenAppPort or $writtenSyslogPort, stop it first --"
+    Write-Host "Docker will fail to start this one with `"port is already allocated`" otherwise."
+    Write-Host "Next:"
+    Write-Host "  docker build -t rain-app ./backend"
+    Write-Host "  docker run -d --name rain --env-file .env -p ${writtenAppPort}:${writtenAppPort} -p ${writtenSyslogPort}:${writtenSyslogPort}/tcp -p ${writtenSyslogPort}:${writtenSyslogPort}/udp rain-app"
+} else {
+    Write-Host "Edit RAIN_DOMAIN in .env if you have a public DNS name for automatic ACME certs."
+    Write-Host "Next: docker compose up --build"
+}

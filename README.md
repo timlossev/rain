@@ -291,45 +291,49 @@ no local storage volume, no Caddy.
 docker compose -f docker-compose.yml -f docker-compose.minimal.yml up --build
 ```
 
-For a remote/managed Postgres (RDS or similar) and local document
-storage -- no `.env` file, no Compose, not even this repo checked out
-past the image build -- a single `docker run` gets the same one
-container, built straight from `backend/`:
+For a remote/managed Postgres (RDS or similar), still no Compose, but
+this repo checked out (for `backend/` to build from) -- `bootstrap`'s
+questions above already cover single-container deployments too (say no
+to the built-in Postgres container, yes to merging the worker in, and
+answer the pgvector/Caddy questions honestly for your Postgres/network),
+and it writes everything -- `POSTGRES_URL`, `APP_SECRET_KEY`,
+`EMBED_WORKER=true`, `ENABLE_PGVECTOR`, `S3_*`, all of it -- into one
+`.env`. Pass that straight to `docker run` with `--env-file` instead of
+re-typing every setting as a separate `-e` flag; `bootstrap` prints the
+exact command for you once it detects that's what you configured
+(`EMBED_WORKER=true` + `WEB_FRONTEND=false`):
 
 ```sh
-docker build -t rain-app ./backend && docker run -d --name rain -p 8000:8000 -p 5514:5514/tcp -p 5514:5514/udp -e DATABASE_URL="postgresql://user:password@your-rds-endpoint:5432/rain" -e APP_SECRET_KEY="$(openssl rand -base64 48)" -e EMBED_WORKER=true rain-app
+docker build -t rain-app ./backend
+docker run -d --name rain --env-file .env -p 8000:8000 -p 5514:5514/tcp -p 5514:5514/udp rain-app
 ```
 
 Serves plain HTTP on 8000 (no Caddy in this shape, so no automatic
 HTTPS -- terminate TLS in front of it yourself if you need it) and
 listens for syslog on 5514, same as `docker-compose.minimal.yml`'s
-overlay. Point `DATABASE_URL` at your own instance -- RDS Postgres
-accepts a plain `postgresql://` DSN as-is unless you've turned on
-`rds.force_ssl`, in which case add `?ssl=require` (asyncpg's own query
-param, not the `sslmode=` one `psql`/libpq use). Add `-e
-S3_BUCKET=... -e S3_REGION=...` (see `.env.example`) if you want
-documents in S3 instead of the container's own non-persistent storage.
-Add `-e ENABLE_PGVECTOR=false` if that RDS role can't create extensions
-at all (typical for a minimum-privilege application role) or the
-instance doesn't offer `vector` in the first place (standard RDS in AWS
-GovCloud) -- confirmed live against both a permission-denied and a
-does-not-exist Postgres: migrations complete either way, and nothing
-else in the app depends on it since it's a reserved, unused-today
-column. `RAIN_DOMAIN` is unused in this shape -- it's Caddy-only, and
-there's no Caddy here -- so there's nothing to set it to. Filled in for
-a GovCloud-style deployment (external Postgres, no privilege to create
-extensions, an S3-compatible bucket), that's:
+overlay. `RAIN_DOMAIN` is unused in this shape -- it's Caddy-only, and
+there's no Caddy here -- so leave it as-is; nothing reads it. Stop any
+other RAIN instance using ports 8000/5514 first (this repo's own
+`docker compose` stack included) -- Docker fails to start a second
+container on either with "port is already allocated" otherwise, it's
+not specific to this deployment shape.
 
-```sh
-docker build -t rain-app ./backend && docker run -d --name rain -p 8000:8000 -p 5514:5514/tcp -p 5514:5514/udp \
-  -e DATABASE_URL="postgresql://user:password@your-rds-endpoint:5432/rain" \
-  -e APP_SECRET_KEY="$(openssl rand -base64 48)" \
-  -e EMBED_WORKER=true \
-  -e ENABLE_PGVECTOR=false \
-  -e DEBUG=false \
-  -e S3_BUCKET=your-bucket -e S3_REGION=us-gov-west-1 \
-  rain-app
-```
+`ENABLE_PGVECTOR=false` is what makes this work at all against a
+Postgres role that can't create extensions (typical for a minimum-
+privilege application role -- `asyncpg.exceptions.
+InsufficientPrivilegeError` is the error otherwise) or doesn't offer
+`vector` in the first place (standard RDS in AWS GovCloud) -- confirmed
+live against both a permission-denied and a does-not-exist Postgres,
+including this exact `--env-file` shape end to end: migrations
+complete, and nothing else in the app depends on the column it skips.
+
+Skipping `bootstrap`/`.env` entirely and passing everything via `-e`
+flags by hand still works -- `DATABASE_URL` (not `POSTGRES_URL`, which
+only `.env`/Compose paths use) is what the app reads directly in that
+case, e.g. `-e DATABASE_URL="postgresql://user:password@your-rds-endpoint:5432/rain"`.
+RDS Postgres accepts a plain `postgresql://` DSN as-is unless you've
+turned on `rds.force_ssl`, in which case add `?ssl=require` (asyncpg's
+own query param, not the `sslmode=` one `psql`/libpq use).
 
 See `docker-compose.minimal.yml`'s own comments for the exact `.env`
 values this needs.

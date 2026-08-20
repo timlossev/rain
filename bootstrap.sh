@@ -222,5 +222,35 @@ sed "${sed_args[@]}" "$example_path" > "$env_path"
 
 echo ""
 echo "Wrote $env_path."
-echo "Edit RAIN_DOMAIN in .env if you have a public DNS name for automatic ACME certs."
-echo "Next: docker compose up --build"
+
+# EMBED_WORKER=true + WEB_FRONTEND=false is what actually makes this a
+# single-container deployment (see .env.example's "Minimal mode") --
+# docker compose still works for that shape (with the
+# docker-compose.minimal.yml overlay), but a bare `docker build` +
+# `docker run --env-file .env` needs nothing this repo doesn't already
+# have checked out, and -- unlike hand-writing a `docker run -e
+# KEY=value` for every setting -- reuses the .env just written instead
+# of re-typing POSTGRES_URL/APP_SECRET_KEY/etc. a second time. Read back
+# from the written file (not the local $embed_worker/$web_frontend
+# variables) so this reflects what's actually in it even if a later
+# change adds another way to set either. Falls back to the recommended
+# docker compose path otherwise.
+written_embed_worker="$(sed -n 's/^EMBED_WORKER=//p' "$env_path")"
+written_web_frontend="$(sed -n 's/^WEB_FRONTEND=//p' "$env_path")"
+if [[ "$written_embed_worker" == "true" && "$written_web_frontend" == "false" ]]; then
+    written_app_port="$(sed -n 's/^APP_PORT=//p' "$env_path")"
+    written_syslog_port="$(sed -n 's/^SYSLOG_PORT=//p' "$env_path")"
+    written_app_port="${written_app_port:-8000}"
+    written_syslog_port="${written_syslog_port:-5514}"
+    echo ""
+    echo "This is a single-container deployment (EMBED_WORKER=true, WEB_FRONTEND=false)."
+    echo "If another RAIN instance (this repo's own docker compose stack, or an earlier"
+    echo "run of this same command) is already using port $written_app_port or $written_syslog_port, stop it first --"
+    echo "Docker will fail to start this one with \"port is already allocated\" otherwise."
+    echo "Next:"
+    echo "  docker build -t rain-app ./backend"
+    echo "  docker run -d --name rain --env-file .env -p $written_app_port:$written_app_port -p $written_syslog_port:$written_syslog_port/tcp -p $written_syslog_port:$written_syslog_port/udp rain-app"
+else
+    echo "Edit RAIN_DOMAIN in .env if you have a public DNS name for automatic ACME certs."
+    echo "Next: docker compose up --build"
+fi

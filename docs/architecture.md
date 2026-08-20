@@ -819,6 +819,45 @@ to find at all. Never set it true against a real deployment; it includes
 source paths, local variables, and SQL text in every unhandled-exception
 response.
 
+A few more, from a real GovCloud-style deployment attempt (external,
+restricted Postgres; no Caddy; single container):
+
+- **`WEB_FRONTEND` and `COMPOSE_PROFILES` disagreeing is a real, easy-to-
+  hit footgun, not just a hypothetical `.env.example` warns about.**
+  `WEB_FRONTEND` is never read by `docker-compose.yml` at all -- only
+  `COMPOSE_PROFILES` decides whether `caddy` (`profiles: ["web-
+  frontend"]`) actually starts. Confirmed live: `WEB_FRONTEND=false` with
+  `COMPOSE_PROFILES` still containing `web-frontend` starts Caddy anyway,
+  which then fails to resolve/get a cert for a domain nothing was
+  actually supposed to be serving. `bootstrap`'s Caddy question now sets
+  both together in one place instead of leaving them to be hand-kept-in-
+  sync.
+- **`POSTGRES_URL` (the `.env`/Compose-facing name) and `DATABASE_URL`
+  (what `rain.settings.Settings` actually reads) being two different
+  names was fine as long as `docker-compose.yml` was the one translating
+  between them, but broke down the moment `docker run --env-file .env`
+  bypassed Compose entirely** -- `.env` has no `DATABASE_URL` line at
+  all, only `POSTGRES_URL`, so the app fell back to its own
+  `localhost`-pointing default instead of the external Postgres actually
+  configured. Fixed at the `Settings` level instead of only the Compose
+  level: a `model_validator` applies the same `POSTGRES_URL` fallback
+  `docker-compose.yml`'s `${POSTGRES_URL:-...}` already did, keyed off
+  whether `DATABASE_URL` was ever explicitly provided
+  (`"database_url" not in self.model_fields_set`) so an explicit
+  `DATABASE_URL` -- the normal Compose path, which always sets one --
+  still wins outright.
+- **"bind failed: port is already allocated" on `SYSLOG_PORT` wasn't a
+  bug in publishing the same host port for both tcp and udp** (confirmed
+  live: one container publishing `-p 5514:5514/tcp -p 5514:5514/udp`
+  together works fine) -- **it was this repo's own separate `docker
+  compose` stack already running and holding that port**, from testing
+  the normal multi-container path earlier in the same session. Any two
+  RAIN instances (Compose-based or a bare `docker run`) sharing
+  `APP_PORT`/`SYSLOG_PORT` hit this the same way; it's an ordinary Docker
+  port conflict, not specific to any one deployment shape. `bootstrap`'s
+  final single-container instructions now say so explicitly rather than
+  leaving it to look like a broken feature.
+
 ## Roadmap
 
 - **Semantic/vector search**: keyword search (Postgres full-text) is live
