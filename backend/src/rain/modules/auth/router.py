@@ -25,7 +25,7 @@ from rain.db.base import control_session
 from rain.db.control_models import PasswordResetToken, Session as SessionRow, Tenant, User
 from rain.modules.auth.provider import authenticate_user
 from rain.modules.auth.saml_config import get_saml_config
-from rain.modules.auth.saml_provider import build_auth, extract_identity, metadata_xml, provision_or_update_user
+from rain.modules.auth.saml_provider import build_auth, extract_identity, metadata_xml, provision_user
 # The app's one SMTP-sending function lives under tickets.notifications
 # (it's where email delivery was first needed) but is generic -- reused
 # here rather than duplicating the aiosmtplib/config_store plumbing for
@@ -408,7 +408,7 @@ async def saml_acs(request: Request):
             )
 
         identity = extract_identity(auth, config)
-        # Logged before provisioning even runs: if provision_or_update_user
+        # Logged before provisioning even runs: if provision_user
         # rejects the identity below (no email, or an email collision),
         # this line is what shows *what the assertion actually carried* --
         # the two warnings it can log don't repeat the raw attribute values.
@@ -419,7 +419,7 @@ async def saml_acs(request: Request):
             identity.role_attribute_value,
             config.role_admin_value,
         )
-        user = await provision_or_update_user(session, config, identity)
+        user = await provision_user(session, config, identity)
         if user is None:
             return templates.TemplateResponse(
                 request,

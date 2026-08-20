@@ -140,20 +140,32 @@ def resolve_role(config: SamlConfig, identity: SamlIdentity) -> str:
     return "client"
 
 
-async def provision_or_update_user(session: AsyncSession, config: SamlConfig, identity: SamlIdentity) -> User | None:
+async def provision_user(session: AsyncSession, config: SamlConfig, identity: SamlIdentity) -> User | None:
     """Find-or-create by email -- the natural cross-system join key
     (NameID alone is often an opaque, IdP-internal identifier, not
     something to display or match a pre-existing account against). None
     if the assertion carried no email, or if the email belongs to an
     existing non-SAML account: same "detect a collision and refuse rather
     than silently take it over" posture as rain.modules.auth.ldap_sync's
-    own _sync_users, not a new policy invented here."""
+    own _sync_users, not a new policy invented here.
+
+    Deliberately create-only past the first login: an existing SAML user
+    is looked up and returned as-is, with role_key/tenant_id/display_name/
+    is_active left completely untouched -- earlier versions re-derived
+    all of these from the assertion on every login (so an IdP-side
+    promotion/demotion took effect immediately), but that also silently
+    discarded any local admin change on the user's very next SSO login,
+    tenant_id included -- and tenant_id is what a user's group
+    memberships are keyed against (they live in that exact tenant's own
+    schema), so re-deriving it out from under a hand-adjusted account
+    could orphan them from group assignments an admin had just made.
+    Promoting/demoting/re-tenanting a SAML user now has to happen the
+    same way as any other user, through Admin > Users -- not automatically
+    on their next login."""
     if not identity.email:
         logger.warning("SAML login: assertion for %s carried no email attribute -- refused", identity.subject)
         return None
     email = identity.email.strip().lower()
-    display_name = " ".join(p for p in (identity.first_name, identity.last_name) if p) or email
-    role_key = resolve_role(config, identity)
 
     result = await session.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
@@ -162,36 +174,34 @@ async def provision_or_update_user(session: AsyncSession, config: SamlConfig, id
         logger.warning("SAML login: %s already exists as a %s account (email collision) -- refused", email, user.auth_source)
         return None
 
+    if user is not None:
+        logger.info(
+            "SAML JIT: %s already provisioned (role=%s, tenant_id=%s) -- leaving existing role/tenant/group assignments untouched",
+            email, user.role_key, user.tenant_id,
+        )
+        return user
+
+    role_key = resolve_role(config, identity)
+    display_name = " ".join(p for p in (identity.first_name, identity.last_name) if p) or email
     # NULL tenant_id for internal_admin (cross-tenant, same as a local or
     # LDAP internal_admin) -- only a "client" gets pinned to the
-    # configured target tenant. Re-derived on every login alongside
-    # role_key itself, so a promotion/demotion in the IdP takes effect
-    # immediately rather than only at first provisioning.
+    # configured target tenant. Only ever computed here, at creation --
+    # see the docstring above for why this isn't re-derived afterward.
     tenant_id = None if role_key == "internal_admin" else config.target_tenant_id
 
-    if user is None:
-        user = User(
-            tenant_id=tenant_id,
-            email=email,
-            password_hash=None,
-            role_key=role_key,
-            display_name=display_name,
-            auth_source="saml",
-            is_active=True,
-        )
-        session.add(user)
-        logger.info(
-            "SAML JIT: provisioning new user %s (role=%s, tenant_id=%s, subject=%s)",
-            email, role_key, tenant_id, identity.subject,
-        )
-    else:
-        logger.info(
-            "SAML JIT: updating existing user %s (role %s -> %s, tenant_id %s -> %s, subject=%s)",
-            email, user.role_key, role_key, user.tenant_id, tenant_id, identity.subject,
-        )
-        user.display_name = display_name
-        user.role_key = role_key
-        user.tenant_id = tenant_id
-        user.is_active = True
+    user = User(
+        tenant_id=tenant_id,
+        email=email,
+        password_hash=None,
+        role_key=role_key,
+        display_name=display_name,
+        auth_source="saml",
+        is_active=True,
+    )
+    session.add(user)
+    logger.info(
+        "SAML JIT: provisioning new user %s (role=%s, tenant_id=%s, subject=%s)",
+        email, role_key, tenant_id, identity.subject,
+    )
     await session.commit()
     return user
