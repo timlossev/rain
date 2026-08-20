@@ -154,7 +154,19 @@ if [[ -t 0 ]]; then
         if [[ "$(ask_yes_no "Store documents in S3 (or an S3-compatible service) instead of local disk?" n)" == "y" ]]; then
             s3_bucket="$(ask "S3 bucket name")"
             s3_region="$(ask "S3 region (blank is fine for a non-AWS endpoint)")"
-            s3_endpoint_url="$(ask "S3 endpoint URL (blank for real AWS S3, set it for MinIO/etc.)")"
+            s3_endpoint_url="$(ask "S3 endpoint URL (blank for real AWS S3, set it for MinIO/etc., or a specific AWS endpoint like GovCloud's FIPS one)")"
+            # Mirrors rain.settings.Settings._normalize_s3_endpoint --
+            # boto3 requires a full URL (scheme included) and otherwise
+            # raises a bare "ValueError: Invalid endpoint: <value>".
+            # Confirmed live against a real GovCloud FIPS endpoint
+            # entered as just "s3-fips.dualstack.us-gov-west-1.
+            # amazonaws.com" -- exactly the shape AWS's own docs give,
+            # with no scheme. Settings normalizes this too regardless,
+            # but this way the value actually written to .env is
+            # already correct.
+            if [[ -n "$s3_endpoint_url" && "$s3_endpoint_url" != *"://"* ]]; then
+                s3_endpoint_url="https://$s3_endpoint_url"
+            fi
             s3_access_key_id="$(ask "S3 access key ID (blank to use an IAM role instead of a static key)")"
             if [[ -n "$s3_access_key_id" ]]; then
                 s3_secret_access_key="$(ask "S3 secret access key")"

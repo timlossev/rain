@@ -59,12 +59,34 @@ async def handle_raw_line(raw_line: str) -> None:
         message = summarize(event_format, parsed_fields, parsed.message) if parsed_fields else parsed.message
 
         async with control_session() as control_db:
-            tenant = await resolve_tenant_for_event(
+            routing = await resolve_tenant_for_event(
                 control_db, host=parsed.host, program=parsed.program, message=message
             )
-        if tenant is None:
-            logger.debug("no tenant matched host=%s program=%s; dropping event", parsed.host, parsed.program)
+        if routing.tenant is None:
+            if routing.discarded:
+                # Working as intended -- an admin deliberately set this
+                # source to be dropped (tickets/live's "Discard these" or
+                # a hand-added discard rule). Not worth a line above
+                # debug for every single matching event.
+                logger.debug("host=%s program=%s matched a discard rule; dropping event", parsed.host, parsed.program)
+            else:
+                # This is the case worth an admin actually seeing: the
+                # event reached the listener and was parsed, but nothing
+                # in Admin > Syslog Sources routes it anywhere -- at
+                # plain logger.debug (the level this used to log at, and
+                # below the default INFO level), a source with no
+                # matching rule at all was silently indistinguishable
+                # from one that never reached the listener in the first
+                # place. Confirmed live: this is exactly what "sent a
+                # test message, nothing showed up, nothing in the logs
+                # either" turned out to be.
+                logger.warning(
+                    "no syslog_source_map rule matched host=%s program=%s -- event received but dropped "
+                    "(add a route or catch-all rule in Admin > Syslog Sources if this wasn't intentional)",
+                    parsed.host, parsed.program,
+                )
             return
+        tenant = routing.tenant
 
         async with tenant_session(tenant.schema_name) as db:
             event = SyslogEvent(

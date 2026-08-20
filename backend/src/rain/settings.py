@@ -109,6 +109,23 @@ class Settings(BaseSettings):
     def _normalize_driver(cls, value: str) -> str:
         return _normalize_postgres_driver(value)
 
+    @field_validator("s3_endpoint_url")
+    @classmethod
+    def _normalize_s3_endpoint(cls, value: str) -> str:
+        # storage.py passes this straight through to boto3.client("s3",
+        # endpoint_url=...) with no validation of its own -- botocore
+        # requires a full URL, scheme included, and raises a bare
+        # `ValueError: Invalid endpoint: <value>` for anything else.
+        # Confirmed live against a real GovCloud FIPS endpoint entered as
+        # just "s3-fips.dualstack.us-gov-west-1.amazonaws.com" (exactly
+        # the shape someone copies out of AWS's own docs, which don't
+        # include a scheme). Only prepended when no scheme is present at
+        # all -- an explicit "http://" (e.g. a local MinIO without TLS)
+        # is left alone rather than forced onto https.
+        if value and "://" not in value:
+            return f"https://{value}"
+        return value
+
     @model_validator(mode="after")
     def _use_postgres_url_fallback(self) -> "Settings":
         # Mirrors docker-compose.yml's DATABASE_URL: ${POSTGRES_URL:-...}

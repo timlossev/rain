@@ -148,7 +148,20 @@ if (-not [Console]::IsInputRedirected) {
         if (Read-YesNo "Store documents in S3 (or an S3-compatible service) instead of local disk?" $false) {
             $text = Set-EnvValue $text "S3_BUCKET" (Read-Answer "S3 bucket name")
             $text = Set-EnvValue $text "S3_REGION" (Read-Answer "S3 region (blank is fine for a non-AWS endpoint)")
-            $text = Set-EnvValue $text "S3_ENDPOINT_URL" (Read-Answer "S3 endpoint URL (blank for real AWS S3, set it for MinIO/etc.)")
+            # Mirrors rain.settings.Settings._normalize_s3_endpoint --
+            # boto3 requires a full URL (scheme included) and otherwise
+            # raises a bare "ValueError: Invalid endpoint: <value>".
+            # Confirmed live against a real GovCloud FIPS endpoint
+            # entered as just "s3-fips.dualstack.us-gov-west-1.
+            # amazonaws.com" -- exactly the shape AWS's own docs give,
+            # with no scheme. Settings normalizes this too regardless,
+            # but this way the value actually written to .env is
+            # already correct.
+            $s3EndpointUrl = Read-Answer "S3 endpoint URL (blank for real AWS S3, set it for MinIO/etc., or a specific AWS endpoint like GovCloud's FIPS one)"
+            if ($s3EndpointUrl -and $s3EndpointUrl -notmatch "://") {
+                $s3EndpointUrl = "https://$s3EndpointUrl"
+            }
+            $text = Set-EnvValue $text "S3_ENDPOINT_URL" $s3EndpointUrl
             $accessKeyId = Read-Answer "S3 access key ID (blank to use an IAM role instead of a static key)"
             $text = Set-EnvValue $text "S3_ACCESS_KEY_ID" $accessKeyId
             if ($accessKeyId) {

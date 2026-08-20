@@ -373,13 +373,24 @@ async def smtp_submit(
 
 async def _listener_is_active(port: int) -> bool:
     """A real-time up/down check rather than a cached/assumed status --
-    opens (and immediately closes) a TCP connection to the worker
-    container's syslog listener, same idea as that container's own
-    Docker healthcheck, just reachable from `app` over the compose
-    network by service name instead of 127.0.0.1. A closed/refused/timed-
-    out connection just means "down", not an error to surface."""
+    opens (and immediately closes) a TCP connection to the syslog
+    listener, same idea as that container's own Docker healthcheck.
+
+    Which host to check depends on the deployment shape: normally the
+    listener runs in the separate `worker` container, reachable from
+    `app` over the compose network by that service name; with
+    EMBED_WORKER=true (single-container/minimal mode, see
+    rain.worker_runtime) it runs in this exact same process instead, so
+    there's no "worker" hostname to resolve on any network -- it has to
+    check its own loopback. Confirmed live: checking "worker"
+    unconditionally in that mode always fails DNS resolution regardless
+    of whether the listener is actually up, showing the port as
+    permanently "down" in the UI even while a manual telnet to it from
+    outside the container succeeded fine. A closed/refused/timed-out
+    connection just means "down", not an error to surface."""
+    host = "localhost" if get_settings().embed_worker else "worker"
     try:
-        _reader, writer = await asyncio.wait_for(asyncio.open_connection("worker", port), timeout=1.5)
+        _reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=1.5)
         writer.close()
         await writer.wait_closed()
         return True

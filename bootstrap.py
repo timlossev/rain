@@ -40,6 +40,22 @@ def _get(text: str, key: str, *, default: str = "") -> str:
     return match.group()[len(key) + 1 :] if match else default
 
 
+def _normalize_s3_endpoint(value: str) -> str:
+    # Mirrors rain.settings.Settings._normalize_s3_endpoint exactly --
+    # boto3 passes this straight to botocore, which requires a full URL
+    # (scheme included) and otherwise raises a bare `ValueError: Invalid
+    # endpoint: <value>`. Confirmed live against a real GovCloud FIPS
+    # endpoint entered as just "s3-fips.dualstack.us-gov-west-1.
+    # amazonaws.com" -- exactly the shape someone copies out of AWS's
+    # own docs, which don't include a scheme. Settings itself normalizes
+    # this too regardless of how it got into .env, but doing it here as
+    # well means the value actually written to .env is already correct,
+    # not just corrected silently every time the app reads it.
+    if value and "://" not in value:
+        return f"https://{value}"
+    return value
+
+
 def _interactive() -> bool:
     return sys.stdin.isatty()
 
@@ -137,7 +153,9 @@ def _prompt_deployment_choices() -> dict[str, str]:
     if _ask_yes_no("Store documents in S3 (or an S3-compatible service) instead of local disk?", default=False):
         values["S3_BUCKET"] = _ask("S3 bucket name")
         values["S3_REGION"] = _ask("S3 region (blank is fine for a non-AWS endpoint)")
-        values["S3_ENDPOINT_URL"] = _ask("S3 endpoint URL (blank for real AWS S3, set it for MinIO/etc.)")
+        values["S3_ENDPOINT_URL"] = _normalize_s3_endpoint(
+            _ask("S3 endpoint URL (blank for real AWS S3, set it for MinIO/etc., or a specific AWS endpoint like GovCloud's FIPS one)")
+        )
         values["S3_ACCESS_KEY_ID"] = _ask("S3 access key ID (blank to use an IAM role instead of a static key)")
         if values["S3_ACCESS_KEY_ID"]:
             values["S3_SECRET_ACCESS_KEY"] = _ask("S3 secret access key")
