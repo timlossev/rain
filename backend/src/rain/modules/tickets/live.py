@@ -118,7 +118,13 @@ async def live_bulk_promote(
             tenant_db,
             ticket_type=ticket_type,
             title=title,
-            description=event.message,
+            # The full event -- host/program/severity/raw/parsed_fields,
+            # not just message -- baked into the description itself. See
+            # build_event_description's own docstring for why this isn't
+            # just left to source_event_id (retention, or a smaller
+            # retention window set after the fact, isn't guaranteed to
+            # leave that row around forever).
+            description=service.build_event_description(event),
             source_event_id=event.id,
             reporter_user_id=ctx.user.id,
         )

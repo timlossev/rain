@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import re
 
 from sqlalchemy import Sequence, func, select
@@ -29,6 +30,7 @@ from rain.db.tenant_models import (
 )
 from rain.modules.tickets import notifications
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
+from rain.modules.tickets.syslog_parser import severity_label
 
 _SEQUENCE_NAMES = {"incident": "inc_number_seq", "vulnerability": "vuln_number_seq", "change": "chg_number_seq"}
 
@@ -43,6 +45,60 @@ async def _next_ticket_number(db: AsyncSession, ticket_type: str) -> str:
     seq = Sequence(_SEQUENCE_NAMES[ticket_type])
     next_val = await db.scalar(select(seq.next_value()))
     return f"{TICKET_TYPE_PREFIX[ticket_type]}-{next_val:06d}"
+
+
+def build_event_description(event: SyslogEvent) -> str:
+    """The full picture of a promoted syslog event, baked into the
+    ticket's own description at promotion time -- both a manual "Turn
+    these into incidents/vulnerabilities" (rain.modules.tickets.live)
+    and an Event Promotion Policy match (rules.apply_rule) call this
+    instead of using event.message alone. Durable independently of
+    source_event_id, which is a soft link: retention (listener.
+    run_retention_sweep) never deletes an event a ticket still points
+    at, but nothing stopped an admin from shortening a tenant's
+    retention window after the fact, and there's no ON DELETE guarantee
+    here the way a real FK would give -- baking the detail into the
+    ticket itself means it survives regardless of what later happens to
+    the source row.
+
+    message comes first exactly as before (so an existing title/
+    description reader sees the same leading text it always did), with
+    host/program/severity/format, then parsed_fields (pretty-printed,
+    for a body event_formats.py recognized as CEF/JSON/kv), then raw
+    (the exact original line as received) each as their own section --
+    skipped individually when not applicable rather than a fixed
+    template, so a plain syslog line's description isn't padded with
+    empty sections. Ticket.description has no separate structured
+    fields for any of this, so it's all text -- see .ticket-description's
+    white-space: pre-wrap (app.css) for why the section breaks below
+    survive on the actual detail page instead of collapsing into one
+    run-on line, which is what a bare HTML <p> does with newlines by
+    default."""
+    sections = [event.message or "(no message)"]
+
+    meta = []
+    if event.host:
+        meta.append(f"Host: {event.host}")
+    if event.program:
+        meta.append(f"Program: {event.program}")
+    if event.severity is not None:
+        meta.append(f"Severity: {severity_label(event.severity)} ({event.severity})")
+    if event.event_format and event.event_format != "plain":
+        meta.append(f"Format: {event.event_format.upper()}")
+    if meta:
+        sections.append("\n".join(meta))
+
+    if event.parsed_fields:
+        sections.append("Parsed fields:\n" + json.dumps(event.parsed_fields, indent=2))
+
+    # Skipped when it's identical to message -- a plain syslog line with
+    # nothing to reformat (event_format == "plain") has raw == message
+    # verbatim, and repeating the same text twice under two different
+    # labels reads as a mistake, not extra detail.
+    if event.raw and event.raw != event.message:
+        sections.append("Raw:\n" + event.raw)
+
+    return "\n\n".join(sections)
 
 
 async def create_ticket(

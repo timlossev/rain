@@ -53,7 +53,10 @@ async def apply_rule(db: AsyncSession, rule: TicketRule, event: SyslogEvent) -> 
         db,
         ticket_type=rule.ticket_type,
         title=title,
-        description=event.message,
+        # The full event, not just message -- see build_event_description's
+        # own docstring (same reasoning applies to a policy-triggered
+        # promotion as a manual one).
+        description=service.build_event_description(event),
         severity=rule.severity,
         asset_id=asset_id,
         source_event_id=event.id,

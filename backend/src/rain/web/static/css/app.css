@@ -1058,7 +1058,12 @@ td.actions { text-align: right; white-space: nowrap; }
 .ticket-title-text { min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ticket-title-form { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; }
 .ticket-title-input { min-width: 0; flex: 1 1 auto; font-weight: 700; }
-.ticket-description { margin: 0 0 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border); color: var(--text); line-height: 1.5; }
+/* pre-wrap so a multi-line description (typed by hand, or -- see
+   rain.modules.tickets.service.build_event_description -- built from a
+   promoted syslog event's host/program/severity/raw/parsed_fields) keeps
+   its line breaks instead of collapsing to one run-on line, which is
+   what a bare <p> does with newlines by default. */
+.ticket-description { margin: 0 0 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border); color: var(--text); line-height: 1.5; white-space: pre-wrap; }
 
 /* Every row in the ticket's key/value metadata table (Assignee, Asset,
    Reported by, ...) mixes plain text with, on some rows, a
