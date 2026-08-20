@@ -49,13 +49,39 @@
        anonymous visitors in the first place -- neither of those is
        changing here, only Catalog joining Tickets as the two that are. #}
     <div data-tabs>
-      <div class="tab-buttons">
-        <button type="button" class="tab-btn active" data-tab-btn="catalog">Request Something</button>
-        <button type="button" class="tab-btn" data-tab-btn="tickets">Report Something</button>
-        {% if user %}
-        <button type="button" class="tab-btn" data-tab-btn="approvals">Pending Actions{% if pending_approval %} ({{ pending_approval | length }}){% endif %}</button>
-        <button type="button" class="tab-btn" data-tab-btn="documents">Document Archive</button>
-        {% endif %}
+      {# Same buttons drive the tab switching either way -- only how
+         they're revealed changes. Above the mobile breakpoint,
+         .tab-buttons[hidden] is force-shown as the normal row (see
+         app.css); below it, the [hidden] attribute takes effect and
+         this becomes a burger-toggled dropdown instead, reusing the
+         generic [data-menu] click-toggle/outside-click/Escape plumbing
+         (app.js) that already drives the topbar user-menu -- no new JS
+         needed. Sign in/out lives here too since the portal page (no
+         topbar, no sidebar -- see base.html's content_alone branch)
+         otherwise has nowhere to put it at all. #}
+      <div class="portal-nav-menu" data-menu>
+        <button type="button" class="portal-nav-toggle" data-menu-toggle aria-haspopup="true" aria-expanded="false" title="Menu">
+          <span class="nav-icon">{{ nav_icon("menu") }}</span> Menu
+        </button>
+        <div class="tab-buttons" data-menu-panel hidden>
+          <button type="button" class="tab-btn active" data-tab-btn="catalog">Request Something</button>
+          <button type="button" class="tab-btn" data-tab-btn="tickets">Report Something</button>
+          {% if user %}
+          <button type="button" class="tab-btn" data-tab-btn="approvals">Pending Actions{% if pending_approval %} ({{ pending_approval | length }}){% endif %}</button>
+          <button type="button" class="tab-btn" data-tab-btn="documents">Document Archive</button>
+          {% endif %}
+          <div class="portal-nav-divider"></div>
+          {% if user %}
+          <form method="post" action="/logout" class="portal-nav-signout">
+            <button class="btn btn-sm" type="submit" style="width:100%; justify-content:center;">
+              <span class="nav-icon">{{ nav_icon("sign-out") }}</span>
+              <span class="label-text">Sign out</span>
+            </button>
+          </form>
+          {% else %}
+          <a class="tab-btn" href="/login?next={{ ('/portal/' ~ tenant.slug) | urlencode }}">Sign in</a>
+          {% endif %}
+        </div>
       </div>
 
       <div class="tab-panel active" data-tab-panel="catalog">
@@ -95,7 +121,7 @@
         {% if user %}
         <div class="table-scroll">
         <table>
-          <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th><th>Last update</th><th></th></tr></thead>
+          <thead><tr><th>Number</th><th>Title</th><th class="mobile-hide">Severity</th><th>Status</th><th class="mobile-hide">Last update</th><th></th></tr></thead>
           <tbody>
             {% for row in reported %}
             <tr>
@@ -114,9 +140,9 @@
                  without already having a session either way. #}
               <td><a href="/tickets/{{ row.ticket.ticket_number }}" data-ticket-timeline="{{ row.ticket.ticket_number }}">{{ row.ticket.ticket_number }}</a></td>
               <td>{{ row.ticket.title }}</td>
-              <td><span class="badge severity-{{ row.ticket.severity }}">{{ row.ticket.severity }}</span></td>
+              <td class="mobile-hide"><span class="badge severity-{{ row.ticket.severity }}">{{ row.ticket.severity }}</span></td>
               <td class="muted">{{ row.ticket.status }}</td>
-              <td class="muted">{{ row.last_update_at.strftime("%Y-%m-%d %H:%M") if row.last_update_at else "-" }}</td>
+              <td class="muted mobile-hide">{{ row.last_update_at.strftime("%Y-%m-%d %H:%M") if row.last_update_at else "-" }}</td>
               <td>
                 {% if can_escalate %}
                 <form method="post" action="/tickets/{{ row.ticket.id }}/escalate" class="inline" data-confirm="Escalate {{ row.ticket.ticket_number }}?">

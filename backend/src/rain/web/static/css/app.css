@@ -531,6 +531,13 @@ form.inline { display: inline; }
 
 /* ---------- tabs (list / create pairs on the same screen) ---------- */
 .tab-buttons { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+/* Same fix, same reason, as .modal-overlay[hidden] below: a bare class
+   selector's `display: flex` beats the UA stylesheet's `[hidden] {
+   display: none }` regardless of specificity, because author styles
+   always win over user-agent styles -- without this, the portal's
+   burger dropdown (.tab-buttons doubling as [data-menu-panel], see
+   report.html) rendered permanently open with no way to close it. */
+.tab-buttons[hidden] { display: none; }
 .tab-btn {
   all: unset;
   cursor: pointer;
@@ -1134,6 +1141,44 @@ td.actions { text-align: right; white-space: nowrap; }
 .portal-signin-hint { margin-top: 10px; }
 .portal-search { margin-bottom: 20px; }
 
+/* Burger nav (rain.modules.portal, report.html) -- the same tab-buttons
+   row doubles as a mobile dropdown panel, toggled by .portal-nav-toggle
+   via the generic [data-menu] plumbing (app.js), so there's exactly one
+   set of buttons rather than a duplicated mobile copy. Above the
+   mobile breakpoint this is force-shown as the plain row it always
+   was (see the min-width override below); the toggle button itself,
+   and the sign-in/out row that only exists for the mobile dropdown,
+   stay hidden there. */
+.portal-nav-menu { position: relative; }
+.portal-nav-toggle {
+  /* all: unset must come first -- it resets every longhand it expands
+     to, `display` included, so putting it after `display: none` here
+     silently undid the hide-on-desktop rule below (confirmed live:
+     the burger button showed at every width, alongside the tab row
+     it's meant to replace only on mobile). */
+  all: unset;
+  display: none;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.portal-nav-toggle:hover, .portal-nav-toggle[aria-expanded="true"] { color: var(--text); border-color: var(--accent); }
+.portal-nav-toggle .nav-icon { width: 18px; height: 18px; color: inherit; }
+.portal-nav-divider, .portal-nav-signout { display: none; }
+
+@media (min-width: 861px) {
+  /* [hidden] is only ever meant to collapse the mobile dropdown -- above
+     that width this is just the original always-visible tab row. */
+  .tab-buttons[data-menu-panel][hidden] { display: flex; }
+}
+
 @media (max-width: 860px) {
   .sidebar { position: fixed; inset: 0 auto 0 0; width: 272px !important; transform: translateX(-100%); transition: transform 0.2s ease; z-index: 20; }
   body.nav-open .sidebar { transform: translateX(0); }
@@ -1154,17 +1199,78 @@ td.actions { text-align: right; white-space: nowrap; }
      shared link), unlike most of the rest of the app. */
   .content-standalone:has(.portal-shell) { padding-top: 20px; }
   .portal-card { padding: 16px; }
-  /* Logo + instance name + tenant pill no longer fit one row at this
-     width without cramming -- wrapping the pill to its own line reads
-     far better than shrinking everything to force a fit. */
-  .portal-header { flex-wrap: wrap; row-gap: 10px; }
-  .portal-tenant-pill { margin-left: 0; }
+  /* The tenant pill used to wrap onto its own line under the logo at
+     this width, which read as cramped. Sticking the whole header (not
+     just the pill in isolation -- a fixed-position pill divorced from
+     its sibling lost the flex row's own align-items: center and sat
+     visibly off from the logo) keeps both pinned to the top of the
+     screen together, still vertically aligned to each other exactly
+     as they already were, and visible even after scrolling past it. */
+  .portal-header {
+    position: sticky;
+    top: 0;
+    z-index: 45;
+    background: var(--bg);
+    /* -24px matches .content-standalone's own padding (unchanged at
+       this width -- only its padding-top is overridden above) so the
+       sticky bar spans edge-to-edge instead of leaving a gap. */
+    margin: 0 -24px 20px;
+    padding: 12px 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .portal-tenant-pill { font-size: 0.78rem; padding: 5px 12px; }
   .portal-header .brand-logo { width: 36px; height: 36px; }
+
+  /* Burger nav: the tab row becomes a toggled dropdown instead of a
+     horizontal-scroll strip (see the shared rules above this media
+     block for the parts that apply at every width). .portal-nav-menu
+     is what actually sits in normal document flow here (the row it
+     wraps is absolutely positioned when open, and display:none when
+     closed, so neither ever contributes flow spacing of its own) --
+     margin-bottom on the menu itself is what the Menu button needs so
+     whatever card follows isn't touching it at 0px. Desktop doesn't
+     need this: .tab-buttons's own margin-bottom (its base rule) is
+     what spaces it there instead. */
+  .portal-nav-menu { margin-bottom: 16px; }
+  .portal-nav-toggle { display: inline-flex; }
+  .tab-buttons[data-menu-panel] {
+    position: absolute;
+    top: 130%;
+    left: 0;
+    right: auto;
+    z-index: 60;
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    overflow-x: visible;
+    min-width: 220px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+    padding: 8px;
+  }
+  .tab-buttons[data-menu-panel] .tab-btn {
+    text-align: left;
+    white-space: normal;
+    padding: 10px 12px;
+    border-bottom: none;
+    border-radius: var(--radius-sm);
+  }
+  .tab-buttons[data-menu-panel] .tab-btn.active { background: var(--surface-sunken); }
+  .portal-nav-divider { display: block; border-top: 1px solid var(--border); margin: 8px 4px; }
+  .portal-nav-signout { display: block; }
+
+  /* Secondary table columns (Severity, Last update on the portal's own
+     "Tickets reported by me" list) -- at phone width the row's core
+     info (Number/Title/Status) plus the timeline modal a row click
+     already opens covers what these added, and dropping them is what
+     actually stops the table from forcing .table-scroll's horizontal
+     scrollbar rather than just narrowing every column further. */
+  .mobile-hide { display: none; }
 }
 
 @media (max-width: 480px) {
-  /* Long tab labels ("Request Something", "Pending Actions", ...) at
-     phone width: shrink and tighten padding rather than relying on
-     horizontal scroll alone to keep the row from feeling oversized. */
-  .portal-shell .tab-btn { padding: 8px 10px; font-size: 0.82rem; }
+  .portal-header { padding: 10px 24px; }
+  .portal-tenant-pill { padding: 4px 10px; }
 }

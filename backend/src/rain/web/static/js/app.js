@@ -211,6 +211,18 @@ document.addEventListener("DOMContentLoaded", () => {
         const target = btn.dataset.tabBtn;
         ownButtons.forEach((b) => b.classList.toggle("active", b === btn));
         ownPanels.forEach((p) => p.classList.toggle("active", p.dataset.tabPanel === target));
+        // The portal's mobile burger nav re-purposes this same tab-
+        // buttons row as a [data-menu-panel] (see report.html) --
+        // picking an item there should close the dropdown behind it
+        // like a normal mobile nav, not leave it open over the panel
+        // that just switched. A no-op everywhere else this tab
+        // plumbing is used, since none of those buttons live inside a
+        // [data-menu-panel].
+        const menuPanel = btn.closest("[data-menu-panel]");
+        if (menuPanel) {
+          menuPanel.hidden = true;
+          menuPanel.closest("[data-menu]")?.querySelector("[data-menu-toggle]")?.setAttribute("aria-expanded", "false");
+        }
       });
     });
   });
