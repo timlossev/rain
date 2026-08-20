@@ -16,12 +16,30 @@
       <span id="live-selection-count">0 selected</span> <span class="nav-icon">{{ nav_icon("dots-vertical") }}</span>
     </button>
     <div class="dropdown-menu-panel row-menu-panel" data-menu-panel hidden>
+      <button type="button" class="row-menu-item" data-live-action="view-full">View full message</button>
+      <div class="dropdown-menu-divider"></div>
       <button type="button" class="row-menu-item" data-live-action="incident">Turn these into incidents</button>
       <button type="button" class="row-menu-item" data-live-action="vulnerability">Turn these into vulnerabilities</button>
       <button type="button" class="row-menu-item" data-live-action="correlate">Correlate these</button>
       <div class="dropdown-menu-divider"></div>
       <button type="button" class="row-menu-item danger" data-live-action="discard">Discard these</button>
     </div>
+  </div>
+</div>
+
+{# Click a row (or "View full message" in the [...] menu above -- either
+   way, the WebSocket feed only ever carries a message truncated to 500
+   chars, never raw/parsed_fields, so this always goes back to the server
+   for the full row; see live.py's own docstring on this route. Same
+   fetch-and-inject-into-a-modal shape as the ticket-timeline/doc-preview
+   modals elsewhere in the app. #}
+<div class="modal-overlay" id="live-message-modal" hidden data-modal>
+  <div class="modal-box">
+    <div class="modal-header">
+      <span id="live-message-title"></span>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="live-message-body"><p class="muted">Loading...</p></div>
   </div>
 </div>
 

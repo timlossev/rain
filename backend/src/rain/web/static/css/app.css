@@ -726,6 +726,21 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
 .doc-md-preview h1, .doc-md-preview h2, .doc-md-preview h3 { margin: 0.6em 0 0.3em; }
 .doc-md-preview p { margin: 0 0 0.8em; }
 .doc-md-preview pre { background: var(--surface-sunken); padding: 10px; border-radius: var(--radius-sm); overflow-x: auto; }
+/* The live event modal's Message/Parsed fields/Raw blocks -- same
+   treatment as .doc-md-preview pre above, but wrapping long lines
+   (white-space: pre-wrap) instead of a horizontal scrollbar: a raw
+   syslog line is one long line by nature, and scrolling to read it a
+   screen-width at a time is worse here than just wrapping it. */
+.live-full-pre {
+  background: var(--surface-sunken);
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "Cascadia Mono", "SF Mono", Consolas, monospace;
+  font-size: 0.82rem;
+  margin: 8px 0 0;
+}
 .doc-md-preview code { font-family: "Cascadia Mono", "SF Mono", Consolas, monospace; background: var(--surface-sunken); padding: 1px 4px; border-radius: 4px; }
 .doc-md-preview blockquote { margin: 0 0 0.8em; padding-left: 12px; border-left: 3px solid var(--border); color: var(--text-muted); }
 .doc-md-preview table { width: 100%; border-collapse: collapse; margin-bottom: 0.8em; }
@@ -1093,15 +1108,22 @@ td.actions { text-align: right; white-space: nowrap; }
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
+  cursor: pointer;
 }
+.live-row:hover { background: var(--surface); }
 .live-row:last-child { border-bottom: none; }
 .live-select { cursor: pointer; }
 .live-time { color: var(--text-muted); }
 .live-host, .live-program { overflow: hidden; text-overflow: ellipsis; }
 .live-message { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .live-sev.sev-emerg, .live-sev.sev-alert, .live-sev.sev-crit { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
-.live-sev.sev-err { background: #ffedd5; color: #9a3412; border-color: transparent; }
-.live-sev.sev-warning { background: #fef9c3; color: #854d0e; border-color: transparent; }
+/* Same values as .severity-high/.severity-medium (tickets/list.html's
+   own severity badges) -- these were still the old palette's literal
+   Tailwind swatches, missed by that redesign since this is a separate
+   rule (.live-sev, not .severity-*) for the same syslog-severity-label
+   vocabulary rather than a ticket's own low/medium/high/critical one. */
+.live-sev.sev-err { background: #f3ddc3; color: #874323; border-color: transparent; }
+.live-sev.sev-warning { background: #f4ecc8; color: #78581a; border-color: transparent; }
 /* Only shown for a message body event_formats.py recognized as CEF/
    JSON/kv and summarized -- not a severity indicator, so kept visually
    distinct (accent, not a sev-* color) and inline with the message

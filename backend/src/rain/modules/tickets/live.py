@@ -24,6 +24,7 @@ from rain.core.security import SESSION_COOKIE_NAME
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db, resolve_ws_tenant_schema
 from rain.db.base import control_session, tenant_session
 from rain.db.control_models import SyslogSourceMap
+from rain.db.tenant_models import SyslogEvent
 from rain.modules.tickets import service
 from rain.modules.tickets.live_bus import asyncpg_dsn, channel_for
 from rain.modules.tickets.syslog_parser import severity_label
@@ -58,6 +59,36 @@ async def live_page(
 ):
     nav = await build_nav_context(ctx)
     return templates.TemplateResponse(request, "tickets/live.html", {**nav, "ctx": ctx})
+
+
+@router.get("/live/{event_id:int}/full", response_class=HTMLResponse)
+async def live_event_full(
+    request: Request,
+    event_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """The live feed's "..." menu -> View full message -- fetch-and-inject
+    into a modal (app.js's generic [data-modal] plumbing), same shape as
+    the document-preview and ticket-timeline modals. Needed at all
+    because the WebSocket feed itself only ever carries message[:500]
+    (live.py's _event_payload) and never raw/parsed_fields -- there's no
+    client-side data to just display, this has to go back to the DB for
+    the full row. 404s (not a redirect) past the retention window or a
+    bad id -- same "just say so inline" contract those other two modals
+    already have for a missing target."""
+    event = await tenant_db.get(SyslogEvent, event_id)
+    if event is None:
+        return HTMLResponse(
+            '<p class="muted">This event is no longer available -- it may have aged out past the '
+            "retention window, or already been cleaned up.</p>",
+            status_code=404,
+        )
+    return templates.TemplateResponse(
+        request,
+        "tickets/_live_event_full.html",
+        {"event": event, "severity_label": severity_label(event.severity)},
+    )
 
 
 @router.post("/live/bulk-promote")

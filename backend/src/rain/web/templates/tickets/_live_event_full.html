@@ -1,0 +1,18 @@
+<table class="ticket-meta">
+  <tr><td class="muted">Received</td><td>{{ event.received_at.strftime("%Y-%m-%d %H:%M:%S") if event.received_at else "-" }}</td></tr>
+  <tr><td class="muted">Host</td><td>{{ event.host or "-" }}</td></tr>
+  <tr><td class="muted">Program</td><td>{{ event.program or "-" }}</td></tr>
+  <tr><td class="muted">Severity</td><td>{% if event.severity is not none %}<span class="badge sev-{{ severity_label }}">{{ severity_label }}</span>{% else %}-{% endif %}</td></tr>
+  <tr><td class="muted">Format</td><td>{{ event.event_format }}</td></tr>
+</table>
+
+<div class="form-section-title" style="margin-top:18px;">Message</div>
+<pre class="live-full-pre">{{ event.message }}</pre>
+
+{% if event.parsed_fields %}
+<div class="form-section-title" style="margin-top:18px;">Parsed fields</div>
+<pre class="live-full-pre">{{ event.parsed_fields | tojson(indent=2) }}</pre>
+{% endif %}
+
+<div class="form-section-title" style="margin-top:18px;">Raw</div>
+<pre class="live-full-pre">{{ event.raw }}</pre>

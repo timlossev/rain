@@ -57,6 +57,7 @@
     row.dataset.host = evt.host || "";
     row.dataset.program = evt.program || "";
     row.dataset.message = evt.message || "";
+    row.title = "Click to view the full message";
 
     const time = new Date(evt.received_at).toLocaleTimeString();
     // event_format is "plain" for standard syslog text (the common
@@ -106,13 +107,51 @@
     if (evt.target.matches("[data-live-select]")) updateSelectionUI();
   });
 
+  // Full-message modal: the WebSocket feed only ever carries message
+  // truncated to 500 chars (live.py's _event_payload), never the full
+  // text or raw/parsed_fields -- opening this always re-fetches the
+  // complete row from the server. Reachable two ways: clicking a row
+  // directly, or "View full message" in the [...] menu (acts on the
+  // first checked row, same convention "Correlate" below already uses
+  // for a value that only makes sense singular).
+  const messageModal = document.getElementById("live-message-modal");
+  const messageTitle = document.getElementById("live-message-title");
+  const messageBody = document.getElementById("live-message-body");
+
+  async function openFullMessage(row) {
+    if (!messageModal || !row) return;
+    const id = row.dataset.id;
+    messageTitle.textContent = `${row.dataset.host || "-"} / ${row.dataset.program || "-"}`;
+    messageBody.innerHTML = '<p class="muted">Loading...</p>';
+    messageModal.hidden = false;
+    try {
+      // Both the success and 404 branches of the route already return
+      // ready-to-show HTML (a detail fragment, or an inline "no longer
+      // available" message) -- no need to branch on resp.ok here.
+      const resp = await fetch(`/tickets/live/${id}/full`);
+      messageBody.innerHTML = await resp.text();
+    } catch (err) {
+      messageBody.innerHTML = '<p class="muted">Couldn\'t load this event.</p>';
+    }
+  }
+
+  feed.addEventListener("click", (evt) => {
+    // Ignore the checkbox itself (selecting a row for a bulk action
+    // shouldn't also pop the modal) and anything already inside a link.
+    if (evt.target.closest("[data-live-select]")) return;
+    const row = evt.target.closest(".live-row");
+    if (row) openFullMessage(row);
+  });
+
   document.querySelectorAll("[data-live-action]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const rows = selectedRows();
       if (!rows.length) return;
       const action = btn.dataset.liveAction;
 
-      if (action === "incident" || action === "vulnerability") {
+      if (action === "view-full") {
+        openFullMessage(rows[0]);
+      } else if (action === "incident" || action === "vulnerability") {
         promoteForm.querySelector("[name=event_ids]").value = rows.map((row) => row.dataset.id).join(",");
         promoteForm.querySelector("[name=ticket_type]").value = action;
         promoteForm.submit();
