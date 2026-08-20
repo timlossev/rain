@@ -38,3 +38,16 @@ def new_session_token() -> str:
 
 def hash_session_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+# Same construction as the session token pair above -- kept as separate,
+# domain-named functions rather than reused directly so a call site reads
+# as "a password-reset token" rather than "a session token" repurposed
+# for something else, even though the underlying primitives are
+# identical (opaque random value, only its hash ever stored).
+def new_reset_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

@@ -7,6 +7,7 @@
     <span class="brand-name">{{ branding.instance_name }}</span>
   </div>
   {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+  {% if reset %}<div class="flash flash-ok">Your password was reset. Sign in with your new password.</div>{% endif %}
   <form method="post" action="/login">
     <input type="hidden" name="next" value="{{ next }}">
     <div class="field">
@@ -16,6 +17,7 @@
     <div class="field">
       <label for="password">Password</label>
       <input type="password" id="password" name="password" autocomplete="current-password" required>
+      {% if smtp_configured %}<a class="auth-forgot" href="/forgot-password">Forgot password?</a>{% endif %}
     </div>
     <button class="btn btn-primary" type="submit" style="width:100%;">Sign in</button>
   </form>

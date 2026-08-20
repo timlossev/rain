@@ -10,24 +10,37 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse,
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from rain.core.config_store import config_store
 from rain.core.security import (
     SESSION_COOKIE_NAME,
     SESSION_TTL_SECONDS,
+    hash_password,
+    hash_reset_token,
     hash_session_token,
+    new_reset_token,
     new_session_token,
 )
 from rain.core.tenancy import CurrentUser, get_current_user_optional
 from rain.db.base import control_session
-from rain.db.control_models import Session as SessionRow, Tenant, User
+from rain.db.control_models import PasswordResetToken, Session as SessionRow, Tenant, User
 from rain.modules.auth.provider import authenticate_user
 from rain.modules.auth.saml_config import get_saml_config
 from rain.modules.auth.saml_provider import build_auth, extract_identity, metadata_xml, provision_or_update_user
+# The app's one SMTP-sending function lives under tickets.notifications
+# (it's where email delivery was first needed) but is generic -- reused
+# here rather than duplicating the aiosmtplib/config_store plumbing for
+# a second email-sending code path that could drift from the first.
+from rain.modules.tickets.notifications import send_email
 from rain.web.safe_redirect import safe_relative_path
 from rain.web.templating import templates
 
 logger = logging.getLogger("rain.auth")
 
 router = APIRouter(tags=["Auth"])
+
+# A reset link is only valid for an hour -- long enough to find the email,
+# short enough that a link sitting in an old inbox isn't a standing risk.
+RESET_TOKEN_TTL_SECONDS = 60 * 60
 
 # Same pattern browsers use to validate a bare <input type="email"> (the
 # WHATWG HTML living standard's "willful violation" of RFC 5322 -- covers
@@ -111,7 +124,13 @@ async def login_form(request: Request, user: CurrentUser | None = Depends(get_cu
     return templates.TemplateResponse(
         request,
         "login.html",
-        {"error": None, "next": request.query_params.get("next", "/"), "saml_enabled": saml_enabled},
+        {
+            "error": None,
+            "next": request.query_params.get("next", "/"),
+            "saml_enabled": saml_enabled,
+            "smtp_configured": bool(config_store.get("smtp_host")),
+            "reset": request.query_params.get("reset"),
+        },
     )
 
 
@@ -130,12 +149,19 @@ async def login_submit(
         # login.html's email field used to catch this client-side
         # (type="email") before the browser's own silent-refusal-to-
         # submit turned into its own confusing "nothing happened" bug.
+        smtp_configured = bool(config_store.get("smtp_host"))
         if not _is_valid_email_format(email):
             saml_enabled = await get_saml_config(session) is not None
             return templates.TemplateResponse(
                 request,
                 "login.html",
-                {"error": "Not a valid email address.", "next": next, "saml_enabled": saml_enabled},
+                {
+                    "error": "Not a valid email address.",
+                    "next": next,
+                    "saml_enabled": saml_enabled,
+                    "smtp_configured": smtp_configured,
+                    "reset": None,
+                },
                 status_code=400,
             )
         user = await authenticate_user(session, email, password)
@@ -144,10 +170,163 @@ async def login_submit(
             return templates.TemplateResponse(
                 request,
                 "login.html",
-                {"error": "Invalid email or password.", "next": next, "saml_enabled": saml_enabled},
+                {
+                    "error": "Invalid email or password.",
+                    "next": next,
+                    "saml_enabled": saml_enabled,
+                    "smtp_configured": smtp_configured,
+                    "reset": None,
+                },
                 status_code=400,
             )
         return await _issue_session(request, session, user, next)
+
+
+@router.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_form(request: Request, user: CurrentUser | None = Depends(get_current_user_optional)):
+    if user is not None:
+        return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(
+        request,
+        "forgot_password.html",
+        {"error": None, "sent": False, "smtp_configured": bool(config_store.get("smtp_host"))},
+    )
+
+
+@router.post("/forgot-password")
+async def forgot_password_submit(request: Request, email: str = Form(...)):
+    # Mirrors login_form's own guard: someone reaching this route while
+    # SMTP isn't configured (the link is hidden on login.html in that
+    # case, but nothing stops a direct POST) gets told plainly rather
+    # than a silent no-op that looks like an email was sent.
+    if not config_store.get("smtp_host"):
+        return templates.TemplateResponse(
+            request,
+            "forgot_password.html",
+            {"error": "Password reset isn't available on this instance -- contact your administrator.", "sent": False, "smtp_configured": False},
+            status_code=400,
+        )
+    if not _is_valid_email_format(email):
+        return templates.TemplateResponse(
+            request,
+            "forgot_password.html",
+            {"error": "Not a valid email address.", "sent": False, "smtp_configured": True},
+            status_code=400,
+        )
+
+    async with control_session() as session:
+        result = await session.execute(
+            select(User).where(
+                User.email == email.strip().lower(), User.auth_source == "local", User.is_active.is_(True)
+            )
+        )
+        user = result.scalar_one_or_none()
+        if user is not None:
+            # Clear any earlier, still-unused request first -- otherwise
+            # an old emailed link stays live alongside a freshly
+            # requested one instead of being superseded by it.
+            await session.execute(
+                delete(PasswordResetToken).where(
+                    PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None)
+                )
+            )
+            token = new_reset_token()
+            session.add(
+                PasswordResetToken(
+                    token_hash=hash_reset_token(token),
+                    user_id=user.id,
+                    expires_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=RESET_TOKEN_TTL_SECONDS),
+                )
+            )
+            await session.commit()
+            reset_url = f"{request.url.scheme}://{request.url.netloc}/reset-password?token={token}"
+            await send_email(
+                [user.email],
+                "Reset your RAIN password",
+                "A password reset was requested for your RAIN account.\n\n"
+                f"Reset your password: {reset_url}\n\n"
+                "This link expires in 1 hour and can only be used once. "
+                "If you didn't request this, you can safely ignore this email.",
+            )
+        # Same response whether or not that email matched a real local
+        # account -- a different one here would let this form be used to
+        # test which email addresses have accounts (or which ones are
+        # LDAP/SAML-only and so have no local password to reset).
+
+    return templates.TemplateResponse(
+        request, "forgot_password.html", {"error": None, "sent": True, "smtp_configured": True}
+    )
+
+
+async def _valid_reset_token(session: AsyncSession, token: str) -> PasswordResetToken | None:
+    if not token:
+        return None
+    result = await session.execute(
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_reset_token(token))
+    )
+    reset = result.scalar_one_or_none()
+    if reset is None or reset.used_at is not None:
+        return None
+    if reset.expires_at < dt.datetime.now(dt.timezone.utc):
+        return None
+    return reset
+
+
+@router.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_form(request: Request, token: str = ""):
+    async with control_session() as session:
+        reset = await _valid_reset_token(session, token)
+    return templates.TemplateResponse(
+        request, "reset_password.html", {"token": token, "valid": reset is not None, "error": None}
+    )
+
+
+@router.post("/reset-password")
+async def reset_password_submit(
+    request: Request,
+    token: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+):
+    async with control_session() as session:
+        reset = await _valid_reset_token(session, token)
+        if reset is None:
+            return templates.TemplateResponse(
+                request,
+                "reset_password.html",
+                {"token": token, "valid": False, "error": None},
+                status_code=400,
+            )
+        if new_password != confirm_password:
+            return templates.TemplateResponse(
+                request,
+                "reset_password.html",
+                {"token": token, "valid": True, "error": "Passwords don't match."},
+                status_code=400,
+            )
+        # Same 10-character minimum enforced at account creation
+        # (setup/router.py) and admin-initiated password changes
+        # (admin/router.py) -- kept identical rather than inventing a
+        # separate policy for this one entry point.
+        if len(new_password) < 10:
+            return templates.TemplateResponse(
+                request,
+                "reset_password.html",
+                {"token": token, "valid": True, "error": "Password must be at least 10 characters."},
+                status_code=400,
+            )
+
+        user_result = await session.execute(select(User).where(User.id == reset.user_id))
+        user = user_result.scalar_one()
+        user.password_hash = hash_password(new_password)
+        reset.used_at = dt.datetime.now(dt.timezone.utc)
+        # A password reset is exactly the moment an account might just
+        # have been recovered from someone else's control -- any session
+        # still live at that point (on any device) shouldn't survive it.
+        await session.execute(delete(SessionRow).where(SessionRow.user_id == user.id))
+        await session.commit()
+
+    return RedirectResponse("/login?reset=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/auth/saml/metadata")

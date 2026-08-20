@@ -108,6 +108,28 @@ class Session(ControlBase):
     user: Mapped[User] = relationship()
 
 
+class PasswordResetToken(ControlBase):
+    """A self-service "Forgot password?" request (rain.modules.auth.router).
+    Same shape as Session -- an opaque random token, only its sha256 hash
+    stored -- but single-use (used_at) and short-lived (expires_at, an hour
+    from creation) rather than a long-lived login credential. Only ever
+    created for a `local` auth_source user; an LDAP/SAML account has no
+    local password to reset, and the request route checks that before
+    creating one."""
+
+    __tablename__ = "password_reset_tokens"
+    __table_args__ = {"schema": CONTROL_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey(f"{CONTROL_SCHEMA}.users.id", ondelete="CASCADE"))
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped[User] = relationship()
+
+
 class GlobalConfig(ControlBase):
     """Instance-wide runtime configuration (branding, instance name, ...).
     See rain.core.config_store for the cached read path."""

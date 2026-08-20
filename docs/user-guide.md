@@ -14,6 +14,18 @@ separate LDAP login flow to learn. If a SAML identity provider has been
 enabled for the instance, a "Sign in with SSO" button appears below the
 password form and sends you to that provider instead.
 
+If the instance has an SMTP relay configured (Admin → Settings), a
+"Forgot password?" link appears under the password field for local
+accounts. It sends a reset link, valid for one hour and usable once,
+to the address on file; the confirmation message is the same whether
+or not that address actually has an account, so the form can't be used
+to test which emails are registered. Resetting a password signs that
+account out everywhere else it was signed in. LDAP and SAML accounts
+have no local password and don't use this flow -- reset your directory
+or identity-provider password instead. If no SMTP relay is configured,
+the link doesn't appear; ask an administrator to set your password
+from Admin → Users instead.
+
 ### First-run setup
 
 The very first time a fresh RAIN instance is opened in a browser, it

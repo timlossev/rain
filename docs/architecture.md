@@ -126,6 +126,18 @@ dispatches on `User.auth_source`); SAML is a separate browser-redirect
 flow entirely (`/auth/saml/login` → IdP → `/auth/saml/acs`) that mints the
 same kind of session at the end instead of checking a password.
 
+Self-service password reset (`/forgot-password`, `/reset-password`)
+follows the same DB-backed-opaque-token shape as sessions:
+`control.password_reset_tokens` stores only a token's sha256 hash,
+single-use (`used_at`) and expiring after an hour. It's gated on an
+SMTP relay being configured (`rain.modules.tickets.notifications.
+send_email`, reused rather than duplicated) and only ever issued for
+`auth_source == "local"` users -- LDAP/SAML accounts have no local
+password to reset. Requesting a reset always returns the same response
+regardless of whether the address matched an account, and completing
+one deletes every `control.sessions` row for that user, signing them
+out everywhere.
+
 Roles come from a `control.roles` table (not a hardcoded enum), seeded with
 `internal_admin` (platform operator, all tenants, every setting),
 `client` (full control scoped to their own tenant, no admin functions),
