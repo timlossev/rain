@@ -238,11 +238,13 @@ docker compose up --build
 
 `bootstrap` generates strong random secrets either way, then asks a
 handful of deployment questions -- built-in vs external Postgres (with
-a live connection test), local disk vs S3 document storage, and a
-separate worker container vs merging it into `app` -- defaulting to
-the setup above if you just press Enter, or skipping the questions
-entirely (same defaults) when run non-interactively, e.g. in CI. It
-only ever runs once; a `.env` that already exists is left untouched.
+a live connection test, and, for an external one, whether it supports
+the pgvector extension), local disk vs S3 document storage, a separate
+worker container vs merging it into `app`, and Caddy vs an existing
+reverse proxy/load balancer in front of RAIN -- defaulting to the setup
+above if you just press Enter, or skipping the questions entirely (same
+defaults) when run non-interactively, e.g. in CI. It only ever runs
+once; a `.env` that already exists is left untouched.
 
 Then visit `https://localhost` (Caddy issues a certificate automatically --
 from its internal CA for `localhost`, or via public ACME if you set
@@ -266,10 +268,18 @@ infrastructure instead of the full default stack: `POSTGRES_URL` points
 RAIN at an external/managed Postgres instead of running its own `db`
 container; `APP_PORT` changes what the app listens on; `WEB_FRONTEND=false`
 skips the Caddy container for deployments that already terminate TLS in
-front of RAIN (e.g. an AWS ALB); `S3_BUCKET` (+ `S3_REGION`/
-`S3_ENDPOINT_URL`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`) points
-document storage at an S3 (or S3-compatible) bucket instead of the local
-uploads volume. See the comments in `.env.example`.
+front of RAIN (e.g. an AWS ALB) -- also drop `web-frontend` from
+`COMPOSE_PROFILES` when you do, since that (not `WEB_FRONTEND`) is what
+Compose actually reads to decide whether to start it; `S3_BUCKET` (+
+`S3_REGION`/`S3_ENDPOINT_URL`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`)
+points document storage at an S3 (or S3-compatible) bucket instead of the
+local uploads volume; `ENABLE_PGVECTOR=false` skips creating the Postgres
+`vector` extension (and the reserved, currently-unused embedding columns
+that depend on it) for an external Postgres that can't create it -- a
+managed-database role without `CREATE EXTENSION` privilege
+(`asyncpg.exceptions.InsufficientPrivilegeError`), or the extension not
+being offered at all (standard RDS in AWS GovCloud). `bootstrap` asks
+about all of this interactively too. See the comments in `.env.example`.
 
 Combine all of those with `EMBED_WORKER=true` (folds the `worker`
 container's own duties -- syslog listener, rule engine, notifications,
@@ -299,6 +309,27 @@ accepts a plain `postgresql://` DSN as-is unless you've turned on
 param, not the `sslmode=` one `psql`/libpq use). Add `-e
 S3_BUCKET=... -e S3_REGION=...` (see `.env.example`) if you want
 documents in S3 instead of the container's own non-persistent storage.
+Add `-e ENABLE_PGVECTOR=false` if that RDS role can't create extensions
+at all (typical for a minimum-privilege application role) or the
+instance doesn't offer `vector` in the first place (standard RDS in AWS
+GovCloud) -- confirmed live against both a permission-denied and a
+does-not-exist Postgres: migrations complete either way, and nothing
+else in the app depends on it since it's a reserved, unused-today
+column. `RAIN_DOMAIN` is unused in this shape -- it's Caddy-only, and
+there's no Caddy here -- so there's nothing to set it to. Filled in for
+a GovCloud-style deployment (external Postgres, no privilege to create
+extensions, an S3-compatible bucket), that's:
+
+```sh
+docker build -t rain-app ./backend && docker run -d --name rain -p 8000:8000 -p 5514:5514/tcp -p 5514:5514/udp \
+  -e DATABASE_URL="postgresql://user:password@your-rds-endpoint:5432/rain" \
+  -e APP_SECRET_KEY="$(openssl rand -base64 48)" \
+  -e EMBED_WORKER=true \
+  -e ENABLE_PGVECTOR=false \
+  -e DEBUG=false \
+  -e S3_BUCKET=your-bucket -e S3_REGION=us-gov-west-1 \
+  rain-app
+```
 
 See `docker-compose.minimal.yml`'s own comments for the exact `.env`
 values this needs.
@@ -309,7 +340,7 @@ values this needs.
 |---|---|---|
 | Frontend edge | Caddy (alpine) | Automatic HTTPS, reverse proxy, nothing else to configure |
 | App | FastAPI + Jinja2, server-rendered | No Node/SPA build, no third-party JS framework to track for CVEs |
-| DB | Postgres with pgvector | Full-text search live now (tsvector/GIN); pgvector enabled and reserved for semantic search once an embedding source exists |
+| DB | Postgres, optionally with pgvector | Full-text search live now (tsvector/GIN); pgvector reserved for semantic search once an embedding source exists -- `ENABLE_PGVECTOR=false` skips it for a Postgres that can't create it |
 | Multi-tenancy | Schema-per-tenant | One Postgres instance, isolated per tenant |
 | Auth | Local email/password + optional LDAP + SAML 2.0 | `python3-saml` for SAML (XML signature verification, not hand-rolled) |
 | Ticketing bus | Built-in syslog listener (TCP+UDP) | syslog-ng pushes to it directly, no third-party syslog library; foldable into the app container itself (`EMBED_WORKER=true`) for a single-container deployment |

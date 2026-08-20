@@ -45,6 +45,8 @@ s3_endpoint_url=""
 s3_access_key_id=""
 s3_secret_access_key=""
 embed_worker=""
+web_frontend=""
+enable_pgvector=""
 compose_profiles=""
 
 ask_yes_no() {
@@ -133,6 +135,20 @@ if [[ -t 0 ]]; then
         if [[ "$(ask_yes_no "Use RAIN's own built-in Postgres container?" y)" == "n" ]]; then
             postgres_url="$(prompt_external_database)"
             profiles="${profiles/local-db,/}"
+            # RAIN's own Postgres image always has pgvector baked in (see
+            # db/Dockerfile), so this is only worth asking once an
+            # external instance is in the picture -- and defaults to
+            # "no" here, unlike every other question above: it's
+            # reserved for a future semantic-search feature nothing uses
+            # yet, but a managed/restricted Postgres refusing to create
+            # it (a permission error on a typical minimum-privilege
+            # role, or the extension not being offered at all -- standard
+            # RDS in AWS GovCloud, e.g.) fails the whole migration chain
+            # outright, a far worse outcome than just not getting an
+            # unused placeholder column.
+            if [[ "$(ask_yes_no "Does that Postgres support the pgvector extension? (reserved for a future semantic-search feature, unused today -- say no if you're not sure, or for most managed/restricted instances)" n)" == "n" ]]; then
+                enable_pgvector="false"
+            fi
         fi
 
         if [[ "$(ask_yes_no "Store documents in S3 (or an S3-compatible service) instead of local disk?" n)" == "y" ]]; then
@@ -148,6 +164,25 @@ if [[ -t 0 ]]; then
         if [[ "$(ask_yes_no "Merge the worker (syslog listener, rule engine, notifications) into the app container instead of running it separately?" n)" == "y" ]]; then
             embed_worker="true"
             profiles="${profiles/,worker/}"
+        fi
+
+        # Keeps WEB_FRONTEND and COMPOSE_PROFILES in sync automatically --
+        # .env.example documents these as needing to be hand-edited
+        # together (Compose profiles can't be toggled from inside a plain
+        # KEY=VALUE variable), but there's no reason this script, which is
+        # already writing both, can't just do that itself.
+        if [[ "$(ask_yes_no "Use Caddy as RAIN's reverse proxy (automatic HTTPS)? Say no if something else already terminates TLS in front of RAIN (e.g. an ALB, an existing reverse proxy)." y)" == "n" ]]; then
+            web_frontend="false"
+            # web-frontend can be in the middle ("local-db,web-frontend,worker"),
+            # at the start ("web-frontend,worker"), at the end
+            # ("local-db,web-frontend"), or the only entry ("web-frontend")
+            # by this point, depending on the two removals above -- unlike
+            # those two (which only ever need to strip one fixed edge),
+            # this one needs all three forms; each is a no-op string
+            # substitution when it doesn't match.
+            profiles="${profiles/,web-frontend/}"
+            profiles="${profiles/web-frontend,/}"
+            profiles="${profiles/web-frontend/}"
         fi
 
         compose_profiles="$profiles"
@@ -179,6 +214,8 @@ sed_args+=(-e "s#^APP_SECRET_KEY=.*\$#APP_SECRET_KEY=$(escape_value "$secret_key
 [[ -n "$s3_access_key_id" ]] && sed_args+=(-e "s#^S3_ACCESS_KEY_ID=.*\$#S3_ACCESS_KEY_ID=$(escape_value "$s3_access_key_id")#")
 [[ -n "$s3_secret_access_key" ]] && sed_args+=(-e "s#^S3_SECRET_ACCESS_KEY=.*\$#S3_SECRET_ACCESS_KEY=$(escape_value "$s3_secret_access_key")#")
 [[ -n "$embed_worker" ]] && sed_args+=(-e "s#^EMBED_WORKER=.*\$#EMBED_WORKER=$(escape_value "$embed_worker")#")
+[[ -n "$web_frontend" ]] && sed_args+=(-e "s#^WEB_FRONTEND=.*\$#WEB_FRONTEND=$(escape_value "$web_frontend")#")
+[[ -n "$enable_pgvector" ]] && sed_args+=(-e "s#^ENABLE_PGVECTOR=.*\$#ENABLE_PGVECTOR=$(escape_value "$enable_pgvector")#")
 [[ -n "$compose_profiles" ]] && sed_args+=(-e "s#^COMPOSE_PROFILES=.*\$#COMPOSE_PROFILES=$(escape_value "$compose_profiles")#")
 
 sed "${sed_args[@]}" "$example_path" > "$env_path"

@@ -122,6 +122,20 @@ if (-not [Console]::IsInputRedirected) {
         if (-not (Read-YesNo "Use RAIN's own built-in Postgres container?" $true)) {
             $text = Set-EnvValue $text "POSTGRES_URL" (Read-ExternalDatabaseUrl)
             $profiles = $profiles | Where-Object { $_ -ne "local-db" }
+            # RAIN's own Postgres image always has pgvector baked in (see
+            # db/Dockerfile), so this is only worth asking once an
+            # external instance is in the picture -- and defaults to
+            # "no" here, unlike every other question above: it's
+            # reserved for a future semantic-search feature nothing uses
+            # yet, but a managed/restricted Postgres refusing to create
+            # it (a permission error on a typical minimum-privilege
+            # role, or the extension not being offered at all -- standard
+            # RDS in AWS GovCloud, e.g.) fails the whole migration chain
+            # outright, a far worse outcome than just not getting an
+            # unused placeholder column.
+            if (-not (Read-YesNo "Does that Postgres support the pgvector extension? (reserved for a future semantic-search feature, unused today -- say no if you're not sure, or for most managed/restricted instances)" $false)) {
+                $text = Set-EnvValue $text "ENABLE_PGVECTOR" "false"
+            }
         }
 
         if (Read-YesNo "Store documents in S3 (or an S3-compatible service) instead of local disk?" $false) {
@@ -138,6 +152,16 @@ if (-not [Console]::IsInputRedirected) {
         if (Read-YesNo "Merge the worker (syslog listener, rule engine, notifications) into the app container instead of running it separately?" $false) {
             $text = Set-EnvValue $text "EMBED_WORKER" "true"
             $profiles = $profiles | Where-Object { $_ -ne "worker" }
+        }
+
+        # Keeps WEB_FRONTEND and COMPOSE_PROFILES in sync automatically --
+        # .env.example documents these as needing to be hand-edited
+        # together (Compose profiles can't be toggled from inside a plain
+        # KEY=VALUE variable), but there's no reason this script, which is
+        # already writing both, can't just do that itself.
+        if (-not (Read-YesNo "Use Caddy as RAIN's reverse proxy (automatic HTTPS)? Say no if something else already terminates TLS in front of RAIN (e.g. an ALB, an existing reverse proxy)." $true)) {
+            $text = Set-EnvValue $text "WEB_FRONTEND" "false"
+            $profiles = $profiles | Where-Object { $_ -ne "web-frontend" }
         }
 
         $text = Set-EnvValue $text "COMPOSE_PROFILES" ($profiles -join ",")

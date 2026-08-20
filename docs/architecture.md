@@ -515,6 +515,26 @@ and completely unpopulated today. The dimension (1536) matches common
 embedding APIs' output size as a reasonable placeholder, not a
 commitment to a specific provider -- see the Roadmap entry below.
 
+**`Settings.enable_pgvector`** (`ENABLE_PGVECTOR` in `.env`, on by
+default) makes all of the above skippable: some managed Postgres
+instances either refuse `CREATE EXTENSION` to the app's own role
+(confirmed live: `asyncpg.exceptions.InsufficientPrivilegeError` against
+a standard, non-superuser RDS role) or don't offer `vector` at all
+(standard RDS in AWS GovCloud) -- since nothing reads or writes these
+columns yet, failing the whole migration chain over an extension that's
+purely reserved for later isn't worth it. Off, control migration 0006's
+`CREATE EXTENSION` and tenant migration 0023's two `add_column` calls
+are no-ops (0023's `search_vector`/GIN part is unaffected -- it needs
+nothing beyond stock Postgres); `rain.db.tenant_models` reads the exact
+same setting at import time to decide whether `Ticket`/`Document` map an
+`embedding` attribute at all, not just whether the column exists in the
+DB -- a bare `select(Ticket)` selects every *mapped* column by default,
+so a mismatch between "the DB doesn't have this column" and "the ORM
+still thinks it does" would fail every ticket/document query, not just
+ones that actually touch `embedding`. Confirmed live end-to-end against
+a Postgres with no `vector` extension available at all: migrations
+complete, and a plain insert + `select(Ticket)` both succeed.
+
 ### Ticket/document URLs
 
 `/tickets/{ticket_number}` and `/documents/{doc_number}` (e.g.

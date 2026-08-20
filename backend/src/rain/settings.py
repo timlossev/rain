@@ -65,6 +65,23 @@ class Settings(BaseSettings):
     # shape); on for a genuinely single-container deployment.
     embed_worker: bool = False
 
+    # Reserves the `vector` Postgres extension/type for a future semantic-
+    # search source (rain.db.tenant_models.Ticket/Document.embedding,
+    # EMBEDDING_DIM) -- unused today (rain.modules.search is full-text
+    # only), so safe to turn off outright. On by default to not change
+    # behavior for an existing deployment that already migrated with it;
+    # turn off for a Postgres that can't grant CREATE EXTENSION at all
+    # (confirmed live: asyncpg.exceptions.InsufficientPrivilegeError
+    # against a standard, non-superuser RDS role) or doesn't ship the
+    # extension in the first place (e.g. standard RDS in AWS GovCloud).
+    # Read at migration time by control migration 0006 and tenant
+    # migration 0023, and at import time by the two embedding columns
+    # below -- flipping it after either has already run against a given
+    # schema has no retroactive effect (same as every other env-at-
+    # deploy-time setting here), only on migrations/schemas from that
+    # point on.
+    enable_pgvector: bool = True
+
     @field_validator("database_url")
     @classmethod
     def _normalize_driver(cls, value: str) -> str:

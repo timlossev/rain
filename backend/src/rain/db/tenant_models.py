@@ -33,6 +33,8 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from rain.settings import get_settings
+
 
 class TenantBase(DeclarativeBase):
     pass
@@ -46,6 +48,16 @@ class TenantBase(DeclarativeBase):
 # docstring for why (no LLM/embedding source wired in, so search today is
 # Postgres full-text search only, via the search_vector columns instead).
 EMBEDDING_DIM = 1536
+
+# Settings.enable_pgvector (see that module) -- whether `embedding` gets
+# mapped on Ticket/Document at all below. A plain module-level bool read
+# once at import time, same as the setting itself: if it's off, the
+# `vector` Postgres type/extension was never created (migrations 0006/
+# 0023 skip it too), so the ORM must not know about the column either --
+# a bare `select(Ticket)` selects every mapped column by default, and
+# that would otherwise fail with "column tickets.embedding does not
+# exist" the moment anything queried a ticket at all.
+ENABLE_PGVECTOR = get_settings().enable_pgvector
 
 
 class AssetType(TenantBase):
@@ -487,9 +499,10 @@ class Ticket(TenantBase):
     # rather than an ordinary nullable column -- confirmed via a real
     # request once documents/tickets could be created again after 0023.
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True, deferred=True, server_default=FetchedValue())
-    # Reserved for a future semantic-search source -- see EMBEDDING_DIM's
-    # comment above. Always NULL today.
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
+    if ENABLE_PGVECTOR:
+        # Reserved for a future semantic-search source -- see
+        # EMBEDDING_DIM's comment above. Always NULL today.
+        embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
 
     asset: Mapped[Asset | None] = relationship()
     source_rule: Mapped["TicketRule | None"] = relationship()
@@ -798,9 +811,11 @@ class Document(TenantBase):
     # without it, creating a document fails the same way creating a
     # ticket did (asyncpg.exceptions.GeneratedAlwaysError).
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True, deferred=True, server_default=FetchedValue())
-    # Reserved for a future semantic-search source -- see EMBEDDING_DIM's
-    # comment near the top of this file. Always NULL today.
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
+    if ENABLE_PGVECTOR:
+        # Reserved for a future semantic-search source -- see
+        # EMBEDDING_DIM's comment near the top of this file. Always NULL
+        # today.
+        embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
 
     links: Mapped[list["DocumentLink"]] = relationship(back_populates="document", cascade="all, delete-orphan")
     webhook: Mapped["WebhookConfig | None"] = relationship()
