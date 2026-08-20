@@ -1058,12 +1058,33 @@ td.actions { text-align: right; white-space: nowrap; }
 .ticket-title-text { min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ticket-title-form { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; }
 .ticket-title-input { min-width: 0; flex: 1 1 auto; font-weight: 700; }
+/* The bottom margin/border that used to live on .ticket-description
+   itself now lives on its wrapper instead -- .ticket-description-toggle
+   ("Show more") sits between the text and that divider, which would
+   otherwise cut across right above the button instead of below it. */
+.ticket-description-wrap { margin: 0 0 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
 /* pre-wrap so a multi-line description (typed by hand, or -- see
    rain.modules.tickets.service.build_event_description -- built from a
    promoted syslog event's host/program/severity/raw/parsed_fields) keeps
    its line breaks instead of collapsing to one run-on line, which is
    what a bare <p> does with newlines by default. */
-.ticket-description { margin: 0 0 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border); color: var(--text); line-height: 1.5; white-space: pre-wrap; }
+.ticket-description { margin: 0; color: var(--text); line-height: 1.5; white-space: pre-wrap; }
+/* -webkit-line-clamp (despite the name, supported in every evergreen
+   browser today, not just WebKit/Blink) truncates by *rendered* lines
+   regardless of whether they come from pre-wrap's own newlines or
+   ordinary word-wrap -- a fixed max-height guess would either cut a
+   line in half or leave dead space depending on actual line count.
+   Removed by app.js's [data-clamp] handler on "Show more", which only
+   ever shows that button when this is actually hiding something
+   (checked via scrollHeight vs clientHeight) -- a short description
+   never grows a clamp or a button in the first place. */
+.ticket-description.clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 15;
+  overflow: hidden;
+}
+.ticket-description-toggle { margin-top: 8px; }
 
 /* Every row in the ticket's key/value metadata table (Assignee, Asset,
    Reported by, ...) mixes plain text with, on some rows, a

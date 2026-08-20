@@ -77,7 +77,18 @@
       </form>
     </div>
   </div>
-  <p class="ticket-description">{{ ticket.description or "No description." }}</p>
+  {# Clamped to 15 lines by default (app.css's .ticket-description.clamped)
+     -- a promoted event's description can run long now that it carries
+     the full event (see rain.modules.tickets.service.
+     build_event_description), and an unclamped wall of text there reads
+     as a layout bug more than a feature. "Show more" only ever appears
+     when the text actually overflows the clamp (app.js's [data-clamp]
+     handler checks scrollHeight vs clientHeight) -- a short description
+     never gets a button with nothing to expand. #}
+  <div class="ticket-description-wrap" data-clamp>
+    <p class="ticket-description clamped" data-clamp-target>{{ ticket.description or "No description." }}</p>
+    <button type="button" class="btn btn-sm ticket-description-toggle" data-clamp-toggle hidden>Show more</button>
+  </div>
   <table class="ticket-meta">
     <tbody>
       <tr><th>Assignee</th><td>

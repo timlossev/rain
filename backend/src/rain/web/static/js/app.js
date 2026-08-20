@@ -385,6 +385,31 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Generic "Show more" for a long clamped text block (ticket detail's
+  // own description -- see .ticket-description.clamped in app.css --
+  // the first user of this, but opt-in via [data-clamp] rather than
+  // hardcoded to that one element in case another long-text field wants
+  // the same treatment later). The toggle button only ever appears when
+  // the text is actually being clipped: scrollHeight only exceeds
+  // clientHeight while -webkit-line-clamp (or any other overflow:
+  // hidden clamp) is genuinely hiding content, so a description short
+  // enough to fit within the clamp never grows a button with nothing to
+  // expand. The +1 is slack for sub-pixel rounding, not a real
+  // threshold -- without it a description landing exactly on the clamp
+  // boundary could show a "Show more" that expands to reveal nothing.
+  document.querySelectorAll("[data-clamp]").forEach((wrap) => {
+    const target = wrap.querySelector("[data-clamp-target]");
+    const toggle = wrap.querySelector("[data-clamp-toggle]");
+    if (!target || !toggle) return;
+    if (target.scrollHeight > target.clientHeight + 1) {
+      toggle.hidden = false;
+      toggle.addEventListener("click", () => {
+        const stillClamped = target.classList.toggle("clamped");
+        toggle.textContent = stillClamped ? "Show more" : "Show less";
+      });
+    }
+  });
+
   // Single "Menu" button drives both behaviors, depending on viewport:
   // on narrow screens it opens/closes the off-canvas sidebar; on wide
   // screens it collapses the sidebar down to icons-only, persisted across
