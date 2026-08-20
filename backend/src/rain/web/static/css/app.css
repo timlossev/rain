@@ -3,27 +3,42 @@
    keeps the image free of any CSS/JS toolchain or CDN dependency (nothing
    to download at build time, nothing to patch for supply-chain CVEs)
    while still giving a modern, consistent look. --accent is overridden
-   inline per-request from branding config (see base.html). */
+   inline per-request from branding config (see base.html).
+
+   Palette is warm (paper/ink undertones) rather than the cool blue-grey
+   neutrals most component-library defaults ship with, and the accent is
+   a deep slate-teal rather than the indigo/violet almost every "AI-
+   generated-looking" admin UI reaches for -- deliberate choices, not
+   left at whatever a starter template shipped with. Same reasoning
+   behind the radius scale: small and consistent (a "drafted with a
+   ruler" feel) instead of the bubbly, everything-is-999px-pill-shaped
+   default -- see the badge/pill/status-step rules further down, all of
+   which deliberately stop short of a full pill now. Shadows are a
+   two-tier system (--shadow for a resting card, --shadow-elevated/
+   --shadow-modal for floating layers) instead of one-off blurred black
+   values invented per component. */
 
 :root {
-  --accent: #6366f1;
+  --accent: #3d6b73;
   --accent-contrast: #ffffff;
-  --bg: #f4f5f7;
+  --bg: #f3f1ea;
   --surface: #ffffff;
-  --surface-sunken: #f9fafb;
-  --border: #e3e5ea;
-  --text: #1a1d29;
-  --text-muted: #6b7280;
-  --danger: #dc2626;
-  --danger-bg: #fef2f2;
-  --ok: #16a34a;
-  --ok-bg: #f0fdf4;
-  --sidebar-bg: #14161f;
-  --sidebar-text: #cbd0dc;
-  --sidebar-text-dim: #7d8296;
-  --radius: 10px;
-  --radius-sm: 6px;
-  --shadow: 0 1px 2px rgba(16, 17, 26, 0.06), 0 1px 1px rgba(16, 17, 26, 0.04);
+  --surface-sunken: #f6f2e9;
+  --border: #ddd6c7;
+  --text: #221f19;
+  --text-muted: #736c5c;
+  --danger: #a8431f;
+  --danger-bg: #faece2;
+  --ok: #4b6b3a;
+  --ok-bg: #f0f3e9;
+  --sidebar-bg: #1e1c16;
+  --sidebar-text: #d9d3c2;
+  --sidebar-text-dim: #8c8570;
+  --radius: 3px;
+  --radius-sm: 2px;
+  --shadow: 0 1px 0 rgba(34, 31, 25, 0.1);
+  --shadow-elevated: 0 10px 24px -8px rgba(34, 31, 25, 0.28), 0 2px 6px rgba(34, 31, 25, 0.12);
+  --shadow-modal: 0 24px 48px -12px rgba(20, 18, 14, 0.45);
   font-size: 15px;
 }
 
@@ -75,7 +90,7 @@ p { margin: 0 0 1em; }
    size read as an afterthought). Bumped globally, with the login and
    portal header -- both bigger, more "front door" contexts than the
    sidebar's own tight column -- sized up further still below. */
-.brand-logo { width: 36px; height: 36px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
+.brand-logo { width: 36px; height: 36px; object-fit: contain; border-radius: var(--radius-sm); flex-shrink: 0; }
 .brand-name { font-weight: 700; font-size: 1.05rem; color: #fff; letter-spacing: 0.02em; white-space: nowrap; }
 
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -103,7 +118,7 @@ p { margin: 0 0 1em; }
   min-width: 120px;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: var(--surface-sunken);
 }
 .topbar-search:focus-within { border-color: var(--accent); }
@@ -124,7 +139,7 @@ p { margin: 0 0 1em; }
 .topbar-user { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; color: var(--text-muted); }
 .search-snippet { font-size: 0.82rem; color: var(--text-muted); margin-top: 3px; }
 .search-snippet mark { background: color-mix(in srgb, var(--accent) 35%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }
-.session-tenant-badge { display: inline-flex; font-size: 0.8rem; color: var(--text-muted); padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-sunken); white-space: nowrap; text-decoration: none; }
+.session-tenant-badge { display: inline-flex; font-size: 0.8rem; color: var(--text-muted); padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-sunken); white-space: nowrap; text-decoration: none; }
 .session-tenant-badge:hover { border-color: var(--accent); text-decoration: none; }
 .session-tenant-badge strong { color: var(--text); }
 
@@ -154,7 +169,7 @@ p { margin: 0 0 1em; }
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-elevated);
   padding: 12px;
 }
 .dropdown-menu-panel[hidden] { display: none; }
@@ -235,10 +250,10 @@ p { margin: 0 0 1em; }
   right: 16px;
   top: 100%;
   margin-top: 4px;
-  background: #1b1e2b;
+  background: #26231a;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-modal);
   z-index: 40;
   max-height: 280px;
   overflow-y: auto;
@@ -264,7 +279,7 @@ p { margin: 0 0 1em; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-elevated);
   z-index: 70;
   max-height: 220px;
   overflow-y: auto;
@@ -320,12 +335,12 @@ p { margin: 0 0 1em; }
   font-size: 0.92rem;
 }
 .nav-link .nav-label { font-weight: 400; flex: 1; }
-.nav-toggle .nav-label { font-weight: 600; color: #eef0f5; flex: 1; text-align: left; }
+.nav-toggle .nav-label { font-weight: 600; color: #f1ede2; flex: 1; text-align: left; }
 .nav-count {
   flex-shrink: 0;
   min-width: 18px;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.12);
   color: var(--sidebar-text);
   font-size: 0.72rem;
@@ -398,11 +413,11 @@ p { margin: 0 0 1em; }
   left: 100%;
   top: -6px;
   min-width: 210px;
-  background: #1b1e2b;
+  background: #26231a;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius);
   padding: 6px 6px 6px 14px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-modal);
   z-index: 30;
 }
 .sidebar.collapsed > nav > .nav-tree > .nav-item.has-children:hover > .nav-children,
@@ -448,7 +463,7 @@ p { margin: 0 0 1em; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 7px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -465,10 +480,25 @@ p { margin: 0 0 1em; }
   font-weight: 600;
   line-height: 1.3;
   cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.08s ease;
 }
 .btn:hover { border-color: var(--accent); text-decoration: none; }
-.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
-.btn-primary:hover { filter: brightness(1.05); }
+.btn:active { transform: translateY(1px); }
+/* A solid, hard-edged offset shadow that grows on hover and flattens on
+   press -- like an actual physical button -- instead of the generic
+   `filter: brightness()` a default component-library button reaches
+   for. Kept to .btn-primary specifically (a page's one major action),
+   not every .btn: a table full of small row-action buttons all doing
+   this at once would read as noise rather than emphasis. */
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  box-shadow: 2px 2px 0 0 color-mix(in srgb, var(--accent) 55%, black);
+  transition: box-shadow 0.1s ease, transform 0.1s ease;
+}
+.btn-primary:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 0 color-mix(in srgb, var(--accent) 55%, black); }
+.btn-primary:active { transform: translate(1px, 1px); box-shadow: none; }
 /* For a toggled/selected state (e.g. an active filter chip) -- distinct
    from .btn-primary's solid accent fill, which is reserved for a page's one
    major/primary action, so a filter toggle doesn't visually compete with it. */
@@ -554,7 +584,7 @@ form.inline { display: inline; }
 .tab-panel.active { display: block; }
 
 /* ---------- cards / panels ---------- */
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
 .card + .card { margin-top: 16px; }
 .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; }
 
@@ -606,7 +636,7 @@ form.inline { display: inline; }
   display: inline-flex;
   align-items: center;
   padding: 7px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   font-size: 0.85rem;
   font-weight: 600;
   border: 1px solid var(--border);
@@ -735,7 +765,7 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
   line-height: 1.45;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--shadow-elevated);
 }
 .help-icon-wrap:hover .help-icon-popover,
 .help-icon-wrap:focus-within .help-icon-popover { display: block; }
@@ -744,7 +774,7 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 17, 26, 0.55);
+  background: rgba(28, 26, 20, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -761,7 +791,7 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
 .modal-box {
   background: var(--surface);
   border-radius: var(--radius);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-modal);
   width: 100%;
   max-width: 720px;
   max-height: 85vh;
@@ -851,7 +881,7 @@ td.actions { text-align: right; white-space: nowrap; }
   gap: 4px;
   vertical-align: middle;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   font-size: 0.72rem;
@@ -872,12 +902,12 @@ td.actions { text-align: right; white-space: nowrap; }
   display: inline-flex;
   align-items: center;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--pill-color, #6b7280);
-  background: color-mix(in srgb, var(--pill-color, #6b7280) 14%, white);
-  border: 1px solid color-mix(in srgb, var(--pill-color, #6b7280) 32%, white);
+  color: var(--pill-color, #736c5c);
+  background: color-mix(in srgb, var(--pill-color, #736c5c) 14%, white);
+  border: 1px solid color-mix(in srgb, var(--pill-color, #736c5c) 32%, white);
 }
 .status-stepper { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .status-stepper form { display: inline-flex; }
@@ -886,23 +916,23 @@ td.actions { text-align: right; white-space: nowrap; }
   box-sizing: border-box;
   cursor: pointer;
   padding: 5px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.3;
-  border: 1.5px solid var(--step-color, #d1d5db);
-  color: var(--step-color, #6b7280);
+  border: 1.5px solid var(--step-color, #d6cfbf);
+  color: var(--step-color, #736c5c);
   background: var(--surface);
   transition: background 0.1s ease, color 0.1s ease;
 }
-.status-step:hover { background: color-mix(in srgb, var(--step-color, #6b7280) 12%, white); }
+.status-step:hover { background: color-mix(in srgb, var(--step-color, #736c5c) 12%, white); }
 .status-step.current {
-  background: var(--step-color, #6b7280);
+  background: var(--step-color, #736c5c);
   color: #fff;
   cursor: default;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--step-color, #6b7280) 35%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--step-color, #736c5c) 35%, transparent);
 }
-.status-step.current:hover { background: var(--step-color, #6b7280); }
+.status-step.current:hover { background: var(--step-color, #736c5c); }
 
 .approval-steps { list-style: none; margin: 0 0 4px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .approval-step {
@@ -975,8 +1005,8 @@ td.actions { text-align: right; white-space: nowrap; }
 
 /* ---------- ticket severity ---------- */
 .severity-low, .sev-debug, .sev-info { color: var(--text-muted); }
-.severity-medium, .sev-notice, .sev-warning { background: #fef9c3; color: #854d0e; border-color: transparent; }
-.severity-high, .sev-err { background: #ffedd5; color: #9a3412; border-color: transparent; }
+.severity-medium, .sev-notice, .sev-warning { background: #f4ecc8; color: #78581a; border-color: transparent; }
+.severity-high, .sev-err { background: #f3ddc3; color: #874323; border-color: transparent; }
 .severity-critical, .sev-crit, .sev-alert, .sev-emerg { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
 
 /* ---------- ticket detail header ---------- */
@@ -1127,7 +1157,7 @@ td.actions { text-align: right; white-space: nowrap; }
   align-items: center;
   padding: 6px 14px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   font-weight: 700;
   font-size: 0.85rem;
   background: var(--surface);
@@ -1216,7 +1246,7 @@ td.actions { text-align: right; white-space: nowrap; }
        sticky bar spans edge-to-edge instead of leaving a gap. */
     margin: 0 -24px 20px;
     padding: 12px 24px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 8px rgba(34, 31, 25, 0.1);
   }
   .portal-tenant-pill { font-size: 0.78rem; padding: 5px 12px; }
   .portal-header .brand-logo { width: 36px; height: 36px; }
@@ -1247,7 +1277,7 @@ td.actions { text-align: right; white-space: nowrap; }
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--shadow-elevated);
     padding: 8px;
   }
   .tab-buttons[data-menu-panel] .tab-btn {

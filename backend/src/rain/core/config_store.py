@@ -37,7 +37,7 @@ DEFAULT_FONT_FAMILY = FONT_CHOICES[0][1]
 # Defaults used until the setup wizard writes real values.
 DEFAULTS: dict[str, Any] = {
     "instance_name": "RAIN",
-    "accent_color": "#6366f1",
+    "accent_color": "#3d6b73",
     "logo_path": None,
     "font_family": DEFAULT_FONT_FAMILY,
     "setup_complete": False,
