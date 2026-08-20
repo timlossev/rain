@@ -361,6 +361,15 @@ class ApprovalFlow(TenantBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Opt-in, per-flow -- not every Change process wants a syslog event
+    # firing on approval, so this doesn't default on. When set, a Change
+    # ticket running this flow gets a synthetic SyslogEvent the moment its
+    # last approval step clears (see rain.modules.tickets.service.
+    # decide_approval_step), which then flows through the same ticket-rule
+    # and correlation-rule pipeline as any real inbound syslog line --
+    # same convention rain.modules.documents.service's alert_on_change
+    # already uses for a document's webhook-detected content change.
+    notify_syslog_on_approval: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     steps: Mapped[list["ApprovalFlowStep"]] = relationship(

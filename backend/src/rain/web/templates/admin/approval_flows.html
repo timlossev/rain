@@ -13,7 +13,7 @@
     <tbody>
       {% for f in page.items %}
       <tr>
-        <td>{{ f.name }}</td>
+        <td>{{ f.name }}{% if f.notify_syslog_on_approval %} <span class="badge" title="Emits a Syslog event when a Change running this flow is fully approved">syslog on approval</span>{% endif %}</td>
         <td class="muted">
           {% for s in f.steps %}{{ loop.index }}. {{ s.label }} &rarr; {% if s.approver_group_id %}group: {{ group_names.get(s.approver_group_id, "deleted group") }}{% elif s.approver_user_id %}{{ step_user_names.get(s.approver_user_id, "unknown user") }}{% else %}(unassigned){% endif %}{% if not loop.last %}<br>{% endif %}{% else %}No steps.{% endfor %}
         </td>

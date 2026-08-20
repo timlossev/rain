@@ -1041,13 +1041,14 @@ async def approval_flows_create(
     request: Request,
     name: str = Form(...),
     is_default: bool = Form(False),
+    notify_syslog_on_approval: bool = Form(False),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
     form = await request.form()
     if is_default:
         await tenant_db.execute(ApprovalFlow.__table__.update().values(is_default=False))
-    flow = ApprovalFlow(name=name.strip(), is_default=is_default)
+    flow = ApprovalFlow(name=name.strip(), is_default=is_default, notify_syslog_on_approval=notify_syslog_on_approval)
     tenant_db.add(flow)
     await tenant_db.flush()
     await _replace_approval_steps(tenant_db, flow.id, form)
@@ -1126,6 +1127,7 @@ async def approval_flows_edit(
     flow_id: int,
     name: str = Form(...),
     is_default: bool = Form(False),
+    notify_syslog_on_approval: bool = Form(False),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
@@ -1137,6 +1139,7 @@ async def approval_flows_edit(
         await tenant_db.execute(ApprovalFlow.__table__.update().values(is_default=False))
     flow.name = name.strip()
     flow.is_default = is_default
+    flow.notify_syslog_on_approval = notify_syslog_on_approval
     for step in list(flow.steps):
         await tenant_db.delete(step)
     await tenant_db.flush()

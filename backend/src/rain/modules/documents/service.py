@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -17,6 +18,45 @@ from rain.modules.webhooks import service as webhook_service
 # Tolerant of a missing or partial zero-pad ("DOC-1" as well as
 # "DOC-000001") -- see rain.modules.tickets.service._TICKET_REF_RE.
 _DOC_REF_RE = re.compile(r"^DOC-(\d+)$", re.IGNORECASE)
+
+_DIFF_MAX_LINES = 40
+
+
+def _content_changed(old_text: str | None, new_text: str) -> bool:
+    """Line-based, not a raw string ==. Confirmed live: a plain
+    `new_text != old_text` flagged a save as "changed" purely because the
+    stored file happened to end in a trailing newline the freshly-
+    submitted textarea body didn't -- exactly the class of insignificant,
+    not-a-real-edit difference this diff logic needs to ignore (the same
+    principle behind not alerting on a metadata-only save, just caught
+    one level lower). str.splitlines() treats "x" and "x\\n" as the same
+    single line, so this only reports a change when a line's actual
+    content differs -- a genuine trailing *blank* line still counts,
+    since splitlines() then produces an extra "" entry."""
+    if old_text is None:
+        return True
+    return old_text.splitlines() != new_text.splitlines()
+
+
+def _diff_summary(old_text: str | None, new_text: str) -> str:
+    """A compact unified diff between a document's previous and new
+    content, for the "raw" field of the SyslogEvent alert_on_change fires
+    (both the webhook-refresh path and a manual edit-and-save) -- lets
+    whoever's looking at the live syslog viewer / a promoted ticket see
+    *what* changed at a glance instead of just that something did.
+    Capped at _DIFF_MAX_LINES rather than embedding the full diff: a
+    large document's full diff would dwarf everything else in the feed."""
+    diff_lines = list(
+        difflib.unified_diff((old_text or "").splitlines(), new_text.splitlines(), lineterm="", n=1)
+    )
+    if not diff_lines:
+        return "(no textual difference)"
+    shown = diff_lines[:_DIFF_MAX_LINES]
+    summary = "\n".join(shown)
+    remaining = len(diff_lines) - len(shown)
+    if remaining > 0:
+        summary += f"\n... ({remaining} more diff line{'s' if remaining != 1 else ''})"
+    return summary
 
 
 async def _next_doc_number(db: AsyncSession) -> str:
@@ -155,7 +195,7 @@ async def refresh_from_webhook(db: AsyncSession, doc: Document) -> RefreshOutcom
     except FileNotFoundError:
         old_text = None
     new_text = result.body
-    changed = new_text != old_text
+    changed = _content_changed(old_text, new_text)
 
     if changed:
         data = new_text.encode("utf-8")
@@ -169,7 +209,7 @@ async def refresh_from_webhook(db: AsyncSession, doc: Document) -> RefreshOutcom
                 facility=None,
                 severity=5,  # notice
                 message=f"Document {doc.doc_number} ({doc.title}) content changed via webhook refresh",
-                raw=f"document #{doc.id} webhook refresh diff (webhook: {webhook.name})",
+                raw=f"document #{doc.id} webhook refresh (webhook: {webhook.name})\n\n{_diff_summary(old_text, new_text)}",
             )
             db.add(event)
             await db.commit()
@@ -181,6 +221,44 @@ async def refresh_from_webhook(db: AsyncSession, doc: Document) -> RefreshOutcom
     doc.last_refreshed_at = datetime.now(timezone.utc)
     await db.commit()
     return RefreshOutcome(ok=True, changed=changed)
+
+
+async def update_body(db: AsyncSession, doc: Document, new_text: str) -> bool:
+    """Saves a manual inline edit (documents/detail.html's Edit/Save
+    flow), with the same alert_on_change wiring refresh_from_webhook
+    already has for webhook-detected changes above -- diffed against the
+    actual stored content (old_text != new_text), never a timestamp or
+    other metadata check, so opening the editor and saving with nothing
+    actually changed (a common no-op: previewing, or just clicking Save
+    out of habit) doesn't fire a false "content changed" alert. Returns
+    whether the content actually changed."""
+    try:
+        old_text = textbody.decode_body(storage.get_storage().read(doc.storage_key))
+    except FileNotFoundError:
+        old_text = None
+    changed = _content_changed(old_text, new_text)
+
+    data = new_text.encode("utf-8")
+    storage.get_storage().save(doc.storage_key, data)
+    await update_body_size(db, doc, len(data))
+
+    if changed and doc.alert_on_change:
+        event = SyslogEvent(
+            host="documents",
+            program=doc.doc_number,
+            facility=None,
+            severity=5,  # notice
+            message=f"Document {doc.doc_number} ({doc.title}) content changed",
+            raw=f"document #{doc.id} manual edit\n\n{_diff_summary(old_text, new_text)}",
+        )
+        db.add(event)
+        await db.commit()
+        matched_rule = await ticket_rules.find_matching_rule(db, event)
+        if matched_rule is not None:
+            await ticket_rules.apply_rule(db, matched_rule, event)
+        await ticket_correlation.evaluate_correlation_rules(db, event)
+
+    return changed
 
 
 async def delete_document(db: AsyncSession, document: Document) -> None:

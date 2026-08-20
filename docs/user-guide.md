@@ -574,14 +574,22 @@ A single document's page, split into tabs:
   Markdown files, a further Write/Preview tab pair lets you render the
   current text through the same Markdown renderer used by "Export to
   PDF", so what you preview is what the PDF will actually look like.
+  Saving diffs what you typed against what's actually stored -- opening
+  the editor and saving with nothing really changed (including a save
+  that only differs by a trailing blank line) doesn't count as a
+  change, so it never raises the alert below on its own.
 - Auto-update (only shown for `.txt`/`.md` files): pick a webhook
   definition to populate this document's contents from, and optionally
   check "Emit syslog alert on change" to raise a syslog event (which
-  Event Promotion Policies can turn into a ticket) whenever a refresh
-  actually changes the stored content. A "Refresh from webhook" button
+  Event Promotion Policies can turn into a ticket) whenever the stored
+  content actually changes -- either from a webhook refresh below, or
+  from a manual save on the Contents tab above; both go through the
+  same diff. The event's detail includes a compact diff (added/removed
+  lines) of exactly what changed, viewable in the live syslog viewer or
+  on whatever ticket it promotes to. A "Refresh from webhook" button
   appears once a webhook is set, along with the timestamp of the last
   refresh; each refresh diffs the new response against what's stored,
-  so nothing changes if the source hasn't.
+  so nothing changes (or alerts) if the source hasn't.
 - Links: every ticket or asset this document is linked to, each with
   an Unlink button, and an "Add link" control below the table. Pick
   Ticket or Asset with the pill selector, then either a ticket number
@@ -817,14 +825,21 @@ Platform Response Rule sends through that channel.
 
 **Approval Flows.** Named, ordered approval processes that a change
 ticket attaches to. The list shows each flow's steps in order (label
-and who's assigned) and which flow, if any, is marked default (used to
+and who's assigned), a "syslog on approval" badge when that's turned
+on (below), and which flow, if any, is marked default (used to
 pre-select on new change tickets); a "Make default" button switches
 it. Creating or editing a flow gives you a Flow name, a "Make this the
-default flow" checkbox, and a variable number of steps (use "+ Add
-step" / "Remove" to resize), each with a Label, a Group, and an
-individual user (via type-to-search); a step needs one or the other,
-and if both are filled in, the group wins. A step doesn't open for
-decisions until the one before it clears.
+default flow" checkbox, an "Emit a Syslog event when a Change running
+this flow is fully approved" checkbox (off by default), and a variable
+number of steps (use "+ Add step" / "Remove" to resize), each with a
+Label, a Group, and an individual user (via type-to-search); a step
+needs one or the other, and if both are filled in, the group wins. A
+step doesn't open for decisions until the one before it clears. When
+the syslog checkbox is on, the moment the last step clears a change
+running that flow fires a synthetic syslog event (the same mechanism a
+document's "alert on change," below, uses) -- visible in the live
+syslog viewer and eligible to match Ticket Rules and Correlation Rules,
+same as a real inbound line.
 
 **Service Catalog.** The list shows each service's Name, Key (its URL), what it Produces
 (incident/vulnerability/change), payload Format, Approval flow (if any),

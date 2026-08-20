@@ -726,6 +726,7 @@ async def decide_approval_step(
         )
     )
     next_step: ApprovalFlowStep | None = None
+    fully_approved = False
     if decision == "rejected":
         approval.overall_status = "rejected"
         approval.completed_at = dt.datetime.now(dt.timezone.utc)
@@ -740,6 +741,7 @@ async def decide_approval_step(
         if next_step is None:
             approval.overall_status = "approved"
             approval.completed_at = dt.datetime.now(dt.timezone.utc)
+            fully_approved = True
         else:
             approval.current_step_order = next_step.sort_order
     await db.commit()
@@ -747,6 +749,51 @@ async def decide_approval_step(
         ticket = await db.get(Ticket, approval.ticket_id)
         if ticket is not None:
             await _notify_approvers(db, ticket, next_step)
+    elif fully_approved:
+        await _emit_syslog_on_full_approval(db, approval)
+
+
+async def _emit_syslog_on_full_approval(db: AsyncSession, approval: ChangeApproval) -> None:
+    """Opt-in per flow (ApprovalFlow.notify_syslog_on_approval, see the
+    Approval Flow form) -- most flows don't want this, so it's a no-op
+    unless the flow this Change ran explicitly turned it on. Mirrors
+    rain.modules.documents.service.refresh_from_webhook's own
+    alert_on_change: a synthetic SyslogEvent row, run through the same
+    ticket-rule/correlation-rule pipeline a real inbound syslog line
+    would hit, rather than an actual outbound network syslog packet --
+    same convention, same reason (Ticket Rules/Correlation Rules become
+    reusable for this too instead of needing a second, parallel notion
+    of "event")."""
+    if approval.flow_id is None:
+        return
+    flow = await db.get(ApprovalFlow, approval.flow_id)
+    if flow is None or not flow.notify_syslog_on_approval:
+        return
+    ticket = await db.get(Ticket, approval.ticket_id)
+    if ticket is None:
+        return
+
+    # Imported locally to avoid a module-load-time cycle: rules.py and
+    # correlation.py both do `from rain.modules.tickets import service`,
+    # so a top-level import of either here would be circular (same
+    # reason create_ticket's own platform_events import, above, is local).
+    from rain.modules.tickets import correlation as ticket_correlation
+    from rain.modules.tickets import rules as ticket_rules
+
+    event = SyslogEvent(
+        host="changes",
+        program=ticket.ticket_number,
+        facility=None,
+        severity=5,  # notice
+        message=f"Change {ticket.ticket_number} ({ticket.title}) fully approved",
+        raw=f"change approval #{approval.id} completed (flow: {flow.name})",
+    )
+    db.add(event)
+    await db.commit()
+    matched_rule = await ticket_rules.find_matching_rule(db, event)
+    if matched_rule is not None:
+        await ticket_rules.apply_rule(db, matched_rule, event)
+    await ticket_correlation.evaluate_correlation_rules(db, event)
 
 
 async def list_tickets_pending_approval_for(db: AsyncSession, user_id: int) -> list[Ticket]:

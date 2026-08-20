@@ -14,6 +14,12 @@
       <div class="field"><label for="name">Flow name</label><input type="text" id="name" name="name" value="{{ flow.name if flow else '' }}" placeholder="Standard Change Approval" required autofocus></div>
       <div class="field" style="flex:0 0 220px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_default" {% if flow and flow.is_default %}checked{% endif %}> Make this the default flow</label></div>
     </div>
+    <div class="form-row">
+      <div class="field">
+        <label class="checkbox-row"><input type="checkbox" name="notify_syslog_on_approval" {% if flow and flow.notify_syslog_on_approval %}checked{% endif %}> Emit a Syslog event when a Change running this flow is fully approved</label>
+        <p class="field-hint">Fires once, right after the last step clears -- the same synthetic-event pipeline a document's "alert on change" already uses, so it can match Ticket Rules and Correlation Rules like any real syslog line.</p>
+      </div>
+    </div>
 
     <h3>Steps, in order</h3>
     <p class="field-hint">Each step needs either a group or an individual user -- not both. If both are filled in, the group wins.

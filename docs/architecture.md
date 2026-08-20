@@ -447,6 +447,27 @@ form -- one POST creates the `Document` and the `DocumentLink` together.
 Documents can also be linked to additional assets/tickets later from the
 document's own detail page.
 
+**Change alerting.** `Document.alert_on_change`, when set, raises a
+synthetic `SyslogEvent` (host `documents`, program the doc number) whenever
+the stored content actually changes -- from a webhook refresh
+(`service.refresh_from_webhook`) or a manual inline edit
+(`service.update_body`), both funneled through the same `_content_changed`/
+`_diff_summary` pair so the two paths can't drift on what counts as a
+change. `_content_changed` compares `str.splitlines()` on both sides, not
+raw string equality: confirmed live that a plain `!=` flagged a save as
+"changed" purely from a trailing-newline artifact between the stored file
+and a freshly-submitted textarea body, which is exactly the class of
+insignificant, not-a-real-edit difference this needs to ignore. The event
+itself then runs through the normal Ticket Rule / Correlation Rule
+pipeline (`rules.find_matching_rule`/`apply_rule`,
+`correlation.evaluate_correlation_rules`) like any real inbound syslog
+line -- a self-generated event feeding the same pipeline rather than a
+second, parallel notion of "event." `_diff_summary` (a capped
+`difflib.unified_diff`) goes in the event's `raw` field so the
+before/after is visible at a glance rather than just "something changed."
+`rain.modules.tickets.service._emit_syslog_on_full_approval` (Change
+approvals, below) reuses this exact same synthetic-event convention.
+
 ## Search
 
 Keyword search only -- no vector/semantic search, because there's no
@@ -632,6 +653,19 @@ Rules, notifications, the activity feed, and export all see it exactly
 like any other. `Ticket.source_catalog_item_id` (SET NULL on the item's
 own deletion) backs a "Service Catalog request" row on the ticket detail
 page, linked back to `/catalog/{key}` when the item is still active.
+
+**`ApprovalFlow.notify_syslog_on_approval`** (off by default, a checkbox
+on the flow form) raises a synthetic `SyslogEvent` (host `changes`,
+program the ticket number) the moment a Change's last approval step
+clears -- `tickets.service._emit_syslog_on_full_approval`, hooked into
+`decide_approval_step` right where `overall_status` flips to `"approved"`.
+Same synthetic-event convention as `Document.alert_on_change` above (a
+self-generated event through the normal Ticket Rule/Correlation Rule
+pipeline, not a second parallel notion of "event"), and the same reason
+for a local, function-body import of `rules`/`correlation` there
+(`rules.py`/`correlation.py` both import `tickets.service`, so a
+top-level import back would be circular -- `create_ticket`'s own
+`platform_events` import, in the same file, does the same thing).
 
 **The produced ticket's description** is the submitted answers, in field
 order, serialized per the item's `payload_format` -- `json`

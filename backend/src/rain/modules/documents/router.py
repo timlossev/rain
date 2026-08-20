@@ -246,9 +246,10 @@ async def update_document_body(
         raise HTTPException(status.HTTP_404_NOT_FOUND)
     if textbody.body_kind(doc.filename) is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "This document type isn't inline-editable.")
-    data = body.encode("utf-8")
-    storage.get_storage().save(doc.storage_key, data)
-    await service.update_body_size(tenant_db, doc, len(data))
+    # Diffs against the stored content itself (see service.update_body) --
+    # opening the editor and saving with no real edits doesn't fire the
+    # alert_on_change SyslogEvent that a genuine content change does.
+    await service.update_body(tenant_db, doc, body)
     return RedirectResponse(f"/documents/{doc.doc_number}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
