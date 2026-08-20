@@ -386,55 +386,6 @@ async def decide_approval(
     return RedirectResponse(f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
-def _build_activity(ticket: Ticket) -> list[dict]:
-    """Comments, status changes, assignment changes, asset changes, field
-    changes (severity/problematic/title), and (change tickets only) approval
-    decisions interleaved into one chronological feed ("Activity"), each
-    tagged with its kind so the caller (screen or PDF) can render them
-    differently. Shared so the PDF export shows the same unified feed as
-    the ticket detail screen instead of drifting apart."""
-    approval_entries = (
-        [{"kind": "approval_decision", "at": d.created_at, "item": d} for d in ticket.approval.decisions]
-        if ticket.approval
-        else []
-    )
-    return sorted(
-        [{"kind": "comment", "at": c.created_at, "item": c} for c in ticket.comments]
-        + [{"kind": "status_change", "at": sc.created_at, "item": sc} for sc in ticket.status_changes]
-        + [{"kind": "assignment_change", "at": ac.created_at, "item": ac} for ac in ticket.assignment_changes]
-        + [{"kind": "asset_change", "at": ac.created_at, "item": ac} for ac in ticket.asset_changes]
-        + [{"kind": "field_change", "at": fc.created_at, "item": fc} for fc in ticket.field_changes]
-        + approval_entries,
-        key=lambda entry: entry["at"] or datetime.min.replace(tzinfo=timezone.utc),
-    )
-
-
-def _assignment_change_ids(ticket: Ticket) -> set[int | None]:
-    ids: set[int | None] = set()
-    for ac in ticket.assignment_changes:
-        ids |= {ac.changed_by_user_id, ac.from_assignee_user_id, ac.to_assignee_user_id}
-    return ids
-
-
-async def _asset_names(tenant_db: AsyncSession, asset_ids: set[int | None]) -> dict[int, str]:
-    """Batched name lookup for the asset picker's initial label and the
-    activity feed's asset-change entries -- same shape as
-    rain.core.user_names.resolve_user_names, but assets live in this same
-    tenant_db session (no cross-schema query needed, unlike users)."""
-    ids = {i for i in asset_ids if i is not None}
-    if not ids:
-        return {}
-    result = await tenant_db.execute(select(Asset).where(Asset.id.in_(ids)))
-    return {a.id: a.name for a in result.scalars()}
-
-
-def _asset_change_ids(ticket: Ticket) -> set[int | None]:
-    ids: set[int | None] = set()
-    for ac in ticket.asset_changes:
-        ids |= {ac.from_asset_id, ac.to_asset_id}
-    return ids
-
-
 @router.get("/{ticket_ref:ticket_ref}", response_class=HTMLResponse)
 async def ticket_detail(
     request: Request,
@@ -467,15 +418,15 @@ async def ticket_detail(
         {ticket.reporter_user_id, ticket.assignee_user_id}
         | {c.author_user_id for c in ticket.comments}
         | {sc.changed_by_user_id for sc in ticket.status_changes}
-        | _assignment_change_ids(ticket)
+        | service.assignment_change_ids(ticket)
         | {ac.changed_by_user_id for ac in ticket.asset_changes}
         | {fc.changed_by_user_id for fc in ticket.field_changes}
         | ({d.decided_by_user_id for d in ticket.approval.decisions} if ticket.approval else set())
         | flow_step_user_ids
     )
-    asset_names = await _asset_names(tenant_db, {ticket.asset_id} | _asset_change_ids(ticket))
+    asset_names = await service.asset_names(tenant_db, {ticket.asset_id} | service.asset_change_ids(ticket))
 
-    activity = _build_activity(ticket)
+    activity = service.build_activity(ticket)
 
     current_step = None
     can_decide = False
@@ -539,12 +490,12 @@ async def ticket_pdf(
         {ticket.reporter_user_id, ticket.assignee_user_id}
         | {c.author_user_id for c in ticket.comments}
         | {sc.changed_by_user_id for sc in ticket.status_changes}
-        | _assignment_change_ids(ticket)
+        | service.assignment_change_ids(ticket)
         | {ac.changed_by_user_id for ac in ticket.asset_changes}
         | {fc.changed_by_user_id for fc in ticket.field_changes}
         | ({d.decided_by_user_id for d in ticket.approval.decisions} if ticket.approval else set())
     )
-    asset_names = await _asset_names(tenant_db, {ticket.asset_id} | _asset_change_ids(ticket))
+    asset_names = await service.asset_names(tenant_db, {ticket.asset_id} | service.asset_change_ids(ticket))
     pdf_bytes = render_pdf(
         "pdf/ticket.html",
         {
@@ -553,7 +504,7 @@ async def ticket_pdf(
             "user_names": user_names,
             "asset_names": asset_names,
             "status_labels": status_labels,
-            "activity": _build_activity(ticket),
+            "activity": service.build_activity(ticket),
             "doc_kind": "Ticket",
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         },

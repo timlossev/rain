@@ -11,6 +11,7 @@ from rain.core.user_names import resolve_user_emails
 from rain.db.tenant_models import (
     ApprovalFlow,
     ApprovalFlowStep,
+    Asset,
     ChangeApproval,
     ChangeApprovalDecision,
     ExportProfile,
@@ -837,3 +838,62 @@ async def list_tickets_reported_by(db: AsyncSession, user_id: int) -> list[dict]
     )
     result = await db.execute(stmt)
     return [{"ticket": ticket, "last_update_at": last_update_at} for ticket, last_update_at in result.all()]
+
+
+def build_activity(ticket: Ticket) -> list[dict]:
+    """Comments, status changes, assignment changes, asset changes, field
+    changes (severity/problematic/title), and (change tickets only) approval
+    decisions interleaved into one chronological feed ("Activity"), each
+    tagged with its kind so the caller (ticket detail screen, PDF export, or
+    the client portal's own timeline modal) can render them differently.
+    Shared so none of those three drift apart on what counts as "activity"
+    or how it's ordered -- moved here from rain.modules.tickets.router (its
+    original home) once the portal needed the exact same feed too."""
+    approval_entries = (
+        [{"kind": "approval_decision", "at": d.created_at, "item": d} for d in ticket.approval.decisions]
+        if ticket.approval
+        else []
+    )
+    return sorted(
+        [{"kind": "comment", "at": c.created_at, "item": c} for c in ticket.comments]
+        + [{"kind": "status_change", "at": sc.created_at, "item": sc} for sc in ticket.status_changes]
+        + [{"kind": "assignment_change", "at": ac.created_at, "item": ac} for ac in ticket.assignment_changes]
+        + [{"kind": "asset_change", "at": ac.created_at, "item": ac} for ac in ticket.asset_changes]
+        + [{"kind": "field_change", "at": fc.created_at, "item": fc} for fc in ticket.field_changes]
+        + approval_entries,
+        key=lambda entry: entry["at"] or dt.datetime.min.replace(tzinfo=dt.timezone.utc),
+    )
+
+
+def assignment_change_ids(ticket: Ticket) -> set[int | None]:
+    """Every user id build_activity's assignment_change entries reference
+    (who changed it, and the from/to assignee) -- feeds a batched
+    rain.core.user_names.resolve_user_names call rather than one lookup
+    per entry. Moved here alongside build_activity for the same reason:
+    the client portal's timeline needs this too, not just the ticket
+    detail screen."""
+    ids: set[int | None] = set()
+    for ac in ticket.assignment_changes:
+        ids |= {ac.changed_by_user_id, ac.from_assignee_user_id, ac.to_assignee_user_id}
+    return ids
+
+
+def asset_change_ids(ticket: Ticket) -> set[int | None]:
+    """Every asset id build_activity's asset_change entries reference (the
+    from/to affected asset) -- feeds asset_names below."""
+    ids: set[int | None] = set()
+    for ac in ticket.asset_changes:
+        ids |= {ac.from_asset_id, ac.to_asset_id}
+    return ids
+
+
+async def asset_names(db: AsyncSession, asset_ids: set[int | None]) -> dict[int, str]:
+    """Batched name lookup for the asset picker's initial label and the
+    activity feed's asset-change entries -- same shape as
+    rain.core.user_names.resolve_user_names, but assets live in this same
+    tenant db session (no cross-schema query needed, unlike users)."""
+    ids = {i for i in asset_ids if i is not None}
+    if not ids:
+        return {}
+    result = await db.execute(select(Asset).where(Asset.id.in_(ids)))
+    return {a.id: a.name for a in result.scalars()}

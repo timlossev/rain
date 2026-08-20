@@ -107,24 +107,9 @@ Ticketing below.
 - **Watchers**: opt in ("Watch" on the ticket detail page) or added
   automatically (reporter, assignee, or a Platform Response Rule) to get
   emailed on a ticket's new comments and status changes
-- **Escalate**: a one-click button on every ticket (and, for a
-  signed-in visitor, next to their own tickets in the client portal)
-  that calls a tenant's configured escalation webhook on demand, logged
-  to the ticket's activity feed
-- **Client portal**: a public per-tenant page with no account needed --
-  "Request Something" (Service Catalog) and "Report Something" (file an
-  incident) are open to every visitor; sign in for a search bar plus
-  "Pending Actions" and "Document Archive" tabs, and a "Today's events"
-  listing pulled from the tenant calendar
-- **Service Catalog**: tenant-defined, requestable forms (Admin > Service
-  Catalog, and on /catalog or the client portal's own Request Something
-  tab) -- each one up to 10 questions (text, number, date, URL, email,
-  yes/no, or a dropdown) that produce an incident, vulnerability, or
-  change ticket on submission, its description the answers serialized as
-  JSON or `key=value` lines, a change optionally routed through an
-  approval flow. A question's value can also come from an existing
-  Document instead of free-form entry -- used as-is, or narrowed with a
-  regex or a JSONPath, with a live Preview while designing the form
+- **Escalate**: a one-click button on every ticket that calls a tenant's
+  configured escalation webhook on demand, logged to the ticket's
+  activity feed
 - **Webhooks**: centrally-configured outbound webhooks (Admin >
   Webhooks) -- one definition (URL, headers, payload, timeout, success
   codes) reused wherever a webhook call is needed, with an optional
@@ -147,6 +132,33 @@ Ticketing below.
 - Quick-action menu and filter chips on every ticket list
 - Branded PDF export of any ticket, including its full activity history
 - Email/Slack notification channels, reusable across any number of rules
+
+**Service Catalog**
+- Tenant-defined, requestable forms (Admin > Service Catalog, reachable
+  from Records Authority or the client portal below) -- each one up to
+  10 questions (text, number, date, URL, email, yes/no, or a dropdown)
+  that produce an incident, vulnerability, or change ticket on
+  submission, its description the answers serialized as JSON or
+  `key=value` lines
+- A change service is optionally routed through an approval flow, the
+  same machinery Change tickets use directly
+- A question's value can come from an existing Document instead of
+  free-form entry -- used as-is, or narrowed with a regex or a JSONPath,
+  with a live Preview while designing the form
+
+**Client Portal**
+- A public per-tenant page (`/portal/<slug>`), no account needed --
+  "Request Something" (the Service Catalog above) and "Report Something"
+  (file an incident) are open to every visitor
+- Sign in for a search bar plus "Pending Actions" (tickets awaiting your
+  approval) and "Document Archive" tabs, and an Escalate button next to
+  your own reported tickets
+- "Today's events", pulled from the tenant calendar, shown to every
+  visitor regardless of sign-in status
+- Two settings gate the whole page (Admin > Branding): require sign-in
+  to file/request anything at all, and whether the page carries this
+  instance's own branding or stays neutral for sharing outside the
+  organization
 
 **Calendar**
 - Per-tenant calendar with a visual month-grid editor
@@ -320,7 +332,7 @@ backend/
     settings.py         -- the only place env vars are read
     db/                  -- models, engine/session, tenant provisioning
     core/                 -- security, RBAC, tenancy resolution, config store, nav registry
-    modules/{setup,auth,admin,assets,tickets,calendar,documents,webhooks,search}/  -- one router+service per feature area
+    modules/{setup,auth,admin,assets,tickets,catalog,calendar,documents,portal,webhooks,search}/  -- one router+service per feature area
     web/                   -- Jinja2 templates, hand-written CSS/JS
   tests/
 ```

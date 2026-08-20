@@ -621,6 +621,15 @@ Report Something's ticket table also gains an Escalate button per
 ticket, once signed in, if your tenant has an escalation webhook
 configured.
 
+Clicking a ticket number in that table opens a lightweight timeline
+view instead of navigating away -- just what's changed and when
+(status changes, comments, assignment/asset changes, approval
+decisions), newest- or oldest-first, the same activity feed the full
+ticket page shows but without any of its editing controls. An "Edit
+ticket" button at the bottom opens the real, full ticket page
+(requires signing in, same as ever) for anyone who wants to comment,
+reassign, or change status.
+
 **Today's events**, above the tabs, lists anything due on the tenant
 calendar today (recurring or one-time), or "None" if nothing is. Shown
 to every visitor regardless of sign-in status.

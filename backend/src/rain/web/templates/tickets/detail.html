@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "_search_picker.html" as picker %}
+{% import "tickets/_activity_entry.html" as activity_entry %}
 {% block title %}{{ ticket.ticket_number }}: {{ ticket.title }} - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}A single ticket's status, metadata, linked documents, and full activity history (comments, status/assignee/asset changes).{% endblock %}
 {% block content %}
@@ -175,7 +176,7 @@
    feed below (field_name == "platform_rule") rather than a separate card
    here -- one chronological history instead of two places to check. #}
 
-<div class="card">
+<div class="card" data-activity-scope>
   <div class="card-title">Activity</div>
   <form method="post" action="/tickets/{{ ticket.id }}/comment" style="margin-bottom:16px;">
     <div class="field">
@@ -193,66 +194,9 @@
   </form>
   <div data-activity-list>
   {% for entry in activity %}
-    {% if entry.kind == "comment" %}
-    <div class="activity-entry" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
-      <div class="activity-meta"><span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> - <strong>{{ user_names.get(entry.item.author_user_id, "Someone") }}</strong></div>
-      <div class="activity-body">{{ entry.item.body }}</div>
+    <div class="activity-entry{{ '' if entry.kind == 'comment' else ' activity-status-change' }}" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
+      {{ activity_entry.entry_content(entry, user_names, asset_names, status_labels) }}
     </div>
-    {% elif entry.kind == "assignment_change" %}
-    <div class="activity-entry activity-status-change" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
-      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
-      <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
-      {% if entry.item.to_assignee_user_id %}
-      assigned this to <strong>{{ user_names.get(entry.item.to_assignee_user_id, "someone") }}</strong>{% if entry.item.from_assignee_user_id %} (previously <strong>{{ user_names.get(entry.item.from_assignee_user_id, "someone") }}</strong>){% endif %}
-      {% else %}
-      unassigned this{% if entry.item.from_assignee_user_id %} (previously <strong>{{ user_names.get(entry.item.from_assignee_user_id, "someone") }}</strong>){% endif %}
-      {% endif %}
-    </div>
-    {% elif entry.kind == "asset_change" %}
-    <div class="activity-entry activity-status-change" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
-      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
-      <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
-      {% if entry.item.to_asset_id %}
-      set the affected asset to <strong>{{ asset_names.get(entry.item.to_asset_id, "an asset") }}</strong>{% if entry.item.from_asset_id %} (previously <strong>{{ asset_names.get(entry.item.from_asset_id, "an asset") }}</strong>){% endif %}
-      {% else %}
-      cleared the affected asset{% if entry.item.from_asset_id %} (previously <strong>{{ asset_names.get(entry.item.from_asset_id, "an asset") }}</strong>){% endif %}
-      {% endif %}
-    </div>
-    {% elif entry.kind == "field_change" %}
-    <div class="activity-entry activity-status-change" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
-      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
-      <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
-      {% if entry.item.field_name == "severity" %}
-      changed priority from <span class="badge severity-{{ entry.item.from_value }}">{{ entry.item.from_value | capitalize }}</span> to <span class="badge severity-{{ entry.item.to_value }}">{{ entry.item.to_value | capitalize }}</span>
-      {% elif entry.item.field_name == "is_problematic" %}
-      {{ "marked this ticket as problematic" if entry.item.to_value == "true" else "unmarked this ticket as problematic" }}
-      {% elif entry.item.field_name == "title" %}
-      renamed this from &ldquo;{{ entry.item.from_value }}&rdquo; to &ldquo;{{ entry.item.to_value }}&rdquo;
-      {% elif entry.item.field_name == "document" %}
-      {% if entry.item.to_value %}linked document <strong>{{ entry.item.to_value }}</strong>{% else %}unlinked document <strong>{{ entry.item.from_value }}</strong>{% endif %}
-      {% elif entry.item.field_name == "platform_rule" %}
-      Platform Response Rule <strong>{{ entry.item.from_value }}</strong> fired: {{ entry.item.to_value }}
-      {% elif entry.item.field_name == "approval_reset" %}
-      {{ entry.item.to_value }}
-      {% elif entry.item.field_name == "escalated" %}
-      escalated this ticket: {{ entry.item.to_value }}
-      {% endif %}
-    </div>
-    {% elif entry.kind == "approval_decision" %}
-    <div class="activity-entry activity-status-change" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
-      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
-      <strong>{{ user_names.get(entry.item.decided_by_user_id, "Someone") }}</strong> -
-      {{ entry.item.decision }} step &ldquo;{{ entry.item.step_label }}&rdquo;{% if entry.item.comment %}: {{ entry.item.comment }}{% endif %}
-    </div>
-    {% else %}
-    <div class="activity-entry activity-status-change" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
-      <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
-      <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
-      changed status
-      {% if entry.item.from_status %}from <span class="status-pill" style="--pill-color: var(--text-muted);">{{ status_labels.get(entry.item.from_status, entry.item.from_status) }}</span>{% endif %}
-      to <span class="status-pill" style="--pill-color: var(--accent);">{{ status_labels.get(entry.item.to_status, entry.item.to_status) }}</span>
-    </div>
-    {% endif %}
   {% else %}
   <p class="muted">No activity yet.</p>
   {% endfor %}

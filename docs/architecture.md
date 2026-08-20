@@ -565,6 +565,35 @@ page this visitor might not even be allowed to open on its own
 (`portal_require_auth` off doesn't imply this visitor can view
 `/tickets/<n>` -- that's still `require_login`).
 
+**Ticket timeline modal.** Clicking a ticket number in Report
+Something's own table opens `GET /portal/<slug>/tickets/<ref>`
+(`portal_ticket_timeline`) into a modal instead of navigating to the
+full ticket page -- signed-in-only, and only for a ticket this visitor
+reported themselves (`ticket.reporter_user_id == user.id`), tighter
+than what a `client`/`client_admin` could reach via the full app (any
+ticket in their tenant), matching this page's own narrower ethos. A
+404 either way for "not signed in," "no such ticket," or "not yours" --
+never 403, so a wrong-visitor request doesn't learn which one it was.
+Renders the exact same entries `rain.modules.tickets.service.
+build_activity` produces for the full ticket detail screen and the PDF
+export (moved there from `tickets.router` specifically so the portal
+could reuse it, along with the `assignment_change_ids`/
+`asset_change_ids`/`asset_names` helpers it depends on) -- content and
+wording are shared via `tickets/_activity_entry.html`'s `entry_content`
+macro, which both this fragment and `tickets/detail.html` call; only
+the wrapper differs (a ServiceNow-style dotted vertical timeline here,
+a flat list there). Client-side "Newest first"/"Oldest first" re-sorts
+already-rendered `[data-at]` entries in place, no re-fetch -- the exact
+same mechanism the ticket detail page's own toggle uses
+(`activateActivitySortToggle` in app.js), refactored into a named,
+re-callable function and exposed as `window.RAIN.
+activateActivitySortToggle` specifically so this modal's fetched-after-
+page-load fragment can activate its own copy, which the original
+page-load-time-only binding could never have found. Modal shell/open-
+close plumbing is portal-page-local (`report.html`), not base.html's
+shared `#doc-preview-modal`, since that one is wrapped in `{% if ctx %}`
+and never renders on this `content_alone` page at all.
+
 ## Service Catalog
 
 `rain.modules.catalog`. `ServiceCatalogItem` (name, description, ticket_

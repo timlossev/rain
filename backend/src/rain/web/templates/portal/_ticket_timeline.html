@@ -1,0 +1,43 @@
+{# The client portal's own lightweight ticket view -- injected into
+   #ticket-timeline-body by app.js's [data-ticket-timeline] handler
+   (rain.modules.portal.router.portal_ticket_timeline). Read-only: no
+   comment form, no editable fields, just what changed and when, plus an
+   "Edit ticket" link out to the real thing for anyone who wants it.
+   Shares rain.web.templates.tickets._activity_entry's entry_content
+   macro with the full ticket detail page's own Activity card -- same
+   entries, same wording, different wrapper (a ServiceNow-style dotted
+   timeline here instead of a flat list). #}
+{% import "tickets/_activity_entry.html" as activity_entry %}
+<div class="timeline-ticket-header">
+  <div class="timeline-ticket-title">{{ ticket.title }}</div>
+  <div class="timeline-ticket-meta">
+    <span class="badge severity-{{ ticket.severity }}">{{ ticket.severity | capitalize }}</span>
+    <span class="status-pill" style="--pill-color: var(--accent);">{{ status_labels.get(ticket.status, ticket.status) }}</span>
+  </div>
+</div>
+
+<div data-activity-scope>
+  {% if activity %}
+  <div class="activity-sort-toggle" data-activity-sort-toggle>
+    <button type="button" class="btn btn-sm active" data-activity-sort="desc">Newest first</button>
+    <button type="button" class="btn btn-sm" data-activity-sort="asc">Oldest first</button>
+  </div>
+  {% endif %}
+
+  <div class="ticket-timeline" data-activity-list>
+    {% for entry in activity %}
+    <div class="timeline-entry timeline-entry-{{ entry.kind }}{{ ' timeline-entry-' ~ entry.item.decision if entry.kind == 'approval_decision' else '' }}" data-at="{{ entry.at.isoformat() if entry.at else '' }}">
+      <span class="timeline-dot"></span>
+      <div class="timeline-content">
+        {{ activity_entry.entry_content(entry, user_names, asset_names, status_labels) }}
+      </div>
+    </div>
+    {% else %}
+    <p class="muted">No updates yet.</p>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="timeline-footer">
+  <a class="btn btn-primary" href="/tickets/{{ ticket.ticket_number }}">Edit ticket</a>
+</div>

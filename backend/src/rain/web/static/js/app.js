@@ -270,6 +270,42 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
+  // Client portal: ticket number click -> lightweight timeline modal
+  // (rain.modules.portal.router.portal_ticket_timeline), same fetch-and-
+  // inject shape as the doc-preview modal just above. The modal title
+  // bar is set synchronously from the link's own text (the ticket
+  // number) rather than waiting on the fetch, so it appears instantly;
+  // the fragment itself (title, severity/status, the timeline, "Edit
+  // ticket") comes from the response. Re-activates the fetched
+  // fragment's own Newest/Oldest-first toggle every time (window.RAIN.
+  // activateActivitySortToggle, defined below) since that markup didn't
+  // exist at page load for the page-load-time binding to have found.
+  const timelineModal = document.querySelector("#ticket-timeline-modal");
+  const timelineBody = document.querySelector("#ticket-timeline-body");
+  const timelineTitle = document.querySelector("#ticket-timeline-title");
+  document.querySelectorAll("[data-ticket-timeline]").forEach((link) => {
+    link.addEventListener("click", async (evt) => {
+      if (!timelineModal) return;
+      evt.preventDefault();
+      const ticketRef = link.dataset.ticketTimeline;
+      timelineTitle.textContent = ticketRef;
+      timelineBody.innerHTML = "<p class=\"muted\">Loading...</p>";
+      timelineModal.hidden = false;
+      try {
+        // location.pathname is this same portal page's own /portal/<slug>
+        // -- appending /tickets/<ref> is portal_ticket_timeline's route,
+        // as distinct from link.href (the /tickets/<ref> full-page
+        // fallback this same click just preventDefault()-ed away from).
+        const resp = await fetch(`${location.pathname.replace(/\/$/, "")}/tickets/${ticketRef}`);
+        timelineBody.innerHTML = resp.ok ? await resp.text() : "<p class=\"muted\">Couldn't load this ticket.</p>";
+        if (resp.ok && window.RAIN && window.RAIN.activateActivitySortToggle) {
+          window.RAIN.activateActivitySortToggle(timelineBody);
+        }
+      } catch (err) {
+        timelineBody.innerHTML = "<p class=\"muted\">Couldn't load this ticket.</p>";
+      }
+    });
+  });
   // Generic modal plumbing -- shared by the doc-preview modal above and by
   // every "+ New X" button + modal (see _modal.html) that replaced the old
   // "New X" tabs sitewide: tabs are for switching between views of the same
@@ -492,39 +528,60 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Ticket Activity feed: Newest first / Oldest first re-sorts the
+  // Activity feed / timeline: Newest first / Oldest first re-sorts the
   // already-rendered entries client-side (server always emits them
   // oldest-first, for the PDF export's chronological narrative -- this
   // just reorders the DOM, no re-fetch) by each entry's data-at
   // timestamp. Actually moves the elements (not a CSS flex-direction
-  // flip) so .activity-entry:last-of-type's border-bottom rule keeps
+  // flip) so a last-entry-specific border/connector CSS rule keeps
   // matching the true last item regardless of sort direction. Defaults
   // to newest-first on load, matching the pre-selected button.
-  document.querySelectorAll("[data-activity-sort-toggle]").forEach((toggle) => {
-    const card = toggle.closest(".card");
-    const list = card && card.querySelector("[data-activity-list]");
-    const buttons = toggle.querySelectorAll("[data-activity-sort]");
-    if (!list || !buttons.length) return;
+  //
+  // A named, re-runnable function (not just a page-load querySelectorAll
+  // loop) because the client portal's ticket timeline modal
+  // (window.RAIN.activateActivitySortToggle below) injects its own
+  // fresh copy of this exact markup via fetch *after* page load, where
+  // it wouldn't otherwise be found -- same reason [data-catalog-preview-
+  // btn] above is a plain per-click handler instead of only running once.
+  // `root` scopes the lookup (document by default, or just the newly-
+  // injected fragment, so re-activating after a second fetch into the
+  // same modal doesn't double-bind the first fragment's already-removed
+  // buttons).
+  const activateActivitySortToggle = (root) => {
+    (root || document).querySelectorAll("[data-activity-sort-toggle]").forEach((toggle) => {
+      // [data-activity-scope] (not .card) -- the ticket detail page's own
+      // Activity card carries both this attribute and .card, but the
+      // portal timeline modal's body isn't styled as a card at all, just
+      // scoped with the same attribute so this lookup works identically
+      // in either context.
+      const scope = toggle.closest("[data-activity-scope]");
+      const list = scope && scope.querySelector("[data-activity-list]");
+      const buttons = toggle.querySelectorAll("[data-activity-sort]");
+      if (!list || !buttons.length) return;
 
-    const applySort = (direction) => {
-      const entries = Array.from(list.querySelectorAll(".activity-entry"));
-      entries.sort((a, b) => {
-        const cmp = (a.dataset.at || "").localeCompare(b.dataset.at || "");
-        return direction === "desc" ? -cmp : cmp;
-      });
-      entries.forEach((el) => list.appendChild(el));
-    };
+      const applySort = (direction) => {
+        const entries = Array.from(list.querySelectorAll("[data-at]"));
+        entries.sort((a, b) => {
+          const cmp = (a.dataset.at || "").localeCompare(b.dataset.at || "");
+          return direction === "desc" ? -cmp : cmp;
+        });
+        entries.forEach((el) => list.appendChild(el));
+      };
 
-    buttons.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        buttons.forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        applySort(btn.dataset.activitySort);
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          buttons.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          applySort(btn.dataset.activitySort);
+        });
       });
+
+      applySort("desc");
     });
-
-    applySort("desc");
-  });
+  };
+  activateActivitySortToggle();
+  window.RAIN = window.RAIN || {};
+  window.RAIN.activateActivitySortToggle = activateActivitySortToggle;
 
   // Export column picker: keep the "order" input in sync with visual position.
   document.querySelectorAll("[data-export-columns]").forEach((table) => {

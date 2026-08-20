@@ -93,18 +93,26 @@
 
         <div class="portal-section-title">Tickets reported by me</div>
         {% if user %}
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th><th>Last update</th><th></th></tr></thead>
           <tbody>
             {% for row in reported %}
             <tr>
-              {# The linked page itself requires login (require_login, same as
-                 every other ticket detail view) regardless of this tenant's
-                 portal_require_auth setting -- and this table only ever
-                 renders for a signed-in user to begin with (see the {% if
-                 user %} above), so there's no path from here into a ticket
-                 without already having a session. #}
-              <td><a href="/tickets/{{ row.ticket.ticket_number }}">{{ row.ticket.ticket_number }}</a></td>
+              {# Opens the lightweight timeline modal (app.js's [data-
+                 ticket-timeline], fetching rain.modules.portal.router.
+                 portal_ticket_timeline) instead of navigating straight to
+                 the full ticket page -- "only the updates," full editing
+                 behind that modal's own "Edit ticket" button instead. The
+                 real href is still a working fallback either way (JS
+                 disabled, a deliberate open-in-new-tab, etc.): that page
+                 requires login (require_login, same as every other ticket
+                 detail view) regardless of this tenant's portal_require_
+                 auth setting -- and this table only ever renders for a
+                 signed-in user to begin with (see the {% if user %}
+                 above), so there's no path from here into a ticket
+                 without already having a session either way. #}
+              <td><a href="/tickets/{{ row.ticket.ticket_number }}" data-ticket-timeline="{{ row.ticket.ticket_number }}">{{ row.ticket.ticket_number }}</a></td>
               <td>{{ row.ticket.title }}</td>
               <td><span class="badge severity-{{ row.ticket.severity }}">{{ row.ticket.severity }}</span></td>
               <td class="muted">{{ row.ticket.status }}</td>
@@ -123,6 +131,7 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
         {% else %}
         <p class="muted portal-signin-hint">Sign in to see tickets you've reported.</p>
         {% endif %}
@@ -130,6 +139,7 @@
 
       {% if user %}
       <div class="tab-panel" data-tab-panel="approvals">
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th></tr></thead>
           <tbody>
@@ -145,9 +155,11 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div class="tab-panel" data-tab-panel="documents">
+        <div class="table-scroll">
         <table>
           <thead><tr><th>Number</th><th>Title</th><th>Updated</th></tr></thead>
           <tbody>
@@ -162,9 +174,27 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
       </div>
       {% endif %}
     </div>
+  </div>
+</div>
+
+{# The lightweight ticket timeline modal -- not gated behind {% if ctx %}
+   the way base.html's own #doc-preview-modal is (that one never renders
+   on this ctx-less, content_alone page at all), so it's defined here
+   instead, portal-page-local. Opened/fetched by app.js's [data-ticket-
+   timeline] handler; closed by the same generic [data-modal]/[data-
+   modal-close] backdrop-click/Escape plumbing every other modal in the
+   app already uses, since this carries the same data-modal opt-in. #}
+<div class="modal-overlay" id="ticket-timeline-modal" hidden data-modal>
+  <div class="modal-box">
+    <div class="modal-header">
+      <span id="ticket-timeline-title"></span>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="ticket-timeline-body"><p class="muted">Loading...</p></div>
   </div>
 </div>
 {% endblock %}

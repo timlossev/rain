@@ -39,6 +39,7 @@ from sqlalchemy import select
 
 from rain.core.tenancy import CurrentUser, get_current_user_optional
 from rain.core.tenant_config import get_tenant_config, get_tenant_configs
+from rain.core.user_names import resolve_user_names
 from rain.db.base import control_session, tenant_session
 from rain.db.control_models import Tenant
 from rain.modules.calendar import service as calendar_service
@@ -336,4 +337,69 @@ async def portal_catalog_submit(
 
     return RedirectResponse(
         f"/portal/{tenant_slug}?created={result.ticket.ticket_number}", status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@router.get("/{tenant_slug}/tickets/{ticket_ref}", response_class=HTMLResponse)
+async def portal_ticket_timeline(
+    request: Request,
+    tenant_slug: str,
+    ticket_ref: str,
+    user: CurrentUser | None = Depends(get_current_user_optional),
+):
+    """The client portal's own lightweight ticket view: a read-only
+    activity timeline rendered into a modal (app.js's [data-ticket-
+    timeline] handler fetches this and injects it), not the full ticket
+    detail/edit page -- "only the updates," per the ask this exists for,
+    with a full "Edit ticket" link out to /tickets/<ref> (require_login,
+    same as ever) for anyone who wants the real thing. This route itself
+    changes nothing.
+
+    Signed-in-only, and only for a ticket this visitor reported
+    themselves -- same reporter_user_id == user.id scope as the "Tickets
+    reported by me" table this is opened from, tighter than what a
+    client/client_admin could actually reach via the full app (any
+    ticket in their tenant), since the portal's whole ethos is a
+    deliberately narrow, self-service surface. A 404 either way (never
+    403) for "not signed in," "no such ticket," and "not your ticket" --
+    an anonymous or wrong-visitor request shouldn't learn which one it
+    was."""
+    access = await _resolve_portal_access(request, tenant_slug, user)
+    if not isinstance(access, tuple):
+        return access
+    tenant, _flags = access
+    if user is None:
+        return templates.TemplateResponse(request, "errors/404.html", {}, status_code=404)
+
+    async with tenant_session(tenant.schema_name) as tenant_db:
+        ticket = await ticket_service.get_ticket_by_ref(tenant_db, ticket_ref)
+        if ticket is None or ticket.reporter_user_id != user.id:
+            return templates.TemplateResponse(request, "errors/404.html", {}, status_code=404)
+
+        status_labels = {s.key: s.label for s in await ticket_service.list_statuses(tenant_db)}
+        activity = ticket_service.build_activity(ticket)
+        user_names = await resolve_user_names(
+            {ticket.reporter_user_id, ticket.assignee_user_id}
+            | {c.author_user_id for c in ticket.comments}
+            | {sc.changed_by_user_id for sc in ticket.status_changes}
+            | ticket_service.assignment_change_ids(ticket)
+            | {ac.changed_by_user_id for ac in ticket.asset_changes}
+            | {fc.changed_by_user_id for fc in ticket.field_changes}
+            | ({d.decided_by_user_id for d in ticket.approval.decisions} if ticket.approval else set())
+        )
+        asset_names = await ticket_service.asset_names(
+            tenant_db, {ticket.asset_id} | ticket_service.asset_change_ids(ticket)
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "portal/_ticket_timeline.html",
+        {
+            "tenant": tenant,
+            "ticket": ticket,
+            "activity": activity,
+            "user_names": user_names,
+            "asset_names": asset_names,
+            "status_labels": status_labels,
+        },
     )

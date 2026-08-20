@@ -68,7 +68,14 @@ p { margin: 0 0 1em; }
 .sidebar-resize-handle:hover, .sidebar-resize-handle.active { background: var(--accent); opacity: 0.5; }
 .sidebar.collapsed .sidebar-resize-handle { display: none; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 16px 20px; overflow: hidden; }
-.brand-logo { width: 28px; height: 28px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
+/* 28px read as tiny outside the PDF header (which renders its own logo
+   separately, rain.web.pdf's own _LOGO_HEIGHT=30 -- close to this old
+   size, and looks right there because a PDF page is dense/printed; the
+   sidebar/login/portal are comparatively open pages where the same
+   size read as an afterthought). Bumped globally, with the login and
+   portal header -- both bigger, more "front door" contexts than the
+   sidebar's own tight column -- sized up further still below. */
+.brand-logo { width: 36px; height: 36px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
 .brand-name { font-weight: 700; font-size: 1.05rem; color: #fff; letter-spacing: 0.02em; white-space: nowrap; }
 
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -776,6 +783,13 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
 .pagination-summary { font-size: 0.82rem; }
 
 /* ---------- tables ---------- */
+/* A horizontal-scroll escape hatch for a table that's wider than its
+   container can comfortably hold -- the client portal's own tables
+   (report.html) opt in, since that page has no sidebar-collapse
+   affordance to reclaim width the way the main app's list pages do on
+   narrow viewports; the table scrolls in its own lane instead of
+   forcing the whole page to. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 th { color: var(--text-muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
@@ -904,6 +918,54 @@ td.actions { text-align: right; white-space: nowrap; }
 .activity-status-change { color: var(--text-muted); }
 .activity-status-change .status-pill { margin: 0 2px; }
 
+/* ---------- client portal ticket timeline (portal/_ticket_timeline.html) ----------
+   A ServiceNow-style dotted vertical timeline -- the same activity
+   entries the ticket detail page's flat .activity-entry list shows
+   (rain.web.templates.tickets._activity_entry's shared entry_content
+   macro), just framed differently for this read-only, "only the
+   updates" modal view. */
+.timeline-ticket-header { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.timeline-ticket-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+.timeline-ticket-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ticket-timeline { position: relative; margin: 16px 0 0; padding: 0; list-style: none; }
+.timeline-entry { position: relative; padding: 0 0 20px 22px; font-size: 0.88rem; }
+.timeline-entry:last-child { padding-bottom: 0; }
+/* The connecting line -- drawn per-entry from its own dot down to the
+   next one's, rather than one long line the whole list sits on top of,
+   so it naturally stops after the last entry with no extra markup. */
+.timeline-entry::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 15px;
+  bottom: -5px;
+  width: 2px;
+  background: var(--border);
+}
+.timeline-entry:last-child::before { display: none; }
+.timeline-dot {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  box-sizing: border-box;
+}
+/* A comment is this timeline's main "someone did something" moment (a
+   human wrote it, not the system logging a field change), and an
+   approval decision is a real decision point -- both get a filled dot
+   instead of the plain bordered one every system-generated change gets,
+   the same "which of these actually matters" distinction ServiceNow's
+   own portal timeline draws with color. */
+.timeline-entry-comment .timeline-dot { border-color: var(--accent); background: var(--accent); }
+.timeline-entry-approval_decision .timeline-dot { border-color: var(--accent); background: var(--accent); }
+.timeline-entry-approval_decision.timeline-entry-rejected .timeline-dot { border-color: var(--danger); background: var(--danger); }
+.timeline-content .activity-body { margin-top: 2px; }
+.timeline-footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+
 /* ---------- ticket severity ---------- */
 .severity-low, .sev-debug, .sev-info { color: var(--text-muted); }
 .severity-medium, .sev-notice, .sev-warning { background: #fef9c3; color: #854d0e; border-color: transparent; }
@@ -1015,6 +1077,7 @@ td.actions { text-align: right; white-space: nowrap; }
 .auth-card.wide { max-width: 560px; }
 .auth-card .brand-name { color: var(--text); font-size: 1.3rem; }
 .auth-card .brand { justify-content: center; padding-bottom: 24px; }
+.auth-card .brand-logo { width: 48px; height: 48px; }
 .auth-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; color: var(--text-muted); font-size: 0.8rem; }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
 .auth-build { text-align: center; font-size: 0.75rem; margin-top: 20px; }
@@ -1048,6 +1111,7 @@ td.actions { text-align: right; white-space: nowrap; }
 .portal-header { display: flex; align-items: center; margin-bottom: 20px; }
 .portal-header .brand { padding: 0; }
 .portal-header .brand-name { color: var(--text); font-size: 1.1rem; }
+.portal-header .brand-logo { width: 44px; height: 44px; }
 .portal-tenant-pill {
   margin-left: auto;
   display: inline-flex;
@@ -1073,4 +1137,32 @@ td.actions { text-align: right; white-space: nowrap; }
   body.nav-open .sidebar { transform: translateX(0); }
   .sidebar-resize-handle { display: none; }
   .content { padding: 16px; }
+
+  /* Generic components used both in the main app and the client portal --
+     safe to tune globally at this breakpoint rather than duplicating a
+     portal-scoped copy of each. */
+  .tab-buttons { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tab-btn { white-space: nowrap; }
+  .modal-overlay { padding: 12px; }
+  .modal-box { max-height: 92vh; }
+
+  /* Client portal (rain.modules.portal) -- a phone-width visitor is a
+     real, expected case here specifically (an employee filing an
+     incident from their phone, a customer requesting something from a
+     shared link), unlike most of the rest of the app. */
+  .content-standalone:has(.portal-shell) { padding-top: 20px; }
+  .portal-card { padding: 16px; }
+  /* Logo + instance name + tenant pill no longer fit one row at this
+     width without cramming -- wrapping the pill to its own line reads
+     far better than shrinking everything to force a fit. */
+  .portal-header { flex-wrap: wrap; row-gap: 10px; }
+  .portal-tenant-pill { margin-left: 0; }
+  .portal-header .brand-logo { width: 36px; height: 36px; }
+}
+
+@media (max-width: 480px) {
+  /* Long tab labels ("Request Something", "Pending Actions", ...) at
+     phone width: shrink and tighten padding rather than relying on
+     horizontal scroll alone to keep the row from feeling oversized. */
+  .portal-shell .tab-btn { padding: 8px 10px; font-size: 0.82rem; }
 }
