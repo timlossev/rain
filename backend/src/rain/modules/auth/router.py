@@ -352,9 +352,12 @@ async def saml_login(request: Request, next: str = "/"):
     async with control_session() as session:
         config = await get_saml_config(session)
     if config is None:
+        logger.warning("SAML SSO: login attempt with no SAML config present -- redirected to /login")
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     auth = await build_auth(request, config)
-    return RedirectResponse(auth.login(return_to=next), status_code=status.HTTP_302_FOUND)
+    redirect_url = auth.login(return_to=next)
+    logger.info("SAML SSO: login initiated -- idp=%s next=%s", config.idp_entity_id, next)
+    return RedirectResponse(redirect_url, status_code=status.HTTP_302_FOUND)
 
 
 @router.post("/auth/saml/acs")
@@ -367,6 +370,7 @@ async def saml_acs(request: Request):
     async with control_session() as session:
         config = await get_saml_config(session)
         if config is None:
+            logger.warning("SAML ACS: response received but no SAML config present -- redirected to /login")
             return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
 
         auth = await build_auth(request, config)
@@ -376,7 +380,23 @@ async def saml_acs(request: Request):
         # accepts IdP-initiated SSO too, not only responses to a request
         # RAIN itself sent. The signature check below is what actually
         # matters for trusting the response's contents either way.
-        auth.process_response()
+        try:
+            auth.process_response()
+        except Exception:
+            # process_response() raises rather than populating get_errors()
+            # for some malformed input (confirmed live: a SAMLResponse that
+            # isn't valid base64-encoded XML at all raises lxml.etree.
+            # XMLSyntaxError deep inside python3-saml) -- caught here so a
+            # misconfigured IdP (wrong encoding, wrong binding, posting the
+            # wrong field) gets the same graceful "SSO sign-in failed" page
+            # everything else in this function does, instead of a bare 500.
+            logger.exception("SAML ACS: process_response() raised -- malformed SAMLResponse?")
+            return templates.TemplateResponse(
+                request,
+                "login.html",
+                {"error": "SSO sign-in failed: malformed response.", "next": "/", "saml_enabled": True},
+                status_code=400,
+            )
         errors = auth.get_errors()
         if errors or not auth.is_authenticated():
             logger.warning("SAML ACS: rejected -- %s (%s)", errors, auth.get_last_error_reason())
@@ -388,6 +408,17 @@ async def saml_acs(request: Request):
             )
 
         identity = extract_identity(auth, config)
+        # Logged before provisioning even runs: if provision_or_update_user
+        # rejects the identity below (no email, or an email collision),
+        # this line is what shows *what the assertion actually carried* --
+        # the two warnings it can log don't repeat the raw attribute values.
+        logger.info(
+            "SAML ACS: assertion accepted -- subject=%s email=%s role_attr=%s (admin value configured: %s)",
+            identity.subject,
+            identity.email,
+            identity.role_attribute_value,
+            config.role_admin_value,
+        )
         user = await provision_or_update_user(session, config, identity)
         if user is None:
             return templates.TemplateResponse(
@@ -397,6 +428,7 @@ async def saml_acs(request: Request):
                 status_code=400,
             )
         if not user.is_active:
+            logger.warning("SAML ACS: %s resolved to a deactivated account -- refused", user.email)
             return templates.TemplateResponse(
                 request,
                 "login.html",
@@ -406,6 +438,13 @@ async def saml_acs(request: Request):
 
         form = await request.form()
         next_path = str(form.get("RelayState") or "/")
+        logger.info(
+            "SAML ACS: session issued for %s (role=%s, tenant_id=%s) -> %s",
+            user.email,
+            user.role_key,
+            user.tenant_id,
+            next_path,
+        )
         return await _issue_session(request, session, user, next_path)
 
 

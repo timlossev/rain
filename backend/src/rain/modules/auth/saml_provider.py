@@ -180,7 +180,15 @@ async def provision_or_update_user(session: AsyncSession, config: SamlConfig, id
             is_active=True,
         )
         session.add(user)
+        logger.info(
+            "SAML JIT: provisioning new user %s (role=%s, tenant_id=%s, subject=%s)",
+            email, role_key, tenant_id, identity.subject,
+        )
     else:
+        logger.info(
+            "SAML JIT: updating existing user %s (role %s -> %s, tenant_id %s -> %s, subject=%s)",
+            email, user.role_key, role_key, user.tenant_id, tenant_id, identity.subject,
+        )
         user.display_name = display_name
         user.role_key = role_key
         user.tenant_id = tenant_id

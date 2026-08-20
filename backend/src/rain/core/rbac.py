@@ -13,14 +13,28 @@ client that also passes require_admin -- see each route's own choice of
 require_login vs require_admin for what that means for it."""
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, status
+import logging
+
+from fastapi import Depends, HTTPException, Request, status
 
 from rain.core.tenancy import CurrentUser, get_current_user
 
+logger = logging.getLogger("rain.rbac")
+
 
 def require_role(*roles: str):
-    async def _dep(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    async def _dep(request: Request, user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
         if user.role_key not in roles:
+            # The one line that answers "why did this 403" after the fact --
+            # a bare HTTPException(403) raises no traceback and logs nothing
+            # on its own, so without this the only trace of a role mismatch
+            # (e.g. a SAML login landing as "client" because the IdP's Role
+            # attribute value didn't match what's configured, then hitting
+            # an admin-only page) is the 403 response itself.
+            logger.warning(
+                "RBAC: %s (role=%s) denied %s %s -- requires one of %s",
+                user.email, user.role_key, request.method, request.url.path, roles,
+            )
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not permitted")
         return user
 
