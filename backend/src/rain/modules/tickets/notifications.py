@@ -52,6 +52,16 @@ def render_template(template: str, placeholders: dict[str, str]) -> str:
 async def send_email(recipients: list[str], subject: str, body: str) -> None:
     host = config_store.get("smtp_host")
     if not host or not recipients:
+        # Previously a bare, silent return -- indistinguishable in the
+        # logs from this having actually sent. A caller that already
+        # checked config_store itself before calling (there isn't one
+        # today) would find this redundant; every actual caller doesn't,
+        # so this is the only place that would ever say so.
+        logger.warning(
+            "email notification skipped (%s) -- subject=%r",
+            "no SMTP relay configured" if not host else "no recipients",
+            subject,
+        )
         return
 
     message = EmailMessage()
@@ -73,13 +83,62 @@ async def send_email(recipients: list[str], subject: str, body: str) -> None:
 
     try:
         await aiosmtplib.send(message, **kwargs)
+        logger.info("email notification sent to %s -- subject=%r", recipients, subject)
     except Exception:
         logger.exception("failed to send email notification to %s", recipients)
+
+
+async def send_test_email(
+    *,
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    use_tls: bool,
+    from_address: str,
+    to_address: str,
+) -> tuple[bool, str]:
+    """Admin > SMTP's "Send test email" button -- unlike send_email above,
+    this takes the relay settings as plain arguments instead of reading
+    them from config_store, so it tests exactly what's currently typed
+    into the form (including an as-yet-unsaved change), not whatever was
+    last saved. Never raises: returns (False, <reason>) on any failure --
+    connection refused, auth rejected, TLS negotiation failure, whatever
+    aiosmtplib surfaces -- so the admin route can show it inline rather
+    than a 500."""
+    message = EmailMessage()
+    message["From"] = from_address or "rain@localhost"
+    message["To"] = to_address
+    message["Subject"] = "RAIN: SMTP relay test"
+    message.set_content(
+        "This is a test email from RAIN's Admin > SMTP Relay page.\n\n"
+        "If you're reading this, outbound email is configured correctly."
+    )
+    kwargs: dict[str, Any] = {"hostname": host, "port": port, "use_tls": use_tls}
+    if username:
+        kwargs["username"] = username
+        kwargs["password"] = password
+    try:
+        await aiosmtplib.send(message, **kwargs)
+        logger.info("SMTP test email sent to %s via %s:%s", to_address, host, port)
+        return True, f"Test email sent to {to_address}."
+    except Exception as exc:
+        logger.warning("SMTP test email to %s via %s:%s failed: %s", to_address, host, port, exc)
+        return False, str(exc)
 
 
 async def send_slack(webhook_url: str, text: str) -> None:
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            await client.post(webhook_url, json={"text": text})
+            resp = await client.post(webhook_url, json={"text": text})
+        # httpx only raises for a network-level failure (DNS, connection
+        # refused, timeout) -- an HTTP-level error response (404 for a
+        # revoked webhook, 500 from Slack's own side) doesn't raise on
+        # its own and, before this, went completely unchecked: a dead
+        # webhook URL looked identical to a real success.
+        if resp.status_code >= 400:
+            logger.warning("Slack notification rejected -- HTTP %s: %s", resp.status_code, resp.text[:300])
+        else:
+            logger.info("Slack notification sent (HTTP %s)", resp.status_code)
     except Exception:
         logger.exception("failed to send Slack notification")

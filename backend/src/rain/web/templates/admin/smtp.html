@@ -3,6 +3,8 @@
 {% block help_text %}One outbound mail relay for the whole instance. Who actually receives ticket notifications is configured per-tenant under Admin > Notification Channels, and used by Tickets > Platform Response Rules.{% endblock %}
 {% block content %}
 <div class="card" style="max-width:480px;">
+  {% if request.query_params.get('test_ok') %}<div class="flash flash-ok">{{ request.query_params.get('test_ok') }}</div>{% endif %}
+  {% if request.query_params.get('test_error') %}<div class="flash flash-error">Test failed: {{ request.query_params.get('test_error') }}</div>{% endif %}
   <form method="post" action="/admin/smtp">
     <div class="form-row">
       <div class="field"><label for="smtp_host">Host</label><input type="text" id="smtp_host" name="smtp_host" value="{{ branding.get('smtp_host', '') }}" placeholder="smtp.example.com"></div>
@@ -14,7 +16,16 @@
       <div class="field"><label for="smtp_password">Password</label><input type="password" id="smtp_password" name="smtp_password" placeholder="leave blank to keep current"></div>
     </div>
     <div class="field"><label class="checkbox-row"><input type="checkbox" name="smtp_use_tls" {% if branding.get('smtp_use_tls', True) %}checked{% endif %}> Use STARTTLS</label></div>
+    <div class="form-section">
+      <div class="form-section-title">Test this configuration</div>
+      <div class="field">
+        <label for="test_recipient">Send a test email to</label>
+        <input type="text" id="test_recipient" name="test_recipient" inputmode="email" placeholder="you@example.com">
+        <p class="field-hint">Tests exactly what's in the form above, saved or not. A blank password uses whatever's already saved.</p>
+      </div>
+    </div>
     <button class="btn btn-primary" type="submit">Save</button>
+    <button class="btn" type="submit" formaction="/admin/smtp/test">Send test email</button>
   </form>
 </div>
 {% endblock %}

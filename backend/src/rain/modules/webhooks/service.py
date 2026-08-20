@@ -6,6 +6,7 @@ each place inlining its own URL/headers/payload/timeout handling."""
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 
 import httpx
@@ -15,6 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from rain.db.tenant_models import SyslogEvent, WebhookConfig
 from rain.modules.tickets import correlation as ticket_correlation
 from rain.modules.tickets import rules as ticket_rules
+
+logger = logging.getLogger("rain.webhooks")
 
 
 def _json_escape(value: str) -> str:
@@ -74,8 +77,25 @@ async def call_webhook(config: WebhookConfig, placeholders: dict[str, str] | Non
     try:
         async with httpx.AsyncClient(timeout=config.timeout_seconds or 10) as client:
             resp = await client.request(method, config.url, headers=headers, **request_kwargs)
-        return WebhookResult(status_code=resp.status_code, success=resp.status_code in success_codes, body=resp.text)
+        success = resp.status_code in success_codes
+        if success:
+            logger.info("webhook '%s' called -- %s %s -> HTTP %s", config.name, method, config.url, resp.status_code)
+        else:
+            # Previously no logging here at all -- a webhook returning
+            # something other than its configured success_codes (a
+            # revoked API token, a 500 on the receiving end, ...) was
+            # only ever visible by way of alert_webhook_failure(), and
+            # only when that specific webhook has alert_on_failure
+            # turned on. This fires regardless, so it's not only in the
+            # container log stream when someone happened to opt into
+            # the DB-recorded alert too.
+            logger.warning(
+                "webhook '%s' returned an unexpected status -- %s %s -> HTTP %s (expected one of %s)",
+                config.name, method, config.url, resp.status_code, sorted(success_codes),
+            )
+        return WebhookResult(status_code=resp.status_code, success=success, body=resp.text)
     except httpx.HTTPError as exc:
+        logger.warning("webhook '%s' call failed -- %s %s -> %s", config.name, method, config.url, exc)
         return WebhookResult(status_code=None, success=False, body="", error=str(exc))
 
 

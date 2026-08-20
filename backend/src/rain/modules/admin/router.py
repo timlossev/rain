@@ -371,6 +371,50 @@ async def smtp_submit(
     return RedirectResponse("/admin/smtp?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.post("/smtp/test")
+async def smtp_test(
+    smtp_host: str = Form(""),
+    smtp_port: int = Form(587),
+    smtp_username: str = Form(""),
+    smtp_password: str = Form(""),
+    smtp_from_address: str = Form(""),
+    smtp_use_tls: bool = Form(False),
+    test_recipient: str = Form(""),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    """"Send test email" -- the same form's fields, submitted here instead
+    of /admin/smtp via the button's formaction, so this tests exactly
+    what's currently typed in rather than whatever was last saved
+    (nothing here is written to config_store). A blank password field
+    means "use whatever's already saved" here too, same convention as
+    the real save route just above -- most of the time an admin testing
+    an already-configured relay isn't retyping the password just to
+    click this button."""
+    if not smtp_host.strip():
+        return RedirectResponse("/admin/smtp?test_error=Host+is+required.", status_code=status.HTTP_303_SEE_OTHER)
+    if not test_recipient.strip():
+        return RedirectResponse(
+            "/admin/smtp?test_error=Enter+an+address+to+send+the+test+to.", status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    password = smtp_password
+    if not password and smtp_username.strip():
+        encrypted_password = config_store.get("smtp_password_encrypted")
+        password = decrypt_json(bytes.fromhex(encrypted_password)) if encrypted_password else ""
+
+    ok, detail = await notifications.send_test_email(
+        host=smtp_host.strip(),
+        port=smtp_port,
+        username=smtp_username.strip(),
+        password=password,
+        use_tls=smtp_use_tls,
+        from_address=smtp_from_address.strip(),
+        to_address=test_recipient.strip(),
+    )
+    param = "test_ok" if ok else "test_error"
+    return RedirectResponse(f"/admin/smtp?{param}={quote(detail)}", status_code=status.HTTP_303_SEE_OTHER)
+
+
 async def _listener_is_active(port: int) -> bool:
     """A real-time up/down check rather than a cached/assumed status --
     opens (and immediately closes) a TCP connection to the syslog
