@@ -143,6 +143,15 @@ document.addEventListener("DOMContentLoaded", () => {
       matches = [];
       activeIndex = -1;
       results.hidden = true;
+      // Opt-in (data-user-picker-auto-submit) -- a filter box (tickets
+      // list's "Filter by asset") wants picking a suggestion to apply
+      // immediately, unlike a data-entry form (ticket form's own asset
+      // field) where picking is just one of several fields on the way to
+      // an explicit Save.
+      if (picker.dataset.userPickerAutoSubmit !== undefined) {
+        const form = picker.closest("form");
+        if (form) form.requestSubmit();
+      }
     };
 
     input.addEventListener("input", () => {
@@ -794,6 +803,48 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         target.innerHTML = "<p class=\"muted\">Preview failed.</p>";
       }
+    });
+  });
+
+  // Row checkbox multi-select for a bulk action bar -- first user is the
+  // tickets list's "Mass resolve", generic enough (reads/writes nothing
+  // ticket-specific) for any other [data-bulk-select] table later. The
+  // header checkbox (data-bulk-select-all) toggles every row; any row
+  // checkbox changing recomputes the count, shows/hides the bar, and
+  // refills the hidden ids field a form elsewhere on the page (declared
+  // outside the table -- a <form> can't itself contain another <table>'s
+  // action buttons the way this page's layout wants) submits.
+  document.querySelectorAll("[data-bulk-select]").forEach((table) => {
+    const selectAll = table.querySelector("[data-bulk-select-all]");
+    const bar = document.querySelector("[data-bulk-select-bar]");
+    const countEl = bar && bar.querySelector("[data-bulk-select-count]");
+    const idsInput = document.querySelector("[data-bulk-select-ids]");
+    const resolveForm = document.getElementById("tickets-bulk-resolve-form");
+
+    const rows = () => Array.from(table.querySelectorAll("[data-bulk-select-row]"));
+
+    const update = () => {
+      const checked = rows().filter((cb) => cb.checked);
+      if (bar) bar.hidden = checked.length === 0;
+      if (countEl) countEl.textContent = `${checked.length} selected`;
+      if (idsInput) idsInput.value = checked.map((cb) => cb.value).join(",");
+      if (resolveForm) {
+        resolveForm.dataset.confirm = `Mark ${checked.length} selected ticket(s) resolved?`;
+      }
+      if (selectAll) {
+        selectAll.checked = checked.length > 0 && checked.length === rows().length;
+        selectAll.indeterminate = checked.length > 0 && checked.length < rows().length;
+      }
+    };
+
+    if (selectAll) {
+      selectAll.addEventListener("change", () => {
+        rows().forEach((cb) => { cb.checked = selectAll.checked; });
+        update();
+      });
+    }
+    table.addEventListener("change", (evt) => {
+      if (evt.target.matches("[data-bulk-select-row]")) update();
     });
   });
 });

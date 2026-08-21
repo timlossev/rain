@@ -1,24 +1,32 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg with context %}
+{% import "_search_picker.html" as picker %}
 {% block title %}Tickets - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Browse and filter tickets (incidents, vulnerabilities, and changes) by type and status. Click a column header to sort by it. Click a ticket to view its full detail and activity.{% endblock %}
+{% block help_text %}Browse and filter tickets (incidents, vulnerabilities, and changes) by type, status, or affected asset. Defaults to active tickets (everything not closed) -- pick "All statuses" or "Closed" to see closed ones. Click a column header to sort by it. Check rows to mass-resolve several at once. Click a ticket to view its full detail and activity.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 
 {# Builds a /tickets query string, keeping every filter/sort dimension at
    its current value except the one(s) passed in -- None means "keep
    current", "" means "explicitly clear". Used by every link in this page
-   so clicking one filter/sort control never silently drops another. #}
-{% macro qs(type=none, status=none, assigned=none, problematic=none, sort=none, dir=none) %}
+   so clicking one filter/sort control never silently drops another.
+   status is handled separately from the rest: `is not none` (not a bare
+   truthiness check) so an explicit "" (the "All statuses" pick) survives
+   being carried through a link that isn't itself about status -- a plain
+   falsy check couldn't tell that apart from "no filter set at all", which
+   would silently revert every other link back to the "active" default. #}
+{% macro qs(type=none, status=none, asset_id=none, assigned=none, problematic=none, sort=none, dir=none) %}
 {%- set parts = [] -%}
 {%- set t = type if type is not none else selected_type -%}
 {%- set s = status if status is not none else selected_status -%}
+{%- set aid = asset_id if asset_id is not none else selected_asset_id -%}
 {%- set a = assigned if assigned is not none else selected_assigned -%}
 {%- set c = problematic if problematic is not none else ("1" if selected_problematic else "") -%}
 {%- set so = sort if sort is not none else selected_sort -%}
 {%- set d = dir if dir is not none else selected_dir -%}
 {%- if t %}{% set _ = parts.append("ticket_type=" ~ t) %}{% endif -%}
-{%- if s %}{% set _ = parts.append("ticket_status=" ~ s) %}{% endif -%}
+{%- if s is not none %}{% set _ = parts.append("ticket_status=" ~ s) %}{% endif -%}
+{%- if aid %}{% set _ = parts.append("asset_id=" ~ aid) %}{% endif -%}
 {%- if a %}{% set _ = parts.append("assigned=" ~ a) %}{% endif -%}
 {%- if c %}{% set _ = parts.append("problematic=" ~ c) %}{% endif -%}
 {%- if so and so != "created_at" %}{% set _ = parts.append("sort=" ~ so) %}{% endif -%}
@@ -44,17 +52,30 @@
 
     <form method="get" action="/tickets" class="field" style="margin-bottom:0;">
       <input type="hidden" name="ticket_type" value="{{ selected_type }}">
+      {% if selected_asset_id %}<input type="hidden" name="asset_id" value="{{ selected_asset_id }}">{% endif %}
       {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
       {% if selected_problematic %}<input type="hidden" name="problematic" value="1">{% endif %}
       {% if selected_sort and selected_sort != "created_at" %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
       {% if selected_dir != "desc" %}<input type="hidden" name="dir" value="{{ selected_dir }}">{% endif %}
       <select id="ticket_status" name="ticket_status" onchange="this.form.submit()" aria-label="Status" title="Filter by status">
-        <option value="">All statuses</option>
+        <option value="active" {% if selected_status is none or selected_status == "active" %}selected{% endif %}>All active</option>
+        <option value="" {% if selected_status == "" %}selected{% endif %}>All statuses</option>
         {% for s in statuses %}
         <option value="{{ s.key }}" {% if selected_status == s.key %}selected{% endif %}>{{ s.label }}</option>
         {% endfor %}
       </select>
     </form>
+
+    <form method="get" action="/tickets" style="margin-bottom:0;">
+      <input type="hidden" name="ticket_type" value="{{ selected_type }}">
+      {% if selected_status is not none %}<input type="hidden" name="ticket_status" value="{{ selected_status }}">{% endif %}
+      {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
+      {% if selected_problematic %}<input type="hidden" name="problematic" value="1">{% endif %}
+      {% if selected_sort and selected_sort != "created_at" %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
+      {% if selected_dir != "desc" %}<input type="hidden" name="dir" value="{{ selected_dir }}">{% endif %}
+      {{ picker.search_picker("asset_id", "/tickets/assets/search", initial_value=selected_asset_id, initial_label=selected_asset_name, placeholder="Filter by asset...", auto_submit=True) }}
+    </form>
+    {% if selected_asset_id %}<a class="btn btn-sm" href="/tickets?{{ qs(asset_id='') }}">Clear asset</a>{% endif %}
 
     <div class="filter-bar-divider"></div>
 
@@ -67,10 +88,21 @@
   </div>
 </div>
 
+<form id="tickets-bulk-resolve-form" method="post" action="/tickets/bulk-resolve" data-confirm="">
+  <input type="hidden" name="ticket_ids" data-bulk-select-ids>
+  <input type="hidden" name="next" value="/tickets?{{ qs() }}">
+</form>
+
 <div class="card">
-  <table class="tickets-table">
+  {# Hidden until >=1 row is checked (app.js's [data-bulk-select]). #}
+  <div class="panel-row bulk-actions-bar" data-bulk-select-bar hidden style="justify-content:flex-start; gap:12px; margin-bottom:12px;">
+    <span class="muted" data-bulk-select-count>0 selected</span>
+    <button type="submit" form="tickets-bulk-resolve-form" class="btn btn-sm btn-primary">Mass resolve</button>
+  </div>
+  <table class="tickets-table" data-bulk-select>
     <thead>
       <tr>
+        <th class="col-narrow"><input type="checkbox" data-bulk-select-all aria-label="Select all"></th>
         <th class="col-narrow">{{ sort_link("ticket_number", "Number") }}</th>
         <th class="col-title">{{ sort_link("title", "Title") }}</th>
         <th class="col-narrow">{{ sort_link("severity", "Severity") }}</th>
@@ -78,12 +110,13 @@
         <th class="col-narrow">Assignee</th>
         <th class="col-narrow">Asset</th>
         <th class="col-narrow">{{ sort_link("created_at", "Created") }}</th>
-        <th></th>
+        <th class="col-narrow"></th>
       </tr>
     </thead>
     <tbody>
       {% for t in page.items %}
       <tr>
+        <td><input type="checkbox" data-bulk-select-row value="{{ t.id }}" aria-label="Select {{ t.ticket_number }}"></td>
         <td><a href="/tickets/{{ t.ticket_number }}">{{ t.ticket_number }}</a></td>
         <td>
           <div class="ticket-title-cell">
@@ -137,7 +170,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="8" class="muted">No tickets yet. <a href="/tickets/new">Create one</a> or watch <a href="/tickets/live">Events</a>.</td></tr>
+      <tr><td colspan="9" class="muted">{% if selected_status == "active" or selected_status is none %}No active tickets. <a href="/tickets?{{ qs(status='') }}">Show all statuses</a>, or <a href="/tickets/new">create one</a>.{% else %}No tickets yet. <a href="/tickets/new">Create one</a> or watch <a href="/tickets/live">Events</a>.{% endif %}</td></tr>
       {% endfor %}
     </tbody>
   </table>

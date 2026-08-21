@@ -73,6 +73,7 @@ async def list_tickets(
     request: Request,
     ticket_type: str | None = None,
     ticket_status: str | None = None,
+    asset_id: int | None = None,
     assigned: str | None = None,  # "me" | "unassigned" | None
     problematic: str | None = None,  # "1" | None
     sort: str | None = None,
@@ -84,9 +85,18 @@ async def list_tickets(
 ):
     nav = await build_nav_context(ctx)
     dir = "asc" if dir == "asc" else "desc"
+    # No ticket_status in the URL at all (a bare /tickets, or the very
+    # first visit) defaults to "active" -- every status except whichever
+    # the tenant's flagged is_closed -- rather than showing every closed
+    # ticket ever, forever, on the landing view. ticket_status="" (the
+    # "All statuses" dropdown option, which always submits the param even
+    # when blank) explicitly opts back into everything; a real status key
+    # (including a closed one) filters to exactly that, same as before.
+    effective_status = "active" if ticket_status is None else ticket_status
     stmt = service.ticket_list_stmt(
         ticket_type=ticket_type,
-        status=ticket_status,
+        status=effective_status,
+        asset_id=asset_id,
         assigned_to=ctx.user.id if assigned == "me" else None,
         unassigned=assigned == "unassigned",
         problematic_only=bool(problematic),
@@ -97,6 +107,7 @@ async def list_tickets(
     statuses = await service.list_statuses(tenant_db)
     status_colors = {s.key: s.color for s in statuses}
     user_names = await resolve_user_names({t.assignee_user_id for t in ticket_page.items})
+    selected_asset = await asset_service.get_asset(tenant_db, asset_id) if asset_id else None
     return templates.TemplateResponse(
         request,
         "tickets/list.html",
@@ -109,6 +120,8 @@ async def list_tickets(
             "status_colors": status_colors,
             "selected_type": ticket_type,
             "selected_status": ticket_status,
+            "selected_asset_id": asset_id,
+            "selected_asset_name": selected_asset.name if selected_asset else "",
             "selected_assigned": assigned,
             "selected_problematic": bool(problematic),
             "selected_sort": sort if sort in service.SORTABLE_COLUMNS else "created_at",
@@ -631,6 +644,34 @@ async def mark_closed(
         closed_status = await service.get_closed_status(tenant_db)
         if closed_status is not None:
             await service.update_status(tenant_db, ticket, closed_status.key, changed_by_user_id=ctx.user.id)
+    return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/bulk-resolve")
+async def bulk_resolve(
+    ticket_ids: str = Form(...),
+    next: str = Form("/tickets"),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """The list page's checkbox-select "Mass resolve" action -- same
+    find-by-name lookup and per-ticket service.update_status call as the
+    single-ticket "Mark cancelled" quick action below uses for its own
+    status, just looped over every checked id instead of one ticket_id
+    path param. update_status is a no-op for a ticket already on that
+    status (no duplicate log entry), and for one this tenant has since
+    renamed/deleted "Resolved" away entirely (resolved_status is then
+    None) the whole action is silently a no-op -- there's no sane status
+    to invent in that case, same reasoning as get_closed_status's own
+    None case."""
+    resolved_status = await service.find_status_by_name(tenant_db, "resolved")
+    if resolved_status is not None:
+        ids = [int(part) for part in ticket_ids.split(",") if part.strip().isdigit()]
+        for ticket_id in ids:
+            ticket = await tenant_db.get(Ticket, ticket_id)
+            if ticket is not None:
+                await service.update_status(tenant_db, ticket, resolved_status.key, changed_by_user_id=ctx.user.id)
     return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
 
 

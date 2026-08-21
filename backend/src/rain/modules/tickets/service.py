@@ -205,6 +205,7 @@ def ticket_list_stmt(
     *,
     ticket_type: str | None = None,
     status: str | None = None,
+    asset_id: int | None = None,
     assigned_to: int | None = None,
     unassigned: bool = False,
     problematic_only: bool = False,
@@ -217,7 +218,14 @@ def ticket_list_stmt(
     "Unassigned Incidents") are mutually exclusive; callers pick one.
     `sort` falls back to created_at (the pre-sorting default) for None or
     anything not in SORTABLE_COLUMNS, rather than erroring on a stale or
-    hand-edited query string."""
+    hand-edited query string.
+
+    `status` is one of: a real TicketStatus.key (filters to exactly that
+    status); the sentinel "active", meaning every status *except* whichever
+    ones the tenant has flagged is_closed (this is the router's own
+    default when the URL carries no ticket_status at all -- see
+    rain.modules.tickets.router.list_tickets); or falsy/None, meaning no
+    status filter at all ("All statuses", closed included)."""
     # selectinload(Ticket.approval): the list view's change rows show an
     # approved/unapproved indicator next to the title (list.html), which
     # needs ticket.approval.overall_status -- without eager-loading it
@@ -228,8 +236,13 @@ def ticket_list_stmt(
     stmt = stmt.order_by(column.desc() if direction != "asc" else column.asc())
     if ticket_type:
         stmt = stmt.where(Ticket.ticket_type == ticket_type)
-    if status:
+    if status == "active":
+        closed_keys = select(TicketStatus.key).where(TicketStatus.is_closed.is_(True))
+        stmt = stmt.where(Ticket.status.not_in(closed_keys))
+    elif status:
         stmt = stmt.where(Ticket.status == status)
+    if asset_id is not None:
+        stmt = stmt.where(Ticket.asset_id == asset_id)
     if unassigned:
         stmt = stmt.where(Ticket.assignee_user_id.is_(None))
     elif assigned_to is not None:
