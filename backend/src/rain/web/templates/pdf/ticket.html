@@ -54,22 +54,22 @@
   {% for entry in activity %}
   <div class="pdf-comment">
     {% if entry.kind == "comment" %}
-    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.author_user_id, "Someone") }}</div>
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ ("RAIN System" if entry.item.author_user_id is none else user_names.get(entry.item.author_user_id, "Deleted user")) }}</div>
     <div>{{ entry.item.body }}</div>
     {% elif entry.kind == "assignment_change" %}
-    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ ("RAIN System" if entry.item.changed_by_user_id is none else user_names.get(entry.item.changed_by_user_id, "Deleted user")) }}</div>
     <div>
       {% if entry.item.to_assignee_user_id %}Assigned this to {{ user_names.get(entry.item.to_assignee_user_id, "someone") }}{% if entry.item.from_assignee_user_id %} (previously {{ user_names.get(entry.item.from_assignee_user_id, "someone") }}){% endif %}
       {% else %}Unassigned this{% if entry.item.from_assignee_user_id %} (previously {{ user_names.get(entry.item.from_assignee_user_id, "someone") }}){% endif %}{% endif %}
     </div>
     {% elif entry.kind == "asset_change" %}
-    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ ("RAIN System" if entry.item.changed_by_user_id is none else user_names.get(entry.item.changed_by_user_id, "Deleted user")) }}</div>
     <div>
       {% if entry.item.to_asset_id %}Set the affected asset to {{ asset_names.get(entry.item.to_asset_id, "an asset") }}{% if entry.item.from_asset_id %} (previously {{ asset_names.get(entry.item.from_asset_id, "an asset") }}){% endif %}
       {% else %}Cleared the affected asset{% if entry.item.from_asset_id %} (previously {{ asset_names.get(entry.item.from_asset_id, "an asset") }}){% endif %}{% endif %}
     </div>
     {% elif entry.kind == "field_change" %}
-    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ ("RAIN System" if entry.item.changed_by_user_id is none else user_names.get(entry.item.changed_by_user_id, "Deleted user")) }}</div>
     <div>
       {% if entry.item.field_name == "severity" %}Changed priority from {{ entry.item.from_value | capitalize }} to {{ entry.item.to_value | capitalize }}
       {% elif entry.item.field_name == "is_problematic" %}{{ "Marked this ticket as problematic" if entry.item.to_value == "true" else "Unmarked this ticket as problematic" }}
@@ -80,10 +80,10 @@
       {% elif entry.item.field_name == "escalated" %}Escalated this ticket: {{ entry.item.to_value }}{% endif %}
     </div>
     {% elif entry.kind == "approval_decision" %}
-    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.decided_by_user_id, "Someone") }}</div>
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ ("RAIN System" if entry.item.decided_by_user_id is none else user_names.get(entry.item.decided_by_user_id, "Deleted user")) }}</div>
     <div>{{ entry.item.decision | capitalize }} step "{{ entry.item.step_label }}"{% if entry.item.comment %} -- {{ entry.item.comment }}{% endif %}</div>
     {% else %}
-    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</div>
+    <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ ("RAIN System" if entry.item.changed_by_user_id is none else user_names.get(entry.item.changed_by_user_id, "Deleted user")) }}</div>
     <div>Changed status{% if entry.item.from_status %} from {{ status_labels.get(entry.item.from_status, entry.item.from_status) }}{% endif %} to {{ status_labels.get(entry.item.to_status, entry.item.to_status) }}</div>
     {% endif %}
   </div>

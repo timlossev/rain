@@ -8,11 +8,11 @@
    rain.modules.tickets.service.build_activity. #}
 {% macro entry_content(entry, user_names, asset_names, status_labels) %}
 {% if entry.kind == "comment" %}
-  <div class="activity-meta"><span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> - <strong>{{ user_names.get(entry.item.author_user_id, "Someone") }}</strong></div>
+  <div class="activity-meta"><span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> - <strong>{{ ("RAIN System" if entry.item.author_user_id is none else user_names.get(entry.item.author_user_id, "Deleted user")) }}</strong></div>
   <div class="activity-body">{{ entry.item.body }}</div>
 {% elif entry.kind == "assignment_change" %}
   <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
-  <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
+  <strong>{{ ("RAIN System" if entry.item.changed_by_user_id is none else user_names.get(entry.item.changed_by_user_id, "Deleted user")) }}</strong> -
   {% if entry.item.to_assignee_user_id %}
   assigned this to <strong>{{ user_names.get(entry.item.to_assignee_user_id, "someone") }}</strong>{% if entry.item.from_assignee_user_id %} (previously <strong>{{ user_names.get(entry.item.from_assignee_user_id, "someone") }}</strong>){% endif %}
   {% else %}
@@ -20,7 +20,7 @@
   {% endif %}
 {% elif entry.kind == "asset_change" %}
   <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
-  <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
+  <strong>{{ ("RAIN System" if entry.item.changed_by_user_id is none else user_names.get(entry.item.changed_by_user_id, "Deleted user")) }}</strong> -
   {% if entry.item.to_asset_id %}
   set the affected asset to <strong>{{ asset_names.get(entry.item.to_asset_id, "an asset") }}</strong>{% if entry.item.from_asset_id %} (previously <strong>{{ asset_names.get(entry.item.from_asset_id, "an asset") }}</strong>){% endif %}
   {% else %}
@@ -28,7 +28,7 @@
   {% endif %}
 {% elif entry.kind == "field_change" %}
   <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
-  <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
+  <strong>{{ ("RAIN System" if entry.item.changed_by_user_id is none else user_names.get(entry.item.changed_by_user_id, "Deleted user")) }}</strong> -
   {% if entry.item.field_name == "severity" %}
   changed priority from <span class="badge severity-{{ entry.item.from_value }}">{{ entry.item.from_value | capitalize }}</span> to <span class="badge severity-{{ entry.item.to_value }}">{{ entry.item.to_value | capitalize }}</span>
   {% elif entry.item.field_name == "is_problematic" %}
@@ -46,11 +46,11 @@
   {% endif %}
 {% elif entry.kind == "approval_decision" %}
   <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
-  <strong>{{ user_names.get(entry.item.decided_by_user_id, "Someone") }}</strong> -
+  <strong>{{ ("RAIN System" if entry.item.decided_by_user_id is none else user_names.get(entry.item.decided_by_user_id, "Deleted user")) }}</strong> -
   {{ entry.item.decision }} step &ldquo;{{ entry.item.step_label }}&rdquo;{% if entry.item.comment %}: {{ entry.item.comment }}{% endif %}
 {% else %}
   <span class="muted">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }}</span> -
-  <strong>{{ user_names.get(entry.item.changed_by_user_id, "Someone") }}</strong> -
+  <strong>{{ ("RAIN System" if entry.item.changed_by_user_id is none else user_names.get(entry.item.changed_by_user_id, "Deleted user")) }}</strong> -
   changed status
   {% if entry.item.from_status %}from <span class="status-pill" style="--pill-color: var(--text-muted);">{{ status_labels.get(entry.item.from_status, entry.item.from_status) }}</span>{% endif %}
   to <span class="status-pill" style="--pill-color: var(--accent);">{{ status_labels.get(entry.item.to_status, entry.item.to_status) }}</span>
