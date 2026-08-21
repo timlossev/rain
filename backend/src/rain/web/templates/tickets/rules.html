@@ -10,16 +10,19 @@
 
 <div class="card">
   <table>
-    <thead><tr><th>Order</th><th>Name</th><th>Type</th><th>Match on</th><th>Pattern</th><th>Severity</th><th></th></tr></thead>
+    <thead><tr><th>Order</th><th>Name</th><th>Type</th><th>Match on</th><th>Pattern</th><th>Severity</th><th></th><th></th></tr></thead>
     <tbody>
       {% for r in page.items %}
-      <tr>
+      <tr{% if not r.is_active %} class="muted"{% endif %}>
         <td class="muted">{{ r.sort_order }}</td>
-        <td>{{ r.name }}</td>
+        <td>{{ r.name }}{% if not r.is_active %} <span class="badge">inactive</span>{% endif %}{% if r.combine_by_title %} <span class="badge" title="Repeat matches fold into an existing open ticket instead of creating a new one">combine</span>{% endif %}</td>
         <td><span class="badge">{{ r.ticket_type }}</span></td>
         <td class="muted">{{ r.match_field }}</td>
         <td><code>{{ r.pattern }}</code></td>
         <td><span class="badge severity-{{ r.severity }}">{{ r.severity }}</span></td>
+        <td class="actions">
+          <a class="btn btn-sm" href="/tickets/rules/{{ r.id }}/edit">Edit</a>
+        </td>
         <td class="actions">
           <form class="inline" method="post" action="/tickets/rules/{{ r.id }}/delete" data-confirm="Delete policy '{{ r.name }}'?">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
@@ -29,7 +32,7 @@
       {% if test_result and test_result.rule_id == r.id %}
       <tr>
         <td></td>
-        <td colspan="6">
+        <td colspan="7">
           {% if test_result.matched %}
           <span class="flash flash-ok" style="display:inline-block;">Matches: "{{ test_result.sample }}"</span>
           {% else %}
@@ -40,7 +43,7 @@
       {% endif %}
       <tr>
         <td></td>
-        <td colspan="6">
+        <td colspan="7">
           <form method="post" action="/tickets/rules/{{ r.id }}/test" class="form-row" style="margin:0;">
             <input type="text" name="sample" placeholder="Paste a sample message to test this rule's pattern against" style="flex:1;">
             <button class="btn btn-sm" type="submit">Test</button>
@@ -48,7 +51,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="7" class="muted">No policies yet -- every event just shows up in Events.</td></tr>
+      <tr><td colspan="8" class="muted">No policies yet -- every event just shows up in Events.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -94,6 +97,10 @@
         <option value="host">Event host = asset External ID</option>
         <option value="program">Event program = asset External ID</option>
       </select>
+    </div>
+    <div class="field">
+      <label class="checkbox-row"><input type="checkbox" name="combine_by_title"> Combine with an existing open ticket that has the same title</label>
+      <div class="field-hint">When on: if a match's computed title equals an already-open ticket of this type, the event is added to that ticket as a "last occurred on ..." comment and the ticket is flagged Problematic, instead of creating a new ticket.</div>
     </div>
     <button class="btn btn-primary" type="submit">Add policy</button>
   </form>

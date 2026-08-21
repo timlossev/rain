@@ -772,6 +772,7 @@ async def rules_create(
     severity: str = Form("medium"),
     asset_match_field: str = Form(""),
     sort_order: int = Form(0),
+    combine_by_title: bool = Form(False),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
@@ -786,10 +787,69 @@ async def rules_create(
             severity=severity,
             asset_match_field=asset_match_field or None,
             sort_order=sort_order,
+            combine_by_title=combine_by_title,
             created_by=ctx.user.id,
         )
     )
     await tenant_db.commit()
+    return RedirectResponse("/tickets/rules/all", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/rules/{rule_id:int}/edit", response_class=HTMLResponse)
+async def rules_edit_form(
+    request: Request,
+    rule_id: int,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    nav = await build_nav_context(ctx)
+    rule = await tenant_db.get(TicketRule, rule_id)
+    if rule is None:
+        return RedirectResponse("/tickets/rules/all", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(
+        request,
+        "tickets/rule_form.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "rule": rule,
+            "ticket_types": TICKET_TYPES,
+            "severities": SEVERITIES,
+            "match_fields": MATCH_FIELDS,
+        },
+    )
+
+
+@router.post("/rules/{rule_id:int}/edit")
+async def rules_edit(
+    rule_id: int,
+    name: str = Form(...),
+    ticket_type: str = Form(...),
+    match_field: str = Form("message"),
+    pattern: str = Form(...),
+    title_template: str = Form("{message}"),
+    severity: str = Form("medium"),
+    asset_match_field: str = Form(""),
+    sort_order: int = Form(0),
+    combine_by_title: bool = Form(False),
+    is_active: bool = Form(False),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    rule = await tenant_db.get(TicketRule, rule_id)
+    if rule is not None:
+        rule.name = name.strip()
+        rule.ticket_type = ticket_type
+        rule.match_field = match_field
+        rule.pattern = pattern
+        rule.title_template = title_template or "{message}"
+        rule.severity = severity
+        rule.asset_match_field = asset_match_field or None
+        rule.sort_order = sort_order
+        rule.combine_by_title = combine_by_title
+        rule.is_active = is_active
+        await tenant_db.commit()
     return RedirectResponse("/tickets/rules/all", status_code=status.HTTP_303_SEE_OTHER)
 
 

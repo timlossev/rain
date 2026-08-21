@@ -533,6 +533,56 @@ async def update_problematic(
     await db.commit()
 
 
+async def find_open_ticket_by_title(db: AsyncSession, ticket_type: str, title: str) -> Ticket | None:
+    """An existing, not-yet-closed ticket of the same type whose title
+    matches exactly -- backs TicketRule.combine_by_title (see
+    combine_event_into_ticket below): decides whether an incoming syslog
+    event is a fresh occurrence or a repeat of something already being
+    worked. "Closed" is whatever the tenant's TicketStatus rows say it is
+    (same definition rain.modules.tickets.nav's active-count badge and
+    update_status's "Mark closed" use), not a hardcoded status string. If
+    more than one somehow matches, the most recently created one wins."""
+    closed_keys = select(TicketStatus.key).where(TicketStatus.is_closed.is_(True))
+    stmt = (
+        select(Ticket)
+        .where(Ticket.ticket_type == ticket_type, Ticket.title == title, Ticket.status.not_in(closed_keys))
+        .order_by(Ticket.created_at.desc())
+        .limit(1)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def combine_event_into_ticket(db: AsyncSession, ticket: Ticket, event: SyslogEvent) -> None:
+    """Folds a repeat syslog occurrence into an already-open ticket instead
+    of creating a new one -- see TicketRule.combine_by_title and rules.
+    apply_rule. Records the new event's full detail as a comment (same
+    content build_event_description puts in a *fresh* ticket's own
+    description, via the same watcher-notification path a human comment
+    takes -- nothing about the repeat occurrence is silently dropped),
+    links the event the same way source_event_id does for a newly created
+    ticket, and turns on is_problematic: a title recurring on an
+    already-open ticket is exactly what that flag means.
+
+    No changed_by_user_id / author_user_id anywhere here -- this is a
+    policy match, not a person acting, same as every other syslog-
+    triggered write in this module (create_ticket's source_rule_id path
+    included)."""
+    when = event.received_at.strftime("%Y-%m-%d %H:%M:%S") if event.received_at else "an unknown time"
+    await add_comment(
+        db, ticket.id, None,
+        f"Repeat occurrence -- last occurred on {when}.\n\n{build_event_description(event)}",
+    )
+    event.promoted_ticket_id = ticket.id
+    await update_problematic(db, ticket, True)
+    # update_problematic() only commits when is_problematic actually
+    # flips -- a *third*-plus occurrence combining onto an already-
+    # problematic ticket would otherwise leave event.promoted_ticket_id
+    # (set just above) sitting uncommitted. Redundant, not harmful, on
+    # every occurrence where update_problematic's own commit already
+    # covered it.
+    await db.commit()
+
+
 async def _reset_approval_if_approved(db: AsyncSession, ticket: Ticket, *, changed_by_user_id: int | None) -> None:
     """Editing an approved change ticket -- title, priority, assignee, or
     affected asset -- invalidates the approvals already collected for it:

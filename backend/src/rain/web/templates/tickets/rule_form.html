@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Edit Policy - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}{% raw %}A syslog event whose match_field matches pattern (regex) is automatically promoted into a ticket of the selected type. The title template fills in {message}, {host}, and {program} from that one matching event -- single braces, not the double-brace {{...}} placeholders webhook payloads use. "Combine" folds a match whose computed title equals an already-open ticket of this type into that ticket (a comment noting the repeat, plus turning on the Problematic flag) instead of creating a new one -- otherwise every match is always a brand-new ticket.{% endraw %}{% endblock %}
+{% block content %}
+<div class="panel-row" style="justify-content:flex-end;">
+  <a class="btn btn-sm" href="/tickets/rules/all">&larr; All policies</a>
+</div>
+
+<div class="card" style="max-width:720px;">
+  <form method="post" action="/tickets/rules/{{ rule.id }}/edit">
+    <div class="form-row">
+      <div class="field">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" value="{{ rule.name }}" placeholder="Failed su attempts" required autofocus>
+      </div>
+      <div class="field">
+        <label for="ticket_type">Ticket type</label>
+        <select id="ticket_type" name="ticket_type">
+          {% for t in ticket_types %}<option value="{{ t }}" {% if t == rule.ticket_type %}selected{% endif %}>{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="severity">Severity</label>
+        <select id="severity" name="severity">
+          {% for s in severities %}<option value="{{ s }}" {% if s == rule.severity %}selected{% endif %}>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label for="match_field">Match on</label>
+        <select id="match_field" name="match_field">
+          {% for f in match_fields %}<option value="{{ f }}" {% if f == rule.match_field %}selected{% endif %}>{{ f }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label for="pattern">Pattern (regex)</label><input type="text" id="pattern" name="pattern" value="{{ rule.pattern }}" placeholder="failed password" required></div>
+      <div class="field" style="flex:0 0 100px;"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="{{ rule.sort_order }}"></div>
+    </div>
+    <div class="field">
+      <label for="title_template">Title template</label>
+      <input type="text" id="title_template" name="title_template" value="{{ rule.title_template }}" placeholder="{message}">
+      <div class="field-hint">Available placeholders: <code>{message}</code>, <code>{host}</code>, <code>{program}</code>.</div>
+    </div>
+    <div class="field">
+      <label for="asset_match_field">Auto-link asset by</label>
+      <select id="asset_match_field" name="asset_match_field">
+        <option value="">Don't auto-link</option>
+        <option value="host" {% if rule.asset_match_field == "host" %}selected{% endif %}>Event host = asset External ID</option>
+        <option value="program" {% if rule.asset_match_field == "program" %}selected{% endif %}>Event program = asset External ID</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="checkbox-row"><input type="checkbox" name="combine_by_title" {% if rule.combine_by_title %}checked{% endif %}> Combine with an existing open ticket that has the same title</label>
+      <div class="field-hint">When on: if a match's computed title equals an already-open ticket of this type, the event is added to that ticket as a "last occurred on ..." comment and the ticket is flagged Problematic, instead of creating a new ticket. No open match &rarr; a new ticket is created as usual.</div>
+    </div>
+    <div class="field">
+      <label class="checkbox-row"><input type="checkbox" name="is_active" {% if rule.is_active %}checked{% endif %}> Active</label>
+      <div class="field-hint">Inactive policies are skipped entirely -- their events fall through to the next policy (or just stay in Events, unpromoted).</div>
+    </div>
+    <button class="btn btn-primary" type="submit">Save changes</button>
+    <a class="btn" href="/tickets/rules/all">Cancel</a>
+  </form>
+</div>
+{% endblock %}

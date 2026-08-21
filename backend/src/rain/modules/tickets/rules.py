@@ -49,6 +49,12 @@ async def apply_rule(db: AsyncSession, rule: TicketRule, event: SyslogEvent) -> 
 
     title = rule.title_template.format(message=event.message or "", host=event.host or "", program=event.program or "")
 
+    if rule.combine_by_title:
+        existing = await service.find_open_ticket_by_title(db, rule.ticket_type, title)
+        if existing is not None:
+            await service.combine_event_into_ticket(db, existing, event)
+            return existing
+
     return await service.create_ticket(
         db,
         ticket_type=rule.ticket_type,

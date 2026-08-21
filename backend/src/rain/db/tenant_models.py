@@ -223,6 +223,12 @@ class TicketRule(TenantBase):
     severity: Mapped[str] = mapped_column(String(15), default="medium", server_default="medium")
     asset_match_field: Mapped[str | None] = mapped_column(String(15), nullable=True)  # host|program, matched to Asset.external_id
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # When true, a match whose computed title equals an already-open
+    # ticket of this rule's ticket_type folds into that ticket (a comment
+    # noting the repeat occurrence + is_problematic turned on) instead of
+    # creating a new one. See rain.modules.tickets.service.
+    # find_open_ticket_by_title / combine_event_into_ticket.
+    combine_by_title: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
