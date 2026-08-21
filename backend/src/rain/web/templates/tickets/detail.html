@@ -71,7 +71,7 @@
         </button>
       </div>
       <form method="post" action="/tickets/{{ ticket.id }}/title" class="ticket-title-form" data-inline-edit-form hidden {% if approval_will_reset %}data-confirm="{{ approval_reset_warning }}"{% endif %}>
-        <input type="text" name="title" value="{{ ticket.title }}" class="ticket-title-input" maxlength="255" required>
+        <input type="text" name="title" value="{{ ticket.title }}" class="ticket-title-input" maxlength="500" required>
         <button type="submit" class="btn btn-sm">Save</button>
         <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
       </form>

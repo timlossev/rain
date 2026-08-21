@@ -130,7 +130,7 @@ async def create_ticket(
     ticket = Ticket(
         ticket_number=await _next_ticket_number(db, ticket_type),
         ticket_type=ticket_type,
-        title=title[:255],
+        title=title[:500],
         description=description,
         severity=severity,
         asset_id=asset_id,
@@ -596,7 +596,7 @@ async def update_title(
     """Returns False (no-op) for a blank title -- the caller decides how
     to surface that, same shape as update_status's False for an unknown
     status."""
-    new_title = new_title.strip()[:255]
+    new_title = new_title.strip()[:500]
     if not new_title or new_title == ticket.title:
         return True
     old_title = ticket.title

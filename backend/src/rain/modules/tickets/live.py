@@ -113,7 +113,7 @@ async def live_bulk_promote(
         event = await service.get_event(tenant_db, event_id)
         if event is None:
             continue
-        title = f"{event.program or event.host or 'Event'}: {event.message[:120]}"
+        title = f"{event.program or event.host or 'Event'}: {event.message[:200]}"
         await service.create_ticket(
             tenant_db,
             ticket_type=ticket_type,

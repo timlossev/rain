@@ -137,7 +137,7 @@ async def new_ticket_form(
         prefill_title = f"Change for {source_ticket.ticket_number}: {source_ticket.title}"
         prefill_description = source_ticket.description or ""
     else:
-        prefill_title = f"{event.program or event.host or 'Event'}: {event.message[:120]}" if event else ""
+        prefill_title = f"{event.program or event.host or 'Event'}: {event.message[:200]}" if event else ""
         prefill_description = event.message if event else ""
     suggested_asset_id = source_ticket.asset_id if source_ticket else None
     suggested_asset_name = source_ticket.asset.name if source_ticket and source_ticket.asset else ""

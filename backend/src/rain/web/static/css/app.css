@@ -865,6 +865,16 @@ thead tr:first-child th:last-child { border-top-right-radius: var(--radius-sm); 
 tr:last-child td { border-bottom: none; }
 td.actions { text-align: right; white-space: nowrap; }
 
+/* /tickets list: plain auto table layout otherwise gives Number/Severity/
+   Status/Assignee/Asset/Created only as much room as their own (short,
+   predictable) content needs, then splits whatever's left over between
+   them and Title -- which starves Title, the one column whose content is
+   actually long and worth reading at a glance. Pinning the narrow columns
+   down (a width still just a hint under auto layout, but enough to stop
+   them claiming more than they need) leaves the rest of the row to Title. */
+.tickets-table .col-narrow { width: 1%; white-space: nowrap; }
+.tickets-table .col-title { width: 45%; }
+
 /* Linked Documents: flex rows instead of a table -- a table's fixed
    columns are exactly what overflowed in a narrow container (confirmed
    live); flex rows can wrap their action buttons onto a second line
@@ -1068,7 +1078,7 @@ td.actions { text-align: right; white-space: nowrap; }
    promoted syslog event's host/program/severity/raw/parsed_fields) keeps
    its line breaks instead of collapsing to one run-on line, which is
    what a bare <p> does with newlines by default. */
-.ticket-description { margin: 0; color: var(--text); line-height: 1.5; white-space: pre-wrap; }
+.ticket-description { margin: 0; color: var(--text); line-height: 1.5; white-space: pre-wrap; font-size: 0.9rem; }
 /* -webkit-line-clamp (despite the name, supported in every evergreen
    browser today, not just WebKit/Blink) truncates by *rendered* lines
    regardless of whether they come from pre-wrap's own newlines or

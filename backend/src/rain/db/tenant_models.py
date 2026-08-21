@@ -436,7 +436,10 @@ class Ticket(TenantBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     ticket_number: Mapped[str] = mapped_column(String(31), unique=True, index=True)  # INC-000123 / VULN-000045 / CHG-000012
     ticket_type: Mapped[str] = mapped_column(String(15))  # incident | vulnerability | change
-    title: Mapped[str] = mapped_column(String(255))
+    # 500, not 255 -- see migration 0034. Syslog-promoted titles (built from
+    # an event's message via a rule's title_template) routinely ran past
+    # the old limit and got silently truncated in service.create_ticket.
+    title: Mapped[str] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(15), default="open", server_default="open")
     severity: Mapped[str] = mapped_column(String(15), default="medium", server_default="medium")

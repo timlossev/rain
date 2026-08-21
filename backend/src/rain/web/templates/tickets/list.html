@@ -68,16 +68,16 @@
 </div>
 
 <div class="card">
-  <table>
+  <table class="tickets-table">
     <thead>
       <tr>
-        <th>{{ sort_link("ticket_number", "Number") }}</th>
-        <th>{{ sort_link("title", "Title") }}</th>
-        <th>{{ sort_link("severity", "Severity") }}</th>
-        <th>{{ sort_link("status", "Status") }}</th>
-        <th>Assignee</th>
-        <th>Asset</th>
-        <th>{{ sort_link("created_at", "Created") }}</th>
+        <th class="col-narrow">{{ sort_link("ticket_number", "Number") }}</th>
+        <th class="col-title">{{ sort_link("title", "Title") }}</th>
+        <th class="col-narrow">{{ sort_link("severity", "Severity") }}</th>
+        <th class="col-narrow">{{ sort_link("status", "Status") }}</th>
+        <th class="col-narrow">Assignee</th>
+        <th class="col-narrow">Asset</th>
+        <th class="col-narrow">{{ sort_link("created_at", "Created") }}</th>
         <th></th>
       </tr>
     </thead>
