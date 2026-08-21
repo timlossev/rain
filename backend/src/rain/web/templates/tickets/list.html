@@ -2,7 +2,7 @@
 {% import "_pagination.html" as pg with context %}
 {% import "_search_picker.html" as picker %}
 {% block title %}Tickets - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Browse and filter tickets (incidents, vulnerabilities, and changes) by type, status, or affected asset. Defaults to active tickets (everything not closed) -- pick "All statuses" or "Closed" to see closed ones. Click a column header to sort by it. Check rows to mass-resolve several at once. Click a ticket to view its full detail and activity.{% endblock %}
+{% block help_text %}Browse and filter tickets (incidents, vulnerabilities, and changes) by type, status, or affected asset. Defaults to active tickets (everything not closed) -- pick "All statuses" or "Closed" to see closed ones. Click a column header to sort by it. Check rows to mass-close several at once. Click a ticket to view its full detail and activity.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 
@@ -88,16 +88,16 @@
   </div>
 </div>
 
-<form id="tickets-bulk-resolve-form" method="post" action="/tickets/bulk-resolve" data-confirm="">
+<form id="tickets-bulk-close-form" method="post" action="/tickets/bulk-close" data-confirm="">
   <input type="hidden" name="ticket_ids" data-bulk-select-ids>
   <input type="hidden" name="next" value="/tickets?{{ qs() }}">
 </form>
 
 <div class="card">
   {# Hidden until >=1 row is checked (app.js's [data-bulk-select]). #}
-  <div class="panel-row bulk-actions-bar" data-bulk-select-bar hidden style="justify-content:flex-start; gap:12px; margin-bottom:12px;">
+  <div class="panel-row bulk-actions-bar" data-bulk-select-bar data-bulk-select-verb="closed" hidden style="justify-content:flex-start; gap:12px; margin-bottom:12px;">
     <span class="muted" data-bulk-select-count>0 selected</span>
-    <button type="submit" form="tickets-bulk-resolve-form" class="btn btn-sm btn-primary">Mass resolve</button>
+    <button type="submit" form="tickets-bulk-close-form" class="btn btn-sm btn-primary">Mass close</button>
   </div>
   <table class="tickets-table" data-bulk-select>
     <thead>

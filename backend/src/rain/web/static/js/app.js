@@ -807,19 +807,24 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Row checkbox multi-select for a bulk action bar -- first user is the
-  // tickets list's "Mass resolve", generic enough (reads/writes nothing
+  // tickets list's "Mass close", generic enough (reads/writes nothing
   // ticket-specific) for any other [data-bulk-select] table later. The
   // header checkbox (data-bulk-select-all) toggles every row; any row
   // checkbox changing recomputes the count, shows/hides the bar, and
-  // refills the hidden ids field a form elsewhere on the page (declared
-  // outside the table -- a <form> can't itself contain another <table>'s
-  // action buttons the way this page's layout wants) submits.
+  // refills the hidden ids field on the action form (found via the ids
+  // input's own closest("form") -- declared outside the table, since a
+  // <form> can't itself contain another <table>'s action buttons the way
+  // this page's layout wants -- rather than a hardcoded form id, so this
+  // stays reusable for a differently-named bulk action later). The
+  // confirm prompt's verb comes from data-bulk-select-verb on the bar
+  // (e.g. "closed") rather than being hardcoded to one action's wording.
   document.querySelectorAll("[data-bulk-select]").forEach((table) => {
     const selectAll = table.querySelector("[data-bulk-select-all]");
     const bar = document.querySelector("[data-bulk-select-bar]");
     const countEl = bar && bar.querySelector("[data-bulk-select-count]");
     const idsInput = document.querySelector("[data-bulk-select-ids]");
-    const resolveForm = document.getElementById("tickets-bulk-resolve-form");
+    const actionForm = idsInput && idsInput.closest("form");
+    const verb = (bar && bar.dataset.bulkSelectVerb) || "updated";
 
     const rows = () => Array.from(table.querySelectorAll("[data-bulk-select-row]"));
 
@@ -828,8 +833,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (bar) bar.hidden = checked.length === 0;
       if (countEl) countEl.textContent = `${checked.length} selected`;
       if (idsInput) idsInput.value = checked.map((cb) => cb.value).join(",");
-      if (resolveForm) {
-        resolveForm.dataset.confirm = `Mark ${checked.length} selected ticket(s) resolved?`;
+      if (actionForm) {
+        actionForm.dataset.confirm = `Mark ${checked.length} selected ticket(s) ${verb}?`;
       }
       if (selectAll) {
         selectAll.checked = checked.length > 0 && checked.length === rows().length;

@@ -647,31 +647,30 @@ async def mark_closed(
     return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/bulk-resolve")
-async def bulk_resolve(
+@router.post("/bulk-close")
+async def bulk_close(
     ticket_ids: str = Form(...),
     next: str = Form("/tickets"),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
-    """The list page's checkbox-select "Mass resolve" action -- same
-    find-by-name lookup and per-ticket service.update_status call as the
-    single-ticket "Mark cancelled" quick action below uses for its own
+    """The list page's checkbox-select "Mass close" action -- same
+    get_closed_status lookup and per-ticket service.update_status call as
+    the single-ticket "Mark closed" quick action above uses for its own
     status, just looped over every checked id instead of one ticket_id
     path param. update_status is a no-op for a ticket already on that
-    status (no duplicate log entry), and for one this tenant has since
-    renamed/deleted "Resolved" away entirely (resolved_status is then
-    None) the whole action is silently a no-op -- there's no sane status
-    to invent in that case, same reasoning as get_closed_status's own
-    None case."""
-    resolved_status = await service.find_status_by_name(tenant_db, "resolved")
-    if resolved_status is not None:
+    status (no duplicate log entry), and for a tenant with no is_closed-
+    flagged status configured at all (closed_status is then None) the
+    whole action is silently a no-op -- there's no sane status to invent
+    in that case, same as "Mark closed" itself."""
+    closed_status = await service.get_closed_status(tenant_db)
+    if closed_status is not None:
         ids = [int(part) for part in ticket_ids.split(",") if part.strip().isdigit()]
         for ticket_id in ids:
             ticket = await tenant_db.get(Ticket, ticket_id)
             if ticket is not None:
-                await service.update_status(tenant_db, ticket, resolved_status.key, changed_by_user_id=ctx.user.id)
+                await service.update_status(tenant_db, ticket, closed_status.key, changed_by_user_id=ctx.user.id)
     return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
 
 
