@@ -64,8 +64,8 @@
           <span class="nav-icon">{{ nav_icon("menu") }}</span> Menu
         </button>
         <div class="tab-buttons" data-menu-panel hidden>
-          <button type="button" class="tab-btn active" data-tab-btn="catalog">Request Something</button>
-          <button type="button" class="tab-btn" data-tab-btn="tickets">Report Something</button>
+          <button type="button" class="tab-btn {{ 'active' if active_tab == 'catalog' else '' }}" data-tab-btn="catalog">Request Something</button>
+          <button type="button" class="tab-btn {{ 'active' if active_tab == 'tickets' else '' }}" data-tab-btn="tickets">Report Something</button>
           {% if user %}
           <button type="button" class="tab-btn" data-tab-btn="approvals">Pending Actions{% if pending_approval %} ({{ pending_approval | length }}){% endif %}</button>
           <button type="button" class="tab-btn" data-tab-btn="documents">Document Archive</button>
@@ -84,11 +84,11 @@
         </div>
       </div>
 
-      <div class="tab-panel active" data-tab-panel="catalog">
+      <div class="tab-panel {{ 'active' if active_tab == 'catalog' else '' }}" data-tab-panel="catalog">
         {% with items = catalog_items, base_href = "/portal/" ~ tenant.slug ~ "/catalog" %}{% include "catalog/_grid_fragment.html" %}{% endwith %}
       </div>
 
-      <div class="tab-panel" data-tab-panel="tickets">
+      <div class="tab-panel {{ 'active' if active_tab == 'tickets' else '' }}" data-tab-panel="tickets">
         <form method="post" action="/portal/{{ tenant.slug }}/tickets">
           {% if interactions | length > 1 %}
           <div class="field">
@@ -117,7 +117,21 @@
           <button class="btn btn-primary" type="submit" style="width:100%;">New ticket</button>
         </form>
 
-        <div class="portal-section-title">Tickets reported by me</div>
+        <div class="portal-section-title" style="justify-content:space-between; display:flex; align-items:center; gap:8px;">
+          <span>Tickets reported by me</span>
+          {% if user %}
+          <form method="get" action="/portal/{{ tenant.slug }}" style="margin-bottom:0;">
+            {% if created %}<input type="hidden" name="created" value="{{ created }}">{% endif %}
+            <select name="ticket_status" onchange="this.form.submit()" aria-label="Status" title="Filter by status" style="font-size:0.85rem;">
+              <option value="active" {% if selected_status is none or selected_status == "active" %}selected{% endif %}>All active</option>
+              <option value="" {% if selected_status == "" %}selected{% endif %}>All statuses</option>
+              {% for s in statuses %}
+              <option value="{{ s.key }}" {% if selected_status == s.key %}selected{% endif %}>{{ s.label }}</option>
+              {% endfor %}
+            </select>
+          </form>
+          {% endif %}
+        </div>
         {% if user %}
         <div class="table-scroll">
         <table>
@@ -153,7 +167,7 @@
               </td>
             </tr>
             {% else %}
-            <tr><td colspan="6" class="muted">No tickets reported yet.</td></tr>
+            <tr><td colspan="6" class="muted">{% if selected_status == "active" or selected_status is none %}No active tickets reported.{% else %}No tickets reported yet.{% endif %}</td></tr>
             {% endfor %}
           </tbody>
         </table>

@@ -980,7 +980,7 @@ async def list_tickets_for_asset(db: AsyncSession, asset_id: int) -> list[Ticket
     return list(result.scalars())
 
 
-async def list_tickets_reported_by(db: AsyncSession, user_id: int) -> list[dict]:
+async def list_tickets_reported_by(db: AsyncSession, user_id: int, *, status: str | None = None) -> list[dict]:
     """Backs the incident portal's "Tickets reported by me" table
     (rain.modules.portal). "Last update" is the more recent of the
     ticket's own updated_at (bumped by any status/severity/title/
@@ -989,7 +989,12 @@ async def list_tickets_reported_by(db: AsyncSession, user_id: int) -> list[dict]
     itself; without folding that in, a ticket with only fresh comments
     and no field changes would read as stale. Deliberately not the full
     multi-source activity feed ticket detail builds (comments + every
-    change table) -- this is a glance-level preview, not the record."""
+    change table) -- this is a glance-level preview, not the record.
+
+    `status` is the same three-way sentinel ticket_list_stmt's own status
+    param is (see that function's docstring): a real TicketStatus.key,
+    the "active" sentinel (every status except is_closed-flagged ones),
+    or falsy/None for no filter at all."""
     latest_comment = (
         select(TicketComment.ticket_id, func.max(TicketComment.created_at).label("latest_comment_at"))
         .group_by(TicketComment.ticket_id)
@@ -1000,8 +1005,13 @@ async def list_tickets_reported_by(db: AsyncSession, user_id: int) -> list[dict]
         select(Ticket, last_update)
         .outerjoin(latest_comment, latest_comment.c.ticket_id == Ticket.id)
         .where(Ticket.reporter_user_id == user_id)
-        .order_by(last_update.desc())
     )
+    if status == "active":
+        closed_keys = select(TicketStatus.key).where(TicketStatus.is_closed.is_(True))
+        stmt = stmt.where(Ticket.status.not_in(closed_keys))
+    elif status:
+        stmt = stmt.where(Ticket.status == status)
+    stmt = stmt.order_by(last_update.desc())
     result = await db.execute(stmt)
     return [{"ticket": ticket, "last_update_at": last_update_at} for ticket, last_update_at in result.all()]
 

@@ -156,6 +156,7 @@ async def portal_form(
     tenant_slug: str,
     created: str = "",
     error: str = "",
+    ticket_status: str | None = None,
     user: CurrentUser | None = Depends(get_current_user_optional),
 ):
     access = await _resolve_portal_access(request, tenant_slug, user)
@@ -163,8 +164,33 @@ async def portal_form(
         return access
     tenant, flags = access
 
+    # Same "no filter in the URL at all" -> "active" default as the main
+    # app's ticket list (rain.modules.tickets.router.list_tickets) --
+    # ticket_status="" (the "All statuses" dropdown option, which always
+    # submits the param) explicitly opts back into everything.
+    effective_status = "active" if ticket_status is None else ticket_status
+    # This whole page has no server-tracked "which tab is open" state
+    # (app.js's [data-tabs] is purely client-side, reset on every full
+    # page load) -- a GET reload triggered by the status filter would
+    # otherwise silently bounce the visitor back to the first tab
+    # (Request Something), losing their place on Report Something right
+    # after they used the very control that's on that tab. ticket_status
+    # being present in the URL at all (even "", from "All statuses") is
+    # the signal this reload was that filter, not a fresh page visit --
+    # same reasoning extends to `created`, whose redirect (below) also
+    # never carried a tab hint before now: a visitor who just filed a
+    # report from this tab landing back on Request Something instead,
+    # with no sign their submission actually went through in the table
+    # right below where they were, was the same class of bug.
+    active_tab = "tickets" if ticket_status is not None or created else "catalog"
+
     async with tenant_session(tenant.schema_name) as tenant_db:
-        reported = await ticket_service.list_tickets_reported_by(tenant_db, user.id) if user is not None else []
+        reported = (
+            await ticket_service.list_tickets_reported_by(tenant_db, user.id, status=effective_status)
+            if user is not None
+            else []
+        )
+        statuses = await ticket_service.list_statuses(tenant_db) if user is not None else []
         # Confirmed against this tenant's own tickets, not just pattern-
         # matched -- the regex alone still lets a well-formed-but-fake
         # number ("INC-999999") through, which isn't content injection
@@ -205,6 +231,9 @@ async def portal_form(
             "interactions": PORTAL_INTERACTIONS,
             "severities": SEVERITIES,
             "reported": reported,
+            "statuses": statuses,
+            "selected_status": ticket_status,
+            "active_tab": active_tab,
             "pending_approval": pending_approval,
             "documents": documents,
             "catalog_items": catalog_items,
