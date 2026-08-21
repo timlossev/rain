@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Something went wrong - {{ branding.instance_name }}{% endblock %}
+{% block content_alone %}
+<div class="card auth-card{{ ' wide' if traceback else '' }}" style="text-align:center;">
+  <h1>500</h1>
+  <p class="muted">Something went wrong on our end. Try again, or come back in a few minutes.</p>
+  {% if traceback %}
+  <pre class="live-full-pre" style="text-align:left;">{{ traceback }}</pre>
+  {% endif %}
+  <a class="btn btn-primary" href="/">Go home</a>
+</div>
+{% endblock %}

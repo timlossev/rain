@@ -7,7 +7,6 @@ tries to render the tree.
 """
 from __future__ import annotations
 
-import html
 import logging
 import traceback
 from contextlib import asynccontextmanager
@@ -202,7 +201,16 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-        if exc.status_code in (403, 404) and "text/html" in request.headers.get("accept", ""):
+        # Previously gated on "text/html" in the Accept header -- meant to
+        # separate a browser navigation from an API client, but this app
+        # has no JSON API surface that actually returns 403/404 (confirmed:
+        # nothing client-side depends on the bare fallback body below), so
+        # that gate's only real effect was an unbranded page for anything
+        # that didn't send a textbook browser Accept header -- a raw curl
+        # request or a missing header entirely, confirmed live as exactly
+        # what produced an unstyled "403 Forbidden" while debugging SAML.
+        # Always branded now, for both.
+        if exc.status_code in (403, 404):
             template = "errors/403.html" if exc.status_code == 403 else "errors/404.html"
             return templates.TemplateResponse(request, template, {}, status_code=exc.status_code)
         return HTMLResponse(f"<h1>{exc.status_code}</h1><p>{exc.detail}</p>", status_code=exc.status_code)
@@ -215,11 +223,17 @@ def create_app() -> FastAPI:
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
         logger.exception("unhandled exception in %s %s", request.method, request.url.path)
-        if settings.debug:
-            tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-            body = f"<h1>500 Internal Server Error</h1><pre>{html.escape(tb)}</pre>"
-            return HTMLResponse(body, status_code=500)
-        return HTMLResponse("Internal Server Error", status_code=500)
+        # errors/500.html renders through content_alone (no ctx -- an
+        # unhandled exception can happen before auth/tenant resolution
+        # ever gets a chance to run, so there's no RequestContext to hand
+        # it), same as errors/403.html/404.html above. debug's traceback
+        # is still plain text inside that same branded shell rather than
+        # a bare dump -- Jinja's autoescaping (no `| safe`) handles the
+        # HTML-escaping html.escape() used to do by hand.
+        traceback_text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)) if settings.debug else None
+        return templates.TemplateResponse(
+            request, "errors/500.html", {"traceback": traceback_text}, status_code=500
+        )
 
     return app
 
