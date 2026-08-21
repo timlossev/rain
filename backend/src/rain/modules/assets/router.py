@@ -84,7 +84,16 @@ async def new_asset_form(
     return templates.TemplateResponse(
         request,
         "assets/form.html",
-        {**nav, "ctx": ctx, "asset": None, "asset_types": asset_types, "fields": fields, "values": {}, "error": None},
+        {
+            **nav,
+            "ctx": ctx,
+            "asset": None,
+            "asset_types": asset_types,
+            "asset_statuses": service.ASSET_STATUSES,
+            "fields": fields,
+            "values": {},
+            "error": None,
+        },
     )
 
 
@@ -159,6 +168,7 @@ async def edit_asset_form(
             "ctx": ctx,
             "asset": asset,
             "asset_types": asset_types,
+            "asset_statuses": service.ASSET_STATUSES,
             "fields": fields,
             "values": values,
             "document_links": document_links,

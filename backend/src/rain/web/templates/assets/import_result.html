@@ -4,12 +4,20 @@
 {% block content %}
 <div class="card" style="max-width:640px;">
   <p><span class="badge badge-accent">{{ result.created }} created</span> &nbsp; <span class="badge badge-accent">{{ result.updated }} updated</span>
-  {% if result.errors %} &nbsp; <span class="badge">{{ result.errors | length }} errors</span>{% endif %}</p>
+  {% if result.errors %} &nbsp; <span class="badge">{{ result.errors | length }} errors</span>{% endif %}
+  {% if result.warnings %} &nbsp; <span class="badge">{{ result.warnings | length }} warnings</span>{% endif %}</p>
 
   {% if result.errors %}
   <h3>Errors</h3>
   <ul>
     {% for err in result.errors %}<li class="muted">{{ err }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if result.warnings %}
+  <h3>Warnings</h3>
+  <ul>
+    {% for w in result.warnings %}<li class="muted">{{ w }}</li>{% endfor %}
   </ul>
   {% endif %}
 

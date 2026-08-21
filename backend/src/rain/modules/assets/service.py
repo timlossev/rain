@@ -15,6 +15,15 @@ from rain.db.tenant_models import Asset, AssetFieldValue, AssetType, CustomField
 # INC/VULN/CHG/DOC use (see rain.modules.tickets.service._next_ticket_number).
 _CI_REF_RE = re.compile(r"^CI-(\d+)$", re.IGNORECASE)
 
+# Single source of truth for the asset status vocabulary -- the manual
+# create/edit form (assets/form.html) renders exactly this list as a
+# <select>, so a manually-set asset can never carry anything else. CSV/JSON
+# import (rain.modules.assets.importer) normalizes against this same tuple
+# instead of writing whatever raw string a source system's export used
+# verbatim -- see importer.py's commit_import for why that used to break
+# the nav sidebar's "active" count silently.
+ASSET_STATUSES = ("active", "in_repair", "retired", "decommissioned")
+
 
 async def next_ci_number(db: AsyncSession) -> str:
     """Public (not the leading-underscore convention rain.modules.tickets.

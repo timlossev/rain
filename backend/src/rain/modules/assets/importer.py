@@ -36,6 +36,7 @@ class ImportResult:
     created: int = 0
     updated: int = 0
     errors: list[str] = dc_field(default_factory=list)
+    warnings: list[str] = dc_field(default_factory=list)
 
 
 async def commit_import(
@@ -87,7 +88,24 @@ async def commit_import(
 
             status_col = mapping.get("status")
             if status_col and row.get(status_col):
-                asset.status = str(row[status_col])
+                # Normalized (casefolded, whitespace/hyphens collapsed to
+                # "_") against service.ASSET_STATUSES rather than written
+                # verbatim -- a source system's own export vocabulary
+                # ("Active", "In Service", "1", ...) previously landed in
+                # the DB unchanged, which the manual edit form's <select>
+                # can never produce and which the nav sidebar's "active"
+                # count (an exact-string match) silently didn't count at
+                # all. Anything that doesn't map cleanly is left at the
+                # asset's existing/default status and reported back so the
+                # import summary shows it instead of hiding it.
+                raw_status = str(row[status_col]).strip()
+                normalized = raw_status.lower().replace("-", "_").replace(" ", "_")
+                if normalized in service.ASSET_STATUSES:
+                    asset.status = normalized
+                else:
+                    result.warnings.append(
+                        f"row {i}: unrecognized status '{raw_status}' -- kept as '{asset.status}'"
+                    )
 
             values: dict[int, Any] = {}
             for field_id, field_def in fields_by_id.items():

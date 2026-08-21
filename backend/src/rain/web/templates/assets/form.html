@@ -38,7 +38,7 @@
       <div class="field">
         <label for="status">Status</label>
         <select id="status" name="status">
-          {% for s in ["active", "in_repair", "retired", "decommissioned"] %}
+          {% for s in asset_statuses %}
           <option value="{{ s }}" {% if asset and asset.status == s %}selected{% endif %}>{{ s }}</option>
           {% endfor %}
         </select>
