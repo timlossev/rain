@@ -187,6 +187,87 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Assets list search: same live-dropdown shape as the user picker above,
+  // but there's no hidden id field to fill in -- picking a suggestion
+  // navigates straight to that asset's edit page (a "jump to" quick
+  // search), while the input is *also* a real form field (name="q"), so
+  // pressing Enter with nothing highlighted, or clicking Search, falls
+  // through to a normal submit that filters the table server-side via the
+  // same q= param (rain.modules.assets.service.asset_search_filter).
+  document.querySelectorAll("[data-asset-search]").forEach((picker) => {
+    const input = picker.querySelector("[data-asset-search-input]");
+    const results = picker.querySelector("[data-asset-search-results]");
+    const endpoint = picker.dataset.assetSearchEndpoint;
+    if (!input || !results || !endpoint) return;
+
+    let matches = [];
+    let activeIndex = -1;
+    let debounceTimer = null;
+
+    const renderResults = () => {
+      results.innerHTML = "";
+      matches.forEach((entry, idx) => {
+        const a = document.createElement("a");
+        a.className = "asset-search-result" + (idx === activeIndex ? " active" : "");
+        a.href = entry.href;
+        a.textContent = entry.label;
+        if (entry.sub) {
+          const sub = document.createElement("span");
+          sub.className = "asset-search-result-sub";
+          sub.textContent = entry.sub;
+          a.appendChild(sub);
+        }
+        results.appendChild(a);
+      });
+      results.hidden = matches.length === 0;
+    };
+
+    input.addEventListener("input", () => {
+      const q = input.value.trim();
+      clearTimeout(debounceTimer);
+      if (q.length < 2) {
+        matches = [];
+        activeIndex = -1;
+        renderResults();
+        return;
+      }
+      debounceTimer = setTimeout(async () => {
+        try {
+          const resp = await fetch(`${endpoint}?q=${encodeURIComponent(q)}`);
+          matches = resp.ok ? await resp.json() : [];
+        } catch (err) {
+          matches = [];
+        }
+        activeIndex = -1;
+        renderResults();
+      }, 200);
+    });
+    input.addEventListener("keydown", (evt) => {
+      if (evt.key === "ArrowDown" && matches.length) {
+        evt.preventDefault();
+        activeIndex = Math.min(activeIndex + 1, matches.length - 1);
+        renderResults();
+      } else if (evt.key === "ArrowUp" && matches.length) {
+        evt.preventDefault();
+        activeIndex = Math.max(activeIndex - 1, 0);
+        renderResults();
+      } else if (evt.key === "Enter" && activeIndex >= 0 && matches[activeIndex]) {
+        // Only hijack Enter when a suggestion is actually highlighted --
+        // otherwise let the surrounding <form> submit normally (filters
+        // the table via q=, same as clicking Search).
+        evt.preventDefault();
+        window.location.href = matches[activeIndex].href;
+      } else if (evt.key === "Escape") {
+        matches = [];
+        activeIndex = -1;
+        renderResults();
+      }
+    });
+    document.addEventListener("click", (evt) => {
+      if (!picker.contains(evt.target)) results.hidden = true;
+    });
+  });
+
   // List/create tab pairs (and any other same-page tab group). A [data-tabs]
   // group can nest inside another one (documents/detail.html: the page's
   // own Description/Contents/Auto-update/Links tabs, with a second Write/

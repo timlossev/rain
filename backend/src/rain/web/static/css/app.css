@@ -288,6 +288,38 @@ p { margin: 0 0 1em; }
 .user-picker-results[hidden] { display: none; }
 .user-picker-result { padding: 7px 10px; border-radius: var(--radius-sm); font-size: 0.85rem; cursor: pointer; }
 .user-picker-result:hover, .user-picker-result.active { background: var(--surface-sunken); }
+
+/* Assets list's live search dropdown -- same floating-panel shape as
+   .user-picker-results above, but its entries are real <a> links (jumps
+   straight to the picked asset) rather than a hidden-field picker. */
+.asset-search { min-width: 260px; }
+.asset-search-results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-elevated);
+  z-index: 70;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.asset-search-results[hidden] { display: none; }
+.asset-search-result {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.asset-search-result:hover, .asset-search-result.active { background: var(--surface-sunken); text-decoration: none; }
+.asset-search-result-sub { font-size: 0.75rem; color: var(--text-muted); }
 .sidebar.collapsed .nav-search { display: none; }
 
 /* ---------- nav tree ----------

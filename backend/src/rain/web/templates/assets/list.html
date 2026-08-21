@@ -2,11 +2,42 @@
 {% import "_pagination.html" as pg with context %}
 {% block title %}Assets - {{ branding.instance_name }}{% endblock %}
 {% block content_class %}content-full{% endblock %}
-{% block help_text %}The asset registry. Browse and filter assets by type, or create/edit individual assets and their custom field values.{% endblock %}
+{% block help_text %}The asset registry. Browse and filter assets by type, search by name/external ID/CI number/custom field value, or create/edit individual assets and their custom field values. Click a column header to sort by it.{% endblock %}
 {% block content %}
-<div class="panel-row" style="justify-content:flex-end;">
+
+{# Builds an /assets query string, keeping every filter/sort dimension at
+   its current value except the one(s) passed in -- same pattern as
+   tickets/list.html's qs() macro, for the same reason: no control here
+   should silently drop another one that's already active. #}
+{% macro qs(asset_type_id=none, q=none, sort=none, dir=none) %}
+{%- set parts = [] -%}
+{%- set t = asset_type_id if asset_type_id is not none else selected_type -%}
+{%- set qv = q if q is not none else selected_q -%}
+{%- set so = sort if sort is not none else selected_sort -%}
+{%- set d = dir if dir is not none else selected_dir -%}
+{%- if t %}{% set _ = parts.append("asset_type_id=" ~ t) %}{% endif -%}
+{%- if qv %}{% set _ = parts.append("q=" ~ qv | urlencode) %}{% endif -%}
+{%- if so %}{% set _ = parts.append("sort=" ~ so) %}{% endif -%}
+{%- if d and d != "asc" %}{% set _ = parts.append("dir=" ~ d) %}{% endif -%}
+{{- parts | join("&") -}}
+{% endmacro %}
+
+{% macro sort_link(key, label) %}
+{%- set next_dir = "asc" if selected_sort == key and selected_dir == "desc" else "desc" -%}
+<a class="sort-th" href="/assets?{{ qs(sort=key, dir=next_dir) }}">{{ label }}{% if selected_sort == key %}<span class="sort-arrow" aria-hidden="true">{{ "&uarr;" | safe if selected_dir == "asc" else "&darr;" | safe }}</span>{% endif %}</a>
+{% endmacro %}
+
+<div class="panel-row" style="justify-content:flex-end; gap:8px;">
+  {% if invalid_status_count and ctx.user.role_key in ("internal_admin", "client_admin") %}
+  <form method="post" action="/assets/repair-statuses" data-confirm="Reset {{ invalid_status_count }} asset(s) with an unrecognized status to 'active'? This is what an import written before status normalization existed can leave behind -- see the Import page's warnings for which rows.">
+    <button type="submit" class="btn" title="{{ invalid_status_count }} asset(s) have a status outside active/in_repair/retired/decommissioned -- not counted on the sidebar until fixed">Fix {{ invalid_status_count }} imported status{{ "es" if invalid_status_count != 1 else "" }}</button>
+  </form>
+  {% endif %}
   <a class="btn btn-primary" href="/assets/new">+ New asset</a>
 </div>
+{% if request.query_params.get("statuses_fixed") %}
+<p class="muted">Fixed {{ request.query_params.get("statuses_fixed") }} asset status value(s).</p>
+{% endif %}
 
 <div class="card">
   <div class="panel-row">
@@ -20,11 +51,35 @@
           {% endfor %}
         </select>
       </div>
+      {% if selected_sort %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
+      {% if selected_dir != "asc" %}<input type="hidden" name="dir" value="{{ selected_dir }}">{% endif %}
+
+      {# [data-asset-search]: live dropdown suggestions (app.js), fetching
+         /assets/search-suggest as you type and jumping straight to a
+         picked asset's edit page. Picking nothing and just pressing Enter
+         (or the Search button) falls through to a normal form submit --
+         filters the table below via the same q= param, matched server-side
+         against name/external_id/ci_number/custom field values
+         (rain.modules.assets.service.asset_search_filter). #}
+      <div class="field asset-search" style="margin-bottom:0; position:relative;" data-asset-search data-asset-search-endpoint="/assets/search-suggest">
+        <label for="asset_q">Search</label>
+        <input type="text" id="asset_q" name="q" value="{{ selected_q }}" placeholder="Name, external ID, CI number, or a custom field value" autocomplete="off" data-asset-search-input>
+        <div class="asset-search-results" hidden data-asset-search-results></div>
+      </div>
+      <button type="submit" class="btn">Search</button>
+      {% if selected_q %}<a class="btn" href="/assets?{{ qs(q='') }}">Clear</a>{% endif %}
     </form>
   </div>
 
   <table>
-    <thead><tr><th>Number</th><th>Name</th><th>Type</th><th>External ID</th><th>Status</th><th></th></tr></thead>
+    <thead><tr>
+      <th>{{ sort_link("ci_number", "Number") }}</th>
+      <th>{{ sort_link("name", "Name") }}</th>
+      <th>{{ sort_link("type", "Type") }}</th>
+      <th>{{ sort_link("external_id", "External ID") }}</th>
+      <th>{{ sort_link("status", "Status") }}</th>
+      <th></th>
+    </tr></thead>
     <tbody>
       {% for asset in page.items %}
       <tr>
@@ -41,7 +96,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted">No assets yet. <a href="/assets/new">Add the first one</a>.</td></tr>
+      <tr><td colspan="6" class="muted">{% if selected_q %}No assets match &ldquo;{{ selected_q }}&rdquo;.{% else %}No assets yet. <a href="/assets/new">Add the first one</a>.{% endif %}</td></tr>
       {% endfor %}
     </tbody>
   </table>

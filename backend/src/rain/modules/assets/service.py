@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from sqlalchemy import Sequence, select
+from sqlalchemy import Sequence, Text, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -36,6 +36,28 @@ async def next_ci_number(db: AsyncSession) -> str:
     return f"CI-{next_val:06d}"
 
 
+async def count_invalid_statuses(db: AsyncSession) -> int:
+    """Assets whose status isn't one of ASSET_STATUSES -- can only exist
+    from an import that predates importer.commit_import's normalization
+    (or a re-import that hit the same bug -- see that function's comment).
+    Used to conditionally show the "Fix imported statuses" action on the
+    Assets list instead of always rendering a button that's a no-op."""
+    return await db.scalar(select(func.count(Asset.id)).where(Asset.status.not_in(ASSET_STATUSES))) or 0
+
+
+async def repair_invalid_statuses(db: AsyncSession) -> int:
+    """Resets every asset whose status isn't one of ASSET_STATUSES to
+    "active" -- the same fallback commit_import now applies going forward,
+    exposed as a standalone action for rows an import file won't reach
+    again (source data no longer at hand, external_id since changed, ...).
+    Returns the number of rows fixed."""
+    result = await db.execute(
+        update(Asset).where(Asset.status.not_in(ASSET_STATUSES)).values(status="active")
+    )
+    await db.commit()
+    return result.rowcount or 0
+
+
 async def list_asset_types(db: AsyncSession, *, active_only: bool = False) -> list[AssetType]:
     stmt = select(AssetType).order_by(AssetType.sort_order, AssetType.name)
     if active_only:
@@ -63,7 +85,48 @@ async def all_fields(db: AsyncSession) -> list[CustomField]:
     return list(result.scalars())
 
 
-def asset_list_stmt(*, asset_type_id: int | None = None):
+def asset_search_filter(q: str):
+    """ILIKE partial ("contains") match against name/external_id/ci_number,
+    plus a correlated EXISTS against AssetFieldValue for a hit anywhere in
+    a custom field's value -- an asset's serial number, hostname, or any
+    other EAV-stored field is just as often what someone actually typed as
+    the asset's own name. AssetFieldValue.value is JSONB holding the raw
+    scalar (not a keyed object), so it's cast to text rather than read via
+    a `->>` key lookup; the cast's surrounding quotes/literal formatting
+    (e.g. a string value casts to '"web-01"') don't affect a %contains%
+    match. EXISTS (not a JOIN) so a hit on 2+ fields doesn't duplicate the
+    asset row. Shared by the Assets list's `q` filter, the search-suggest
+    autocomplete endpoint, and rain.modules.search.service's global search
+    -- one definition of "matches this text" for all three."""
+    pattern = f"%{q}%"
+    field_match = (
+        select(AssetFieldValue.id)
+        .where(AssetFieldValue.asset_id == Asset.id, cast(AssetFieldValue.value, Text).ilike(pattern))
+        .exists()
+    )
+    return or_(
+        Asset.name.ilike(pattern),
+        Asset.external_id.ilike(pattern),
+        Asset.ci_number.ilike(pattern),
+        field_match,
+    )
+
+
+# Column sort keys the Assets list's header links use (rain.modules.
+# assets.router.list_assets / assets/list.html's sort_link macro, same
+# shape as rain.modules.tickets.router's ticket list sorting). "type"
+# isn't here -- it sorts by the related AssetType.name, which needs an
+# explicit join (selectinload's second query can't drive an ORDER BY on
+# the first), handled separately in asset_list_stmt below.
+_SORT_COLUMNS = {
+    "ci_number": Asset.ci_number,
+    "name": Asset.name,
+    "external_id": Asset.external_id,
+    "status": Asset.status,
+}
+
+
+def asset_list_stmt(*, asset_type_id: int | None = None, q: str | None = None, sort: str | None = None, dir: str = "asc"):
     """Shared statement builder -- used both by list_assets() (full list,
     for exports/dropdowns/etc, where pagination would be wrong) and the
     Assets screen's paginated query (rain.modules.assets.router), so the
@@ -71,10 +134,32 @@ def asset_list_stmt(*, asset_type_id: int | None = None):
     stmt = select(Asset).options(
         selectinload(Asset.asset_type),
         selectinload(Asset.field_values).selectinload(AssetFieldValue.field),
-    ).order_by(Asset.name)
+    )
     if asset_type_id is not None:
         stmt = stmt.where(Asset.asset_type_id == asset_type_id)
+    if q:
+        stmt = stmt.where(asset_search_filter(q))
+    if sort == "type":
+        stmt = stmt.join(AssetType, Asset.asset_type_id == AssetType.id, isouter=True)
+        order_col = AssetType.name
+    else:
+        order_col = _SORT_COLUMNS.get(sort, Asset.name)
+    stmt = stmt.order_by(order_col.desc() if dir == "desc" else order_col.asc())
     return stmt
+
+
+async def search_assets_brief(db: AsyncSession, q: str, *, limit: int = 8) -> list[Asset]:
+    """Backs the Assets list's live autocomplete dropdown -- a short,
+    unpaginated top-N, not the full filtered list asset_list_stmt builds
+    for the table itself."""
+    stmt = (
+        select(Asset)
+        .options(selectinload(Asset.asset_type))
+        .where(asset_search_filter(q))
+        .order_by(Asset.name)
+        .limit(limit)
+    )
+    return list((await db.execute(stmt)).scalars())
 
 
 async def list_assets(db: AsyncSession, *, asset_type_id: int | None = None) -> list[Asset]:

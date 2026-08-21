@@ -1,6 +1,13 @@
-"""Keyword search across Tickets and Documents -- Postgres full-text
-search (the generated `search_vector` columns + GIN index added by
-tenant migration 0023), ranked with ts_rank, not a naive ILIKE scan.
+"""Keyword search across Tickets, Documents, and Assets.
+
+Tickets/Documents: Postgres full-text search (the generated
+`search_vector` columns + GIN index added by tenant migration 0023),
+ranked with ts_rank. Assets have no search_vector column -- there's no
+free-text title/description to feed a tsvector, just a name plus
+external_id/ci_number and arbitrary EAV custom field values -- so they're
+matched with the same ILIKE "contains" logic the Assets list's own search
+box uses (rain.modules.assets.service.asset_search_filter), given a fixed
+rank rather than a real ts_rank score (see search() below).
 
 No vector/semantic search: that needs an embedding source (a local model
 or an API) to turn a query into a vector in the first place, and this
@@ -17,8 +24,10 @@ from dataclasses import dataclass
 from markupsafe import Markup, escape
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from rain.db.tenant_models import Asset, Document, Ticket
+from rain.modules.assets import service as assets_service
 
 # Recognizes a ticket/document/asset number typed by hand, tolerant of a
 # missing or partial zero-pad (e.g. "inc-1" as well as "INC-000001") --
@@ -26,6 +35,13 @@ from rain.db.tenant_models import Asset, Document, Ticket
 # digits, but someone typing one from memory won't necessarily match that
 # exactly.
 _NUMBER_RE = re.compile(r"^(INC|VULN|CHG|DOC|CI)-0*(\d+)$", re.IGNORECASE)
+
+# ts_rank on a real keyword match typically lands well under 1.0 for
+# ordinary title/description text -- this sits comfortably inside that
+# range so an asset ILIKE hit surfaces alongside ticket/document matches
+# instead of always trailing every one of them (or, at 0, needing a
+# tie-break rule of its own).
+_ASSET_RANK = 0.1
 
 # Sentinel bytes ts_headline wraps a match in -- swapped for real <mark>
 # tags only *after* escaping the rest of the snippet (see _headline_to_html),
@@ -53,11 +69,9 @@ def _headline_to_html(raw: str | None) -> Markup | None:
 
 async def find_by_number(db: AsyncSession, query: str) -> SearchResult | None:
     """An exact ticket/document/asset number takes the searcher straight to
-    that one record instead of a results page that could only ever contain
-    it. Assets aren't otherwise part of search() below (no search_vector
-    column -- see this module's docstring on what Search covers), but a
-    typed-in CI number is still an exact, unambiguous lookup the same way
-    a ticket/document number is."""
+    that one record instead of a results page that would just contain it
+    among (possibly) other matches -- checked before search() below runs
+    at all, same as a ticket/document number."""
     match = _NUMBER_RE.match(query.strip())
     if not match:
         return None
@@ -86,11 +100,12 @@ async def find_by_number(db: AsyncSession, query: str) -> SearchResult | None:
 
 
 async def search(db: AsyncSession, query: str, *, limit_per_kind: int = 25) -> list[SearchResult]:
-    """Top matches from each of tickets and documents (ranked
+    """Top matches from each of tickets, documents, and assets (ranked
     independently -- ts_rank isn't comparable across two different
-    tsvector expressions), merged and re-sorted by rank. Small-enough
-    result sets in practice that doing the merge in Python instead of a
-    single UNION query is simpler and not a real cost."""
+    tsvector expressions, and assets have no tsvector at all, see
+    _ASSET_RANK above), merged and re-sorted by rank. Small-enough result
+    sets in practice that doing the merge in Python instead of a single
+    UNION query is simpler and not a real cost."""
     query = query.strip()
     if not query:
         return []
@@ -124,8 +139,22 @@ async def search(db: AsyncSession, query: str, *, limit_per_kind: int = 25) -> l
         .limit(limit_per_kind)
     )
 
+    # No tsvector/ts_rank for assets (see this module's docstring) -- given
+    # _ASSET_RANK, a fixed middling score, instead of 0, so a handful of
+    # asset hits don't get buried at the very bottom of a large ticket/
+    # document result set, but a strong keyword match on a ticket/document
+    # title still outranks them.
+    asset_stmt = (
+        select(Asset)
+        .options(selectinload(Asset.asset_type))
+        .where(assets_service.asset_search_filter(query))
+        .order_by(Asset.name)
+        .limit(limit_per_kind)
+    )
+
     ticket_rows = (await db.execute(ticket_stmt)).all()
     doc_rows = (await db.execute(doc_stmt)).all()
+    asset_rows = (await db.execute(asset_stmt)).scalars().all()
 
     results = [
         (
@@ -153,6 +182,19 @@ async def search(db: AsyncSession, query: str, *, limit_per_kind: int = 25) -> l
             ),
         )
         for d, rank, headline in doc_rows
+    ] + [
+        (
+            _ASSET_RANK,
+            SearchResult(
+                kind="asset",
+                id=a.id,
+                number=a.ci_number,
+                title=a.name,
+                snippet=Markup(f"{escape(a.asset_type.name)} &middot; {escape(a.status)}") if a.asset_type else None,
+                href=f"/assets/{a.ci_number}/edit",
+            ),
+        )
+        for a in asset_rows
     ]
     results.sort(key=lambda pair: pair[0], reverse=True)
     return [r for _, r in results]

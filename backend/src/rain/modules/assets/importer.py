@@ -95,16 +95,33 @@ async def commit_import(
                 # the DB unchanged, which the manual edit form's <select>
                 # can never produce and which the nav sidebar's "active"
                 # count (an exact-string match) silently didn't count at
-                # all. Anything that doesn't map cleanly is left at the
-                # asset's existing/default status and reported back so the
-                # import summary shows it instead of hiding it.
+                # all.
                 raw_status = str(row[status_col]).strip()
                 normalized = raw_status.lower().replace("-", "_").replace(" ", "_")
                 if normalized in service.ASSET_STATUSES:
                     asset.status = normalized
+                elif asset.status not in service.ASSET_STATUSES:
+                    previous = asset.status
+                    # Only overwrite when the asset's *current* status is
+                    # itself already invalid (e.g. written by an import
+                    # before this normalization existed) -- falls back to
+                    # "active" instead of leaving it broken forever, which
+                    # is what silently kept re-imported legacy rows stuck
+                    # off the nav sidebar's count even after this fix
+                    # shipped (confirmed live: re-importing an existing
+                    # row whose stored status was already "In Service"
+                    # left it as "In Service" verbatim). A row that
+                    # already carries a *valid* status (set by hand, or by
+                    # a clean prior import) is left alone -- an unmapped
+                    # or garbled value in *this* file shouldn't clobber a
+                    # legitimately-set status.
+                    asset.status = "active"
+                    result.warnings.append(
+                        f"row {i}: unrecognized status '{raw_status}' -- reset to 'active' (was invalid: '{previous}')"
+                    )
                 else:
                     result.warnings.append(
-                        f"row {i}: unrecognized status '{raw_status}' -- kept as '{asset.status}'"
+                        f"row {i}: unrecognized status '{raw_status}' -- kept existing '{asset.status}'"
                     )
 
             values: dict[int, Any] = {}

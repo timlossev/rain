@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Search{% if q %}: {{ q }}{% endif %} - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Keyword search across ticket and document titles/descriptions/numbers. Type a number like INC-000001 or DOC-000004 to jump straight to that record instead of a results list.{% endblock %}
+{% block help_text %}Keyword search across ticket/document titles/descriptions/numbers and asset names/external IDs/CI numbers/custom field values. Type a number like INC-000001, DOC-000004, or CI-000012 to jump straight to that record instead of a results list.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 {% if not q %}
@@ -15,7 +15,7 @@
     <tbody>
       {% for r in results %}
       <tr>
-        <td><span class="badge{% if r.kind == 'ticket' %} badge-accent{% endif %}">{{ "Ticket" if r.kind == "ticket" else "Document" }}</span></td>
+        <td><span class="badge{% if r.kind == 'ticket' %} badge-accent{% endif %}">{{ {"ticket": "Ticket", "document": "Document", "asset": "Asset"}[r.kind] }}</span></td>
         <td class="muted">{{ r.number }}</td>
         <td>
           <a href="{{ r.href }}">{{ r.title }}</a>

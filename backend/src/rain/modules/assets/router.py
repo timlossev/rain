@@ -56,19 +56,80 @@ router = APIRouter(prefix="/assets", tags=["Assets"])
 async def list_assets(
     request: Request,
     asset_type_id: int | None = None,
+    q: str = "",
+    sort: str = "",
+    dir: str = "asc",
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    asset_page = await paginate(tenant_db, service.asset_list_stmt(asset_type_id=asset_type_id), page=page)
+    q = q.strip()
+    asset_page = await paginate(
+        tenant_db,
+        service.asset_list_stmt(asset_type_id=asset_type_id, q=q or None, sort=sort or None, dir=dir),
+        page=page,
+    )
     asset_types = await service.list_asset_types(tenant_db)
+    invalid_status_count = await service.count_invalid_statuses(tenant_db)
     return templates.TemplateResponse(
         request,
         "assets/list.html",
-        {**nav, "ctx": ctx, "page": asset_page, "asset_types": asset_types, "selected_type": asset_type_id},
+        {
+            **nav,
+            "ctx": ctx,
+            "page": asset_page,
+            "asset_types": asset_types,
+            "selected_type": asset_type_id,
+            "selected_q": q,
+            "selected_sort": sort,
+            "selected_dir": dir,
+            "invalid_status_count": invalid_status_count,
+        },
     )
+
+
+@router.get("/search-suggest")
+async def search_suggest(
+    q: str = "",
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Backs the Assets list's live autocomplete dropdown (app.js's
+    [data-asset-search]) -- same partial-match logic as the list page's own
+    `q` filter (service.asset_search_filter), just a short top-N instead of
+    the full paginated result. Under 2 characters is almost certainly still
+    mid-keystroke and would mostly just return noise on a short/common
+    fragment, so it's treated the same as an empty query."""
+    q = q.strip()
+    if len(q) < 2:
+        return []
+    assets = await service.search_assets_brief(tenant_db, q)
+    return [
+        {
+            "label": f"{a.ci_number} — {a.name}",
+            "sub": a.asset_type.name if a.asset_type else "",
+            "href": f"/assets/{a.ci_number}/edit",
+        }
+        for a in assets
+    ]
+
+
+@router.post("/repair-statuses")
+async def repair_statuses(
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    # Resets any asset whose status isn't one of the four canonical values
+    # back to "active" -- the fallback rows can get stuck at forever if
+    # they were written by an import that predates commit_import's
+    # normalization (or hit before importer.py's own update-path fix),
+    # since re-importing the same file no longer touches them once
+    # external_id-matched. See service.repair_invalid_statuses and
+    # importer.commit_import's own comment for the full history.
+    fixed = await service.repair_invalid_statuses(tenant_db)
+    return RedirectResponse(f"/assets?statuses_fixed={fixed}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/new", response_class=HTMLResponse)
