@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_pagination.html" as pg %}
+{% import "_pagination.html" as pg with context %}
 {% import "_modal.html" as modal %}
 {% block title %}Custom Fields - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Define extra fields on assets -- global (all types) or scoped to a single asset type -- with a type, required flag, and select options where applicable.{% endblock %}

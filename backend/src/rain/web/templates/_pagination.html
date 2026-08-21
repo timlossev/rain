@@ -1,3 +1,14 @@
+{# Every caller must import this `with context` (see each template's own
+   import line) -- request below is never passed in as a macro argument,
+   it's read off the calling template's own context, which a plain
+   `{% import %}` (no `with context`) doesn't expose to an imported
+   macro at all. Confirmed live: a bare import worked fine right up
+   until a list actually had enough rows to render a real Prev/Next
+   link (has_prev/has_next are false for a single page, so the
+   request.url.include_query_params(...) expressions below are only
+   ever evaluated once there's a second page) -- at which point Jinja
+   raised `'request' is undefined`, not any earlier during that page's
+   otherwise-normal render. #}
 {% macro render_pagination(page) %}
 {% if page.total_pages > 1 or page.total > 0 %}
 <div class="pagination">

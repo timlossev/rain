@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_pagination.html" as pg %}
+{% import "_pagination.html" as pg with context %}
 {% import "_modal.html" as modal %}
 {% block title %}Tenants - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Manage tenants (customer organizations), each with its own isolated database schema. Internal admins can switch their active tenant from here.{% endblock %}

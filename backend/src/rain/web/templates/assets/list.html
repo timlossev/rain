@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_pagination.html" as pg %}
+{% import "_pagination.html" as pg with context %}
 {% block title %}Assets - {{ branding.instance_name }}{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block help_text %}The asset registry. Browse and filter assets by type, or create/edit individual assets and their custom field values.{% endblock %}

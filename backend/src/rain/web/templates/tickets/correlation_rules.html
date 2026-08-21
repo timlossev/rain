@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_pagination.html" as pg %}
+{% import "_pagination.html" as pg with context %}
 {% import "_modal.html" as modal %}
 {% block title %}Correlation Rules - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Unlike Event Promotion Policies (one event, first match wins), a correlation rule looks across multiple events. Simple repetition fires once enough matching events land within the time window; ML anomalies learns what's normal and fires on an unusual one instead. Either can be grouped by host or program for a separate count/model and ticket per value, and both re-arm once the window elapses. The title template fills in {count}, {window}, {message}, {host}, and {program} (the last three from the most recent contributing event), plus {score} for ML anomalies -- single braces, same plain string-formatting syntax Event Promotion Policies' own title template uses, not the double-brace placeholders webhooks/notification channels use.{% endblock %}

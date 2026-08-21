@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_pagination.html" as pg %}
+{% import "_pagination.html" as pg with context %}
 {% block title %}Tickets - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Browse and filter tickets (incidents, vulnerabilities, and changes) by type and status. Click a column header to sort by it. Click a ticket to view its full detail and activity.{% endblock %}
 {% block content_class %}content-full{% endblock %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_pagination.html" as pg %}
+{% import "_pagination.html" as pg with context %}
 {% import "_modal.html" as modal %}
 {% block title %}Groups - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Named sets of users, scoped to the active tenant. Used as an approval flow step's target -- any one member of the group can clear that step -- instead of naming individual people every time a flow is defined.{% endblock %}

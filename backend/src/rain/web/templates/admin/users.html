@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_pagination.html" as pg %}
+{% import "_pagination.html" as pg with context %}
 {% import "_modal.html" as modal %}
 {% block title %}Users - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Manage user accounts, roles, and tenant assignment. Internal Admin users can see the Admin menu and manage every tenant; Client users are scoped to one tenant.{% endblock %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_pagination.html" as pg %}
+{% import "_pagination.html" as pg with context %}
 {% block title %}Webhooks - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Centrally-configured outbound webhooks -- one definition here, reused wherever a webhook call is needed: a Platform Response Rule's "webhook" action, or a Document's "populate from webhook" setting.{% endblock %}
 {% block content %}

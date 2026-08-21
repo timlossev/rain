@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_pagination.html" as pg %}
+{% import "_pagination.html" as pg with context %}
 {% block title %}Documents - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}The document repository. Upload files, edit txt/md documents in-line, link documents to tickets or assets, and search by title or document number.{% endblock %}
 {% block content %}

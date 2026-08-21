@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_pagination.html" as pg %}
+{% import "_pagination.html" as pg with context %}
 {% block title %}Approval Flows - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Named, ordered approval processes for Change tickets. Each step is assigned to a group (any one member clears it) or an individual user; a step doesn't open until the one before it clears. Mark one flow "default" to have it auto-selected on new changes.{% endblock %}
 {% block content %}
