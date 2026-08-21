@@ -663,14 +663,23 @@ async def bulk_close(
     status (no duplicate log entry), and for a tenant with no is_closed-
     flagged status configured at all (closed_status is then None) the
     whole action is silently a no-op -- there's no sane status to invent
-    in that case, same as "Mark closed" itself."""
+    in that case, same as "Mark closed" itself.
+
+    Also drops a comment on every ticket closed this way (through the
+    normal add_comment path, so it notifies watchers same as a human
+    comment would) recording who reviewed it and that it was judged
+    non-actionable -- a mass-close is exactly that judgment call, unlike
+    the single-ticket "Mark closed" action, which carries no such
+    assumption about *why* and so gets no comment of its own."""
     closed_status = await service.get_closed_status(tenant_db)
     if closed_status is not None:
         ids = [int(part) for part in ticket_ids.split(",") if part.strip().isdigit()]
+        note = f"Seen by and acknowledged as non-actionable by {ctx.user.display_name} ({ctx.user.email})"
         for ticket_id in ids:
             ticket = await tenant_db.get(Ticket, ticket_id)
             if ticket is not None:
                 await service.update_status(tenant_db, ticket, closed_status.key, changed_by_user_id=ctx.user.id)
+                await service.add_comment(tenant_db, ticket.id, ctx.user.id, note)
     return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
 
 
