@@ -108,7 +108,7 @@ async def search_suggest(
     assets = await service.search_assets_brief(tenant_db, q)
     return [
         {
-            "label": f"{a.ci_number} — {a.name}",
+            "label": f"{a.ci_number} -- {a.name}",
             "sub": a.asset_type.name if a.asset_type else "",
             "href": f"/assets/{a.ci_number}/edit",
         }
