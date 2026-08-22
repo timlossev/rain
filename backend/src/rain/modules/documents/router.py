@@ -258,13 +258,20 @@ async def set_document_webhook_config(
     document_id: int,
     webhook_id: str = Form(""),
     alert_on_change: bool = Form(False),
+    webhook_response_is_json: bool = Form(False),
+    webhook_json_path: str = Form(""),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     doc = await service.get_document(tenant_db, document_id)
     if doc is not None:
         await service.update_webhook_config(
-            tenant_db, doc, webhook_id=int(webhook_id) if webhook_id else None, alert_on_change=alert_on_change
+            tenant_db,
+            doc,
+            webhook_id=int(webhook_id) if webhook_id else None,
+            alert_on_change=alert_on_change,
+            response_is_json=webhook_response_is_json,
+            json_path=webhook_json_path.strip() or None,
         )
     return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -291,6 +298,8 @@ async def refresh_document_from_webhook(
             status_code=status.HTTP_303_SEE_OTHER,
         )
     query = "refreshed=1" if outcome.changed else "refreshed=0"
+    if outcome.json_note:
+        query += f"&json_note={quote(outcome.json_note)}"
     return RedirectResponse(f"/documents/{doc.doc_number}?{query}", status_code=status.HTTP_303_SEE_OTHER)
 
 

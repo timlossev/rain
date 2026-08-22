@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import difflib
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from jsonpath_ng.ext import parse as parse_jsonpath
 from sqlalchemy import Sequence, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -57,6 +59,51 @@ def _diff_summary(old_text: str | None, new_text: str) -> str:
     if remaining > 0:
         summary += f"\n... ({remaining} more diff line{'s' if remaining != 1 else ''})"
     return summary
+
+
+def _extract_json_text(raw_body: str, json_path: str | None) -> tuple[str, str | None]:
+    """Backs Document.webhook_response_is_json (refresh_from_webhook
+    below). Returns (text_to_save, note) -- note is None on the "worked
+    as configured" path, or a short user-facing explanation of why the
+    raw response got saved instead, for the caller to flash without ever
+    treating it as a hard failure.
+
+    - Invalid JSON: falls back to raw_body verbatim, unparsed any further
+      (no CEF/kv-style guessing here -- this field is specifically "the
+      admin says this webhook returns JSON," so a parse failure is worth
+      surfacing, not silently reinterpreting as something else).
+    - No json_path: the whole parsed object, pretty-printed (`indent=2`)
+      instead of whatever compact/single-line form the webhook actually
+      sent -- this is what makes "just save the response" still produce a
+      readable document body.
+    - json_path set: same jsonpath-ng.ext parser and broad except as
+      rain.modules.catalog.service.resolve_field_source's own "jsonpath"
+      mode (its Ply-based parser doesn't consistently raise one exception
+      type across every malformed expression) -- a malformed expression or
+      a path matching nothing both fall back to the pretty-printed whole
+      object, not the raw response, since the JSON itself was valid.
+    - A matched value that isn't itself a string (a nested object/array,
+      a number) is pretty-printed the same way the "no path" case is --
+      there's no single sane "document text" for a non-scalar match
+      otherwise.
+    """
+    try:
+        data = json.loads(raw_body)
+    except (ValueError, TypeError):
+        return raw_body, "Response wasn't valid JSON -- saved verbatim."
+
+    if not json_path:
+        return json.dumps(data, indent=2), None
+
+    try:
+        matches = parse_jsonpath(json_path).find(data)
+    except Exception:
+        return json.dumps(data, indent=2), "Invalid JSONPath -- saved the full JSON response instead."
+    if not matches:
+        return json.dumps(data, indent=2), "JSONPath matched nothing -- saved the full JSON response instead."
+
+    value = matches[0].value
+    return (value if isinstance(value, str) else json.dumps(value, indent=2)), None
 
 
 async def _next_doc_number(db: AsyncSession) -> str:
@@ -153,9 +200,19 @@ async def update_description(db: AsyncSession, doc: Document, description: str |
     await db.commit()
 
 
-async def update_webhook_config(db: AsyncSession, doc: Document, *, webhook_id: int | None, alert_on_change: bool) -> None:
+async def update_webhook_config(
+    db: AsyncSession,
+    doc: Document,
+    *,
+    webhook_id: int | None,
+    alert_on_change: bool,
+    response_is_json: bool = False,
+    json_path: str | None = None,
+) -> None:
     doc.webhook_id = webhook_id
     doc.alert_on_change = alert_on_change
+    doc.webhook_response_is_json = response_is_json
+    doc.webhook_json_path = json_path
     await db.commit()
 
 
@@ -164,6 +221,11 @@ class RefreshOutcome:
     ok: bool
     changed: bool = False
     error: str | None = None
+    #: Set when webhook_response_is_json was on but something about that
+    #: didn't go as configured (invalid JSON, a bad/empty-matching
+    #: JSONPath) -- never a reason to fail the refresh, just something
+    #: worth flashing back at whoever clicked "Refresh from webhook".
+    json_note: str | None = None
 
 
 async def refresh_from_webhook(db: AsyncSession, doc: Document) -> RefreshOutcome:
@@ -195,6 +257,9 @@ async def refresh_from_webhook(db: AsyncSession, doc: Document) -> RefreshOutcom
     except FileNotFoundError:
         old_text = None
     new_text = result.body
+    json_note = None
+    if doc.webhook_response_is_json:
+        new_text, json_note = _extract_json_text(result.body, doc.webhook_json_path)
     changed = _content_changed(old_text, new_text)
 
     if changed:
@@ -220,7 +285,7 @@ async def refresh_from_webhook(db: AsyncSession, doc: Document) -> RefreshOutcom
 
     doc.last_refreshed_at = datetime.now(timezone.utc)
     await db.commit()
-    return RefreshOutcome(ok=True, changed=changed)
+    return RefreshOutcome(ok=True, changed=changed, json_note=json_note)
 
 
 async def update_body(db: AsyncSession, doc: Document, new_text: str) -> bool:

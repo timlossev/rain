@@ -812,6 +812,16 @@ class Document(TenantBase):
     webhook_id: Mapped[int | None] = mapped_column(ForeignKey("webhook_configs.id", ondelete="SET NULL"), nullable=True)
     alert_on_change: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     last_refreshed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Opt-in JSON handling for a webhook response, evaluated by
+    # rain.modules.documents.service.refresh_from_webhook: parse the
+    # response body as JSON, then either pull one value out of it via
+    # webhook_json_path (a JSONPath, same expression language/library as
+    # ServiceCatalogField.source_expression's own "jsonpath" mode) or, with
+    # no path set, save the whole parsed object pretty-printed. Invalid
+    # JSON never fails the refresh -- it just falls back to saving the raw
+    # response verbatim, same as webhook_response_is_json being off.
+    webhook_response_is_json: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    webhook_json_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     # DB-generated (GENERATED ALWAYS AS ... STORED, see migration 0023) from
     # doc_number/title/description -- never written from Python, only ever
     # read (search_vector.op("@@")(...)), see rain.modules.search. Indexes

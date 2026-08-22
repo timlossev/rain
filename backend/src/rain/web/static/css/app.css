@@ -757,6 +757,21 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
 .doc-md-preview { min-height: 200px; }
 .doc-md-preview h1, .doc-md-preview h2, .doc-md-preview h3 { margin: 0.6em 0 0.3em; }
 .doc-md-preview p { margin: 0 0 0.8em; }
+
+/* Auto-update tab's "Refresh from webhook" action -- a border-top
+   separates it from the settings form above (was previously a bare
+   <button> immediately followed by a <span>, glued together with a
+   single space) so it reads as its own action-plus-status-line, not a
+   continuation of the settings fields. */
+.doc-refresh-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.doc-refresh-row form { margin: 0; }
 .doc-md-preview pre { background: var(--surface-sunken); padding: 10px; border-radius: var(--radius-sm); overflow-x: auto; }
 /* The live event modal's Message/Parsed fields/Raw blocks -- same
    treatment as .doc-md-preview pre above, but wrapping long lines
