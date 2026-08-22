@@ -52,11 +52,33 @@ def _link_callback(uri: str, rel: str) -> str:
     someone's document would otherwise make xhtml2pdf fetch an
     attacker-chosen URL from the server itself (SSRF) every time that
     document is exported to PDF."""
+    if uri.startswith("data:"):
+        # Inline data -- FileNetworkManager already has safe native
+        # support for this (no network or filesystem access involved at
+        # all), same as it does for /media/branding and /static below.
+        # This is how _logo_for_pdf hands over a raster (PNG/JPEG) logo
+        # once it's been flattened onto white -- see its own docstring.
+        return uri
     if uri.startswith("/media/branding/"):
         path = Path(get_settings().uploads_dir) / "branding" / uri.removeprefix("/media/branding/")
     elif uri.startswith("/static/"):
         path = _STATIC_DIR / uri.removeprefix("/static/")
     else:
+        # _logo_for_pdf's own SVG branch hands over an absolute
+        # filesystem path directly (not a URL) for an SVG logo, since
+        # svg2rlg reads straight off disk -- already resolved server-
+        # side from a real file under uploads_dir/branding, never from
+        # unsanitized input at this point, so safe to pass through as
+        # long as it's actually confined to that one directory.
+        branding_dir = (Path(get_settings().uploads_dir) / "branding").resolve()
+        candidate = Path(uri)
+        if candidate.is_absolute():
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                return _BLOCKED_URI
+            if resolved.is_relative_to(branding_dir):
+                return str(resolved) if resolved.exists() else _BLOCKED_URI
         return _BLOCKED_URI
     return str(path) if path.exists() else _BLOCKED_URI
 
