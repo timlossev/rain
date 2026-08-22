@@ -1306,7 +1306,7 @@ td.actions { text-align: right; white-space: nowrap; }
 }
 .portal-nav-toggle:hover, .portal-nav-toggle[aria-expanded="true"] { color: var(--text); border-color: var(--accent); }
 .portal-nav-toggle .nav-icon { width: 18px; height: 18px; color: inherit; }
-.portal-nav-divider, .portal-nav-signout, .portal-nav-account { display: none; }
+.portal-nav-divider { display: none; }
 
 @media (min-width: 861px) {
   /* [hidden] is only ever meant to collapse the mobile dropdown -- above
@@ -1394,9 +1394,6 @@ td.actions { text-align: right; white-space: nowrap; }
   }
   .tab-buttons[data-menu-panel] .tab-btn.active { background: var(--surface-sunken); }
   .portal-nav-divider { display: block; border-top: 1px solid var(--border); margin: 8px 4px; }
-  .portal-nav-signout, .portal-nav-account { display: block; }
-  .portal-nav-account .user-menu-name, .portal-nav-account .user-menu-build { padding: 0 12px; }
-  .portal-nav-account .badge { margin: 0 12px 8px; }
 
   /* Secondary table columns (Severity, Last update on the portal's own
      "Tickets reported by me" list) -- at phone width the row's core
