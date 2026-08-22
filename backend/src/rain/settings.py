@@ -64,13 +64,18 @@ class Settings(BaseSettings):
     # Document repository storage (rain.modules.documents.storage) --
     # local disk (uploads_dir above) unless s3_bucket is set, in which
     # case every document body reads/writes go to that bucket instead
-    # and the local uploads volume no longer needs to persist them (it's
-    # still used for branding logos and the CSV/JSON import stash, both
-    # deliberately out of scope for this -- see storage.py's docstring).
-    # s3_endpoint_url is what makes this work against any S3-compatible
-    # service (MinIO, etc.), not just real AWS S3 -- leave blank for AWS,
-    # set it for anything self-hosted. s3_access_key_id/s3_secret_access_key
-    # are optional: leave both blank to fall back to boto3's normal
+    # and the local uploads volume no longer needs to persist them. The
+    # branding logo is still served from local disk either way (see
+    # storage.py's docstring), but also backs itself up to this same
+    # bucket when it's set (rain.web.uploads) so it survives the local
+    # copy going missing; without s3_bucket, that backup goes to Postgres
+    # instead. The CSV/JSON import stash stays on local disk unconditionally
+    # -- it's transient, gone by design once the import finishes, nothing
+    # worth backing up. s3_endpoint_url is what makes this work against
+    # any S3-compatible service (MinIO, etc.), not just real AWS S3 --
+    # leave blank for AWS, set it for anything self-hosted.
+    # s3_access_key_id/s3_secret_access_key are optional: leave both
+    # blank to fall back to boto3's normal
     # credential chain (an instance/task IAM role, ~/.aws/credentials,
     # AWS_* env vars) instead of a static pair in .env.
     s3_bucket: str = ""

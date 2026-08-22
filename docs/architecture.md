@@ -53,12 +53,15 @@ base file too: the base `app` service doesn't publish `SYSLOG_PORT` by
 default (it would conflict with the separate `worker` service's own
 mapping of that same host port in the normal topology this mode isn't
 running), so the overlay adds it back. Without `S3_BUCKET` set in this
-mode, document uploads (and the branding logo, which stays local-disk-
-only regardless of `S3_BUCKET` -- see `rain.modules.documents.storage`'s
-docstring) live in the container's own writable layer with no volume
-behind it at all, gone the next time the container is recreated -- an
-explicit, documented trade-off for genuine single-container simplicity,
-not an oversight.
+mode, document bodies live in the container's own writable layer with no
+volume behind it at all, gone the next time the container is recreated
+-- an explicit, documented trade-off for genuine single-container simplicity,
+not an oversight. The branding logo doesn't share that fate either way:
+it's always served from local disk (same as ever), but also always has a
+durable backup to restore that local copy from at next startup -- S3
+when `S3_BUCKET` is set, a row in `control.branding_assets` (Postgres,
+already required infrastructure) when it isn't. See
+`rain.web.uploads`'s docstring.
 
 **Kubernetes.** `charts/rain/` is a Helm chart covering the same two
 shapes, translated onto the same underlying `Settings` fields (an
@@ -408,12 +411,16 @@ uploaded filename (`Path(name).name`), so a filename like
 `../../etc/passwd` can't escape the tenant's subtree (or, for S3, land
 outside the `documents/` prefix) either way.
 
-Branding logos (`rain.web.uploads`) and the CSV/JSON import stash stay on
-local disk regardless of `s3_bucket` -- logos are served straight off the
-local static mount (`/media/branding`), which an S3 object can't be
-without a signed-URL redirect this app doesn't have, and the import stash
-is transient by design (gone once the import finishes). Both are small/
-short-lived enough that this doesn't undercut S3's actual purpose here:
+Branding logos (`rain.web.uploads`) are always *served* straight off the
+local static mount (`/media/branding`) regardless of `s3_bucket` -- an S3
+object can't be, without a signed-URL redirect this app doesn't have --
+but every upload also writes a durable backup (S3 under its own
+"branding" prefix in the same bucket when `s3_bucket` is set, a row in
+`control.branding_assets` otherwise), restored to local disk at startup
+if it's missing there. The CSV/JSON import stash stays on local disk
+unconditionally, with no backup at all -- it's transient by design, gone
+once the import finishes, nothing worth persisting. Both are small
+enough either way that this doesn't undercut S3's actual purpose here:
 document bodies, which can be large and numerous, are what "eliminate the
 uploads volume" is actually about.
 

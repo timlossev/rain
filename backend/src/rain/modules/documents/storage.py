@@ -10,12 +10,16 @@ Never served through the static file mount (see rain.main's /media/branding
 scoping) -- always through the authenticated
 GET /documents/{id}/download route.
 
-Scope: this is document bodies only. Branding logos (rain.web.uploads,
-served straight off the local static mount, which an S3 object can't be
-without a signed-URL redirect this app doesn't have) and the CSV/JSON
-import stash (transient, gone by design once the import finishes) stay
-on local disk regardless of s3_bucket -- see Settings.s3_bucket's own
-docstring.
+Scope: this is document bodies only -- rain.web.uploads reuses
+S3StorageBackend for its own, separate purpose (backing up the branding
+logo under its own "branding" prefix in the same bucket), but doesn't go
+through get_storage() to do it, since a logo is always served straight
+off the local static mount regardless of s3_bucket (an S3 object can't
+be, without a signed-URL redirect this app doesn't have) -- S3 there is
+only ever a backup to restore the local copy from, never the read path
+itself. The CSV/JSON import stash stays on local disk unconditionally
+too, being transient by design (gone once the import finishes, nothing
+to back up). See Settings.s3_bucket's own docstring.
 """
 from __future__ import annotations
 

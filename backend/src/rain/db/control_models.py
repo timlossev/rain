@@ -147,6 +147,31 @@ class GlobalConfig(ControlBase):
     )
 
 
+class BrandingAsset(ControlBase):
+    """Durable backup of an uploaded branding asset (the logo, today --
+    `key` is future-proofing, not a real choice yet). The local static
+    mount (`/media/branding`, see rain.main) is still what actually serves
+    the logo; this table exists purely so rain.web.uploads can restore
+    that local file if it's gone -- a container recreated with no
+    persistent uploads volume (docker-compose.minimal.yml, the
+    single-container `docker run` quickstart) loses it every time
+    otherwise. Used only when `S3_BUCKET` isn't set; an S3 bucket backs
+    this up there instead (rain.web.uploads._backup_logo), since Postgres
+    is the one piece of infrastructure every deployment already has and
+    this table is what stands in for S3 when there isn't one."""
+
+    __tablename__ = "branding_assets"
+    __table_args__ = {"schema": CONTROL_SCHEMA}
+
+    key: Mapped[str] = mapped_column(String(50), primary_key=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    content_type: Mapped[str] = mapped_column(String(100))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class AuthProviderConfig(ControlBase):
     """local | saml | ldap -- one row per provider, seeded by the initial
     migration. local/ldap/saml are all functional; see
