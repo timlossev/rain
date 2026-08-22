@@ -1252,7 +1252,7 @@ td.actions { text-align: right; white-space: nowrap; }
    other page's --accent (including this same tenant's authenticated app
    view) is unaffected. */
 .portal-shell.portal-unbranded { --accent: #52525b; }
-.portal-header { display: flex; align-items: center; margin-bottom: 20px; }
+.portal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
 .portal-header .brand { padding: 0; }
 .portal-header .brand-name { color: var(--text); font-size: 1.1rem; }
 .portal-header .brand-logo { width: 44px; height: 44px; }

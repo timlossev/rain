@@ -10,6 +10,37 @@
     </div>
     {% endif %}
     <span class="portal-tenant-pill">{{ tenant.name }}</span>
+    {% if user %}
+    {# Same identity info as the authenticated app's own topbar user-menu
+       (base.html) -- name, role badge, schema build number, sign out --
+       plus one option that menu doesn't need: this visitor is signed in
+       but viewing the portal specifically (base.html's topbar links here
+       via session-tenant-badge), so give them a way back to the full
+       app instead of just the sign-out door. #}
+    <div class="dropdown-menu" data-menu>
+      <button type="button" class="dropdown-menu-btn user-menu-btn" data-menu-toggle aria-haspopup="true" aria-expanded="false" title="{{ user.display_name }}">
+        <span class="nav-icon">{{ nav_icon("user") }}</span>
+      </button>
+      <div class="dropdown-menu-panel" data-menu-panel hidden>
+        <div class="user-menu-name">{{ user.display_name }}</div>
+        <span class="badge badge-accent">{{ user.role_key }}</span>
+        <div class="dropdown-menu-divider"></div>
+        <div class="user-menu-build muted" title="Current database schema revision">Build {{ db_build }}</div>
+        <div class="dropdown-menu-divider"></div>
+        <a class="btn btn-sm" href="/" style="width:100%; justify-content:center;">
+          <span class="nav-icon">{{ nav_icon("swap") }}</span>
+          <span class="label-text">Back to full app</span>
+        </a>
+        <div class="dropdown-menu-divider"></div>
+        <form method="post" action="/logout">
+          <button class="btn btn-sm" type="submit" style="width:100%; justify-content:center;">
+            <span class="nav-icon">{{ nav_icon("sign-out") }}</span>
+            <span class="label-text">Sign out</span>
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <div class="card portal-card portal-today">
