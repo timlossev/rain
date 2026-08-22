@@ -10,6 +10,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from rain.core.xlsx_export import neutralize_formula
 from rain.core.xlsx_export import render_xlsx as _render_xlsx
 from rain.modules.assets import service
 
@@ -59,7 +60,7 @@ def render_csv(rows: list[dict[str, Any]], headers: list[str]) -> str:
     writer = csv.DictWriter(buf, fieldnames=headers)
     writer.writeheader()
     for row in rows:
-        writer.writerow(row)
+        writer.writerow({h: neutralize_formula(row.get(h)) for h in headers})
     return buf.getvalue()
 
 

@@ -4,7 +4,7 @@ import io
 import secrets
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Form, Request, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -616,7 +616,12 @@ async def import_commit(
     form = await request.form()
     mapping = {key[len("map_") :]: value for key, value in form.items() if key.startswith("map_") and value}
 
-    stash = import_stash_path(token)
+    try:
+        stash = import_stash_path(token)
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired import session -- start the import again.")
+    if not stash.exists():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired import session -- start the import again.")
     raw = stash.read_bytes()
     rows = importer.parse_rows(raw, fmt)
     result = await importer.commit_import(

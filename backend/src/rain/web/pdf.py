@@ -29,18 +29,36 @@ _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _LOGO_HEIGHT = 30
 
 
+#: Returned for any URI this callback refuses to resolve (see the `else`
+#: branch below) -- schemeless, so xhtml2pdf's own FileNetworkManager
+#: routes it to LocalFileURI (a plain local-disk open, no network
+#: request) instead of NetworkFileUri, and it never resolves to a real
+#: file, so the image just renders missing rather than partially working.
+#: Returning "" instead would NOT block anything: pisaFileObject only
+#: overrides its URI `if callback and (new := callback(...))`, so a
+#: falsy return is silently ignored and it fetches the *original* URI
+#: anyway -- confirmed against xhtml2pdf's own files.py.
+_BLOCKED_URI = "/__blocked_by_pdf_link_callback__"
+
+
 def _link_callback(uri: str, rel: str) -> str:
     """Resolve the handful of local URL prefixes the PDF templates can
     reference (branding logo, static CSS/images) to real filesystem paths,
     since xhtml2pdf fetches assets itself rather than going through
-    Starlette's routing."""
+    Starlette's routing. Anything else is refused outright, not passed
+    through -- a document body is user-authored Markdown (rain.modules.
+    documents.textbody.render_markdown), and its rendered HTML lands in
+    this same PDF template with |safe, so an <img src="http://..."> in
+    someone's document would otherwise make xhtml2pdf fetch an
+    attacker-chosen URL from the server itself (SSRF) every time that
+    document is exported to PDF."""
     if uri.startswith("/media/branding/"):
         path = Path(get_settings().uploads_dir) / "branding" / uri.removeprefix("/media/branding/")
     elif uri.startswith("/static/"):
         path = _STATIC_DIR / uri.removeprefix("/static/")
     else:
-        return uri
-    return str(path) if path.exists() else uri
+        return _BLOCKED_URI
+    return str(path) if path.exists() else _BLOCKED_URI
 
 
 def _logo_for_pdf(branding: dict) -> dict:

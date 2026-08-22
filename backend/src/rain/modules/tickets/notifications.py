@@ -25,6 +25,7 @@ import httpx
 
 from rain.core.config_store import config_store
 from rain.core.crypto import decrypt_json
+from rain.core.url_safety import check_outbound_url
 
 logger = logging.getLogger("rain.notifications")
 
@@ -128,6 +129,10 @@ async def send_test_email(
 
 
 async def send_slack(webhook_url: str, text: str) -> None:
+    unsafe_reason = await check_outbound_url(webhook_url)
+    if unsafe_reason is not None:
+        logger.warning("Slack notification blocked -- %s", unsafe_reason)
+        return
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(webhook_url, json={"text": text})

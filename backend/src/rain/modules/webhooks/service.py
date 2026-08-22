@@ -13,6 +13,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from rain.core.url_safety import check_outbound_url
 from rain.db.tenant_models import SyslogEvent, WebhookConfig
 from rain.modules.tickets import correlation as ticket_correlation
 from rain.modules.tickets import rules as ticket_rules
@@ -57,6 +58,11 @@ async def call_webhook(config: WebhookConfig, placeholders: dict[str, str] | Non
     """Never raises -- both callers (a rule firing, a document refresh)
     treat a failed call as a logged/displayed outcome, not something
     that should propagate and take down whatever triggered it."""
+    unsafe_reason = await check_outbound_url(config.url)
+    if unsafe_reason is not None:
+        logger.warning("webhook '%s' blocked -- %s", config.name, unsafe_reason)
+        return WebhookResult(status_code=None, success=False, body="", error=unsafe_reason)
+
     method = (config.http_method or "POST").upper()
     headers = dict(config.headers or {})
     success_codes = _parse_success_codes(config.success_codes)

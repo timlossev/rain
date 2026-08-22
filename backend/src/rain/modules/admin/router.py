@@ -30,7 +30,8 @@ from rain.core.rbac import require_admin, require_internal_admin, require_login
 from rain.core.security import hash_password
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.tenant_config import get_tenant_config, get_tenant_configs, set_tenant_config, set_tenant_configs
-from rain.core.user_names import resolve_user_names
+from rain.core.url_safety import check_outbound_url
+from rain.core.user_names import is_assignable_user, resolve_user_names
 from rain.db.base import control_session, tenant_session
 from rain.db.control_models import AuthProviderConfig, Session as SessionRow, SyslogSourceMap, Tenant, User
 from rain.db.provisioning import InvalidSlugError, provision_tenant
@@ -998,10 +999,15 @@ async def group_detail(
 async def group_add_member(
     group_id: int,
     user_id: str = Form(""),
+    ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
-    if user_id:
+    # Same reasoning as tickets.router.assign_ticket: the picker this form
+    # field is filled from only ever offers this tenant's own users, but
+    # a crafted POST could name any user id at all -- re-checked here
+    # server-side rather than trusted from the form.
+    if user_id and await is_assignable_user(int(user_id), ctx.active_tenant.id):
         existing = await tenant_db.execute(
             select(GroupMembership).where(
                 GroupMembership.group_id == group_id, GroupMembership.user_id == int(user_id)
@@ -1097,6 +1103,7 @@ async def approval_flows_create(
     name: str = Form(...),
     is_default: bool = Form(False),
     notify_syslog_on_approval: bool = Form(False),
+    ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
@@ -1106,12 +1113,12 @@ async def approval_flows_create(
     flow = ApprovalFlow(name=name.strip(), is_default=is_default, notify_syslog_on_approval=notify_syslog_on_approval)
     tenant_db.add(flow)
     await tenant_db.flush()
-    await _replace_approval_steps(tenant_db, flow.id, form)
+    await _replace_approval_steps(tenant_db, flow.id, form, tenant_id=ctx.active_tenant.id)
     await tenant_db.commit()
     return RedirectResponse("/admin/approval-flows", status_code=status.HTTP_303_SEE_OTHER)
 
 
-async def _replace_approval_steps(tenant_db: AsyncSession, flow_id: int, form) -> None:
+async def _replace_approval_steps(tenant_db: AsyncSession, flow_id: int, form, *, tenant_id: int) -> None:
     """Shared by create and edit -- steps have no identity worth preserving
     across an edit (they're just an ordered label/approver list), so an
     edit rebuilds them from the submitted form rather than diffing against
@@ -1121,6 +1128,11 @@ async def _replace_approval_steps(tenant_db: AsyncSession, flow_id: int, form) -
         group_id = str(form.get(f"step_group_{i}", "")).strip()
         user_id = str(form.get(f"step_user_{i}", "")).strip()
         if not group_id and not user_id:
+            continue
+        # Same reasoning as assign_ticket/group_add_member -- a step's
+        # approver_user_id is a plain form field, re-validated here rather
+        # than trusted, so it can't name a user outside this tenant.
+        if user_id and not group_id and not await is_assignable_user(int(user_id), tenant_id):
             continue
         label = str(form.get(f"step_label_{i}", "")).strip() or f"Step {sort_order + 1}"
         tenant_db.add(
@@ -1183,6 +1195,7 @@ async def approval_flows_edit(
     name: str = Form(...),
     is_default: bool = Form(False),
     notify_syslog_on_approval: bool = Form(False),
+    ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
@@ -1198,7 +1211,7 @@ async def approval_flows_edit(
     for step in list(flow.steps):
         await tenant_db.delete(step)
     await tenant_db.flush()
-    await _replace_approval_steps(tenant_db, flow.id, form)
+    await _replace_approval_steps(tenant_db, flow.id, form, tenant_id=ctx.active_tenant.id)
     await tenant_db.commit()
     return RedirectResponse("/admin/approval-flows", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -1498,6 +1511,16 @@ async def webhooks_create(
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
+    # Fail fast with a clear reason at save time -- the same check
+    # call_webhook() re-applies on every actual call (the real
+    # enforcement point, since a URL that resolves safely today could
+    # resolve to something internal later), so this is UX, not the
+    # security boundary itself.
+    unsafe_reason = await check_outbound_url(url.strip())
+    if unsafe_reason is not None:
+        return RedirectResponse(
+            f"/admin/webhooks/new?error={quote(f'URL rejected: {unsafe_reason}')}", status_code=status.HTTP_303_SEE_OTHER
+        )
     await webhook_service.create_webhook(
         tenant_db,
         name=name.strip(),
@@ -1546,6 +1569,12 @@ async def webhooks_edit(
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
+    unsafe_reason = await check_outbound_url(url.strip())
+    if unsafe_reason is not None:
+        return RedirectResponse(
+            f"/admin/webhooks/{webhook_id}/edit?error={quote(f'URL rejected: {unsafe_reason}')}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
     webhook = await webhook_service.get_webhook(tenant_db, webhook_id)
     if webhook is not None:
         await webhook_service.update_webhook(

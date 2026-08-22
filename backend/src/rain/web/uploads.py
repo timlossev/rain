@@ -18,6 +18,7 @@ this is specifically covering for."""
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 from pathlib import Path
 
@@ -147,7 +148,23 @@ async def save_logo_upload(upload: UploadFile) -> str:
     return f"/media/branding/{filename}"
 
 
+_IMPORT_STASH_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
 def import_stash_path(token: str) -> Path:
+    """`token` round-trips through an HTML form field between the preview
+    and commit steps (rain.modules.assets.router), so it has to be
+    treated as attacker-controlled at this end regardless of the fact
+    that the preview step only ever generates it via secrets.token_hex(16)
+    -- an unvalidated token here let a crafted commit request (e.g.
+    token="/etc/passwd" or "../../../etc/passwd") turn this into an
+    arbitrary-path read (import_commit reads it) and delete (unlink()
+    afterwards) instead of one confined to the import-stash directory.
+    Enforcing the exact shape secrets.token_hex(16) actually produces --
+    not just Path(token).name -- also rules out a same-directory token
+    that happens to collide with something else already staged there."""
+    if not _IMPORT_STASH_TOKEN_RE.match(token):
+        raise ValueError(f"invalid import stash token: {token!r}")
     stash_dir = Path(get_settings().uploads_dir) / "import-stash"
     stash_dir.mkdir(parents=True, exist_ok=True)
     return stash_dir / f"{token}.bin"

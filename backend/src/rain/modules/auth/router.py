@@ -31,7 +31,7 @@ from rain.modules.auth.saml_provider import build_auth, extract_identity, metada
 # here rather than duplicating the aiosmtplib/config_store plumbing for
 # a second email-sending code path that could drift from the first.
 from rain.modules.tickets.notifications import send_email
-from rain.web.safe_redirect import safe_relative_path
+from rain.web.safe_redirect import public_origin, safe_relative_path
 from rain.web.templating import templates
 
 logger = logging.getLogger("rain.auth")
@@ -239,7 +239,7 @@ async def forgot_password_submit(request: Request, email: str = Form(...)):
                 )
             )
             await session.commit()
-            reset_url = f"{request.url.scheme}://{request.url.netloc}/reset-password?token={token}"
+            reset_url = f"{public_origin(request)}/reset-password?token={token}"
             await send_email(
                 [user.email],
                 "Reset your RAIN password",

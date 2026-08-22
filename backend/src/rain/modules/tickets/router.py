@@ -16,7 +16,7 @@ from rain.core.pagination import paginate
 from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.tenant_config import get_tenant_config
-from rain.core.user_names import resolve_user_names
+from rain.core.user_names import is_assignable_user, resolve_user_names
 from rain.db.base import control_session
 from rain.db.control_models import User
 from rain.db.tenant_models import (
@@ -304,11 +304,19 @@ async def assign_ticket(
     _: CurrentUser = Depends(require_login),
 ):
     ticket = await tenant_db.get(Ticket, ticket_id)
-    if ticket is not None:
+    new_assignee_id = int(assignee_user_id) if assignee_user_id else None
+    # search_assignable_users only ever offers this tenant's own users
+    # (plus internal_admin), but that's just what the picker shows --
+    # nothing stops a crafted POST from naming a different tenant's user
+    # id outright, which would otherwise both leak that user's display
+    # name back onto this ticket and subscribe them as a watcher on this
+    # tenant's ticket traffic. Re-applying the same scoping check server-
+    # side here is what actually enforces it.
+    if ticket is not None and (new_assignee_id is None or await is_assignable_user(new_assignee_id, ctx.active_tenant.id)):
         await service.update_assignee(
             tenant_db,
             ticket,
-            int(assignee_user_id) if assignee_user_id else None,
+            new_assignee_id,
             changed_by_user_id=ctx.user.id,
         )
     return RedirectResponse(f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
