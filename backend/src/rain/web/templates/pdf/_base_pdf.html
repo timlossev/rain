@@ -6,7 +6,21 @@
   /* xhtml2pdf only understands a CSS 2.1-ish subset (no flexbox/grid, no
      text-transform, no border-radius) -- kept deliberately plain. */
   @page { size: A4; margin: 2cm 1.6cm; }
-  body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #1a1d29; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #1a1d29; -pdf-word-wrap: CJK; }
+  /* -pdf-word-wrap (xhtml2pdf's own vendor property -- standard CSS
+     word-wrap/overflow-wrap isn't in its supported subset) switches
+     reportlab's line-breaking from "only break at whitespace" to
+     "break at any character once the line is full," same algorithm
+     it was built for CJK text, which never has whitespace between
+     words either. Set on body so it inherits everywhere (confirmed:
+     reportlab's own wordWrap style property is in the same inherited-
+     attribute list as fontName/textColor) -- without it, one long
+     unbroken string (a ticket title, a URL, a token) with no spaces
+     for reportlab's normal algorithm to break on just runs off the
+     page edge instead of wrapping; confirmed directly against
+     reportlab's Paragraph.wrap(): the same 200-character string
+     measured 1112pt wide (page content is ~460pt) with this off, and
+     exactly 400pt -- wrapped to fit -- with it on. */
   .pdf-header { width: 100%; border-bottom: 2px solid {{ branding.accent_color or "#6366f1" }}; padding-bottom: 10px; margin-bottom: 18px; }
   .pdf-header table { width: 100%; }
   .pdf-instance { font-size: 8.5pt; color: #6b7280; }

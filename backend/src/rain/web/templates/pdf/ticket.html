@@ -32,7 +32,7 @@
 </table>
 
 <h2 class="pdf-section">Description</h2>
-<p>{{ ticket.description or "No description." }}</p>
+<p>{{ (ticket.description | nl2br) if ticket.description else "No description." }}</p>
 
 <h2 class="pdf-section">Linked documents</h2>
 {% if document_links %}
@@ -55,7 +55,7 @@
   <div class="pdf-comment">
     {% if entry.kind == "comment" %}
     <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ ("RAIN System" if entry.item.author_user_id is none else user_names.get(entry.item.author_user_id, "Deleted user")) }}</div>
-    <div>{{ entry.item.body }}</div>
+    <div>{{ entry.item.body | nl2br }}</div>
     {% elif entry.kind == "assignment_change" %}
     <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ ("RAIN System" if entry.item.changed_by_user_id is none else user_names.get(entry.item.changed_by_user_id, "Deleted user")) }}</div>
     <div>

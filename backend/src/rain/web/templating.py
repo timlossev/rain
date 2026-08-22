@@ -4,6 +4,7 @@ import logging
 import time
 from pathlib import Path
 
+from markupsafe import Markup, escape
 from starlette.templating import Jinja2Templates
 
 from rain.core.config_store import config_store
@@ -71,7 +72,25 @@ def top_nav_label(nodes, path: str) -> str | None:
     return best_label
 
 
+def nl2br(value: str | None) -> Markup:
+    """Explicit line breaks for free text (a ticket description, a
+    comment body, a plain-text document body) that's meant to keep its
+    original line breaks -- needed specifically for the PDF export
+    templates (rain.web.pdf), which reuse this same Jinja2 environment.
+    A normal browser honors a literal "\\n" inside a block element (or
+    inside a <pre> with white-space: pre-wrap, as the web preview/inline
+    editor already rely on), but xhtml2pdf's reportlab-based text flow
+    doesn't -- confirmed live: a <pre> with three literal newlines and
+    that same CSS still extracted as one run-on line with no breaks at
+    all. Each line is escaped individually (not the whole value first)
+    so this is still autoescape-safe to use directly in a template."""
+    if not value:
+        return Markup("")
+    return Markup("<br>\n").join(escape(line) for line in str(value).split("\n"))
+
+
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR), context_processors=[_branding_context])
 templates.env.globals["asset_version"] = ASSET_VERSION
 templates.env.globals["top_nav_label"] = top_nav_label
 templates.env.globals["db_build"] = DB_BUILD
+templates.env.filters["nl2br"] = nl2br
