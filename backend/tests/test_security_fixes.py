@@ -6,9 +6,11 @@ specifically locking in a vulnerability class each, not general
 behavior."""
 from __future__ import annotations
 
+import ipaddress
+
 import pytest
 
-from rain.core.url_safety import check_outbound_url
+from rain.core.url_safety import _is_unsafe_ip, check_outbound_url
 from rain.core.xlsx_export import neutralize_formula
 from rain.modules.documents.textbody import render_markdown
 from rain.web.uploads import import_stash_path
@@ -74,3 +76,27 @@ async def test_check_outbound_url_rejects_non_http_schemes():
 
 async def test_check_outbound_url_rejects_missing_host():
     assert await check_outbound_url("http://") is not None
+
+
+@pytest.mark.parametrize("addr", ["10.0.0.5", "192.168.1.1", "172.16.0.1", "8.8.8.8", "2001:4860:4860::8888"])
+def test_is_unsafe_ip_allows_private_and_public_addresses(addr):
+    # RAIN is built to run air-gapped -- a tenant's webhook reaching its
+    # own internal network (an on-prem monitoring tool, an internal API)
+    # on a private/RFC1918 address is the normal, intended case here,
+    # not an attack. Regression test for exactly that: a real report of
+    # a legitimate webhook to a private IP being rejected.
+    assert _is_unsafe_ip(ipaddress.ip_address(addr)) is False
+
+
+@pytest.mark.parametrize(
+    "addr",
+    ["127.0.0.1", "::1", "169.254.169.254", "169.254.170.2", "224.0.0.1", "0.0.0.0"],
+)
+def test_is_unsafe_ip_still_blocks_loopback_and_link_local(addr):
+    # Loopback (would reach this app's own container instead of the
+    # webhook's claimed target) and link-local (169.254.0.0/16 is what
+    # actually covers a cloud metadata endpoint -- 169.254.169.254 on
+    # AWS/GCP, 169.254.170.2 on AWS ECS) are never a legitimate webhook
+    # target in any deployment, air-gapped or not -- unlike a private
+    # RFC1918 address, these stay blocked.
+    assert _is_unsafe_ip(ipaddress.ip_address(addr)) is True
