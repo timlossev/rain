@@ -25,11 +25,16 @@ imagePullSecrets: []
 # ConfigMap.
 appSecretKey: ""
 
-# Public domain the app is reached at. Only used to fill in
-# ingress.host below if you leave that blank -- unlike RAIN_DOMAIN in
-# the Compose deployment (which Caddy uses to request an ACME
-# certificate), nothing in the app itself reads this; TLS here is
-# whatever your ingress controller/cert-manager setup already does.
+# Public domain the app is reached at. Fills in ingress.host below if
+# you leave that blank, AND is passed through as RAIN_DOMAIN (unlike the
+# Compose deployment, where Caddy is the only thing that reads it, to
+# request an ACME certificate -- TLS here is whatever your ingress
+# controller/cert-manager setup already does, this doesn't drive that).
+# The app itself reads RAIN_DOMAIN for one thing: preferring it over a
+# request's own (spoofable) Host header when building an absolute link
+# sent outside the request/response cycle, e.g. a password-reset email
+# (rain.web.safe_redirect.public_origin) -- worth setting correctly even
+# though nothing here depends on it for routing/TLS the way Caddy does.
 domain: rain.example.com
 
 database:
@@ -54,6 +59,18 @@ database:
     storage:
       size: 10Gi
       storageClassName: ""
+  # Reserves the `vector` Postgres extension for a future semantic-search
+  # source -- unused today, so safe to turn off outright. Matters most
+  # for exactly the database.url case above: turn off for a managed
+  # Postgres role that can't CREATE EXTENSION (a minimum-privilege
+  # application role is typical on RDS/Cloud SQL) or doesn't ship the
+  # extension in the first place (e.g. standard RDS in AWS GovCloud) --
+  # same ENABLE_PGVECTOR knob the Compose deployment's bootstrap wizard
+  # asks about, just not auto-detected here. See Settings.enable_pgvector's
+  # own docstring; flipping this after migrations have already run
+  # against a schema has no retroactive effect, only on ones from that
+  # point on.
+  enablePgvector: true
 
 # Document repository storage (rain.modules.documents.storage). Leave
 # s3.enabled false to use the persistence.* PVC below instead -- same

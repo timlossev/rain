@@ -72,6 +72,7 @@ ones:
 | `appSecretKey` | Required. Session-cookie signing + config-at-rest encryption key. |
 | `database.url` | External Postgres DSN. Takes priority over `database.embedded.*`. |
 | `database.embedded.enabled` | Bundle a single-replica Postgres instead (eval/dev only). |
+| `database.enablePgvector` | Off for a managed Postgres role that can't `CREATE EXTENSION`, or that doesn't ship `vector` at all (e.g. standard RDS in AWS GovCloud). |
 | `storage.s3.enabled` / `storage.s3.bucket` | Document storage in S3 (or S3-compatible) instead of a PVC. |
 | `storage.persistence.enabled` | PVC for local document storage; ignored once `storage.s3.enabled` is true. |
 | `worker.embedded` | Fold the worker's duties into the `app` Deployment instead of a separate one. |
@@ -79,12 +80,18 @@ ones:
 
 ## Verification note
 
-This chart was written and reviewed against the exact env vars/behavior
-the app itself expects (`backend/src/rain/settings.py`,
-`docker-compose.yml`) but has not been installed against a real
-Kubernetes cluster -- there wasn't one available in the environment this
-was built in. Render it locally before a real install to catch any
-templating mistakes:
+This chart is written and periodically re-checked against the exact env
+vars/behavior the app itself expects (`backend/src/rain/settings.py`,
+`docker-compose.yml`) -- `helm lint`/`helm template` rendered and
+inspected across the deployment shapes above (default, remote DB + S3
+with a static key pair, remote DB + S3 on an IAM/instance-profile role,
+minimal mode, `database.enablePgvector=false`), catching two settings
+(`ENABLE_PGVECTOR`, `RAIN_DOMAIN`) that the app gained after this chart
+was first written and that had gone unwired here since. It has still
+never been installed against a real Kubernetes cluster -- there wasn't
+one available in the environment this was built/reviewed in. Render it
+locally before a real install to catch any templating mistakes of your
+own:
 
 ```sh
 helm template rain ./charts/rain --set appSecretKey=x --set database.url=postgresql://u:p@h:5432/rain

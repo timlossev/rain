@@ -93,6 +93,10 @@ separately by deployment-app.yaml instead of here.
   value: {{ .Values.syslog.port | quote }}
 - name: DEBUG
   value: {{ .Values.app.debug | quote }}
+- name: RAIN_DOMAIN
+  value: {{ .Values.ingress.host | default .Values.domain | quote }}
+- name: ENABLE_PGVECTOR
+  value: {{ .Values.database.enablePgvector | quote }}
 {{- if .Values.storage.s3.enabled }}
 - name: S3_BUCKET
   value: {{ .Values.storage.s3.bucket | quote }}
