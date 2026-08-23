@@ -157,6 +157,9 @@ Ticketing below.
   to file/request anything at all, and whether the page carries this
   instance's own branding or stays neutral for sharing outside the
   organization
+- An optional full-page background image (Admin > Branding), shown for
+  any tenant with that branding setting on; unset by default, same
+  plain background as ever
 
 **Calendar**
 - Per-tenant calendar with a visual month-grid editor

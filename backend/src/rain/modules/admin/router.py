@@ -56,7 +56,7 @@ from rain.modules.webhooks import service as webhook_service
 from rain.settings import get_settings
 from rain.web.nav import build_nav_context
 from rain.web.templating import templates
-from rain.web.uploads import UploadError, save_logo_upload
+from rain.web.uploads import UploadError, save_logo_upload, save_portal_background_upload
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -118,9 +118,19 @@ async def branding_submit(
     accent_color: str = Form(...),
     font_family: str = Form(""),
     logo: UploadFile | None = None,
+    portal_background: UploadFile | None = None,
     ctx: RequestContext = Depends(get_request_context),
     user: CurrentUser = Depends(require_internal_admin),
 ):
+    async def _error(exc: UploadError) -> HTMLResponse:
+        nav = await build_nav_context(ctx)
+        return templates.TemplateResponse(
+            request,
+            "admin/branding.html",
+            {**nav, "ctx": ctx, "error": str(exc), "font_choices": FONT_CHOICES, **await _portal_settings(ctx)},
+            status_code=400,
+        )
+
     await config_store.set("instance_name", instance_name.strip(), updated_by=user.id)
     await config_store.set("accent_color", accent_color.strip(), updated_by=user.id)
     # Whitelisted against FONT_CHOICES (not just server-rendered <select>
@@ -135,13 +145,16 @@ async def branding_submit(
             logo_path = await save_logo_upload(logo)
             await config_store.set("logo_path", logo_path, updated_by=user.id)
         except UploadError as exc:
-            nav = await build_nav_context(ctx)
-            return templates.TemplateResponse(
-                request,
-                "admin/branding.html",
-                {**nav, "ctx": ctx, "error": str(exc), "font_choices": FONT_CHOICES, **await _portal_settings(ctx)},
-                status_code=400,
-            )
+            return await _error(exc)
+    # Optional -- the client portal renders exactly as it does today
+    # (branding.portal_background_path is None, same as before this
+    # field existed) until an internal_admin sets one here.
+    if portal_background is not None and portal_background.filename:
+        try:
+            background_path = await save_portal_background_upload(portal_background)
+            await config_store.set("portal_background_path", background_path, updated_by=user.id)
+        except UploadError as exc:
+            return await _error(exc)
     return RedirectResponse("/admin/branding?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 

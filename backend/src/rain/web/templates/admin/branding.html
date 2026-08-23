@@ -33,6 +33,12 @@
       <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
       <div class="field-hint">PNG, JPEG, SVG or WebP, up to 5MB. Leave empty to keep the current logo.</div>
     </div>
+    <div class="field">
+      <label for="portal_background">Client portal background image</label>
+      {% if branding.portal_background_path %}<p><img src="{{ branding.portal_background_path }}" alt="" style="height:60px; border-radius:var(--radius-sm);"></p>{% endif %}
+      <input type="file" id="portal_background" name="portal_background" accept="image/png,image/jpeg,image/webp">
+      <div class="field-hint">Optional -- shown full-page behind the public incident portal (<code>/portal/&lt;tenant&gt;</code>) for any tenant with "Show instance branding" on below. PNG, JPEG or WebP, up to 10MB. Leave empty to keep the current one (or the portal's plain default background, if none has been set yet).</div>
+    </div>
     <button class="btn btn-primary" type="submit">Save</button>
   </form>
 </div>

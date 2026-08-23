@@ -26,7 +26,7 @@ from rain.db import migrate, provisioning
 from rain.db.base import dispose_engine
 from rain.settings import get_settings
 from rain.web.templating import templates
-from rain.web.uploads import restore_logo_if_missing
+from rain.web.uploads import restore_logo_if_missing, restore_portal_background_if_missing
 from rain.worker_runtime import WorkerServices
 
 logging.basicConfig(level=logging.INFO)
@@ -52,11 +52,13 @@ async def lifespan(app: FastAPI):
         logger.info("loading global config...")
         await config_store.load_all()
         await config_store.start_listener()
-        # Restores the branding logo to local disk if config_store says one
-        # was uploaded but it isn't there -- e.g. this container's uploads
-        # volume didn't survive being recreated. See restore_logo_if_missing's
-        # own docstring; a no-op the overwhelming majority of the time.
+        # Restores the branding logo / portal background image to local
+        # disk if config_store says one was uploaded but it isn't there
+        # -- e.g. this container's uploads volume didn't survive being
+        # recreated. See restore_logo_if_missing's own docstring; a
+        # no-op the overwhelming majority of the time.
         await restore_logo_if_missing()
+        await restore_portal_background_if_missing()
         # EMBED_WORKER=true folds the syslog listener + rule engine +
         # notifications + calendar sweep + LDAP sync into this same
         # process instead of a separate `worker` container/service --

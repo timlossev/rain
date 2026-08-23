@@ -1238,6 +1238,23 @@ td.actions { text-align: right; white-space: nowrap; }
    .portal-shell's own padding-top holds the header a fixed distance
    from the top of the viewport regardless of what's below it. */
 .content-standalone:has(.portal-shell) { display: block; padding-top: 56px; }
+/* Optional (Admin > Branding), instance-wide client-portal wallpaper --
+   see report.html's own comment on why this is a fixed/full-viewport
+   layer rather than living inside .portal-shell itself. z-index: -1 on
+   a `position: fixed` element sits behind literally everything else on
+   the page (every other element here is default z-index: auto, painted
+   above it), without needing every card on top of it to opt into its
+   own stacking context first. Absent (the common case -- no background
+   image set) this rule simply never matches anything. */
+.portal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
 .portal-shell { width: 100%; max-width: 640px; margin: 0 auto; }
 /* The tabbed layout (Request Something, Report Something -- both open to
    every visitor -- plus Pending Actions/Document Archive once signed in)

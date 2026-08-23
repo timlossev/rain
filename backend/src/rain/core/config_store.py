@@ -39,6 +39,7 @@ DEFAULTS: dict[str, Any] = {
     "instance_name": "RAIN",
     "accent_color": "#3d6b73",
     "logo_path": None,
+    "portal_background_path": None,
     "font_family": DEFAULT_FONT_FAMILY,
     "setup_complete": False,
 }

@@ -1,6 +1,18 @@
 {% extends "base.html" %}
 {% block title %}{{ tenant.name }}: Report an Incident{% endblock %}
 {% block content_alone %}
+{% if branded and branding.portal_background_path %}
+{# Optional, instance-wide (Admin > Branding), shown only for a tenant
+   with portal_branded on -- same gating as the logo/instance-name right
+   below. Fixed/full-viewport rather than living inside .portal-shell
+   (which is a centered, max-width column) so it reads as a page
+   backdrop behind everything, not just behind the narrow content
+   itself; every card already has its own opaque background, so nothing
+   here needs its own readability treatment on top of that. Absent
+   entirely (branding.portal_background_path is None) the page renders
+   exactly as it always has -- this block just never runs. #}
+<div class="portal-backdrop" style="background-image:url('{{ branding.portal_background_path }}');"></div>
+{% endif %}
 <div class="portal-shell portal-wide{{ ' portal-unbranded' if not branded else '' }}">
   <div class="portal-header">
     {% if branded %}

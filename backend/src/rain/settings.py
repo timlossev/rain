@@ -65,11 +65,12 @@ class Settings(BaseSettings):
     # local disk (uploads_dir above) unless s3_bucket is set, in which
     # case every document body reads/writes go to that bucket instead
     # and the local uploads volume no longer needs to persist them. The
-    # branding logo is still served from local disk either way (see
-    # storage.py's docstring), but also backs itself up to this same
-    # bucket when it's set (rain.web.uploads) so it survives the local
-    # copy going missing; without s3_bucket, that backup goes to Postgres
-    # instead. The CSV/JSON import stash stays on local disk unconditionally
+    # branding assets (the logo, and the client portal's optional
+    # background image) are still served from local disk either way
+    # (see storage.py's docstring), but also back themselves up to this
+    # same bucket when it's set (rain.web.uploads) so they survive the
+    # local copy going missing; without s3_bucket, that backup goes to
+    # Postgres instead. The CSV/JSON import stash stays on local disk unconditionally
     # -- it's transient, gone by design once the import finishes, nothing
     # worth backing up. s3_endpoint_url is what makes this work against
     # any S3-compatible service (MinIO, etc.), not just real AWS S3 --

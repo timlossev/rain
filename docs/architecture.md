@@ -56,11 +56,12 @@ running), so the overlay adds it back. Without `S3_BUCKET` set in this
 mode, document bodies live in the container's own writable layer with no
 volume behind it at all, gone the next time the container is recreated
 -- an explicit, documented trade-off for genuine single-container simplicity,
-not an oversight. The branding logo doesn't share that fate either way:
-it's always served from local disk (same as ever), but also always has a
+not an oversight. Branding assets (the logo, and the client portal's
+optional background image) don't share that fate either way: each is
+always served from local disk (same as ever), but also always has a
 durable backup to restore that local copy from at next startup -- S3
-when `S3_BUCKET` is set, a row in `control.branding_assets` (Postgres,
-already required infrastructure) when it isn't. See
+when `S3_BUCKET` is set, its own row in `control.branding_assets`
+(Postgres, already required infrastructure) when it isn't. See
 `rain.web.uploads`'s docstring.
 
 **Kubernetes.** `charts/rain/` is a Helm chart covering the same two
@@ -411,13 +412,14 @@ uploaded filename (`Path(name).name`), so a filename like
 `../../etc/passwd` can't escape the tenant's subtree (or, for S3, land
 outside the `documents/` prefix) either way.
 
-Branding logos (`rain.web.uploads`) are always *served* straight off the
+Branding assets (`rain.web.uploads` -- the logo, and the client portal's
+optional background image) are always *served* straight off the
 local static mount (`/media/branding`) regardless of `s3_bucket` -- an S3
 object can't be, without a signed-URL redirect this app doesn't have --
 but every upload also writes a durable backup (S3 under its own
-"branding" prefix in the same bucket when `s3_bucket` is set, a row in
-`control.branding_assets` otherwise), restored to local disk at startup
-if it's missing there. The CSV/JSON import stash stays on local disk
+"branding" prefix in the same bucket when `s3_bucket` is set, its own
+row in `control.branding_assets` otherwise), restored to local disk at
+startup if it's missing there. The CSV/JSON import stash stays on local disk
 unconditionally, with no backup at all -- it's transient by design, gone
 once the import finishes, nothing worth persisting. Both are small
 enough either way that this doesn't undercut S3's actual purpose here:
