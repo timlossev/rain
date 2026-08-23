@@ -8,9 +8,8 @@ internal_admin-only, both hidden in the template and enforced on its own
 POST route. Ticket Statuses/Notification Channels/Groups/Approval Flows/
 Webhooks are the same require_admin tier (internal_admin for whichever
 tenant is active, or client_admin for their one pinned tenant; Event
-Promotion Policies/Correlation Rules/Platform Response Rules are the same
-tier but live in rain.modules.tickets.router instead, alongside the rest
-of Tickets)."""
+Promotion Policies/Platform Response Rules are the same tier but live in
+rain.modules.tickets.router instead, alongside the rest of Tickets)."""
 from __future__ import annotations
 
 import asyncio

@@ -44,8 +44,8 @@ def require_role(*roles: str):
 require_login = require_role("internal_admin", "client", "client_admin")
 require_internal_admin = require_role("internal_admin")
 # Tenant-scoped admin functions (Ticket Statuses, Notification Channels,
-# Groups, Approval Flows, Webhooks, Event Promotion Policies, Correlation
-# Rules, Platform Response Rules): internal_admin can reach these for
+# Groups, Approval Flows, Webhooks, Event Promotion Policies, Platform
+# Response Rules): internal_admin can reach these for
 # whichever tenant is currently active, client_admin only for their one
 # pinned tenant -- there is no query path here that could reach another
 # tenant's data regardless of which of the two is asking, since

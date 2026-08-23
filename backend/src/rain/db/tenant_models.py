@@ -76,13 +76,25 @@ class AssetType(TenantBase):
 
 
 class CustomField(TenantBase):
-    """A key/value field describing an asset. `asset_type_id` NULL means the
-    field applies to every asset type in this tenant."""
+    """A key/value field describing an asset or a ticket -- `scope`
+    ("asset" | "ticket") distinguishes which, sharing one definitions
+    table rather than duplicating the whole concept (same reasoning as
+    ExportProfile.scope). `asset_type_id` only ever applies to an
+    asset-scoped row (NULL there means "every asset type in this
+    tenant"); a ticket-scoped row always carries NULL, since tickets
+    don't have per-tenant *types* the way assets do -- a ticket-scoped
+    field applies tenant-wide, across all three ticket types, not to one
+    of them. See rain.modules.tickets.schemas' own field-value module
+    docstring for why a ticket-scoped field also never honors
+    is_required, unlike an asset-scoped one."""
 
     __tablename__ = "custom_fields"
-    __table_args__ = (UniqueConstraint("asset_type_id", "field_key", name="uq_custom_fields_type_key"),)
+    __table_args__ = (
+        UniqueConstraint("scope", "asset_type_id", "field_key", name="uq_custom_fields_scope_type_key"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    scope: Mapped[str] = mapped_column(String(10), default="asset", server_default="asset")
     asset_type_id: Mapped[int | None] = mapped_column(ForeignKey("asset_types.id", ondelete="CASCADE"), nullable=True)
     field_key: Mapped[str] = mapped_column(String(63))
     label: Mapped[str] = mapped_column(String(255))
@@ -145,8 +157,10 @@ class ExportProfile(TenantBase):
     the Assets and Tickets export screens -- `scope` ("asset" | "ticket")
     keeps each screen's profile list to its own kind rather than
     duplicating this table; asset_type_id only ever applies to an
-    asset-scoped row (tickets have no per-tenant custom fields to scope
-    by, so it stays null there)."""
+    asset-scoped row (a ticket-scoped CustomField is always tenant-wide,
+    not scoped to one of the three ticket types the way an asset one can
+    be scoped to an asset type, so this stays null for every ticket-
+    scoped row here too)."""
 
     __tablename__ = "export_profiles"
 
@@ -207,126 +221,101 @@ class SyslogEvent(TenantBase):
 
 
 class TicketRule(TenantBase):
-    """Regex-based auto-promotion: an active syslog event matching `pattern`
-    against `match_field` becomes a ticket of `ticket_type`. Evaluated in
-    `sort_order`; first match wins (a message doesn't spawn two tickets)."""
+    """An Event Promotion Policy: decides whether/how an active syslog
+    event becomes a ticket. Evaluated once per newly-persisted event
+    (rain.modules.tickets.rules.evaluate_and_promote) in `sort_order`.
+    `promotion_type` picks which of three ways a rule wraps event(s) into
+    a ticket:
+
+    - "single": the plain case -- an event matching `match_field`/
+      `pattern` becomes its own ticket of `ticket_type`. First
+      single/repetition match for a given event wins (a message doesn't
+      spawn two tickets); an "ml_anomaly" rule below never competes for
+      this, see evaluate_and_promote's own docstring.
+    - "repetition": same match, but a computed title (`title_template`,
+      via {message}/{host}/{program}) that equals an already-open
+      ticket's folds the new occurrence into that ticket instead of
+      spawning a new one -- a comment noting the repeat + is_problematic
+      turned on (rain.modules.tickets.service.find_open_ticket_by_title /
+      combine_event_into_ticket), so N occurrences of "the same thing"
+      become one ticket accumulating history rather than N separate ones.
+      This used to be a combine_by_title checkbox on every rule (0035);
+      promoted to its own promotion_type here since it's a genuinely
+      different shape of policy, not a modifier on "single".
+    - "ml_anomaly": scores every matching event (blank/`.*` `pattern` to
+      mean "every event") against a per rule+group_key river.anomaly.
+      HalfSpaceTrees online model (rain.modules.tickets.rules.
+      _ml_features), firing once its anomaly score clears
+      `ml_score_threshold` and the group has seen at least
+      `ml_warmup_count` events (so a freshly-created rule doesn't flag
+      its own cold-start baseline). `group_by` (none|host|program) keeps
+      a separate model per group-key value; `window_minutes` is this
+      type's re-arm cooldown between fires for a given group -- unused by
+      "single"/"repetition", which have no window concept at all.
+      Per-group model state lives in TicketRuleState, not here.
+
+    This table used to be two: TicketRule (single-event, "does this one
+    event become a ticket") and a separate CorrelationRule (multi-event:
+    a "threshold" type counting N matches in a trailing window, or this
+    same ml_anomaly logic) evaluated independently alongside it. The
+    "threshold" type was dropped outright rather than folded in here --
+    it duplicated what "repetition" already does more simply (one open
+    ticket accumulating repeat occurrences, flagged problematic, instead
+    of a fresh aggregated ticket per window), so there was no reason to
+    keep both. See migration 0038 for the consolidation."""
 
     __tablename__ = "ticket_rules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-    ticket_type: Mapped[str] = mapped_column(String(15))  # incident | vulnerability
+    promotion_type: Mapped[str] = mapped_column(String(15), default="single", server_default="single")
+    ticket_type: Mapped[str] = mapped_column(String(15))  # incident | vulnerability | change
     match_field: Mapped[str] = mapped_column(String(15), default="message", server_default="message")  # message|host|program
     pattern: Mapped[str] = mapped_column(String(500))
     title_template: Mapped[str] = mapped_column(String(255), default="{message}", server_default="{message}")
     severity: Mapped[str] = mapped_column(String(15), default="medium", server_default="medium")
     asset_match_field: Mapped[str | None] = mapped_column(String(15), nullable=True)  # host|program, matched to Asset.external_id
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    # When true, a match whose computed title equals an already-open
-    # ticket of this rule's ticket_type folds into that ticket (a comment
-    # noting the repeat occurrence + is_problematic turned on) instead of
-    # creating a new one. See rain.modules.tickets.service.
-    # find_open_ticket_by_title / combine_event_into_ticket.
-    combine_by_title: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class CorrelationRule(TenantBase):
-    """Multi-event correlation, evaluated once per newly-persisted event
-    (rain.modules.tickets.correlation), alongside -- not instead of --
-    TicketRule's single-event promotion. `rule_type` picks which of two
-    ways a rule decides "this is worth a ticket":
-
-    - "threshold" counts events matching `match_field`/`pattern` within a
-      trailing `window_minutes` window, optionally grouped by `group_by`
-      (a distinct correlation "instance" per group-key value, e.g. per
-      host), and fires once that count reaches `threshold_count`. No
-      continuous streaming engine behind this (compare: Esper/Norikra) --
-      the count is a plain, bounded SQL query against syslog_events run
-      at the moment a new event arrives, which is sufficient because the
-      only thing that can ever push a threshold rule over its line is
-      the event that was just persisted.
-    - "ml_anomaly" scores every event matching `match_field`/`pattern`
-      (blank/`.*` to mean "every event") against a per rule+group_key
-      river.anomaly.HalfSpaceTrees model (an online/incremental learner
-      -- no batch retraining, one event at a time, matching a live
-      syslog stream), fed by rain.modules.tickets.correlation._ml_features.
-      `ml_score_threshold` (0-1, higher = more anomalous) is the score a
-      new event's anomaly score must clear to fire a ticket;
-      `ml_warmup_count` is how many events a group's model sees before
-      it's allowed to fire at all, so a freshly-created rule doesn't
-      flag its own cold-start baseline as anomalous. Still respects
-      `window_minutes` as the same re-arm cooldown "threshold" uses, and
-      `group_by`/`asset_match_field` the same way -- an ML rule is a
-      different scoring method for the same overall "detect and fire"
-      shape, not a different pipeline.
-
-    A future "sequence" rule_type (A then B within T, or absence-of-B-
-    after-A) could reuse this same table/nav/evaluation entry point
-    without a schema change beyond whatever its own config needs."""
-
-    __tablename__ = "correlation_rules"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(255))
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-    rule_type: Mapped[str] = mapped_column(String(15), default="threshold", server_default="threshold")
-    ticket_type: Mapped[str] = mapped_column(String(15))  # incident | vulnerability
-    match_field: Mapped[str] = mapped_column(String(15), default="message", server_default="message")
-    pattern: Mapped[str] = mapped_column(String(500))
+    # ml_anomaly only -- ignored by "single"/"repetition" rules.
     group_by: Mapped[str] = mapped_column(String(15), default="none", server_default="none")  # none|host|program
-    threshold_count: Mapped[int] = mapped_column(Integer, default=5, server_default="5")
     window_minutes: Mapped[int] = mapped_column(Integer, default=5, server_default="5")
-    title_template: Mapped[str] = mapped_column(
-        String(255),
-        default="{count} matching events in {window}m",
-        server_default="{count} matching events in {window}m",
-    )
-    severity: Mapped[str] = mapped_column(String(15), default="medium", server_default="medium")
-    asset_match_field: Mapped[str | None] = mapped_column(String(15), nullable=True)  # host|program, matched to Asset.external_id
-    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    # ml_anomaly only -- ignored by "threshold" rules.
     ml_score_threshold: Mapped[float] = mapped_column(Float, default=0.7, server_default="0.7")
     ml_warmup_count: Mapped[int] = mapped_column(Integer, default=250, server_default="250")
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class CorrelationRuleState(TenantBase):
-    """One row per (rule, group-key) actually seen -- e.g. one row per
-    host for a rule grouped by host. For a "threshold" rule, tracks when
-    that group last fired a ticket so a threshold that stays breached
-    doesn't spawn a new ticket on every subsequent matching event; it
-    re-arms once `window_minutes` has elapsed since the last trigger
-    (not once the count drops back under the threshold -- simpler to
-    reason about and to implement without keeping a live count outside
-    of the DB query itself). `last_triggered_at` is null until a
-    group's first fire (both rule types) or, for "ml_anomaly", simply
-    while its model is still warming up.
+class TicketRuleState(TenantBase):
+    """One row per (rule, group-key) an "ml_anomaly" TicketRule has
+    actually seen -- e.g. one row per host for a rule grouped by host.
+    "single"/"repetition" rules never touch this table; they have no
+    window/cooldown concept and no per-group model to persist.
 
-    For an "ml_anomaly" rule, this is also where that group's model
-    lives between events: `ml_model` is a pickled
-    river.anomaly.HalfSpaceTrees (see CorrelationRule's docstring) and
-    `ml_event_count` is how many events it's been fed, checked against
-    the rule's ml_warmup_count. Only rain.modules.tickets.correlation
-    ever writes ml_model, and only with bytes it just produced by
-    pickling its own in-memory model -- never with anything read from a
-    request -- so unpickling it back here doesn't cross a trust boundary
-    the way unpickling arbitrary user input would.
+    `ml_model` is a pickled river.anomaly.HalfSpaceTrees (see TicketRule's
+    own docstring) and `ml_event_count` is how many events it's been fed,
+    checked against the rule's ml_warmup_count. `last_triggered_at` tracks
+    when this group last fired a ticket, so a model that keeps scoring
+    above threshold doesn't spawn a new one on every subsequent matching
+    event -- it re-arms once window_minutes has elapsed since the last
+    trigger; null until the group's first fire (or simply while still
+    warming up). Only rain.modules.tickets.rules ever writes ml_model,
+    and only with bytes it just produced by pickling its own in-memory
+    model -- never with anything read from a request -- so unpickling it
+    back here doesn't cross a trust boundary the way unpickling arbitrary
+    user input would.
 
     `group_key` is `""` (never NULL) for an ungrouped (group_by="none")
     rule -- Postgres unique constraints treat every NULL as distinct from
     every other NULL, which would silently defeat both the uniqueness
-    guarantee and the ON CONFLICT upsert in
-    rain.modules.tickets.correlation for any rule that isn't grouped."""
+    guarantee and the ON CONFLICT upsert in rain.modules.tickets.rules
+    for any rule that isn't grouped."""
 
-    __tablename__ = "correlation_rule_states"
-    __table_args__ = (UniqueConstraint("rule_id", "group_key", name="uq_correlation_rule_states_rule_group"),)
+    __tablename__ = "ticket_rule_states"
+    __table_args__ = (UniqueConstraint("rule_id", "group_key", name="uq_ticket_rule_states_rule_group"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    rule_id: Mapped[int] = mapped_column(ForeignKey("correlation_rules.id", ondelete="CASCADE"), index=True)
+    rule_id: Mapped[int] = mapped_column(ForeignKey("ticket_rules.id", ondelete="CASCADE"), index=True)
     group_key: Mapped[str] = mapped_column(String(255), default="", server_default="")
     last_triggered_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ml_model: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
@@ -451,10 +440,12 @@ class Ticket(TenantBase):
     severity: Mapped[str] = mapped_column(String(15), default="medium", server_default="medium")
     asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"), nullable=True)
     source_event_id: Mapped[int | None] = mapped_column(ForeignKey("syslog_events.id", ondelete="SET NULL"), nullable=True)
+    # The Event Promotion Policy that produced this ticket, if any -- one
+    # column for all three promotion_type values (a single, dedicated
+    # source_correlation_rule_id existed here before migration 0038
+    # unified TicketRule/CorrelationRule into one table; see TicketRule's
+    # own docstring).
     source_rule_id: Mapped[int | None] = mapped_column(ForeignKey("ticket_rules.id", ondelete="SET NULL"), nullable=True)
-    source_correlation_rule_id: Mapped[int | None] = mapped_column(
-        ForeignKey("correlation_rules.id", ondelete="SET NULL"), nullable=True
-    )
     # Set when this ticket was promoted from another one (incident/vulnerability
     # -> change is the only path today, but this is generic). SET NULL on
     # delete rather than CASCADE -- losing the origin ticket shouldn't take
@@ -515,7 +506,6 @@ class Ticket(TenantBase):
 
     asset: Mapped[Asset | None] = relationship()
     source_rule: Mapped["TicketRule | None"] = relationship()
-    source_correlation_rule: Mapped[CorrelationRule | None] = relationship()
     source_ticket: Mapped["Ticket | None"] = relationship(remote_side=[id])
     source_catalog_item: Mapped["ServiceCatalogItem | None"] = relationship()
     comments: Mapped[list["TicketComment"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")
@@ -538,6 +528,31 @@ class Ticket(TenantBase):
         back_populates="ticket", cascade="all, delete-orphan", uselist=False
     )
     watchers: Mapped[list["TicketWatcher"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")
+    field_values: Mapped[list["TicketFieldValue"]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan"
+    )
+
+
+class TicketFieldValue(TenantBase):
+    """EAV storage for a ticket's custom field values -- same shape as
+    AssetFieldValue, just against a Ticket instead of an Asset. `field`
+    is always a scope="ticket" CustomField row (see that model's own
+    docstring); nothing here enforces that at the DB layer, the same
+    trust boundary AssetFieldValue.field already has for scope="asset"."""
+
+    __tablename__ = "ticket_field_values"
+    __table_args__ = (UniqueConstraint("ticket_id", "field_id", name="uq_ticket_field_values"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True)
+    field_id: Mapped[int] = mapped_column(ForeignKey("custom_fields.id", ondelete="CASCADE"))
+    value: Mapped[object | None] = mapped_column(JSONB, nullable=True)
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    ticket: Mapped[Ticket] = relationship(back_populates="field_values")
+    field: Mapped[CustomField] = relationship()
 
 
 class TicketComment(TenantBase):

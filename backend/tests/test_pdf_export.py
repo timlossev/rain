@@ -95,7 +95,6 @@ def test_ticket_pdf_renders_with_enough_content_to_span_multiple_pages():
         reporter_user_id=None,
         reported_anonymously=True,
         source_rule=None,
-        source_correlation_rule=None,
         source_event_id=None,
         source_ticket=None,
         start_date=None,

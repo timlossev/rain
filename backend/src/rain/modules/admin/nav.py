@@ -93,6 +93,11 @@ nav_registry.register(
                         order=4,
                         roles=_TENANT_ADMIN_ROLES,
                     ),
+                    # Covers what used to be a separate Correlation Rules
+                    # screen too -- unified into one TicketRule table/UI
+                    # (promotion_type: single | repetition | ml_anomaly),
+                    # see rain.db.tenant_models.TicketRule's own docstring
+                    # and migration 0038.
                     NavNode(
                         key="admin-event-promotion-policies",
                         label="Event Promotion Policies",
@@ -101,24 +106,17 @@ nav_registry.register(
                         roles=_TENANT_ADMIN_ROLES,
                     ),
                     NavNode(
-                        key="admin-correlation-rules",
-                        label="Correlation Rules",
-                        href="/tickets/correlation-rules",
-                        order=6,
-                        roles=_TENANT_ADMIN_ROLES,
-                    ),
-                    NavNode(
                         key="admin-platform-response-rules",
                         label="Platform Response Rules",
                         href="/tickets/platform-events",
-                        order=7,
+                        order=6,
                         roles=_TENANT_ADMIN_ROLES,
                     ),
                     NavNode(
                         key="admin-webhooks",
                         label="Webhooks",
                         href="/admin/webhooks",
-                        order=8,
+                        order=7,
                         roles=_TENANT_ADMIN_ROLES,
                     ),
                     # Moved here from the Assets menu -- defining the
@@ -128,7 +126,7 @@ nav_registry.register(
                         key="admin-asset-types",
                         label="Asset Types",
                         href="/assets/types",
-                        order=9,
+                        order=8,
                         roles=_TENANT_ADMIN_ROLES,
                     ),
                     # Defines what shows up on /catalog and the portal's
@@ -139,6 +137,22 @@ nav_registry.register(
                         key="admin-service-catalog",
                         label="Service Catalog",
                         href="/admin/catalog",
+                        order=9,
+                        roles=_TENANT_ADMIN_ROLES,
+                    ),
+                    # Bulk-defines ticket custom fields from an uploaded
+                    # spreadsheet's header row (+ sample data, best-effort
+                    # type-guessed) -- same "designing the schema is an
+                    # admin function" reasoning as Asset Types/Service
+                    # Catalog above, and gated require_admin to match
+                    # (rain.modules.tickets.router.field_pack_form), unlike
+                    # the one-at-a-time Custom Fields screen under Records
+                    # Authority, which keeps its own pre-existing
+                    # require_login gate.
+                    NavNode(
+                        key="admin-ticket-field-pack",
+                        label="Import Ticket Field Pack",
+                        href="/tickets/fields/import-pack",
                         order=10,
                         roles=_TENANT_ADMIN_ROLES,
                     ),

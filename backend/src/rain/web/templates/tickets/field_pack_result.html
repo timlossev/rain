@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Field Pack Result - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Summary of the field pack import you just ran.{% endblock %}
+{% block content %}
+<div class="card" style="max-width:640px;">
+  <p><span class="badge badge-accent">{{ created }} created</span>
+  {% if skipped %} &nbsp; <span class="badge">{{ skipped | length }} skipped</span>{% endif %}</p>
+
+  {% if skipped %}
+  <h3>Skipped</h3>
+  <ul>
+    {% for s in skipped %}<li class="muted">{{ s }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  <a class="btn btn-primary" href="/tickets/fields">View custom fields</a>
+  <a class="btn" href="/tickets/fields/import-pack">Import another pack</a>
+</div>
+{% endblock %}

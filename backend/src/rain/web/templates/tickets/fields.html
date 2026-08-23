@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% import "_pagination.html" as pg with context %}
+{% import "_modal.html" as modal %}
+{% block title %}Custom Fields - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Define extra fields on tickets -- tenant-wide, applying to every ticket type -- with a type and select options where applicable.{% endblock %}
+{% block content %}
+<div class="panel-row">
+  <a class="btn btn-sm" href="/tickets">&larr; Tickets</a>
+  {{ modal.trigger_button("custom-field", "+ New custom field") }}
+  <a class="btn btn-sm" href="/tickets/fields/import-pack">Import field pack</a>
+</div>
+
+<div class="card">
+  <table>
+    <thead><tr><th>Key</th><th>Label</th><th>Type</th><th></th></tr></thead>
+    <tbody>
+      {% for f in page.items %}
+      <tr>
+        <td class="muted">{{ f.field_key }}</td>
+        <td>{{ f.label }}</td>
+        <td><span class="badge">{{ f.field_type }}</span></td>
+        <td class="actions">
+          <form class="inline" method="post" action="/tickets/fields/{{ f.id }}/delete" data-confirm="Delete field '{{ f.label }}'?">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">No custom fields yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ pg.render_pagination(page) }}
+</div>
+
+{% call modal.modal("custom-field", "New custom field") %}
+  <form method="post" action="/tickets/fields">
+    <div class="form-row">
+      <div class="field"><label for="field_key">Key</label><input type="text" id="field_key" name="field_key" placeholder="cab_reference" pattern="[a-z][a-z0-9_]*" required></div>
+      <div class="field"><label for="label">Label</label><input type="text" id="label" name="label" placeholder="CAB Reference" required></div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label for="field_type">Field type</label>
+        <select id="field_type" name="field_type">
+          <option value="text">Text</option>
+          <option value="number">Number</option>
+          <option value="boolean">Yes / No</option>
+          <option value="date">Date</option>
+          <option value="url">URL</option>
+          <option value="email">Email</option>
+          <option value="select">Select</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="select_options">Select options (comma-separated, if type = Select)</label>
+        <input type="text" id="select_options" name="select_options" placeholder="low, medium, high">
+      </div>
+    </div>
+    <button class="btn btn-primary" type="submit">Add field</button>
+  </form>
+{% endcall %}
+{% endblock %}

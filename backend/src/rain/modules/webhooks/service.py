@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from rain.core.url_safety import check_outbound_url
 from rain.db.tenant_models import SyslogEvent, WebhookConfig
-from rain.modules.tickets import correlation as ticket_correlation
 from rain.modules.tickets import rules as ticket_rules
 
 logger = logging.getLogger("rain.webhooks")
@@ -109,10 +108,10 @@ async def alert_webhook_failure(db: AsyncSession, webhook: WebhookConfig, result
     """Called by a caller of call_webhook when result.success is False and
     webhook.alert_on_failure is set -- synthesizes a SyslogEvent and runs
     it through the same rule engine real syslog traffic goes through
-    (rain.modules.tickets.rules/correlation), same pattern as
-    rain.modules.calendar.sweep's syslog bridge and Document's
-    alert_on_change, so a webhook that's stopped responding can auto-file
-    a ticket the same way any other monitored condition can."""
+    (rain.modules.tickets.rules), same pattern as rain.modules.calendar.
+    sweep's syslog bridge and Document's alert_on_change, so a webhook
+    that's stopped responding can auto-file a ticket the same way any
+    other monitored condition can."""
     detail = result.error or f"HTTP {result.status_code}"
     event = SyslogEvent(
         host="webhooks",
@@ -124,10 +123,7 @@ async def alert_webhook_failure(db: AsyncSession, webhook: WebhookConfig, result
     )
     db.add(event)
     await db.commit()
-    matched_rule = await ticket_rules.find_matching_rule(db, event)
-    if matched_rule is not None:
-        await ticket_rules.apply_rule(db, matched_rule, event)
-    await ticket_correlation.evaluate_correlation_rules(db, event)
+    await ticket_rules.evaluate_and_promote(db, event)
 
 
 async def get_webhook(db: AsyncSession, webhook_id: int) -> WebhookConfig | None:

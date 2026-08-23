@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Review Field Pack - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Detected {{ guesses | length }} column(s). Type and key are guessed from the column header and its sample values -- review and edit before creating anything; nothing is saved until you submit below.{% endblock %}
+{% block content %}
+<div class="card" style="max-width:900px;">
+  {% if not guesses %}
+  <p class="muted">No columns detected in that file.</p>
+  <a class="btn" href="/tickets/fields/import-pack">Start over</a>
+  {% else %}
+  <form method="post" action="/tickets/fields/import-pack/commit">
+    <table>
+      <thead>
+        <tr><th>Include</th><th>Column</th><th>Key</th><th>Label</th><th>Type</th><th>Select options</th><th>Samples</th></tr>
+      </thead>
+      <tbody>
+        {% for g in guesses %}
+        {% set already = g.field_key in existing_keys %}
+        <tr>
+          <td><input type="checkbox" name="col_{{ loop.index0 }}_include" value="1" {% if not already %}checked{% endif %}></td>
+          <td class="muted">{{ g.header }}</td>
+          <td><input type="text" name="col_{{ loop.index0 }}_key" value="{{ g.field_key }}" pattern="[a-z][a-z0-9_]*" style="width:140px;">
+            {% if already %}<div class="field-hint">already exists</div>{% endif %}</td>
+          <td><input type="text" name="col_{{ loop.index0 }}_label" value="{{ g.label }}" style="width:160px;"></td>
+          <td>
+            <select name="col_{{ loop.index0 }}_type">
+              {% for t in ["text", "number", "boolean", "date", "url", "email", "select"] %}
+              <option value="{{ t }}" {% if g.field_type == t %}selected{% endif %}>{{ t }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td><input type="text" name="col_{{ loop.index0 }}_options" value="{{ (g.select_options or []) | join(', ') }}" placeholder="comma-separated" style="width:160px;"></td>
+          <td class="muted">{{ g.samples[:3] | join(', ') }}{% if g.samples | length > 3 %}, &hellip;{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button class="btn btn-primary" type="submit" style="margin-top:16px;">Create fields</button>
+    <a class="btn" href="/tickets/fields/import-pack">Start over</a>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

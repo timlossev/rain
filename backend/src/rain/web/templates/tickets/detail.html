@@ -107,12 +107,11 @@
         {% if ticket.reporter_user_id %}{{ user_names.get(ticket.reporter_user_id, "-") }}
         {%- elif ticket.reported_anonymously %}an unauthenticated user (incident portal)
         {%- elif ticket.source_rule %}Event Promotion Policy: {{ ticket.source_rule.name }}
-        {%- elif ticket.source_correlation_rule %}Correlation Rule: {{ ticket.source_correlation_rule.name }}
         {%- else %}-{% endif %}
       </td></tr>
       <tr><th>Source event</th><td class="muted">{% if ticket.source_event_id %}#{{ ticket.source_event_id }}{% else %}manually created{% endif %}</td></tr>
-      {% if ticket.source_correlation_rule %}
-      <tr><th>Correlation rule</th><td class="muted"><a href="/tickets/correlation-rules">{{ ticket.source_correlation_rule.name }}</a></td></tr>
+      {% if ticket.source_rule %}
+      <tr><th>Event Promotion Policy</th><td class="muted"><a href="/tickets/rules/{{ ticket.source_rule.id }}/edit">{{ ticket.source_rule.name }}</a></td></tr>
       {% endif %}
       {% if ticket.source_ticket %}
       <tr><th>Promoted from</th><td class="muted"><a href="/tickets/{{ ticket.source_ticket.ticket_number }}">{{ ticket.source_ticket.ticket_number }}: {{ ticket.source_ticket.title }}</a></td></tr>
@@ -180,6 +179,20 @@
   </form>
   {% if not flows %}<p class="field-hint">No approval flows configured yet -- <a href="/admin/approval-flows/new">create one</a>.</p>{% endif %}
   {% endif %}
+</div>
+{% endif %}
+
+{% if fields %}
+<div class="card">
+  <div class="card-title">Custom fields</div>
+  <form method="post" action="/tickets/{{ ticket.id }}/fields">
+    <div class="form-row" data-fields-container>
+      {% with values = field_values %}
+      {% include "tickets/_fields_fragment.html" %}
+      {% endwith %}
+    </div>
+    <button class="btn btn-sm btn-primary" type="submit">Save</button>
+  </form>
 </div>
 {% endif %}
 

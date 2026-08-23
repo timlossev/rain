@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import io
+import re
+import secrets
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Form, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +14,7 @@ from sqlalchemy.orm import selectinload
 from starlette.convertors import Convertor, register_url_convertor
 
 from rain.core.export_columns import merge_profile_columns
+from rain.core.field_pack import sniff_columns
 from rain.core.pagination import paginate
 from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
@@ -21,7 +24,7 @@ from rain.db.base import control_session
 from rain.db.control_models import User
 from rain.db.tenant_models import (
     Asset,
-    CorrelationRule,
+    CustomField,
     Group,
     NotificationChannel,
     PlatformEventAction,
@@ -31,15 +34,24 @@ from rain.db.tenant_models import (
     WebhookConfig,
 )
 from rain.modules.assets import service as asset_service
+from rain.modules.assets.schemas import coerce_field_value
 from rain.modules.documents import service as document_service
-from rain.modules.tickets import exporter, platform_events, service
-from rain.modules.tickets.correlation import GROUP_BY_FIELDS, RULE_TYPES
+from rain.modules.tickets import exporter, importer, platform_events, service
+from rain.modules.tickets.rules import GROUP_BY_FIELDS, PROMOTION_TYPES
 from rain.modules.tickets.schemas import MATCH_FIELDS, SEVERITIES, TICKET_TYPES
 from rain.modules.webhooks import service as webhook_service
 from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
 from rain.web.safe_redirect import safe_relative_path
 from rain.web.templating import templates
+from rain.web.uploads import import_stash_path
+
+# Same shape the manual "New custom field" form's field_key
+# `pattern="[a-z][a-z0-9_]*"` requires -- rain.core.field_pack.slugify_key
+# already produces this, but a field pack's preview screen lets an admin
+# hand-edit the guessed key before commit, so it's re-validated here too.
+_FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
 
 class _TicketRefConvertor(Convertor):
     """Matches a ticket_number ("INC-000123"/"VULN-000045"/"CHG-000012" --
@@ -163,6 +175,7 @@ async def new_ticket_form(
 
     flows = await service.list_approval_flows(tenant_db)
     default_flow = next((f for f in flows if f.is_default), None)
+    fields = await service.ticket_fields(tenant_db)
 
     return templates.TemplateResponse(
         request,
@@ -182,6 +195,8 @@ async def new_ticket_form(
             "suggested_asset_name": suggested_asset_name,
             "flows": flows,
             "default_flow_id": default_flow.id if default_flow else None,
+            "fields": fields,
+            "values": {},
             "error": error,
         },
     )
@@ -189,6 +204,7 @@ async def new_ticket_form(
 
 @router.post("")
 async def create_ticket(
+    request: Request,
     ticket_type: str = Form(...),
     title: str = Form(...),
     description: str = Form(""),
@@ -235,6 +251,22 @@ async def create_ticket(
     )
     if ticket_type == "change":
         await service.start_approval(tenant_db, ticket, int(approval_flow_id) if approval_flow_id else None)
+
+    # Custom field capture: tenant-wide (rain.modules.tickets.service.
+    # ticket_fields, not filtered by ticket_type), same "read the field
+    # list, then only trust field_<id> keys it names" pattern as
+    # rain.modules.assets.router.create_asset -- never trusts arbitrary
+    # form keys directly.
+    fields = await service.ticket_fields(tenant_db)
+    if fields:
+        form = await request.form()
+        values = {}
+        for f in fields:
+            raw = form.get(f"field_{f.id}")
+            values[f.id] = coerce_field_value(f.field_type, raw if isinstance(raw, str) else None)
+        await service.set_ticket_field_values(tenant_db, ticket, values)
+        await tenant_db.commit()
+
     return RedirectResponse(f"/tickets/{ticket.ticket_number}", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -471,6 +503,9 @@ async def ticket_detail(
     is_watching = await service.is_watching(tenant_db, ticket.id, ctx.user.id)
     escalation_webhook_id = await get_tenant_config(tenant_db, "escalation_webhook_id", None)
 
+    fields = await service.ticket_fields(tenant_db)
+    field_values = {fv.field_id: fv.value for fv in ticket.field_values}
+
     return templates.TemplateResponse(
         request,
         "tickets/detail.html",
@@ -491,6 +526,8 @@ async def ticket_detail(
             "group_names": group_names,
             "is_watching": is_watching,
             "can_escalate": escalation_webhook_id is not None,
+            "fields": fields,
+            "field_values": field_values,
         },
     )
 
@@ -517,6 +554,8 @@ async def ticket_pdf(
         | ({d.decided_by_user_id for d in ticket.approval.decisions} if ticket.approval else set())
     )
     asset_names = await service.asset_names(tenant_db, {ticket.asset_id} | service.asset_change_ids(ticket))
+    fields = await service.ticket_fields(tenant_db)
+    values = {fv.field_id: fv.value for fv in ticket.field_values}
     pdf_bytes = render_pdf(
         "pdf/ticket.html",
         {
@@ -526,6 +565,8 @@ async def ticket_pdf(
             "asset_names": asset_names,
             "status_labels": status_labels,
             "activity": service.build_activity(ticket),
+            "fields": fields,
+            "values": values,
             "doc_kind": "Ticket",
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         },
@@ -548,6 +589,33 @@ async def add_comment(
     if body.strip():
         await service.add_comment(tenant_db, ticket_id, ctx.user.id, body.strip())
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{ticket_id:int}/fields")
+async def save_fields(
+    request: Request,
+    ticket_id: int,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """One bulk save for every custom field value on this ticket's detail
+    page -- unlike severity/title's per-field data-inline-edit JS, there's
+    no reason to round-trip per field here, so the Custom fields card is
+    just a plain form posting here."""
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is not None:
+        form = await request.form()
+        fields = await service.ticket_fields(tenant_db)
+        values = {}
+        for f in fields:
+            raw = form.get(f"field_{f.id}")
+            values[f.id] = coerce_field_value(f.field_type, raw if isinstance(raw, str) else None)
+        await service.set_ticket_field_values(tenant_db, ticket, values)
+        await tenant_db.commit()
+    return RedirectResponse(
+        f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER
+    )
 
 
 @router.post("/{ticket_id:int}/status")
@@ -709,6 +777,172 @@ async def mark_cancelled(
     return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
 
 
+# ------------------------------------------------------------- fields ----
+
+
+@router.get("/fields", response_class=HTMLResponse)
+async def fields_list(
+    request: Request,
+    page: int = 1,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    nav = await build_nav_context(ctx)
+    stmt = (
+        select(CustomField)
+        .where(CustomField.scope == "ticket")
+        .order_by(CustomField.sort_order, CustomField.label)
+    )
+    field_page = await paginate(tenant_db, stmt, page=page)
+    return templates.TemplateResponse(
+        request, "tickets/fields.html", {**nav, "ctx": ctx, "page": field_page, "error": None}
+    )
+
+
+@router.post("/fields")
+async def create_field(
+    field_key: str = Form(...),
+    label: str = Form(...),
+    field_type: str = Form("text"),
+    select_options: str = Form(""),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    # No asset_type_id (tickets don't have user-defined types -- see the
+    # 0037 migration's docstring) and no is_required (see rain.modules.
+    # tickets.schemas' note on why a required ticket-scoped field isn't
+    # supported) -- both deliberate differences from the asset-scoped
+    # twin of this route.
+    options = [o.strip() for o in select_options.split(",") if o.strip()] if field_type == "select" else None
+    tenant_db.add(
+        CustomField(
+            scope="ticket",
+            asset_type_id=None,
+            field_key=field_key.strip().lower(),
+            label=label.strip(),
+            field_type=field_type,
+            select_options=options,
+            is_required=False,
+        )
+    )
+    await tenant_db.commit()
+    return RedirectResponse("/tickets/fields", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/fields/{field_id:int}/delete")
+async def delete_field(
+    field_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    # scope == "ticket" guard -- see the asset-scoped twin of this route
+    # (rain.modules.assets.router.delete_field) for why.
+    field = await tenant_db.get(CustomField, field_id)
+    if field is not None and field.scope == "ticket":
+        await tenant_db.delete(field)
+        await tenant_db.commit()
+    return RedirectResponse("/tickets/fields", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/fields/import-pack", response_class=HTMLResponse)
+async def field_pack_form(
+    request: Request,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    # require_admin, unlike the single-field CRUD just above (a
+    # deliberate, previously-audited require_login quirk this doesn't
+    # inherit) -- defining a whole pack of fields from an uploaded
+    # spreadsheet in one shot is a tenant administration action, same
+    # category as Asset Types/Service Catalog under Admin > Tenant
+    # Administration, not a day-to-day ticketing task.
+    _: CurrentUser = Depends(require_admin),
+):
+    nav = await build_nav_context(ctx)
+    return templates.TemplateResponse(request, "tickets/field_pack.html", {**nav, "ctx": ctx})
+
+
+@router.post("/fields/import-pack/preview", response_class=HTMLResponse)
+async def field_pack_preview(
+    request: Request,
+    file: UploadFile,
+    fmt: str = Form(...),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    raw = await file.read()
+    guesses = sniff_columns(raw, fmt)
+    existing_keys = {f.field_key for f in await service.ticket_fields(tenant_db)}
+
+    nav = await build_nav_context(ctx)
+    return templates.TemplateResponse(
+        request,
+        "tickets/field_pack_preview.html",
+        {**nav, "ctx": ctx, "guesses": guesses, "existing_keys": existing_keys},
+    )
+
+
+@router.post("/fields/import-pack/commit")
+async def field_pack_commit(
+    request: Request,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    """Rows round-trip as plain indexed form fields (col_<i>_*) straight
+    from the preview screen -- no import-stash token needed the way the
+    row-data importers use, since there's no file left to re-read at this
+    step: every value this needs (key/label/type/options, all already
+    edited into the form) is right there in the POST body."""
+    form = await request.form()
+    existing_keys = {f.field_key for f in await service.ticket_fields(tenant_db)}
+    seen_keys: set[str] = set()
+    created = 0
+    skipped: list[str] = []
+
+    indices = sorted({int(k.split("_")[1]) for k in form.keys() if k.startswith("col_") and k.split("_")[1].isdigit()})
+    for i in indices:
+        if not form.get(f"col_{i}_include"):
+            continue
+        field_key = str(form.get(f"col_{i}_key", "")).strip().lower()
+        label = str(form.get(f"col_{i}_label", "")).strip()
+        field_type = str(form.get(f"col_{i}_type", "text")).strip()
+        raw_options = str(form.get(f"col_{i}_options", ""))
+
+        if not field_key or not label:
+            skipped.append(f"column {i}: missing key or label")
+            continue
+        if not _FIELD_KEY_RE.match(field_key):
+            skipped.append(f"'{field_key}': must start with a letter and contain only lowercase letters, digits, _")
+            continue
+        if field_key in existing_keys or field_key in seen_keys:
+            skipped.append(f"'{field_key}': already exists")
+            continue
+
+        options = [o.strip() for o in raw_options.split(",") if o.strip()] if field_type == "select" else None
+        tenant_db.add(
+            CustomField(
+                scope="ticket",
+                asset_type_id=None,
+                field_key=field_key,
+                label=label,
+                field_type=field_type,
+                select_options=options,
+                is_required=False,
+            )
+        )
+        seen_keys.add(field_key)
+        created += 1
+
+    await tenant_db.commit()
+
+    nav = await build_nav_context(ctx)
+    return templates.TemplateResponse(
+        request, "tickets/field_pack_result.html", {**nav, "ctx": ctx, "created": created, "skipped": skipped}
+    )
+
+
 # ------------------------------------------------------------- export ----
 
 
@@ -733,7 +967,7 @@ async def export_form(
             "ticket_types": TICKET_TYPES,
             "statuses": statuses,
             "columns": merge_profile_columns(
-                exporter.available_columns(), selected_profile.columns if selected_profile else None
+                await exporter.available_columns(tenant_db), selected_profile.columns if selected_profile else None
             ),
             "profiles": profiles,
             "selected_profile_id": profile_id,
@@ -762,7 +996,7 @@ async def export_run(
             columns.append({"source": source, "header": header, "order": int(form.get(f"order_{source}", 0) or 0)})
     columns.sort(key=lambda c: c["order"])
     if not columns:
-        columns = [{"source": s, "header": h} for s, h in exporter.available_columns()]
+        columns = [{"source": s, "header": h} for s, h in await exporter.available_columns(tenant_db)]
 
     if save_as.strip():
         await service.save_export_profile(
@@ -790,13 +1024,114 @@ async def export_run(
     )
 
 
+# ------------------------------------------------------------- import ----
+
+
+@router.get("/import", response_class=HTMLResponse)
+async def import_form(
+    request: Request,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    nav = await build_nav_context(ctx)
+    return templates.TemplateResponse(request, "tickets/import.html", {**nav, "ctx": ctx, "ticket_types": TICKET_TYPES})
+
+
+@router.post("/import/preview", response_class=HTMLResponse)
+async def import_preview(
+    request: Request,
+    file: UploadFile,
+    fmt: str = Form(...),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    raw = await file.read()
+    token = secrets.token_hex(16)
+    import_stash_path(token).write_bytes(raw)
+
+    headers = importer.sniff_headers(raw, fmt)
+    fields = await service.ticket_fields(tenant_db)
+    targets = [
+        ("ticket_type", "Type"),
+        ("title", "Title"),
+        ("description", "Description"),
+        ("severity", "Severity"),
+    ] + [(f"field_{f.id}", f.label) for f in fields]
+    suggestions = {}
+    for target_key, target_label in targets:
+        match = next((h for h in headers if h.strip().lower() == target_label.strip().lower()), None)
+        if match:
+            suggestions[target_key] = match
+
+    nav = await build_nav_context(ctx)
+    return templates.TemplateResponse(
+        request,
+        "tickets/import_preview.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "token": token,
+            "fmt": fmt,
+            "headers": headers,
+            "targets": targets,
+            "suggestions": suggestions,
+        },
+    )
+
+
+@router.post("/import/commit", response_class=HTMLResponse)
+async def import_commit(
+    request: Request,
+    token: str = Form(...),
+    fmt: str = Form(...),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    form = await request.form()
+    mapping = {key[len("map_") :]: value for key, value in form.items() if key.startswith("map_") and value}
+
+    try:
+        stash = import_stash_path(token)
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired import session -- start the import again.")
+    if not stash.exists():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired import session -- start the import again.")
+    raw = stash.read_bytes()
+    rows = importer.parse_rows(raw, fmt)
+    result = await importer.commit_import(tenant_db, rows=rows, mapping=mapping, actor_id=ctx.user.id)
+    stash.unlink(missing_ok=True)
+
+    nav = await build_nav_context(ctx)
+    return templates.TemplateResponse(request, "tickets/import_result.html", {**nav, "ctx": ctx, "result": result})
+
+
 # --------------------------------------------------------------- rules ---
+
+
+def _clamp_rule_ml_fields(
+    *, group_by: str, window_minutes: int, ml_score_threshold: float, ml_warmup_count: int
+) -> dict:
+    return dict(
+        group_by=group_by if group_by in GROUP_BY_FIELDS else "none",
+        window_minutes=max(1, window_minutes),
+        # min(1.0, max(0.0, ...))/max(1, ...) so a typo/blank field can't
+        # produce a threshold of 0 (every event would be "anomalous") or a
+        # warmup of 0 (a rule fires on its very first, baseline-free event).
+        ml_score_threshold=min(1.0, max(0.0, ml_score_threshold)),
+        ml_warmup_count=max(1, ml_warmup_count),
+    )
 
 
 @router.get("/rules/all", response_class=HTMLResponse)
 async def rules_list(
     request: Request,
     page: int = 1,
+    prefill_pattern: str | None = None,
+    prefill_match_field: str | None = None,
+    prefill_ticket_type: str | None = None,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
@@ -804,6 +1139,22 @@ async def rules_list(
     nav = await build_nav_context(ctx)
     stmt = select(TicketRule).order_by(TicketRule.sort_order)
     rule_page = await paginate(tenant_db, stmt, page=page)
+    # "New policy from selection" (tickets/live's selection menu) lands
+    # here with the New policy modal pre-filled from the selected
+    # event(s) instead of asking the admin to retype a pattern they just
+    # saw stream by -- see live.js's buildRulePrefillUrl. Defaults the
+    # modal to the "repetition" tab (bundling repeat occurrences of the
+    # same thing into one ticket is what that action is for), but every
+    # field stays editable/switchable before saving.
+    prefill = (
+        {
+            "pattern": prefill_pattern,
+            "match_field": prefill_match_field if prefill_match_field in MATCH_FIELDS else "message",
+            "ticket_type": prefill_ticket_type if prefill_ticket_type in TICKET_TYPES else "incident",
+        }
+        if prefill_pattern
+        else None
+    )
     return templates.TemplateResponse(
         request,
         "tickets/rules.html",
@@ -814,6 +1165,8 @@ async def rules_list(
             "ticket_types": TICKET_TYPES,
             "severities": SEVERITIES,
             "match_fields": MATCH_FIELDS,
+            "group_by_fields": GROUP_BY_FIELDS,
+            "prefill": prefill,
             "test_result": None,
         },
     )
@@ -822,6 +1175,7 @@ async def rules_list(
 @router.post("/rules/all")
 async def rules_create(
     name: str = Form(...),
+    promotion_type: str = Form("single"),
     ticket_type: str = Form(...),
     match_field: str = Form("message"),
     pattern: str = Form(...),
@@ -829,14 +1183,23 @@ async def rules_create(
     severity: str = Form("medium"),
     asset_match_field: str = Form(""),
     sort_order: int = Form(0),
-    combine_by_title: bool = Form(False),
+    group_by: str = Form("none"),
+    window_minutes: int = Form(5),
+    ml_score_threshold: float = Form(0.7),
+    ml_warmup_count: int = Form(250),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
+    if promotion_type not in PROMOTION_TYPES:
+        promotion_type = "single"
+    ml_fields = _clamp_rule_ml_fields(
+        group_by=group_by, window_minutes=window_minutes, ml_score_threshold=ml_score_threshold, ml_warmup_count=ml_warmup_count
+    )
     tenant_db.add(
         TicketRule(
             name=name.strip(),
+            promotion_type=promotion_type,
             ticket_type=ticket_type,
             match_field=match_field,
             pattern=pattern,
@@ -844,8 +1207,8 @@ async def rules_create(
             severity=severity,
             asset_match_field=asset_match_field or None,
             sort_order=sort_order,
-            combine_by_title=combine_by_title,
             created_by=ctx.user.id,
+            **ml_fields,
         )
     )
     await tenant_db.commit()
@@ -874,6 +1237,7 @@ async def rules_edit_form(
             "ticket_types": TICKET_TYPES,
             "severities": SEVERITIES,
             "match_fields": MATCH_FIELDS,
+            "group_by_fields": GROUP_BY_FIELDS,
         },
     )
 
@@ -882,6 +1246,7 @@ async def rules_edit_form(
 async def rules_edit(
     rule_id: int,
     name: str = Form(...),
+    promotion_type: str = Form("single"),
     ticket_type: str = Form(...),
     match_field: str = Form("message"),
     pattern: str = Form(...),
@@ -889,14 +1254,21 @@ async def rules_edit(
     severity: str = Form("medium"),
     asset_match_field: str = Form(""),
     sort_order: int = Form(0),
-    combine_by_title: bool = Form(False),
+    group_by: str = Form("none"),
+    window_minutes: int = Form(5),
+    ml_score_threshold: float = Form(0.7),
+    ml_warmup_count: int = Form(250),
     is_active: bool = Form(False),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
     rule = await tenant_db.get(TicketRule, rule_id)
     if rule is not None:
+        ml_fields = _clamp_rule_ml_fields(
+            group_by=group_by, window_minutes=window_minutes, ml_score_threshold=ml_score_threshold, ml_warmup_count=ml_warmup_count
+        )
         rule.name = name.strip()
+        rule.promotion_type = promotion_type if promotion_type in PROMOTION_TYPES else "single"
         rule.ticket_type = ticket_type
         rule.match_field = match_field
         rule.pattern = pattern
@@ -904,8 +1276,9 @@ async def rules_edit(
         rule.severity = severity
         rule.asset_match_field = asset_match_field or None
         rule.sort_order = sort_order
-        rule.combine_by_title = combine_by_title
         rule.is_active = is_active
+        for key, value in ml_fields.items():
+            setattr(rule, key, value)
         await tenant_db.commit()
     return RedirectResponse("/tickets/rules/all", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -948,136 +1321,11 @@ async def rules_test(
             "ticket_types": TICKET_TYPES,
             "severities": SEVERITIES,
             "match_fields": MATCH_FIELDS,
+            "group_by_fields": GROUP_BY_FIELDS,
+            "prefill": None,
             "test_result": {"rule_id": rule_id, "sample": sample, "matched": matched},
         },
     )
-
-
-# --------------------------------------------------------- correlation ---
-
-
-@router.get("/correlation-rules", response_class=HTMLResponse)
-async def correlation_rules_list(
-    request: Request,
-    page: int = 1,
-    prefill_pattern: str | None = None,
-    prefill_match_field: str | None = None,
-    prefill_ticket_type: str | None = None,
-    prefill_group_by: str | None = None,
-    prefill_threshold: int | None = None,
-    ctx: RequestContext = Depends(get_request_context),
-    tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_admin),
-):
-    nav = await build_nav_context(ctx)
-    stmt = select(CorrelationRule).order_by(CorrelationRule.sort_order)
-    rule_page = await paginate(tenant_db, stmt, page=page)
-    # "Correlate these" (tickets/live's selection menu) lands here with the
-    # New rule modal pre-filled from the selected events instead of asking
-    # the admin to retype a pattern they just saw stream by -- see
-    # live.js's buildCorrelatePrefillUrl.
-    prefill = (
-        {
-            "pattern": prefill_pattern,
-            "match_field": prefill_match_field if prefill_match_field in MATCH_FIELDS else "message",
-            "ticket_type": prefill_ticket_type if prefill_ticket_type in TICKET_TYPES else "incident",
-            "group_by": prefill_group_by if prefill_group_by in GROUP_BY_FIELDS else "none",
-            "threshold": prefill_threshold or 5,
-        }
-        if prefill_pattern
-        else None
-    )
-    return templates.TemplateResponse(
-        request,
-        "tickets/correlation_rules.html",
-        {
-            **nav,
-            "ctx": ctx,
-            "page": rule_page,
-            "ticket_types": TICKET_TYPES,
-            "severities": SEVERITIES,
-            "match_fields": MATCH_FIELDS,
-            "group_by_fields": GROUP_BY_FIELDS,
-            "rule_types": RULE_TYPES,
-            "prefill": prefill,
-        },
-    )
-
-
-_DEFAULT_TITLE_TEMPLATES = {
-    "threshold": "{count} matching events in {window}m",
-    "ml_anomaly": "Anomalous event detected (score {score})",
-}
-
-
-@router.post("/correlation-rules")
-async def correlation_rules_create(
-    name: str = Form(...),
-    rule_type: str = Form("threshold"),
-    ticket_type: str = Form(...),
-    match_field: str = Form("message"),
-    pattern: str = Form(...),
-    group_by: str = Form("none"),
-    threshold_count: int = Form(5),
-    window_minutes: int = Form(5),
-    title_template: str = Form(""),
-    severity: str = Form("medium"),
-    asset_match_field: str = Form(""),
-    sort_order: int = Form(0),
-    ml_score_threshold: float = Form(0.7),
-    ml_warmup_count: int = Form(250),
-    ctx: RequestContext = Depends(get_request_context),
-    tenant_db: AsyncSession = Depends(get_tenant_db),
-    _: CurrentUser = Depends(require_admin),
-):
-    if rule_type not in RULE_TYPES:
-        rule_type = "threshold"
-    tenant_db.add(
-        CorrelationRule(
-            name=name.strip(),
-            rule_type=rule_type,
-            ticket_type=ticket_type,
-            match_field=match_field,
-            pattern=pattern,
-            group_by=group_by,
-            threshold_count=max(2, threshold_count),
-            window_minutes=max(1, window_minutes),
-            title_template=title_template.strip() or _DEFAULT_TITLE_TEMPLATES[rule_type],
-            severity=severity,
-            asset_match_field=asset_match_field or None,
-            sort_order=sort_order,
-            # min(1, ...) so a typo/blank field can't produce a threshold
-            # of 0 (every event would be "anomalous") or a warmup of 0
-            # (a rule fires on its very first, baseline-free event).
-            ml_score_threshold=min(1.0, max(0.0, ml_score_threshold)),
-            ml_warmup_count=max(1, ml_warmup_count),
-            created_by=ctx.user.id,
-        )
-    )
-    await tenant_db.commit()
-    return RedirectResponse("/tickets/correlation-rules", status_code=status.HTTP_303_SEE_OTHER)
-
-
-@router.post("/correlation-rules/{rule_id:int}/delete")
-async def correlation_rules_delete(
-    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
-):
-    rule = await tenant_db.get(CorrelationRule, rule_id)
-    if rule is not None:
-        await tenant_db.delete(rule)
-        await tenant_db.commit()
-    return RedirectResponse("/tickets/correlation-rules", status_code=status.HTTP_303_SEE_OTHER)
-
-
-@router.post("/correlation-rules/{rule_id:int}/toggle")
-async def correlation_rules_toggle(
-    rule_id: int, tenant_db: AsyncSession = Depends(get_tenant_db), _: CurrentUser = Depends(require_admin)
-):
-    rule = await tenant_db.get(CorrelationRule, rule_id)
-    if rule is not None:
-        rule.is_active = not rule.is_active
-        await tenant_db.commit()
-    return RedirectResponse("/tickets/correlation-rules", status_code=status.HTTP_303_SEE_OTHER)
 
 
 # ----------------------------------------------------- platform events ---

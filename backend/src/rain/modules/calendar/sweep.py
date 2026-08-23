@@ -31,7 +31,7 @@ from rain.db.tenant_models import SyslogEvent
 from rain.modules.calendar import recurrence
 from rain.modules.calendar import service as calendar_service
 from rain.modules.documents import service as document_service
-from rain.modules.tickets import correlation, rules
+from rain.modules.tickets import rules
 
 logger = logging.getLogger("rain.calendar_sweep")
 
@@ -76,10 +76,7 @@ async def run_calendar_sweep() -> None:
                         db.add(event)
                         await db.commit()
 
-                        matched_rule = await rules.find_matching_rule(db, event)
-                        if matched_rule is not None:
-                            await rules.apply_rule(db, matched_rule, event)
-                        await correlation.evaluate_correlation_rules(db, event)
+                        await rules.evaluate_and_promote(db, event)
 
                     if document_id is not None:
                         doc = await document_service.get_document(db, document_id)

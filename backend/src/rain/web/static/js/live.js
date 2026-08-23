@@ -163,13 +163,12 @@
           "Future events from them will be dropped before reaching any tenant -- this doesn't delete what's already here.";
         discardForm.querySelector("[name=hosts]").value = hosts.join(",");
         discardForm.submit();
-      } else if (action === "correlate") {
+      } else if (action === "new-policy") {
         const params = new URLSearchParams({
           prefill_pattern: rows[0].dataset.message.slice(0, 200),
           prefill_match_field: "message",
-          prefill_threshold: String(rows.length),
         });
-        window.location.href = `/tickets/correlation-rules?${params.toString()}`;
+        window.location.href = `/tickets/rules/all?${params.toString()}`;
       }
     });
   });

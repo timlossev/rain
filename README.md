@@ -58,9 +58,9 @@ already knows how to emit one over Syslog, natively or with minimal
 forwarder config. That's why the event bus is a built-in Syslog
 listener rather than a growing list of bespoke integrations: point
 whatever's already generating alerts at RAIN, and Event Promotion
-Policies / Correlation Rules turn that stream into the tickets and
-incident records the frameworks above actually require -- without
-asking anyone to rip out a detection stack that already works.
+Policies turn that stream into the tickets and incident records the
+frameworks above actually require -- without asking anyone to rip out a
+detection stack that already works.
 
 Not every one of those tools puts the same thing inside the syslog
 message body, though -- some send plain text, some send CEF (Wazuh
@@ -87,16 +87,26 @@ Ticketing below.
 **Ticketing** -- the primary focus of the platform
 - Three ticket types -- incident, vulnerability, and change -- sharing
   one record, one activity feed, and one export pipeline
+- Optional custom fields (same text/number/boolean/date/URL/email/select
+  types as the Asset Registry's, tenant-wide across all three ticket
+  types) -- a default tenant schema defines none, but any defined become
+  capturable on the ticket form/detail page and importable/exportable
+  right alongside the built-in columns
+- CSV / JSON / Excel import (create-only -- incident/vulnerability; a
+  change needs an approval flow attached by hand) and export, with
+  reusable column/header/order profiles, mirroring the Asset Registry's
 - A built-in syslog listener turns any syslog-ng-fed event stream into a
   live event feed -- auto-detects and parses CEF, JSON, and Splunk-style
   key=value message bodies alongside plain syslog text, no per-source
   configuration needed
 - **Event Promotion Policies**: regex rules that auto-promote a matching
-  syslog event into an incident or vulnerability ticket
-- **Correlation Rules**: promote across multiple events instead of just
-  one -- either a trailing-window repetition count, or an online ML
-  model that learns normal traffic per rule and fires on a genuinely
-  unusual event. Both are optionally grouped per host/program
+  syslog event into an incident, vulnerability, or change ticket -- one
+  event per ticket ("single"), or repeats of the same thing folded into
+  one already-open ticket instead of a fresh one each time (marked
+  Problematic, "repetition"); an "ML anomaly" policy instead learns
+  normal traffic per rule (optionally grouped per host/program) and
+  fires on a genuinely unusual event, running alongside the other two
+  rather than competing with them for the same event
 - **Platform Response Rules**: react to new tickets by notifying Slack or
   email, calling a webhook, attaching a document or asset, marking the
   ticket problematic, or adding a watcher (a system user or a bare

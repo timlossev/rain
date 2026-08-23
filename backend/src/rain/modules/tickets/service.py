@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
+from typing import Any
 
 from sqlalchemy import Sequence, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,7 @@ from rain.db.tenant_models import (
     Asset,
     ChangeApproval,
     ChangeApprovalDecision,
+    CustomField,
     ExportProfile,
     GroupMembership,
     SyslogEvent,
@@ -23,6 +25,7 @@ from rain.db.tenant_models import (
     TicketAssignmentChange,
     TicketComment,
     TicketFieldChange,
+    TicketFieldValue,
     TicketStatus,
     TicketStatusChange,
     TicketWatcher,
@@ -111,7 +114,6 @@ async def create_ticket(
     asset_id: int | None = None,
     source_event_id: int | None = None,
     source_rule_id: int | None = None,
-    source_correlation_rule_id: int | None = None,
     source_ticket_id: int | None = None,
     source_catalog_item_id: int | None = None,
     start_date: dt.date | None = None,
@@ -136,7 +138,6 @@ async def create_ticket(
         asset_id=asset_id,
         source_event_id=source_event_id,
         source_rule_id=source_rule_id,
-        source_correlation_rule_id=source_correlation_rule_id,
         source_ticket_id=source_ticket_id,
         source_catalog_item_id=source_catalog_item_id,
         start_date=start_date,
@@ -231,7 +232,15 @@ def ticket_list_stmt(
     # needs ticket.approval.overall_status -- without eager-loading it
     # here, that's a lazy load in an async session (raises
     # MissingGreenlet) the first time a change row renders.
-    stmt = select(Ticket).options(selectinload(Ticket.asset), selectinload(Ticket.approval))
+    # selectinload(Ticket.field_values)...(.field): this same statement
+    # backs list_tickets(), which tickets/exporter.py's build_rows() uses
+    # -- a custom-field column needs ticket.field_values without a lazy
+    # load, same MissingGreenlet risk as the two above.
+    stmt = select(Ticket).options(
+        selectinload(Ticket.asset),
+        selectinload(Ticket.approval),
+        selectinload(Ticket.field_values).selectinload(TicketFieldValue.field),
+    )
     column = SORTABLE_COLUMNS.get(sort, Ticket.created_at)
     stmt = stmt.order_by(column.desc() if direction != "asc" else column.asc())
     if ticket_type:
@@ -263,7 +272,6 @@ def _ticket_detail_stmt():
     return select(Ticket).options(
         selectinload(Ticket.asset),
         selectinload(Ticket.source_rule),
-        selectinload(Ticket.source_correlation_rule),
         selectinload(Ticket.source_ticket),
         selectinload(Ticket.source_catalog_item),
         selectinload(Ticket.comments),
@@ -272,6 +280,7 @@ def _ticket_detail_stmt():
         selectinload(Ticket.asset_changes),
         selectinload(Ticket.field_changes),
         selectinload(Ticket.rule_triggers),
+        selectinload(Ticket.field_values).selectinload(TicketFieldValue.field),
         selectinload(Ticket.approval).selectinload(ChangeApproval.decisions),
         selectinload(Ticket.approval).selectinload(ChangeApproval.flow).selectinload(ApprovalFlow.steps),
     )
@@ -548,7 +557,7 @@ async def update_problematic(
 
 async def find_open_ticket_by_title(db: AsyncSession, ticket_type: str, title: str) -> Ticket | None:
     """An existing, not-yet-closed ticket of the same type whose title
-    matches exactly -- backs TicketRule.combine_by_title (see
+    matches exactly -- backs a "repetition"-type TicketRule (see
     combine_event_into_ticket below): decides whether an incoming syslog
     event is a fresh occurrence or a repeat of something already being
     worked. "Closed" is whatever the tenant's TicketStatus rows say it is
@@ -567,8 +576,8 @@ async def find_open_ticket_by_title(db: AsyncSession, ticket_type: str, title: s
 
 async def combine_event_into_ticket(db: AsyncSession, ticket: Ticket, event: SyslogEvent) -> None:
     """Folds a repeat syslog occurrence into an already-open ticket instead
-    of creating a new one -- see TicketRule.combine_by_title and rules.
-    apply_rule. Records the new event's full detail as a comment (same
+    of creating a new one -- see TicketRule's "repetition" promotion_type
+    and rules.apply_rule. Records the new event's full detail as a comment (same
     content build_event_description puts in a *fresh* ticket's own
     description, via the same watcher-notification path a human comment
     takes -- nothing about the repeat occurrence is silently dropped),
@@ -734,9 +743,8 @@ async def escalate_ticket(
     and to the webhook's own alert_on_failure path on a failed call.
     Returns a short outcome string for the caller to flash back."""
     # Imported locally to avoid a module-load-time cycle: webhooks.service
-    # imports tickets.correlation and tickets.rules, both of which import
-    # this module -- same reason create_ticket's platform_events import
-    # is local instead of top-level.
+    # imports tickets.rules, which imports this module -- same reason
+    # create_ticket's platform_events import is local instead of top-level.
     from rain.modules.webhooks import service as webhook_service
 
     placeholders = {
@@ -878,11 +886,11 @@ async def _emit_syslog_on_full_approval(db: AsyncSession, approval: ChangeApprov
     unless the flow this Change ran explicitly turned it on. Mirrors
     rain.modules.documents.service.refresh_from_webhook's own
     alert_on_change: a synthetic SyslogEvent row, run through the same
-    ticket-rule/correlation-rule pipeline a real inbound syslog line
-    would hit, rather than an actual outbound network syslog packet --
-    same convention, same reason (Ticket Rules/Correlation Rules become
-    reusable for this too instead of needing a second, parallel notion
-    of "event")."""
+    Event Promotion Policy pipeline (rain.modules.tickets.rules) a real
+    inbound syslog line would hit, rather than an actual outbound network
+    syslog packet -- same convention, same reason (Event Promotion
+    Policies become reusable for this too instead of needing a second,
+    parallel notion of "event")."""
     if approval.flow_id is None:
         return
     flow = await db.get(ApprovalFlow, approval.flow_id)
@@ -892,11 +900,10 @@ async def _emit_syslog_on_full_approval(db: AsyncSession, approval: ChangeApprov
     if ticket is None:
         return
 
-    # Imported locally to avoid a module-load-time cycle: rules.py and
-    # correlation.py both do `from rain.modules.tickets import service`,
-    # so a top-level import of either here would be circular (same
-    # reason create_ticket's own platform_events import, above, is local).
-    from rain.modules.tickets import correlation as ticket_correlation
+    # Imported locally to avoid a module-load-time cycle: rules.py does
+    # `from rain.modules.tickets import service`, so a top-level import
+    # of it here would be circular (same reason create_ticket's own
+    # platform_events import, above, is local).
     from rain.modules.tickets import rules as ticket_rules
 
     event = SyslogEvent(
@@ -909,10 +916,7 @@ async def _emit_syslog_on_full_approval(db: AsyncSession, approval: ChangeApprov
     )
     db.add(event)
     await db.commit()
-    matched_rule = await ticket_rules.find_matching_rule(db, event)
-    if matched_rule is not None:
-        await ticket_rules.apply_rule(db, matched_rule, event)
-    await ticket_correlation.evaluate_correlation_rules(db, event)
+    await ticket_rules.evaluate_and_promote(db, event)
 
 
 async def list_tickets_pending_approval_for(db: AsyncSession, user_id: int) -> list[Ticket]:
@@ -967,6 +971,34 @@ async def save_export_profile(
     db.add(profile)
     await db.commit()
     return profile
+
+
+async def ticket_fields(db: AsyncSession) -> list[CustomField]:
+    """Ticket-scoped half of the shared custom_fields table -- see that
+    model's own docstring for why assets and tickets share one table
+    (scope) instead of two. Unlike rain.modules.assets.service.
+    fields_for_type, there's no asset_type_id to filter by: a ticket-scoped
+    CustomField is always tenant-wide (asset_type_id is always NULL for
+    these rows -- see the 0037 migration's docstring), so every field here
+    applies to every ticket type."""
+    result = await db.execute(
+        select(CustomField).where(CustomField.scope == "ticket").order_by(CustomField.sort_order, CustomField.label)
+    )
+    return list(result.scalars())
+
+
+async def set_ticket_field_values(db: AsyncSession, ticket: Ticket, values: dict[int, Any]) -> None:
+    # Queried explicitly rather than via `ticket.field_values` -- mirrors
+    # rain.modules.assets.service.set_field_values exactly, same
+    # MissingGreenlet risk against a just-constructed Ticket that hasn't
+    # gone through _ticket_detail_stmt()'s eager load.
+    result = await db.execute(select(TicketFieldValue).where(TicketFieldValue.ticket_id == ticket.id))
+    existing = {fv.field_id: fv for fv in result.scalars()}
+    for field_id, value in values.items():
+        if field_id in existing:
+            existing[field_id].value = value
+        else:
+            db.add(TicketFieldValue(ticket_id=ticket.id, field_id=field_id, value=value))
 
 
 async def list_tickets_for_asset(db: AsyncSession, asset_id: int) -> list[Ticket]:

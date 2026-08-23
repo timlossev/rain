@@ -8,6 +8,34 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-23
 
+- **Unified Event Promotion Policies and Correlation Rules** into one
+  system: a policy's `promotion_type` is now "single" (one event, one
+  ticket -- the old TicketRule behavior), "repetition" (folds a repeat
+  occurrence into an already-open ticket instead, marking it Problematic
+  -- what `combine_by_title` used to do as a checkbox), or "ml_anomaly"
+  (the online-model anomaly detection Correlation Rules used to own
+  separately). Dropped Correlation Rules' "threshold" type outright --
+  it duplicated what "repetition" already does more simply. One less
+  admin screen, one less code path evaluating every event, and "New
+  policy from selection" on the live event feed (renamed from
+  "Correlate these") now lands on the same unified policy editor.
+- **Custom attributes on tickets**: the same text/number/boolean/date/
+  URL/email/select custom-field system the Asset Registry has, now
+  extended to tickets -- tenant-wide across all three ticket types, no
+  per-type scoping and no "Required" option (a ticket can be filed by
+  automated paths -- Event Promotion Policies, the client portal,
+  Service Catalog -- that don't know about custom fields at all). A
+  default tenant schema still defines none; once a tenant adds some,
+  they're capturable on the ticket form/detail page and importable/
+  exportable right alongside the built-in columns. Also new: CSV/JSON
+  import for tickets (create-only, incident/vulnerability -- a change
+  needs an approval flow, which isn't something a spreadsheet column can
+  express) -- ticketing had export but no import path before this.
+- **Import Ticket Field Pack**: bulk-defines a tenant's ticket custom
+  fields from an uploaded spreadsheet's header row instead of adding
+  them one at a time -- sample data underneath each column is used to
+  guess a field type (best-effort, always editable before saving);
+  nothing from the sample rows themselves is imported or stored.
 - **Portal background image**: an optional, instance-wide background
   image/wallpaper for the public client portal (Admin > Branding, next
   to the logo), shown only for a tenant with "Show instance branding"

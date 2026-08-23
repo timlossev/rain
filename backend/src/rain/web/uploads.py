@@ -211,8 +211,9 @@ _IMPORT_STASH_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 
 def import_stash_path(token: str) -> Path:
     """`token` round-trips through an HTML form field between the preview
-    and commit steps (rain.modules.assets.router), so it has to be
-    treated as attacker-controlled at this end regardless of the fact
+    and commit steps (rain.modules.assets.router, rain.modules.tickets.
+    router), so it has to be treated as attacker-controlled at this end
+    regardless of the fact
     that the preview step only ever generates it via secrets.token_hex(16)
     -- an unvalidated token here let a crafted commit request (e.g.
     token="/etc/passwd" or "../../../etc/passwd") turn this into an

@@ -80,7 +80,9 @@ nav_registry.register(
                 order=5,
                 count_provider=_active_catalog_item_count,
             ),
-            NavNode(key="tickets-export", label="Export", href="/tickets/export/run", order=6),
+            NavNode(key="tickets-fields", label="Custom Fields", href="/tickets/fields", order=6),
+            NavNode(key="tickets-export", label="Export", href="/tickets/export/run", order=7),
+            NavNode(key="tickets-import", label="Import", href="/tickets/import", order=8),
         ],
     )
 )

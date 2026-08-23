@@ -1,10 +1,10 @@
 """CSV/JSON/Excel ticket export with a caller-supplied column set -- which
 fields, what header each one gets, and the order they appear in -- mirroring
-rain.modules.assets.exporter's ad-hoc column picker. Tickets don't have
-per-tenant custom fields the way assets do, so the column list is fixed
-rather than pulled from the DB, but the shape (source/header/order) is
-identical so the same export.html column-picker table and app.js wiring
-work for both screens."""
+rain.modules.assets.exporter's ad-hoc column picker, including the
+field_<id> convention for a tenant's custom fields (rain.modules.tickets.
+service.ticket_fields) appended after the fixed BUILTIN_SOURCES -- same
+shape (source/header/order) so the same export.html column-picker table
+and app.js wiring work for both screens."""
 from __future__ import annotations
 
 import csv
@@ -30,17 +30,19 @@ BUILTIN_SOURCES = [
 ]
 
 
-def available_columns() -> list[tuple[str, str]]:
-    return BUILTIN_SOURCES
+async def available_columns(db: AsyncSession) -> list[tuple[str, str]]:
+    fields = await service.ticket_fields(db)
+    return BUILTIN_SOURCES + [(f"field_{f.id}", f.label) for f in fields]
 
 
 async def build_rows(
     db: AsyncSession, *, ticket_type: str | None, status: str | None, columns: list[dict[str, str]]
 ) -> list[dict[str, Any]]:
-    """columns: [{"source": "ticket_number" | ... | "created_at", "header": str}]"""
+    """columns: [{"source": "ticket_number" | ... | "created_at" | "field_<id>", "header": str}]"""
     tickets = await service.list_tickets(db, ticket_type=ticket_type, status=status)
     rows: list[dict[str, Any]] = []
     for t in tickets:
+        value_by_field = {fv.field_id: fv.value for fv in t.field_values}
         row: dict[str, Any] = {}
         for col in columns:
             source, header = col["source"], col["header"]
@@ -60,6 +62,8 @@ async def build_rows(
                 row[header] = t.description
             elif source == "created_at":
                 row[header] = t.created_at.isoformat() if t.created_at else None
+            elif source.startswith("field_"):
+                row[header] = value_by_field.get(int(source.split("_", 1)[1]))
             else:
                 row[header] = None
         rows.append(row)

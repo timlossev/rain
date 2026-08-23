@@ -180,3 +180,84 @@ async def test_document_numbering_and_linking():
         await document_service.delete_document(session, found)
 
         assert await document_service.links_for(session, "asset", asset.id) == []
+
+
+async def test_ticket_custom_fields_scope_isolation_and_import_export():
+    """A ticket-scoped CustomField and an asset-scoped one share one table
+    (CustomField.scope) -- this covers the three things that break if that
+    sharing ever leaks: assets.service.fields_for_type/all_fields still
+    only see asset-scoped rows, tickets.service.ticket_fields only sees
+    ticket-scoped ones, and a value written through set_ticket_field_values
+    round-trips through both the exporter's field_<id> column and the
+    importer's mapping the same way rain.modules.assets' own custom fields
+    already do."""
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import AssetType, CustomField
+    from rain.modules.assets import service as asset_service
+    from rain.modules.tickets import exporter, importer, service
+
+    tenant = await provision_tenant(slug="delta", name="Delta LLC")
+
+    async with tenant_session(tenant.schema_name) as session:
+        asset_type = AssetType(key="server", name="Server")
+        session.add(asset_type)
+        session.add(CustomField(scope="asset", asset_type_id=None, field_key="warranty", label="Warranty", field_type="text"))
+        ticket_field = CustomField(scope="ticket", asset_type_id=None, field_key="cab_ref", label="CAB Reference", field_type="text")
+        session.add(ticket_field)
+        await session.commit()
+        await session.refresh(ticket_field)
+
+        # Scope isolation: each side only ever sees its own rows.
+        asset_fields = await asset_service.all_fields(session)
+        assert [f.field_key for f in asset_fields] == ["warranty"]
+        ticket_fields = await service.ticket_fields(session)
+        assert [f.field_key for f in ticket_fields] == ["cab_ref"]
+
+        # Capture + round-trip through get_ticket's eager load.
+        ticket = await service.create_ticket(session, ticket_type="incident", title="net outage", description=None)
+        await service.set_ticket_field_values(session, ticket, {ticket_field.id: "CAB-4021"})
+        await session.commit()
+
+        reloaded = await service.get_ticket(session, ticket.id)
+        assert reloaded is not None
+        assert {fv.field_id: fv.value for fv in reloaded.field_values} == {ticket_field.id: "CAB-4021"}
+
+        # Export: field_<id> column shows up and carries the value.
+        columns = await exporter.available_columns(session)
+        assert (f"field_{ticket_field.id}", "CAB Reference") in columns
+        rows = await exporter.build_rows(
+            session,
+            ticket_type=None,
+            status=None,
+            columns=[{"source": "title", "header": "Title"}, {"source": f"field_{ticket_field.id}", "header": "CAB"}],
+        )
+        row = next(r for r in rows if r["Title"] == "net outage")
+        assert row["CAB"] == "CAB-4021"
+
+        # Import: a mapped column lands in TicketFieldValue for the new row.
+        result = await importer.commit_import(
+            session,
+            rows=[{"Type": "incident", "Title": "imported ticket", "CAB": "CAB-9999"}],
+            mapping={"ticket_type": "Type", "title": "Title", f"field_{ticket_field.id}": "CAB"},
+            actor_id=None,
+        )
+        assert result.created == 1
+        assert result.errors == []
+
+        imported = await service.list_tickets(session, ticket_type="incident")
+        imported_ticket = next(t for t in imported if t.title == "imported ticket")
+        reloaded_imported = await service.get_ticket(session, imported_ticket.id)
+        assert reloaded_imported is not None
+        assert {fv.field_id: fv.value for fv in reloaded_imported.field_values} == {ticket_field.id: "CAB-9999"}
+
+        # A change row is rejected rather than silently created without an
+        # approval flow -- see rain.modules.tickets.importer's own docstring.
+        change_result = await importer.commit_import(
+            session,
+            rows=[{"Type": "change", "Title": "should not import"}],
+            mapping={"ticket_type": "Type", "title": "Title"},
+            actor_id=None,
+        )
+        assert change_result.created == 0
+        assert len(change_result.errors) == 1

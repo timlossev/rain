@@ -13,7 +13,6 @@ from sqlalchemy.orm import selectinload
 
 from rain.db.tenant_models import Document, DocumentLink, SyslogEvent
 from rain.modules.documents import storage, textbody
-from rain.modules.tickets import correlation as ticket_correlation
 from rain.modules.tickets import rules as ticket_rules
 from rain.modules.webhooks import service as webhook_service
 
@@ -278,10 +277,7 @@ async def refresh_from_webhook(db: AsyncSession, doc: Document) -> RefreshOutcom
             )
             db.add(event)
             await db.commit()
-            matched_rule = await ticket_rules.find_matching_rule(db, event)
-            if matched_rule is not None:
-                await ticket_rules.apply_rule(db, matched_rule, event)
-            await ticket_correlation.evaluate_correlation_rules(db, event)
+            await ticket_rules.evaluate_and_promote(db, event)
 
     doc.last_refreshed_at = datetime.now(timezone.utc)
     await db.commit()
@@ -318,10 +314,7 @@ async def update_body(db: AsyncSession, doc: Document, new_text: str) -> bool:
         )
         db.add(event)
         await db.commit()
-        matched_rule = await ticket_rules.find_matching_rule(db, event)
-        if matched_rule is not None:
-            await ticket_rules.apply_rule(db, matched_rule, event)
-        await ticket_correlation.evaluate_correlation_rules(db, event)
+        await ticket_rules.evaluate_and_promote(db, event)
 
     return changed
 

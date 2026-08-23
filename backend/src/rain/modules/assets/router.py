@@ -416,6 +416,7 @@ async def fields_list(
     asset_types = await service.list_asset_types(tenant_db)
     stmt = (
         select(CustomField)
+        .where(CustomField.scope == "asset")
         .options(selectinload(CustomField.asset_type))
         .order_by(CustomField.asset_type_id.is_(None), CustomField.sort_order, CustomField.label)
     )
@@ -441,6 +442,7 @@ async def create_field(
     options = [o.strip() for o in select_options.split(",") if o.strip()] if field_type == "select" else None
     tenant_db.add(
         CustomField(
+            scope="asset",
             asset_type_id=int(asset_type_id) if asset_type_id else None,
             field_key=field_key.strip().lower(),
             label=label.strip(),
@@ -459,8 +461,12 @@ async def delete_field(
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
+    # scope == "asset" guard: without it, this route (and its ticket-side
+    # twin) could be used to delete the other module's custom fields --
+    # same id space, both reachable by any logged-in user (require_login,
+    # not require_admin -- a pre-existing, deliberate quirk this shares).
     field = await tenant_db.get(CustomField, field_id)
-    if field is not None:
+    if field is not None and field.scope == "asset":
         await tenant_db.delete(field)
         await tenant_db.commit()
     return RedirectResponse("/assets/fields", status_code=status.HTTP_303_SEE_OTHER)

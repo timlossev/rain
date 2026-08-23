@@ -79,8 +79,10 @@ app expects instead.
 - `control` schema (always present): `tenants`, `users`, `sessions`,
   `roles`, `global_config`, `auth_providers`, `syslog_source_map`,
   `audit_log`.
-- `tenant_<slug>` schema per tenant: `asset_types`, `custom_fields`,
-  `assets`, `asset_field_values`, `export_profiles`, `tenant_config`,
+- `tenant_<slug>` schema per tenant: `asset_types`, `custom_fields` (a
+  `scope` column shared between asset- and ticket-scoped field
+  definitions -- see below), `assets`, `asset_field_values`,
+  `ticket_field_values`, `export_profiles`, `tenant_config`,
   `syslog_events`, `ticket_rules`, `tickets`, `ticket_comments`,
   `notification_channels`, `webhook_configs`, `documents`,
   `document_links`, `audit_log`.
@@ -150,7 +152,7 @@ and `client_admin` (pinned to one tenant exactly like `client` --
 `rain.core.rbac.require_admin`, giving them admin rights over that one
 tenant's own tenant-scoped settings: Ticket Statuses, Notification
 Channels, Groups, Approval Flows, Webhooks, Event Promotion Policies,
-Correlation Rules, Platform Response Rules). `require_admin` accepts
+Platform Response Rules). `require_admin` accepts
 `internal_admin` or `client_admin`; platform-wide settings (Branding,
 Tenants, Users, Auth Providers, SMTP Relay, Syslog Listener) stay on the
 stricter `require_internal_admin` instead. The tenant scoping itself
@@ -212,7 +214,10 @@ no library, kept in its own file (loaded only on the live-viewer page via
 ## Asset Registry (Milestone 1, full scope)
 
 - `asset_types` / `custom_fields` (EAV field definitions, `asset_type_id`
-  nullable = applies to every type) / `assets` / `asset_field_values`.
+  nullable = applies to every type; `scope="asset"` here, `scope="ticket"`
+  for the Ticketing section's own custom fields below -- one shared
+  definitions table, filtered by scope at every call site) / `assets` /
+  `asset_field_values`.
 - CSV/JSON import: upload → column-to-field mapping (auto-suggested by
   header name) → commit, upserting by `external_id` when present
   (`rain.modules.assets.importer`).
@@ -249,8 +254,8 @@ every key=value pair) are stored on `SyslogEvent.parsed_fields`, and
 Name field, a JSON payload's `message`/`msg`/`rule.description`/
 `full_log`, or a kv payload's `msg=`/`message=`/`description=`) instead
 of the raw structured text -- so the live viewer, a promoted ticket's
-title, and Event Promotion Policy/Correlation Rule matching against
-`message` all see something legible regardless of source format.
+title, and Event Promotion Policy matching against `message` all see
+something legible regardless of source format.
 Detection order is deliberately CEF, then JSON, then key=value last:
 each is checked by its own marker (CEF's prefix, JSON's brace-wrapped-
 and-actually-parses), while key=value is the loosest heuristic (needs
@@ -283,19 +288,49 @@ FastAPI only special-cases an exact `Request`/`WebSocket` match even
 though both are Starlette `HTTPConnection` subclasses with the same
 `.cookies`.
 
-**Rule engine + tickets.** Each persisted event is checked against that
-tenant's active `ticket_rules` (regex on `message`/`host`/`program`,
-evaluated in `sort_order`, first match wins --
-`rain.modules.tickets.rules`). A match creates a `Ticket` via
-`rain.modules.tickets.service.create_ticket`, which numbers it
-`INC-000123` / `VULN-000045` from a real Postgres sequence
-(`inc_number_seq` / `vuln_number_seq`, one pair per tenant schema, allocated
-through SQLAlchemy's `Sequence(...).next_value()` so `schema_translate_map`
-resolves it to the right schema -- raw `nextval('name')` SQL text would
-not, since translation only applies to compiled schema-item constructs,
-not textual SQL). The same manual "Promote to Incident/Vulnerability"
-buttons in the live viewer hit `GET /tickets/new?source_event_id=...`,
-which pre-fills the form and suggests an asset match by `external_id`.
+**Event Promotion Policies (rule engine).** Each persisted event is
+checked against that tenant's active `ticket_rules`
+(`rain.modules.tickets.rules.evaluate_and_promote`) in `sort_order`.
+`TicketRule.promotion_type` picks one of three ways a policy decides
+"this is worth a ticket" -- one table, one screen (`GET /tickets/rules/all`),
+where a single/multi-event, regex/ML distinction used to mean two
+separate models (TicketRule + CorrelationRule) evaluated by two separate
+code paths; see `TicketRule`'s own docstring and migration 0038 for why
+that split didn't earn its keep:
+
+- `single`: a match (regex on `message`/`host`/`program`) becomes its own
+  `Ticket` via `rain.modules.tickets.service.create_ticket`.
+- `repetition`: same match, but if the computed title equals an already-
+  open ticket of this policy's type, the event folds into that ticket
+  instead (`service.combine_event_into_ticket` -- a comment noting the
+  repeat + `is_problematic` turned on) rather than creating a new one.
+- `ml_anomaly`: scores every matching event (blank/`.*` pattern to mean
+  "every event") against a per rule+group_key online model
+  (`river.anomaly.HalfSpaceTrees`, trained on severity/message-length/
+  hour-of-day -- deliberately small and numeric, not an NLP pass over the
+  message) and fires once the score clears a threshold, after a warm-up
+  count of events. A model's pickled state persists on
+  `TicketRuleState.ml_model`, read/written under `SELECT ... FOR UPDATE`
+  since scoring-then-training is a read-modify-write, not a single atomic
+  statement; the row is only ever written with bytes this module just
+  pickled itself, never with anything from a request, so unpickling it
+  back isn't a deserialization-of-untrusted-input concern.
+
+`single`/`repetition` are evaluated first-match-wins (an event never
+spawns two tickets that way); `ml_anomaly` policies never "consume" the
+event the way those two do -- every active one still scores it against
+its own model regardless of what a `single`/`repetition` policy above it
+did, the same "alongside, not instead of" property a separate
+CorrelationRule concept used to provide as two systems instead of one.
+`Ticket`s numbers itself `INC-000123` / `VULN-000045` from a real
+Postgres sequence (`inc_number_seq` / `vuln_number_seq`, one pair per
+tenant schema, allocated through SQLAlchemy's `Sequence(...).next_value()`
+so `schema_translate_map` resolves it to the right schema -- raw
+`nextval('name')` SQL text would not, since translation only applies to
+compiled schema-item constructs, not textual SQL). The same manual
+"Promote to Incident/Vulnerability" buttons in the live viewer hit
+`GET /tickets/new?source_event_id=...`, which pre-fills the form and
+suggests an asset match by `external_id`.
 
 **Notifications.** `rain.modules.tickets.notifications` sends email
 (`aiosmtplib`) and Slack (`httpx` POST to an incoming webhook) on ticket
@@ -339,30 +374,16 @@ this isn't pattern-matched or automatic: `rain.modules.tickets.service.
 escalate_ticket` fires it for one ticket, on demand, logged to that
 ticket's activity feed the same way a rule firing is.
 
-**Correlation Rules.** `rain.modules.tickets.correlation`, evaluated
-alongside the single-event rule engine above, once per persisted event.
-`CorrelationRule.rule_type` picks one of two ways to decide "this is
-worth a ticket": `threshold` counts matching events in a trailing
-window (a plain bounded SQL query re-run on each new event -- no
-streaming engine, since the new event is the only thing that can ever
-push the count over the line); `ml_anomaly` scores each matching event
-against a per rule+group_key online model (`river.anomaly.HalfSpaceTrees`,
-trained on severity/message-length/hour-of-day -- deliberately small
-and numeric, not an NLP pass over the message) and fires once the score
-clears a threshold, after a warm-up count of events. A model's pickled
-state persists on `CorrelationRuleState.ml_model`, read/written under
-`SELECT ... FOR UPDATE` since scoring-then-training is a read-modify-
-write, not a single atomic statement the way the threshold path's
-last-fired timestamp bump is; the row is only ever written with bytes
-this module just pickled itself, never with anything from a request, so
-unpickling it back isn't a deserialization-of-untrusted-input concern.
-Both rule types share the same cooldown/group-by/asset-link mechanics
-and the same `New rule` modal, split into "Simple repetition" / "ML
-anomalies" tabs.
-
-**Export.** `GET/POST /tickets/export/run` -- fixed-column CSV/JSON
-(tickets don't carry custom fields the way assets do, so this skips the
-Asset Registry exporter's configurable-column picker).
+**Export.** `GET/POST /tickets/export/run` -- CSV/JSON/Excel with the
+same configurable-column picker the Asset Registry exporter uses: a fixed
+set of built-in columns plus, if the tenant has defined any, one
+`field_<id>` column per tenant-wide ticket custom field (`custom_fields`
+scoped `scope="ticket"` -- shares the table with assets' own custom
+fields rather than a second one, see `CustomField`'s own docstring).
+`POST /tickets/import/*` is the create-only counterpart -- CSV/JSON,
+mapped columns become a new incident/vulnerability per row (a change
+needs an approval flow attached by hand, so it's rejected here rather
+than silently created without one).
 
 **Document linking** (the ticketing spec's "link to a document repository
 as a knowledge base") is live -- see Document Repository below.
@@ -467,10 +488,9 @@ raw string equality: confirmed live that a plain `!=` flagged a save as
 "changed" purely from a trailing-newline artifact between the stored file
 and a freshly-submitted textarea body, which is exactly the class of
 insignificant, not-a-real-edit difference this needs to ignore. The event
-itself then runs through the normal Ticket Rule / Correlation Rule
-pipeline (`rules.find_matching_rule`/`apply_rule`,
-`correlation.evaluate_correlation_rules`) like any real inbound syslog
-line -- a self-generated event feeding the same pipeline rather than a
+itself then runs through the normal Event Promotion Policy pipeline
+(`rules.evaluate_and_promote`) like any real inbound syslog line -- a
+self-generated event feeding the same pipeline rather than a
 second, parallel notion of "event." `_diff_summary` (a capped
 `difflib.unified_diff`) goes in the event's `raw` field so the
 before/after is visible at a glance rather than just "something changed."
@@ -689,10 +709,10 @@ program the ticket number) the moment a Change's last approval step
 clears -- `tickets.service._emit_syslog_on_full_approval`, hooked into
 `decide_approval_step` right where `overall_status` flips to `"approved"`.
 Same synthetic-event convention as `Document.alert_on_change` above (a
-self-generated event through the normal Ticket Rule/Correlation Rule
+self-generated event through the normal Event Promotion Policy
 pipeline, not a second parallel notion of "event"), and the same reason
-for a local, function-body import of `rules`/`correlation` there
-(`rules.py`/`correlation.py` both import `tickets.service`, so a
+for a local, function-body import of `rules` there
+(`rules.py` imports `tickets.service`, so a
 top-level import back would be circular -- `create_ticket`'s own
 `platform_events` import, in the same file, does the same thing).
 

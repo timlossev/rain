@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Import Tickets - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Upload a CSV or JSON file, then map its columns to ticket fields on the next screen. Each row becomes a new incident or vulnerability -- change tickets need an approval flow attached by hand, so they aren't importable here.{% endblock %}
+{% block content %}
+<div class="card" style="max-width:560px;">
+  <form method="post" action="/tickets/import/preview" enctype="multipart/form-data">
+    <div class="field">
+      <label for="fmt">Format</label>
+      <select id="fmt" name="fmt">
+        <option value="csv">CSV</option>
+        <option value="json">JSON (array of objects)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="file">File</label>
+      <input type="file" id="file" name="file" accept=".csv,.json,application/json,text/csv" required>
+    </div>
+    <button class="btn btn-primary" type="submit">Continue</button>
+  </form>
+</div>
+{% endblock %}

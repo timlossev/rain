@@ -19,7 +19,6 @@
     {% if ticket.reporter_user_id %}{{ user_names.get(ticket.reporter_user_id, "-") }}
     {%- elif ticket.reported_anonymously %}an unauthenticated user (incident portal)
     {%- elif ticket.source_rule %}Event Promotion Policy: {{ ticket.source_rule.name }}
-    {%- elif ticket.source_correlation_rule %}Correlation Rule: {{ ticket.source_correlation_rule.name }}
     {%- else %}-{% endif %}
   </td></tr>
   <tr><th>Source event</th><td>{% if ticket.source_event_id %}Event #{{ ticket.source_event_id }}{% else %}Manually created{% endif %}</td></tr>
@@ -33,6 +32,23 @@
 
 <h2 class="pdf-section">Description</h2>
 <p>{{ (ticket.description | nl2br) if ticket.description else "No description." }}</p>
+
+{% if fields %}
+<h2 class="pdf-section">Custom fields</h2>
+<table class="pdf-kv">
+  {% for f in fields %}
+  {% set val = values.get(f.id) %}
+  <tr>
+    <th>{{ f.label }}</th>
+    <td>
+      {% if f.field_type == "boolean" %}{{ "Yes" if val else "No" }}
+      {% elif val is none or val == "" %}-
+      {% else %}{{ val }}{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
 
 <h2 class="pdf-section">Linked documents</h2>
 {% if document_links %}

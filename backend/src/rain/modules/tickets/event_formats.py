@@ -154,10 +154,10 @@ def summarize(event_format: str, fields: dict, fallback: str) -> str:
     """A human-readable one-liner for whatever got parsed, used as
     SyslogEvent.message in place of the raw CEF/JSON/kv text -- so the
     Events feed, a promoted ticket's title, and any Event Promotion
-    Policy/Correlation Rule matching against `message` see something
-    legible instead of a wall of key=value pairs or a JSON blob. Falls
-    back to the original (pre-parse) message if nothing recognizable is
-    found -- never returns an empty string."""
+    Policy matching against `message` see something legible instead of a
+    wall of key=value pairs or a JSON blob. Falls back to the original
+    (pre-parse) message if nothing recognizable is found -- never
+    returns an empty string."""
     if event_format == "cef":
         return fields.get("name") or fallback
     if event_format == "json":

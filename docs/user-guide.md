@@ -161,6 +161,11 @@ If you arrived here from a live event or from another ticket's
 "Promote to Change" action, the page shows a note above the form
 saying so, and the title/description are pre-filled from the source.
 
+If your tenant has defined any ticket custom fields (Records Authority >
+Custom Fields -- see "Custom Fields (tickets)" below), a "Custom fields"
+section appears at the bottom of the form to capture them. A tenant
+that hasn't defined any doesn't see this section at all.
+
 ### Ticket detail
 
 The single-ticket page. At the top is a status stepper: one button per
@@ -189,13 +194,16 @@ Below that is the main card:
 - A metadata table: Assignee and Asset (both editable inline via the
   same type-to-search picker used on the New ticket form, each with
   its own Save button), Reported by (shows the user who filed it, or
-  which Event Promotion Policy or Correlation Rule auto-created it),
-  Source event (the originating syslog event ID, or "manually
-  created"), Promoted from (if this ticket was promoted from another
-  one, a link back to it), Change window (start and end date/time, on
-  change tickets only), and Created (timestamp).
+  which Event Promotion Policy auto-created it), Source event (the
+  originating syslog event ID, or "manually created"), Promoted from
+  (if this ticket was promoted from another one, a link back to it),
+  Change window (start and end date/time, on change tickets only), and
+  Created (timestamp).
 - The document links list for this ticket (see Documents below for how
   linking works) with an inline "Add link" control.
+- If your tenant has defined any ticket custom fields, a "Custom
+  fields" card with one Save button for the whole set -- unlike
+  severity/title, these don't save individually as you edit each one.
 
 Editing the title, severity, assignee, or asset on a change ticket
 that's already been approved prompts a confirmation, because doing so
@@ -239,11 +247,37 @@ readable one-line summary pulled from whatever that format's own
 
 Check the boxes next to one or more events to reveal a selection menu
 with four bulk actions: "Turn these into incidents", "Turn these into
-vulnerabilities", "Correlate these" (jumps to Correlation Rules with a
-pattern pre-filled from the selection), and "Discard these". Events
-that never get promoted into a ticket are dropped automatically after
-the tenant's configured retention window regardless of whether you act
-on them here.
+vulnerabilities", "New policy from selection" (jumps to Event Promotion
+Policies with a pattern pre-filled from the selection, defaulted to a
+Repetition policy), and "Discard these". Events that never get promoted
+into a ticket are dropped automatically after the tenant's configured
+retention window regardless of whether you act on them here.
+
+### Custom Fields (tickets)
+
+At Records Authority > Custom Fields. A default tenant schema defines
+none of these -- tickets ship with no custom attributes until you add
+some here. Unlike an asset custom field, a ticket one always applies
+tenant-wide, across all three ticket types -- there's no per-type
+scoping and no "Required" option (a ticket can be filed by several
+automated paths that don't know about custom fields at all -- an Event
+Promotion Policy, the client portal, a Service Catalog submission -- so
+a required one would silently break those instead of just being asked
+for on the manual "New ticket" form). A table of every field defined,
+showing its key, label, and type. "+ New custom field" opens a form:
+
+- Key: the internal, lowercase identifier stored on each ticket.
+- Label: the human-readable name shown on forms.
+- Field type: Text, Number, Yes/No, Date, URL, Email, or Select.
+- Select options (comma-separated): only used when Field type is
+  Select.
+
+Once defined, a field becomes capturable on the New ticket form and the
+ticket detail page's Custom fields card (see above), and importable/
+exportable right alongside the built-in ticket columns (see Import/
+Export below). Bulk-defining a whole set of fields at once from a
+spreadsheet, instead of one at a time here, is a Tenant Administration
+task -- see "Import Ticket Field Pack" under Admin below.
 
 ### Export (tickets)
 
@@ -251,10 +285,24 @@ At Records Authority > Export. Filter which tickets to include by type
 and status, pick an output format (CSV, JSON, or Excel), and choose
 which columns to include, what header text each one gets, and what
 order they appear in via a per-column table (a checkbox, the source
-field name, an editable header, and a numeric order). Optionally save
-the whole column layout under a name so you can re-run the same export
-later without reconfiguring it; saved profiles appear in a list below
-with a "Load" link.
+field name, an editable header, and a numeric order) -- if your tenant
+has defined any ticket custom fields, each one appears as its own
+column alongside the built-in ones. Optionally save the whole column
+layout under a name so you can re-run the same export later without
+reconfiguring it; saved profiles appear in a list below with a "Load"
+link.
+
+### Import (tickets)
+
+At Records Authority > Import. Upload a CSV or JSON file, then map its
+columns to Type, Title, Description, Severity, and (if your tenant has
+defined any) each custom field -- Type and Title are required, the rest
+optional. Each row becomes a new incident or vulnerability ticket; a row
+whose Type is Change is rejected rather than silently filed without one,
+since a change needs an approval flow attached, which isn't something a
+spreadsheet column can express -- file those by hand instead. The result
+screen shows how many tickets were created and lists any per-row errors
+or warnings.
 
 ### Service Catalog
 
@@ -277,84 +325,82 @@ Catalog under Admin below.
 
 ## Automation
 
-Three kinds of rules turn the raw syslog stream and ticket activity
-into action. All three live under Admin > Tenant Administration,
-though the first two are really about syslog events and the third is
-about tickets.
+Two kinds of rules turn the raw syslog stream and ticket activity into
+action. Both live under Admin > Tenant Administration -- the first is
+really about syslog events, the second about tickets.
 
 ### Event Promotion Policies
 
 At Tickets > Rules (Admin > Tenant Administration > Event Promotion
-Policies). A policy is a single regular expression checked against one
-incoming syslog event; the first policy (in Order) whose pattern
-matches wins, and that event becomes a new ticket. Each policy defines:
+Policies). A policy is checked against every incoming syslog event
+whose `Match on` field matches its `Pattern` (a regular expression).
+Each policy defines a Promotion type -- three ways to turn a match into
+a ticket:
+
+**Single event** -- the plain case: a match becomes its own new ticket.
+
+**Repetition** -- a match's computed title (from the Title template
+below) is checked against already-open tickets of this policy's type;
+an exact match folds the new occurrence into that ticket instead (a
+"last occurred on ..." comment, and the ticket flagged Problematic)
+rather than creating a new one. No open match, and it's created as
+usual. Use this for "the same kind of thing happening repeatedly should
+be one ticket accumulating history, not a new one every time."
+
+**ML anomaly** -- an online model learns what this policy's traffic
+normally looks like (from each matching event's severity, message
+length, and time of day) and fires on an event that doesn't fit,
+instead of any fixed pattern of repeats.
+
+- Group by: none, host, or program. "None" trains across every matching
+  event tenant-wide as one model; "host" or "program" gives each
+  distinct value its own model and, if it fires, its own ticket.
+- Re-arm cooldown (minutes): once a model (or a model and group, if
+  grouped) fires, it won't fire again until this many minutes have
+  passed, so a burst of unusual activity produces one ticket, not one
+  per anomalous event.
+- Anomaly score threshold: how unusual (0-1, higher = more unusual) a
+  new event's score must be to fire a ticket.
+- Warm-up events: how many events the model sees before it's allowed to
+  fire at all, so a brand new policy doesn't flag its own cold start as
+  anomalous.
+
+**Single** and **Repetition** policies compete for each event -- the
+first one (in Order) whose pattern matches wins, so an event never
+spawns two tickets that way. **ML anomaly** policies never compete for
+the event the other two do: every active one still scores it against
+its own model regardless of what a Single/Repetition policy above it
+did.
+
+Fields every policy has, regardless of Promotion type:
 
 - Name.
 - Ticket type to create: incident, vulnerability, or change.
 - Severity to assign the new ticket.
 - Match on: which event field the pattern is checked against, one of
   message, host, or program.
-- Pattern: a regular expression.
-- Order: lower numbers are evaluated first.
+- Pattern: a regular expression (blank matches every event -- mostly
+  useful for an ML anomaly policy, which otherwise needs no base filter).
+- Order: lower numbers are evaluated first (Single/Repetition only --
+  doesn't affect ML anomaly policies, which don't compete for the event).
 - Title template: the new ticket's title, with `{message}`, `{host}`,
-  and `{program}` placeholders available.
+  and `{program}` placeholders (plus, for ML anomaly, `{count}`,
+  `{window}`, and `{score}`).
 - Auto-link asset by (optional): don't auto-link, or match the event's
   host or program against an asset's External ID field to link the new
   ticket to that asset automatically.
 
 Each policy row has a small "Test" form: paste a sample log line in and
 it reports whether the policy's current pattern would match it, without
-creating anything.
+creating anything. A policy also has an Active checkbox on its edit
+page to disable it without deleting it -- an inactive policy is skipped
+entirely, its events falling through to the next one (or just staying
+in Events, unpromoted).
 
-### Correlation Rules
-
-At Tickets > Correlation Rules. Where a promotion policy reacts to one
-event, a correlation rule reacts across multiple events. The "New rule"
-form splits into two tabs for the two ways a rule can decide that:
-
-**Simple repetition** -- when enough events matching its pattern land
-within a trailing time window, one ticket is created.
-
-- Threshold (events): how many matching events must land within the
-  window before a ticket is created.
-
-**ML anomalies** -- an online model learns what this rule's traffic
-normally looks like (from each matching event's severity, message
-length, and time of day) and fires on an event that doesn't fit,
-instead of a fixed count.
-
-- Anomaly score threshold: how unusual (0-1, higher = more unusual) a
-  new event's score must be to fire a ticket.
-- Warm-up events: how many events the model sees before it's allowed to
-  fire at all, so a brand new rule doesn't flag its own cold start as
-  anomalous.
-
-Fields shared by both, on top of the same
-name/pattern/match-on/severity/ticket-type/order used by promotion
-policies:
-
-- Pattern: leave blank to consider every event; narrow it to scope
-  either kind of rule to a slice of traffic first.
-- Window (minutes): for Simple repetition, the trailing window the
-  threshold is measured over; for ML anomalies, the cooldown before the
-  same rule (and group) can fire again.
-- Group by: none, host, or program. "None" correlates (or, for ML
-  anomalies, trains) across every matching event tenant-wide as one;
-  "host" or "program" gives each distinct value its own count/model
-  and, if it fires, its own ticket.
-- Title template, with `{count}`, `{window}`, `{message}`, `{host}`,
-  and `{program}` placeholders (the last three come from the most
-  recent contributing event), plus `{score}` for ML anomalies. Leave
-  blank for a sensible default.
-- Auto-link asset by, same as promotion policies but matched against
-  the most recent contributing event.
-
-Once a rule (or a rule and group, if grouped) fires, it re-arms only
-after its window has elapsed, so a single burst of activity produces
-one ticket, not one per event past the threshold. Each rule also has a
-toggle button to enable or disable it without deleting it, and a "New
-rule" form pre-fills the Simple repetition tab from whatever events you
-had selected if you got here via Events' "Correlate these" action.
+Events' selection menu (see Events above) has a "New policy from
+selection" action that jumps here with a pattern pre-filled from the
+selected event(s), defaulted to the Repetition tab -- review before
+saving, every field stays editable.
 
 ### Platform Response Rules
 
@@ -471,8 +517,8 @@ Fields:
 - Asset type: picking a different type here dynamically swaps which
   custom fields appear further down the form.
 - External ID (optional): a serial number, asset tag, or cloud
-  resource ID; also what Event Promotion Policies and Correlation
-  Rules match against when auto-linking an asset to a ticket.
+  resource ID; also what an Event Promotion Policy's "Auto-link asset
+  by" matches against when auto-linking an asset to a ticket.
 - Status: active, in_repair, retired, or decommissioned.
 - Whatever custom fields are defined for the selected type (see Custom
   Fields below), each rendered as the appropriate input for its field
@@ -838,8 +884,8 @@ step doesn't open for decisions until the one before it clears. When
 the syslog checkbox is on, the moment the last step clears a change
 running that flow fires a synthetic syslog event (the same mechanism a
 document's "alert on change," below, uses) -- visible in the live
-syslog viewer and eligible to match Ticket Rules and Correlation Rules,
-same as a real inbound line.
+syslog viewer and eligible to match Event Promotion Policies, same as a
+real inbound line.
 
 **Service Catalog.** The list shows each service's Name, Key (its URL), what it Produces
 (incident/vulnerability/change), payload Format, Approval flow (if any),
@@ -874,9 +920,25 @@ question count, and an active toggle. "+ New service" gives you:
   still-editable default. Click **Preview** next to a question to check
   what a pattern currently resolves to before saving.
 
-**Event Promotion Policies, Correlation Rules, Platform Response
-Rules.** Covered in full under Automation above; the Admin menu links
-straight to the same pages Tickets links to.
+**Event Promotion Policies, Platform Response Rules.** Covered in full
+under Automation above; the Admin menu links straight to the same pages
+Tickets links to.
+
+**Import Ticket Field Pack.** Bulk-defines ticket custom fields from an
+uploaded spreadsheet instead of adding them one at a time -- see "Custom
+Fields (tickets)" above for what a custom field is and where they show
+up. Upload a CSV or Excel file whose header row names the fields you
+want (a row or two of real/representative data underneath each column
+lets it guess a field type -- text, number, boolean, date, URL, email,
+or select -- automatically); a header-only file works too, everything
+just starts as Text on the next screen, and nothing from the data rows
+themselves is ever imported or stored, only the field definitions you
+confirm are. The next screen lists every detected column with its
+guessed key, label, and type, all editable, plus a preview of its
+sample values, and an Include checkbox (unchecked by default for a
+column whose key already exists); review and adjust before submitting.
+The result screen shows how many fields were created and lists any
+skipped (a duplicate key, or a missing key/label).
 
 **Webhooks.** Centrally-defined outbound HTTP calls, reused by Platform
 Response Rules, document auto-update, notification channels, and the
@@ -907,14 +969,12 @@ it's worth knowing which is which:
   A document's "Refresh from webhook" (and the calendar's matching
   auto-update policy) calls with none of these -- a payload template
   used there should be static, since none of the placeholders resolve.
-- Single braces (`{message}`) -- an Event Promotion Policy's or
-  Correlation Rule's Title template (plain Python string formatting,
-  deliberately different from the double-brace syntax above, which
-  would otherwise misparse a JSON payload's own braces). Event
-  Promotion Policies get `{message}`, `{host}`, and `{program}` from
-  the one event that matched; Correlation Rules get those same three
-  (from the most recent contributing event) plus `{count}` and
-  `{window}`, and ML anomalies rules also get `{score}`.
+- Single braces (`{message}`) -- an Event Promotion Policy's Title
+  template (plain Python string formatting, deliberately different from
+  the double-brace syntax above, which would otherwise misparse a JSON
+  payload's own braces). Every promotion type gets `{message}`,
+  `{host}`, and `{program}` from the matching event; an ML anomaly
+  policy also gets `{count}`, `{window}`, and `{score}`.
 
 **Asset Types.** Covered under Assets above; reached from here since
 defining the asset schema is treated as an admin task.

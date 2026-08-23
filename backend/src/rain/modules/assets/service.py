@@ -73,7 +73,10 @@ async def get_asset_type(db: AsyncSession, asset_type_id: int) -> AssetType | No
 async def fields_for_type(db: AsyncSession, asset_type_id: int | None) -> list[CustomField]:
     stmt = (
         select(CustomField)
-        .where((CustomField.asset_type_id == asset_type_id) | (CustomField.asset_type_id.is_(None)))
+        .where(
+            CustomField.scope == "asset",
+            (CustomField.asset_type_id == asset_type_id) | (CustomField.asset_type_id.is_(None)),
+        )
         .order_by(CustomField.sort_order, CustomField.label)
     )
     result = await db.execute(stmt)
@@ -81,7 +84,12 @@ async def fields_for_type(db: AsyncSession, asset_type_id: int | None) -> list[C
 
 
 async def all_fields(db: AsyncSession) -> list[CustomField]:
-    result = await db.execute(select(CustomField).order_by(CustomField.sort_order, CustomField.label))
+    # scope == "asset": CustomField is now shared with ticket-scoped fields
+    # (rain.modules.tickets.service.ticket_fields) -- without this filter
+    # every asset screen using this (form field list, import mapping,
+    # export column picker) would also list ticket custom fields.
+    stmt = select(CustomField).where(CustomField.scope == "asset").order_by(CustomField.sort_order, CustomField.label)
+    result = await db.execute(stmt)
     return list(result.scalars())
 
 
