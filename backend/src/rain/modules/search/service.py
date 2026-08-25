@@ -2,7 +2,11 @@
 
 Tickets/Documents: Postgres full-text search (the generated
 `search_vector` columns + GIN index added by tenant migration 0023),
-ranked with ts_rank. Assets have no search_vector column -- there's no
+ranked with ts_rank. A Document's optional tags (migration 0039) are
+folded into its search_vector too, at the same weight as its
+description -- nothing here has to know tags exist; they're just
+already part of what ts_rank/ts_headline are scoring/highlighting
+against. Assets have no search_vector column -- there's no
 free-text title/description to feed a tsvector, just a name plus
 external_id/ci_number and arbitrary EAV custom field values -- so they're
 matched with the same ILIKE "contains" logic the Assets list's own search
@@ -129,8 +133,19 @@ async def search(db: AsyncSession, query: str, *, limit_per_kind: int = 25) -> l
     )
 
     doc_rank = func.ts_rank(Document.search_vector, tsquery)
+    # Tags folded into the headline source text too (not just search_vector
+    # itself) -- otherwise a document that only matched via a tag (nothing
+    # in title/description) would ts_headline down to an empty/misleading
+    # snippet despite being a real, ranked hit.
     doc_headline = func.ts_headline(
-        "english", func.coalesce(Document.title, "") + ". " + func.coalesce(Document.description, ""), tsquery, headline_opts
+        "english",
+        func.coalesce(Document.title, "")
+        + ". "
+        + func.coalesce(func.array_to_string(Document.tags, ", "), "")
+        + ". "
+        + func.coalesce(Document.description, ""),
+        tsquery,
+        headline_opts,
     )
     doc_stmt = (
         select(Document, doc_rank.label("rank"), doc_headline.label("headline"))

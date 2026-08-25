@@ -1,6 +1,6 @@
 """Tests that need no database: field coercion, password hashing, the
-CSV/JSON export/import round trip, and the field-pack type-guessing
-heuristic."""
+CSV/JSON export/import round trip, the field-pack type-guessing
+heuristic, and document tag parsing."""
 from __future__ import annotations
 
 from io import BytesIO
@@ -11,6 +11,7 @@ from rain.core.field_pack import sniff_columns, slugify_key
 from rain.core.security import hash_password, hash_session_token, new_session_token, verify_password
 from rain.modules.assets import exporter, importer
 from rain.modules.assets.schemas import coerce_field_value
+from rain.modules.documents.service import parse_tags
 
 
 def test_coerce_field_value_number():
@@ -114,3 +115,21 @@ def test_field_pack_csv_and_blank_headers_skipped():
     raw = b"Name,,Status\nweb-01,x,active\n"
     guesses = sniff_columns(raw, "csv")
     assert [g.header for g in guesses] == ["Name", "Status"]
+
+
+def test_parse_tags_dedupes_case_insensitively_keeping_first_spelling():
+    assert parse_tags("Security, security, SECURITY") == ["Security"]
+
+
+def test_parse_tags_strips_and_drops_empties():
+    assert parse_tags(" runbook ,  , onboarding ,") == ["runbook", "onboarding"]
+
+
+def test_parse_tags_empty_input():
+    assert parse_tags("") == []
+    assert parse_tags("   ") == []
+
+
+def test_parse_tags_caps_at_twenty():
+    raw = ", ".join(f"tag{i}" for i in range(30))
+    assert len(parse_tags(raw)) == 20

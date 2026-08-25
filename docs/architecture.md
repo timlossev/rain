@@ -497,6 +497,34 @@ before/after is visible at a glance rather than just "something changed."
 `rain.modules.tickets.service._emit_syslog_on_full_approval` (Change
 approvals, below) reuses this exact same synthetic-event convention.
 
+**Tags.** `Document.tags` (`text[]`, tenant migration 0039) -- optional,
+freeform, comma-separated on input (`rain.modules.documents.service.
+parse_tags`: trimmed, deduped case-insensitively keeping first spelling,
+capped at 20). A plain array column rather than a normalized tags/
+document_tags join table: nothing here needs a tenant-wide tag registry
+or tag-scoped browsing, just tagging a document and finding it by that
+tag later, and the array feeds directly into `search_vector` (Search,
+below), which a join table's `GENERATED` expression couldn't reference
+at all. See that section for the `IMMUTABLE`-function workaround folding
+an array into a `tsvector` needed.
+
+**Calendar link.** `CalendarEntry.document_id` (tenant migration 0040,
+`ON DELETE CASCADE`) is a plain "this entry is about this document"
+association -- independent of `CalendarEntry.policy_ref`'s existing
+`refresh_document` auto-update mechanism (an opaque JSON policy blob
+acted on by `rain.modules.calendar.sweep` on each due occurrence --
+`service.refresh_from_webhook` for the referenced document, same call
+its own "Refresh from webhook" button makes). Backs a document's own
+Calendar tab (`rain.modules.calendar.service.list_entries_for_document`)
+and the calendar entry form's "Related document" picker; picking a
+document there and also checking "auto-refresh" sets both `document_id`
+and `policy_ref` from the one selection, so the two never point at
+different documents by construction. 0040 backfills `document_id` from
+any pre-existing `policy_ref.document_id` (the only shape `policy_ref`
+has ever had) so an entry that already auto-refreshed a document shows
+up on that document's Calendar tab immediately, not just newly-created
+ones.
+
 ## Search
 
 Keyword search only -- no vector/semantic search, because there's no
@@ -511,10 +539,26 @@ would read as a misleading claim.
 **Index.** `tickets.search_vector`/`documents.search_vector` are
 `GENERATED ALWAYS AS ... STORED` `tsvector` columns (tenant migration
 0023) built from `ticket_number`/`title`/`description` and
-`doc_number`/`title`/`description` respectively, weighted (`setweight`,
-number/title `'A'`, description `'B'`), GIN-indexed. Metadata only, not
-a document's file body -- indexing arbitrary uploaded file content is a
-bigger feature this doesn't attempt.
+`doc_number`/`title`/`tags`/`description` respectively, weighted
+(`setweight`, number/title `'A'`, tags/description `'B'`), GIN-indexed.
+Metadata only, not a document's file body -- indexing arbitrary
+uploaded file content is a bigger feature this doesn't attempt.
+
+`documents.tags` (`text[]`, tenant migration 0039) folding into a
+`GENERATED` column needs a plain `text` blob for `to_tsvector()` first,
+and Postgres requires that generated expression to be `IMMUTABLE` --
+neither `array_to_string(tags, ' ')` nor a `tags::text` cast qualifies
+(both `STABLE`, confirmed live: `ALTER TABLE ... ADD COLUMN ...
+GENERATED` against either raises "generation expression is not
+immutable"), and `array_to_tsvector(tags)` -- `IMMUTABLE`, but its
+lexemes don't participate in `@@` matching via `websearch_to_tsquery` at
+all (confirmed live: even an exact, no-stemming-needed tag came back
+false). 0039 instead defines a tiny `IMMUTABLE`-marked SQL wrapper
+function per tenant schema (`"{schema}".immutable_array_to_string`,
+dropped along with the schema itself -- no shared/`public`-schema
+leftover) purely to satisfy Postgres's immutability check for a case
+that doesn't actually risk anything (a tenant schema's own collation
+isn't changing under a `STORED` column).
 
 **Query.** `rain.modules.search.service.search()` runs two independently
 ranked queries (`ts_rank` + `websearch_to_tsquery`, which parses quoted

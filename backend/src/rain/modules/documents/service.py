@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from jsonpath_ng.ext import parse as parse_jsonpath
-from sqlalchemy import Sequence, select
+from sqlalchemy import Sequence, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,6 +21,31 @@ from rain.modules.webhooks import service as webhook_service
 _DOC_REF_RE = re.compile(r"^DOC-(\d+)$", re.IGNORECASE)
 
 _DIFF_MAX_LINES = 40
+
+# Sanity ceiling, not a real limit anyone should hit -- guards against a
+# pasted wall of text (or a stray script) turning "comma-separated tags"
+# into hundreds of tsvector lexemes for one document.
+_MAX_TAGS = 20
+_MAX_TAG_LENGTH = 50
+
+
+def parse_tags(raw: str) -> list[str]:
+    """Comma-separated free text (the form field's own shape) -> a clean
+    list: trimmed, empties dropped, deduped case-insensitively (first
+    spelling wins -- "Security, security" keeps "Security"), capped at
+    _MAX_TAGS. Order preserved otherwise, so re-editing a document's tags
+    doesn't shuffle them for no reason."""
+    seen: set[str] = set()
+    tags: list[str] = []
+    for piece in raw.split(","):
+        tag = piece.strip()[:_MAX_TAG_LENGTH]
+        if not tag or tag.lower() in seen:
+            continue
+        seen.add(tag.lower())
+        tags.append(tag)
+        if len(tags) >= _MAX_TAGS:
+            break
+    return tags
 
 
 def _content_changed(old_text: str | None, new_text: str) -> bool:
@@ -121,6 +146,7 @@ async def create_document(
     mime_type: str | None,
     size_bytes: int,
     uploaded_by: int | None,
+    tags: list[str] | None = None,
 ) -> Document:
     doc = Document(
         doc_number=await _next_doc_number(db),
@@ -131,6 +157,7 @@ async def create_document(
         mime_type=mime_type,
         size_bytes=size_bytes,
         uploaded_by=uploaded_by,
+        tags=tags or [],
     )
     db.add(doc)
     await db.commit()
@@ -145,22 +172,21 @@ def document_list_stmt(*, search: str | None = None):
     stmt = select(Document).order_by(Document.created_at.desc())
     if search:
         like = f"%{search}%"
-        stmt = stmt.where(Document.title.ilike(like) | Document.doc_number.ilike(like))
+        # array_to_string: an ARRAY column has no ilike of its own -- this
+        # is the list screen's own quick "contains" filter, kept as plain
+        # ILIKE like the other two columns here rather than reusing the
+        # tsvector search_vector (that's ranked full-text search, this is
+        # a simple substring filter over a small, already-paginated list).
+        stmt = stmt.where(
+            Document.title.ilike(like)
+            | Document.doc_number.ilike(like)
+            | func.array_to_string(Document.tags, " ").ilike(like)
+        )
     return stmt
 
 
 async def list_documents(db: AsyncSession, *, search: str | None = None) -> list[Document]:
     result = await db.execute(document_list_stmt(search=search))
-    return list(result.scalars())
-
-
-async def list_webhook_populated(db: AsyncSession) -> list[Document]:
-    """Documents with a webhook configured -- the only ones eligible for a
-    calendar entry's "refresh this document on occurrence" policy
-    (rain.modules.calendar.sweep); backs that picker on the calendar
-    entry form."""
-    stmt = select(Document).where(Document.webhook_id.is_not(None)).order_by(Document.title)
-    result = await db.execute(stmt)
     return list(result.scalars())
 
 
@@ -196,6 +222,11 @@ async def update_body_size(db: AsyncSession, doc: Document, size_bytes: int) -> 
 
 async def update_description(db: AsyncSession, doc: Document, description: str | None) -> None:
     doc.description = description
+    await db.commit()
+
+
+async def update_tags(db: AsyncSession, doc: Document, tags: list[str]) -> None:
+    doc.tags = tags
     await db.commit()
 
 

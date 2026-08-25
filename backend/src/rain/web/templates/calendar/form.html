@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ "Edit" if entry else "New" }} calendar entry - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Create or edit a calendar entry -- one-time or recurring (daily/weekly/monthly/quarterly/every 6 months/annually). Optionally emit a syslog event on each occurrence so Event Promotion Policies can act on it.{% endblock %}
+{% block help_text %}Create or edit a calendar entry -- one-time or recurring (daily/weekly/monthly/quarterly/every 6 months/annually). Optionally emit a syslog event on each occurrence so Event Promotion Policies can act on it, or tie it to a document (e.g. a quarterly revision reminder), optionally also auto-refreshing that document from its webhook on each occurrence.{% endblock %}
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
 <div class="card" style="max-width:640px;">
   <form method="post" action="{{ '/calendar/' ~ entry.id if entry else '/calendar' }}">
+    <input type="hidden" name="redirect" value="{{ redirect_to }}">
     <div class="form-row">
       <div class="field"><label for="title">Title</label><input type="text" id="title" name="title" value="{{ entry.title if entry else '' }}" required autofocus></div>
       <div class="field" style="flex:0 0 170px;"><label for="start_date">Date</label><input type="date" id="start_date" name="start_date" value="{{ prefill_date }}" required></div>
@@ -37,22 +38,24 @@
       <div class="field"><label for="event_program">Event "program" value (optional)</label><input type="text" id="event_program" name="event_program" value="{{ entry.event_program if entry and entry.event_program else '' }}" placeholder="Defaults to the title"></div>
     </div>
 
-    <h3>Auto-update</h3>
-    <p class="field-hint">When set, each occurrence refreshes the chosen document from its configured webhook --
-      the same "Refresh from webhook" a document's own page offers, just triggered by this entry's schedule instead
-      of a click. Only documents with a webhook configured (Documents &gt; a document &gt; Auto-update tab) show up
-      below.</p>
-    <div class="field">
-      <label for="refresh_document_id">Refresh document on occurrence</label>
-      <select id="refresh_document_id" name="refresh_document_id">
-        <option value="">-- none --</option>
-        {% for d in webhook_documents %}<option value="{{ d.id }}" {% if refresh_document_id == d.id %}selected{% endif %}>{{ d.doc_number }}: {{ d.title }}</option>{% endfor %}
-      </select>
-      {% if not webhook_documents %}<div class="field-hint">No webhook-populated documents yet.</div>{% endif %}
+    <h3>Related document</h3>
+    <p class="field-hint">Optionally tie this entry to a document -- it'll show up on that document's own Calendar
+      tab (e.g. "this document is due for revision every quarter"). Independent of the syslog bridge above; picking
+      a document here doesn't do anything by itself beyond that.</p>
+    <div class="form-row">
+      <div class="field">
+        <label for="document_id">Document</label>
+        <select id="document_id" name="document_id">
+          <option value="">-- none --</option>
+          {% for d in documents %}<option value="{{ d.id }}" {% if selected_document_id == d.id %}selected{% endif %}>{{ d.doc_number }}: {{ d.title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="auto_refresh" {% if auto_refresh %}checked{% endif %}> Also auto-refresh it from its webhook on each occurrence</label></div>
     </div>
+    <p class="field-hint">Auto-refresh only takes effect for a document with a webhook configured (Documents &gt; that document &gt; Auto-update tab) -- same "Refresh from webhook" action, just triggered by this entry's schedule instead of a click.</p>
 
     <button class="btn btn-primary" type="submit">{{ "Save changes" if entry else "Create entry" }}</button>
-    <a class="btn" href="/calendar">Cancel</a>
+    <a class="btn" href="{{ redirect_to }}">Cancel</a>
   </form>
 </div>
 
@@ -60,6 +63,7 @@
 <div class="card" style="max-width:640px;">
   <div class="card-title">Delete</div>
   <form method="post" action="/calendar/{{ entry.id }}/delete" data-confirm="Delete calendar entry '{{ entry.title }}'?">
+    <input type="hidden" name="redirect" value="{{ redirect_to }}">
     <button class="btn btn-danger" type="submit">Delete entry</button>
   </form>
 </div>

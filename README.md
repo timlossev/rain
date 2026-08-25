@@ -180,14 +180,16 @@ Ticketing below.
 - **Syslog bridge**: flag an entry to synthesize a syslog event on each
   occurrence, so the same rule engine that reacts to real syslog traffic
   can react to a recurring calendar entry too
-- **Auto-update**: point an entry at a webhook-populated document, and
-  each occurrence refreshes it the same way that document's own "Refresh
-  from webhook" button would
+- **Related document**: tie an entry to a document (e.g. a quarterly
+  revision reminder), manageable either here or from that document's
+  own Calendar tab -- optionally also **auto-refreshing** it from its
+  configured webhook on each occurrence, the same way that document's
+  own "Refresh from webhook" button would
 - Standard iCalendar (.ics) export/import
 
 **Document Repository**
-- `DOC-xxxxxx` entries with description, file attachment, and links to
-  any asset or ticket
+- `DOC-xxxxxx` entries with description, optional freeform tags, file
+  attachment, and links to any asset or ticket
 - Storage is local disk by default, or an S3 (or S3-compatible -- MinIO,
   etc.) bucket if `S3_BUCKET` is set in `.env` -- no code changes, and no
   local uploads volume to persist once every document lives in the
@@ -195,13 +197,17 @@ Ticketing below.
 - A document's contents can be populated by calling a configured
   webhook, with the new content diffed against what's stored and an
   optional syslog alert when it changes
+- A document's own Calendar tab: recurring or one-off reminders tied to
+  it (e.g. "due for revision every quarter"), independent of the
+  webhook auto-update above -- plain reminders unless one also opts
+  into auto-refreshing that document on the same schedule
 - Branded PDF export, noting the source webhook and last-refresh date
   when a document is webhook-populated
 
 **Search**
 - A global search bar (every page) for keyword search across ticket and
-  document titles/descriptions/numbers, Postgres full-text ranked, with
-  match highlighting
+  document titles/descriptions/numbers (documents' tags included),
+  Postgres full-text ranked, with match highlighting
 - Typing a ticket, document, or asset number (`INC-000001`, `DOC-000004`,
   `CI-000001`) jumps straight to that record instead of a results page
 - Ticket and document detail pages live at that same human-readable

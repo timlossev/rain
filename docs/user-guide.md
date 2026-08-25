@@ -81,8 +81,9 @@ reporting a problem), plus the sign-out button.
 
 The search bar in the topbar is present on every page. Typing a word
 or phrase searches ticket and document titles, descriptions, and
-numbers, ranked by relevance, and takes you to a results page listing
-matches with a highlighted snippet of where the match occurred.
+numbers (documents' tags too), ranked by relevance, and takes you to a
+results page listing matches with a highlighted snippet of where the
+match occurred.
 
 Typing an exact record number instead (`INC-000001`, `VULN-000004`,
 `CHG-000012`, `DOC-000002`) skips the results page entirely and opens
@@ -479,14 +480,18 @@ Two optional behaviors, further down the same form:
   real syslog traffic does. An optional "Event program" value lets you
   give that synthesized event a specific program name to match on;
   left blank, it defaults to the entry's title.
-- Auto-update: pick a document (only documents that already have a
-  webhook configured show up in this list) and each occurrence
-  refreshes it from that webhook automatically, the same as clicking
-  that document's own "Refresh from webhook" button, just on a
-  schedule instead of on demand.
+- Related document: pick a document and this entry shows up on that
+  document's own Calendar tab -- a plain reminder by itself (e.g. "this
+  document is due for revision every quarter"), with no side effect.
+  Check "Also auto-refresh it from its webhook on each occurrence" to
+  additionally have each occurrence refresh that document from its
+  configured webhook, the same as clicking its own "Refresh from
+  webhook" button, just on a schedule instead of on demand -- only
+  takes effect for a document that actually has a webhook configured.
 
 An existing entry's edit page also has a Delete button, with a
-confirmation prompt.
+confirmation prompt. Both come back to wherever you opened the form
+from -- the main Calendar screen, or a document's own Calendar tab.
 
 ### Import
 
@@ -589,9 +594,9 @@ The document repository, reached from Documents in the sidebar
 
 ### Document list
 
-A table of every document (Number, Title, File, Uploaded date) with a
-search box that matches against title or document number
-(`DOC-000123`), and an "+ Upload document" button.
+A table of every document (Number, Title, Tags, File, Uploaded date)
+with a search box that matches against title, document number
+(`DOC-000123`), or a tag, and an "+ Upload document" button.
 
 ### New document
 
@@ -604,15 +609,17 @@ two ways to create one, switched with a tab control:
   This is how you create a placeholder document with nothing to upload
   yet, just a title and some notes.
 
-Either way, Title (required) and Description (optional) are entered
-once at the top of the form and apply regardless of which tab you use.
-If you arrived here from another record's "link a document" action,
-the new document is attached to that record automatically and the page
-says so.
+Either way, Title (required), Description (optional), and Tags
+(optional, comma-separated) are entered once at the top of the form and
+apply regardless of which tab you use. If you arrived here from another
+record's "link a document" action, the new document is attached to that
+record automatically and the page says so.
 
 ### Document detail
 
-A single document's page, split into tabs:
+Above the tabs, next to the header, tags show as badges with a pencil
+icon to edit them (comma-separated, same as on upload) -- "No tags."
+if none are set yet. Below that, the page is split into tabs:
 
 - Description: a plain textarea, saved independently of the file
   itself.
@@ -640,10 +647,16 @@ A single document's page, split into tabs:
   an Unlink button, and an "Add link" control below the table. Pick
   Ticket or Asset with the pill selector, then either a ticket number
   (`INC-000123`) or a numeric asset ID, and click "Add link".
+- Calendar: every calendar entry tied to this document (Title, Date,
+  Repeats, and an "auto-refresh" badge on any that also refresh this
+  document's content on occurrence -- see Calendar above), each with
+  Edit and Delete, and a "+ New reminder" button that opens the
+  calendar entry form pre-filled for this document and returns you
+  here afterward.
 
-Above the tabs, the page header shows the document's filename and size,
-its upload date, and three actions: Download, Export to PDF (which
-notes the source webhook and last refresh date if the document is
+The page header itself shows the document's filename and size, its
+upload date, and three actions: Download, Export to PDF (which notes
+the source webhook and last refresh date if the document is
 webhook-populated), and Delete (with confirmation, and this cannot be
 undone).
 
@@ -652,9 +665,11 @@ undone).
 Reached by typing anything other than an exact record number into the
 topbar search bar. Shows a ranked table of matching tickets and
 documents (a Type badge, the record number, and the title with a
-highlighted snippet of the matching text), or a "no matches" message if
-nothing was found. Leaving the search box empty shows a prompt instead
-of an empty results table.
+highlighted snippet of the matching text) -- a document can match on
+its tags as well as its title/description, and the snippet reflects
+whichever one matched. A "no matches" message shows if nothing was
+found; leaving the search box empty shows a prompt instead of an empty
+results table.
 
 ## Client Portal
 

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ doc.doc_number }}: {{ doc.title }} - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}A single document's details -- description, contents (with an inline editor for txt/md files), auto-update from a webhook, and what it's linked to.{% endblock %}
+{% block help_text %}A single document's details -- tags, description, contents (with an inline editor for txt/md files), auto-update from a webhook, what it's linked to, and any calendar reminders (e.g. a quarterly revision) tied to it.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:space-between; align-items:flex-start;">
   <div>
@@ -16,6 +16,22 @@
   </div>
 </div>
 
+<div class="panel-row" style="margin-bottom:16px;">
+  <span class="doc-tags-edit" data-inline-edit>
+    <span class="doc-tags-display" data-inline-edit-display>
+      {% for tag in doc.tags %}<span class="badge">{{ tag }}</span> {% else %}<span class="muted">No tags.</span>{% endfor %}
+      <button type="button" class="inline-edit-btn" data-inline-edit-toggle title="Edit tags" aria-label="Edit tags">
+        <span class="nav-icon">{{ nav_icon("pencil") }}</span>
+      </button>
+    </span>
+    <form method="post" action="/documents/{{ doc.id }}/tags" data-inline-edit-form hidden>
+      <input type="text" name="tags" value="{{ doc.tags | join(', ') }}" placeholder="runbook, security, onboarding" style="min-width:320px;">
+      <button type="submit" class="btn btn-sm">Save</button>
+      <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
+    </form>
+  </span>
+</div>
+
 <div class="card" data-tabs>
   <div class="tab-buttons">
     {% if body_kind %}
@@ -26,6 +42,7 @@
     <button type="button" class="tab-btn" data-tab-btn="auto-update">Auto-update</button>
     {% endif %}
     <button type="button" class="tab-btn" data-tab-btn="links">Links ({{ doc.links | length }})</button>
+    <button type="button" class="tab-btn" data-tab-btn="calendar">Calendar ({{ calendar_entries | length }})</button>
   </div>
 
   {% if body_kind %}
@@ -160,6 +177,33 @@
       </div>
       <button class="btn btn-sm" type="submit">Add link</button>
     </form>
+  </div>
+
+  <div class="tab-panel" data-tab-panel="calendar">
+    <p class="field-hint">Calendar entries tied to this document -- e.g. "due for revision every quarter." Manual reminders unless one also has auto-refresh turned on (shown below).</p>
+    <table>
+      <thead><tr><th>Title</th><th>Date</th><th>Repeats</th><th></th><th></th><th></th></tr></thead>
+      <tbody>
+        {% for e in calendar_entries %}
+        <tr{% if not e.is_active %} class="muted"{% endif %}>
+          <td>{{ e.title }}{% if not e.is_active %} <span class="badge">inactive</span>{% endif %}</td>
+          <td class="muted">{{ e.start_date.strftime("%Y-%m-%d") }}</td>
+          <td class="muted">{{ e.recurrence or "one-time" }}</td>
+          <td>{% if e.policy_ref and e.policy_ref.get("type") == "refresh_document" %}<span class="badge">auto-refresh</span>{% endif %}</td>
+          <td class="actions"><a class="btn btn-sm" href="/calendar/{{ e.id }}/edit?redirect=/documents/{{ doc.doc_number }}">Edit</a></td>
+          <td class="actions">
+            <form class="inline" method="post" action="/calendar/{{ e.id }}/delete" data-confirm="Delete calendar entry '{{ e.title }}'?">
+              <input type="hidden" name="redirect" value="/documents/{{ doc.doc_number }}">
+              <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted">No calendar entries for this document yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <a class="btn btn-sm" href="/calendar/new?document_id={{ doc.id }}&redirect=/documents/{{ doc.doc_number }}" style="margin-top:12px;">+ New reminder</a>
   </div>
 </div>
 {% endblock %}

@@ -14,6 +14,7 @@ from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.modules.assets import service as asset_service
+from rain.modules.calendar import service as calendar_service
 from rain.modules.documents import service, storage, textbody
 from rain.modules.documents.schemas import LINKED_TYPES, MAX_UPLOAD_BYTES
 from rain.modules.tickets import service as ticket_service
@@ -112,6 +113,7 @@ async def create_document(
     file: UploadFile | None = None,
     title: str = Form(...),
     description: str = Form(""),
+    tags: str = Form(""),
     body: str = Form(""),
     body_format: str = Form("txt"),
     linked_type: str = Form(""),
@@ -164,6 +166,7 @@ async def create_document(
         mime_type=mime_type,
         size_bytes=len(data),
         uploaded_by=ctx.user.id,
+        tags=service.parse_tags(tags),
     )
 
     if linked_type in LINKED_TYPES and linked_id:
@@ -204,6 +207,7 @@ async def document_detail(
     ticket_numbers = await ticket_service.get_ticket_numbers(tenant_db, ticket_link_ids)
     asset_link_ids = [link.linked_id for link in doc.links if link.linked_type == "asset"]
     asset_numbers = await asset_service.get_ci_numbers(tenant_db, asset_link_ids)
+    calendar_entries = await calendar_service.list_entries_for_document(tenant_db, doc.id)
     return templates.TemplateResponse(
         request,
         "documents/detail.html",
@@ -217,6 +221,7 @@ async def document_detail(
             "webhooks": webhooks,
             "ticket_numbers": ticket_numbers,
             "asset_numbers": asset_numbers,
+            "calendar_entries": calendar_entries,
         },
     )
 
@@ -231,6 +236,19 @@ async def update_document_description(
     doc = await service.get_document(tenant_db, document_id)
     if doc is not None:
         await service.update_description(tenant_db, doc, description.strip() or None)
+    return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{document_id:int}/tags")
+async def update_document_tags(
+    document_id: int,
+    tags: str = Form(""),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is not None:
+        await service.update_tags(tenant_db, doc, service.parse_tags(tags))
     return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 

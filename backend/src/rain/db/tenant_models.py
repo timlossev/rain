@@ -30,7 +30,7 @@ from sqlalchemy import (
     func,
 )
 from pgvector.sqlalchemy import Vector
-from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from rain.settings import get_settings
@@ -837,13 +837,23 @@ class Document(TenantBase):
     # response verbatim, same as webhook_response_is_json being off.
     webhook_response_is_json: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     webhook_json_path: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # DB-generated (GENERATED ALWAYS AS ... STORED, see migration 0023) from
-    # doc_number/title/description -- never written from Python, only ever
-    # read (search_vector.op("@@")(...)), see rain.modules.search. Indexes
-    # metadata only, not the file body -- see that module's docstring.
-    # server_default=FetchedValue(): see Ticket.search_vector's comment --
-    # without it, creating a document fails the same way creating a
-    # ticket did (asyncpg.exceptions.GeneratedAlwaysError).
+    # Optional, freeform -- a plain array rather than a normalized tags
+    # table (see migration 0039's own docstring for why: nothing here
+    # needs a tenant-wide tag registry or tag-scoped browsing, just
+    # tagging a document and finding it by that tag later, and the
+    # array feeds directly into search_vector below, which a join
+    # table's GENERATED expression couldn't reference). Never NULL --
+    # "no tags" is an empty array, not a null one, so callers can always
+    # iterate it without a None-check.
+    tags: Mapped[list[str]] = mapped_column(ARRAY(String), default=list, server_default="{}")
+    # DB-generated (GENERATED ALWAYS AS ... STORED, see migrations 0023
+    # and 0039) from doc_number/title/tags/description -- never written
+    # from Python, only ever read (search_vector.op("@@")(...)), see
+    # rain.modules.search. Indexes metadata only, not the file body --
+    # see that module's docstring. server_default=FetchedValue(): see
+    # Ticket.search_vector's comment -- without it, creating a document
+    # fails the same way creating a ticket did
+    # (asyncpg.exceptions.GeneratedAlwaysError).
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True, deferred=True, server_default=FetchedValue())
     if ENABLE_PGVECTOR:
         # Reserved for a future semantic-search source -- see
@@ -1051,14 +1061,33 @@ class CalendarEntry(TenantBase):
     own dedup marker (one synthetic event per occurrence, not one per
     sweep tick).
 
+    `document_id` (optional) is a plain "this entry is about this
+    document" link -- what backs a document's own Calendar tab
+    (rain.modules.documents.router.document_detail) and the entry form's
+    "Related document" picker, e.g. "this document is due for revision
+    every quarter." ON DELETE CASCADE: a revision reminder for a deleted
+    document has no reason to survive as an orphan (same choice
+    DocumentLink.document_id already made). Independent of `policy_ref`
+    below -- linking an entry to a document here doesn't imply any
+    auto-update action, it's purely a manual reminder unless `policy_ref`
+    also opts into one.
+
     `policy_ref` is an opaque JSON blob carrying an occurrence-driven
     "policy" for this entry, round-tripping through .ics export/import
     (as a custom X-RAIN-POLICY property). The one shape acted on today
     (rain.modules.calendar.sweep) is `{"type": "refresh_document",
     "document_id": <id>}` -- refresh that document from its configured
     webhook (rain.modules.documents.service.refresh_from_webhook) on
-    every due occurrence, e.g. "update document X quarterly". Independent
-    of `emit_syslog_event`; an entry can do either, both, or neither."""
+    every due occurrence, e.g. "update document X quarterly" for real
+    rather than just being reminded to. Its own document_id and this
+    row's `document_id` column point at the same document in practice
+    (the entry form only ever sets policy_ref for whichever document
+    `document_id` already names -- see rain.modules.calendar.router),
+    but they're read independently: `document_id` is what a plain
+    reminder needs, `policy_ref` is what the sweep needs, and a document
+    a tenant simply wants reminded about was never required to have a
+    webhook configured at all. Independent of `emit_syslog_event` too;
+    an entry can do any combination of the three."""
 
     __tablename__ = "calendar_entries"
 
@@ -1073,6 +1102,7 @@ class CalendarEntry(TenantBase):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     emit_syslog_event: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     event_program: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), nullable=True, index=True)
     policy_ref: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     last_fired_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -1080,6 +1110,8 @@ class CalendarEntry(TenantBase):
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    document: Mapped[Document | None] = relationship()
 
 
 class AuditLog(TenantBase):

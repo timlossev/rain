@@ -28,6 +28,16 @@ async def get_entry(db: AsyncSession, entry_id: int) -> CalendarEntry | None:
     return await db.get(CalendarEntry, entry_id)
 
 
+async def list_entries_for_document(db: AsyncSession, document_id: int) -> list[CalendarEntry]:
+    """Backs a document's own Calendar tab -- every entry (active or not,
+    unlike the month grid) linked to it via CalendarEntry.document_id,
+    regardless of whether it also auto-refreshes that document via
+    policy_ref (see CalendarEntry's own docstring)."""
+    stmt = select(CalendarEntry).where(CalendarEntry.document_id == document_id).order_by(CalendarEntry.start_date)
+    result = await db.execute(stmt)
+    return list(result.scalars())
+
+
 async def create_entry(db: AsyncSession, **fields: Any) -> CalendarEntry:
     entry = CalendarEntry(**fields)
     db.add(entry)

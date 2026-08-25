@@ -6,6 +6,27 @@ the honest anchor point. Each entry is a synthesis of that day's commits,
 not a 1:1 commit dump; see `git log` for the literal history this is
 drawn from. Updated alongside every push to `main`.
 
+## 2026-08-25
+
+- **Document tags**: optional, freeform, comma-separated tags on a
+  document (Documents list, upload form, and an inline-editable badge
+  row on the document's own page), folded into the same Postgres
+  full-text index tickets/documents already use -- searchable from the
+  global search bar and the Documents list's own search box, no
+  separate tag index or screen. Hit (and worked around) a real Postgres
+  constraint along the way: neither `array_to_string()` nor a plain
+  array-to-text cast qualifies as `IMMUTABLE`, which a `GENERATED`
+  column's expression requires -- a tiny per-tenant-schema `IMMUTABLE`
+  SQL wrapper function does.
+- **Calendar reminders for documents**: a document's own Calendar tab
+  lists calendar entries tied to it via a new, plain
+  `CalendarEntry.document_id` link, with a "+ New reminder" action --
+  e.g. "this document is due for revision every quarter," independent
+  of (but optionally combinable with, via one unified picker) the
+  existing webhook auto-refresh-on-occurrence policy. Existing
+  auto-refresh entries get backfilled onto their document's Calendar
+  tab automatically.
+
 ## 2026-08-23
 
 - **Unified Event Promotion Policies and Correlation Rules** into one

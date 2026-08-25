@@ -261,3 +261,70 @@ async def test_ticket_custom_fields_scope_isolation_and_import_export():
         )
         assert change_result.created == 0
         assert len(change_result.errors) == 1
+
+
+async def test_document_tags_search_and_calendar_link():
+    """Covers migration 0039's IMMUTABLE-function workaround for folding
+    an array into a GENERATED tsvector (a search on a tag with nothing
+    else matching still has to find the document), and 0040's plain
+    CalendarEntry.document_id link (independent of the older policy_ref
+    auto-refresh mechanism) plus its ON DELETE CASCADE."""
+    import datetime as dt
+
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import CalendarEntry
+    from rain.modules.calendar import service as calendar_service
+    from rain.modules.documents import service as document_service
+    from rain.modules.search import service as search_service
+
+    tenant = await provision_tenant(slug="kappa", name="Kappa Inc")
+
+    async with tenant_session(tenant.schema_name) as session:
+        doc = await document_service.create_document(
+            session,
+            title="Runbook: incident response",
+            description="How we handle a P1.",
+            filename="runbook.md",
+            storage_key="kappa/runbook.md",
+            mime_type="text/markdown",
+            size_bytes=100,
+            uploaded_by=None,
+            tags=document_service.parse_tags("Security, security, oncall"),
+        )
+        await session.commit()
+        assert doc.tags == ["Security", "oncall"]
+
+        # A query matching only the tag, nothing in title/description.
+        results = await search_service.search(session, "oncall")
+        assert any(r.kind == "document" and r.id == doc.id for r in results)
+
+        # The Documents list screen's own quick-search box matches tags too.
+        list_hits = (
+            await session.execute(document_service.document_list_stmt(search="oncall"))
+        ).scalars().all()
+        assert any(d.id == doc.id for d in list_hits)
+
+        # Calendar link: a plain reminder, no auto-refresh policy.
+        entry = await calendar_service.create_entry(
+            session,
+            title="Quarterly revision",
+            description=None,
+            start_date=dt.date(2026, 1, 1),
+            recurrence="quarterly",
+            recurrence_end=None,
+            emit_syslog_event=False,
+            event_program=None,
+            document_id=doc.id,
+            policy_ref=None,
+            created_by=None,
+        )
+        await session.commit()
+
+        for_doc = await calendar_service.list_entries_for_document(session, doc.id)
+        assert [e.id for e in for_doc] == [entry.id]
+
+        # Deleting the document cascades to its linked reminder.
+        await document_service.delete_document(session, doc)
+        remaining = await session.get(CalendarEntry, entry.id)
+        assert remaining is None
