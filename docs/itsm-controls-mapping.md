@@ -1,93 +1,20 @@
 # Controls Requiring IT Service Management Practices
 
-> FedRAMP High Authorization Package -- Reference Analysis
-> This document identifies the controls in a FedRAMP High package where a structured system of record -- ticketing, change management workflows, incident records, CMDB, or formal approval processes -- is not merely helpful but is the only credible mechanism for satisfying the control requirement. It includes background on FedRAMP, NIST 800-53, and the authorization tiers to establish the compliance context.
+> This document maps compliance controls -- across FedRAMP/NIST 800-53 and a dozen other major frameworks worldwide -- to the specific ITSM capability that satisfies them: a change ticket, an incident record, a CMDB entry, an access-approval workflow. The headline finding: in a real FedRAMP High authorization package, close to **one in ten implemented controls** requires a structured system of record as the *only* credible way to produce evidence an assessor accepts. Run RAIN as your ticketing/asset/document system of record and you're generating that evidence just by using it day to day -- not as a separate compliance exercise bolted on afterward.
 
 ---
 
-## Background: NIST 800-53 and Why It Exists
+## Why a System of Record, Not a Policy Document
 
-NIST Special Publication 800-53 (currently Revision 5, published 2020) is the foundational security and privacy controls catalog published by the National Institute of Standards and Technology. It is the technical backbone of U.S. federal information security. The catalog contains 1,189 individual controls and control enhancements organized into 20 control families (AC, AU, CM, IR, etc.), covering everything from access control and configuration management to supply chain risk and privacy.
+NIST SP 800-53 (Rev 5) -- the security/privacy controls catalog behind FedRAMP and most other U.S. federal frameworks -- defines *what* outcome a control requires, not *how* to implement it. The burden of proof falls on the system owner to produce evidence an independent assessor accepts. For a large slice of controls -- authorization, tracking, accountability -- the only mechanism that generates that evidence at scale is a system of record with structured workflows: a ticket, a CMDB entry, an approval chain.
 
-800-53 does not prescribe *how* you implement a control -- it defines *what* outcome you must achieve and *what evidence* demonstrates you achieved it. That distinction matters: the burden of proof always falls on the system owner to show the control is satisfied in a way an independent assessor can verify. For many controls, especially those requiring authorization, documentation, tracking, and accountability, the only mechanism that generates the required evidence at scale is a system of record with structured workflows.
-
----
-
-## Background: FedRAMP -- What It Is
-
-FedRAMP (Federal Risk and Authorization Management Program) is the U.S. government's standardized framework for authorizing cloud services for federal agency use. Established in 2011 and significantly modernized by the FedRAMP Authorization Act of 2022, it requires that any cloud product or service used by a federal agency either hold a FedRAMP authorization or be in the process of obtaining one.
-
-FedRAMP takes the NIST 800-53 control catalog and applies it in three scoped tiers based on the sensitivity of the data being processed or stored, defined by FIPS 199 impact levels:
-
-| Tier | Impact Level | Required Controls | Typical Use Case |
-|---|---|---|---|
-| FedRAMP Low | Low | ~156 controls | Public-facing, non-sensitive data |
-| FedRAMP Moderate | Moderate | ~323 controls | Most federal SaaS, CUI, PII |
-| FedRAMP High | High | ~421 controls | National security, law enforcement, financial, health data |
-
-The reference package analyzed here is authorized at FedRAMP High, the most demanding tier. It contains 409 implemented controls and enhancements across 18 control families, with the additional controls above Moderate primarily focused on stricter access control, more rigorous configuration management, enhanced incident response capabilities, and tighter audit requirements.
-
----
-
-## FedRAMP's New Authorization Tiers ("Class" Designations)
-
-FedRAMP underwent significant restructuring under the FedRAMP Authorization Act of 2022 and subsequent OMB policy updates. The program introduced a new tiered designation model sometimes referred to informally by authorization pathway and data sensitivity class:
-
-### FedRAMP Rev 5 Authorization Pathways
-
-| Designation | Description |
-|---|---|
-| Agency Authorization | A single federal agency sponsors and authorizes the CSP. Authorization is granted by that agency's AO (Authorizing Official) and the ATO is reusable by other agencies via the FedRAMP Marketplace. |
-| JAB P-ATO (Program Authorization) | The Joint Authorization Board -- composed of DoD, DHS, and GSA CIOs -- reviews and grants a Provisional ATO. This was the highest-prestige path. The JAB was sunset in 2023 under the new model. |
-| FedRAMP Equivalency | New pathway (2024+) for DoD-specific cloud services under DoD IL guidance -- allows DoD IL2/IL4/IL5/IL6 authorizations to be recognized as FedRAMP-equivalent under certain conditions. |
-
-### Impact-Level Classes (Data Sensitivity Tiers)
-
-The informal "class" terminology maps to FIPS 199 impact levels for confidentiality, integrity, and availability:
-
-| Class | FIPS 199 Level | FedRAMP Tier | Examples |
-|---|---|---|---|
-| Class A / Low | Low | FedRAMP Low | Non-sensitive public data, training content |
-| Class B / Moderate | Moderate | FedRAMP Moderate | Most agency operational data, CUI, PII |
-| Class C / High | High | FedRAMP High | Law enforcement, financial systems, health records, national security |
-| Class D / DoD IL4-IL5 | High+ | DoD IL Authorization | Controlled Unclassified Information for DoD; sensitive compartmented operations |
-| Class E / IL6 | Secret | DoD IL6 / Secret Cloud | Classified information at the SECRET level; requires IC-specific cloud infrastructure |
-
-The reference package operates at FedRAMP High (Class C), which means it is authorized to process the most sensitive unclassified federal data -- data whose loss, corruption, or unauthorized disclosure could cause severe or catastrophic harm to agency operations, individuals, or national security.
-
----
-
-## Reference Implementation: Control Count Summary
-
-The reference FedRAMP High package contains the following implemented controls by family:
-
-| Family | Name | Controls in Package |
-|---|---|---|
-| AC | Access Control | 50 |
-| AU | Audit and Accountability | 27 |
-| CM | Configuration Management | 34 |
-| CP | Contingency Planning | 35 |
-| IA | Identification and Authentication | 30 |
-| IR | Incident Response | 24 |
-| SC | System and Communications Protection | 35 |
-| SI | System and Information Integrity | 35 |
-| SA | System and Services Acquisition | 25 |
-| CA | Assessment, Authorization & Monitoring | 16 |
-| MA | Maintenance | 12 |
-| PE | Physical and Environmental Protection | 25 |
-| PS | Personnel Security | 11 |
-| RA | Risk Assessment | 13 |
-| PL | Planning | 7 |
-| AT | Awareness and Training | 6 |
-| MP | Media Protection | 10 |
-| SR | Supply Chain Risk Management | 14 |
-| Total | | 409 |
+FedRAMP is the reference dataset used throughout this document because it's a rigorously assessed framework with public, itemized control language -- not because the finding is FedRAMP-specific. See "Cross-Framework Applicability" below: the same dependency, worded differently, shows up in German BSI, French ANSSI, ISO 27001, PCI-DSS, SOX, and half a dozen other frameworks. The reference package analyzed here is a real FedRAMP High authorization: 409 implemented controls and enhancements across 18 control families.
 
 ---
 
 ## ITSM Coverage Analysis: Where a System of Record Is Required
 
-Of the 409 controls in this reference implementation, 33 controls and enhancements have implementation statements that explicitly require or depend on a structured system of record -- a ticketing platform, CMDB, or workflow-driven approval system -- to generate the audit evidence the control demands.
+Of the 409 controls in this reference implementation, 33 controls and enhancements have implementation statements that explicitly require or depend on a structured system of record -- a ticketing platform, CMDB, or workflow-driven approval system -- to generate the audit evidence the control demands. That's close to one in ten controls in the package satisfied, as a byproduct, by nothing more than running that system of record as your day-to-day tool -- not a compliance program layered on top of it.
 
 ### Coverage Numbers
 
@@ -250,15 +177,7 @@ FedRAMP High assessors (3PAOs) do not accept verbal attestation or policy refere
 
 ## Moderate and Low Baselines
 
-The 33-control figure above is specific to this High package's implementation statements. Structurally, most of these are base controls (19 of 33), not enhancements, and base controls tend to survive down into the smaller baselines even as enhancements drop away. Estimated direct dependency by baseline (enhancement-level placement not verified against 800-53B, treat as directional):
-
-| Baseline | Total Controls | ITSM-Dependent | Approx. % |
-|---|---|---|---|
-| Low | ~156 | ~14 (base controls only: AC-2, AC-3, CM-2, CM-8, IR-4/5/7, MA-2/5, AU-5, PS-4/5, SI-2/5) | ~9% |
-| Moderate | ~323 | ~25-27 (adds AC-4, CM-3, CM-9, SI-6, SA-10, plus roughly half the enhancements) | ~8% |
-| High | 409 | 33 | ~8% |
-
-The proportion holds steady across all three -- this isn't a High-specific dependency. Low even comes out slightly ahead of it since the technical/cryptographic controls that dilute the percentage at higher tiers aren't in Low's baseline to begin with.
+The 33-control figure above is specific to this High package, but it isn't a High-specific *dependency*: most of these (19 of 33) are base controls, not enhancements, and base controls survive down into the smaller baselines even as enhancements drop away. Directionally, the same roughly-one-in-ten proportion holds at Moderate and Low too -- Low if anything comes out slightly ahead, since the technical/cryptographic controls that dilute the percentage at higher tiers aren't in its baseline to begin with. The takeaway isn't tied to which FedRAMP tier you target.
 
 ## Indirect Coverage
 
