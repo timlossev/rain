@@ -1413,7 +1413,6 @@ async def platform_event_detail(
     if rule is None:
         return RedirectResponse("/tickets/platform-events", status_code=status.HTTP_303_SEE_OTHER)
     channels = list((await tenant_db.execute(select(NotificationChannel).order_by(NotificationChannel.name))).scalars())
-    documents = await document_service.list_documents(tenant_db)
     assets = await asset_service.list_assets(tenant_db)
     webhooks = await webhook_service.list_webhooks(tenant_db)
     return templates.TemplateResponse(
@@ -1428,7 +1427,6 @@ async def platform_event_detail(
             "match_fields": platform_events.MATCH_FIELDS,
             "action_types": platform_events.ACTION_TYPES,
             "channels": channels,
-            "documents": documents,
             "assets": assets,
             "webhooks": webhooks,
             "webhook_names": {w.id: w.name for w in webhooks},

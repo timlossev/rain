@@ -102,12 +102,8 @@
       {% if not webhooks %}<div class="field-hint">No webhooks yet -- create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.</div>{% endif %}
     </div>
 
-    <div class="field" data-action-fields="attach_document">
-      <label for="document_id">Document</label>
-      <select id="document_id" name="document_id">
-        <option value="">-</option>
-        {% for d in documents %}<option value="{{ d.id }}">{{ d.doc_number }}: {{ d.title }}</option>{% endfor %}
-      </select>
+    <div data-action-fields="attach_document">
+      {{ picker.search_picker("document_id", "/documents/search", label="Document", placeholder="Search documents...") }}
     </div>
     <div class="field" data-action-fields="attach_asset">
       <label for="asset_id">Asset</label>

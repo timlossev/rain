@@ -5,6 +5,7 @@ import datetime as dt
 
 from fastapi import APIRouter, Depends, Form, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from rain.core.config_store import config_store
 from rain.core.rbac import require_login
@@ -101,6 +102,19 @@ def _has_auto_refresh(entry) -> bool:
     return policy.get("type") == "refresh_document"
 
 
+async def _document_label(tenant_db: AsyncSession, document_id: int | None) -> str:
+    """The search_picker's initial display text for a pre-selected
+    document -- looked up on demand (a single row) rather than passing
+    every document down to the template, which a plain <select> needed
+    but a type-to-search field never does; unmanageable once a tenant
+    has more than a handful of documents (same reason the ticket
+    assignee/asset pickers work this way already)."""
+    if document_id is None:
+        return ""
+    doc = await document_service.get_document(tenant_db, document_id)
+    return f"{doc.doc_number}: {doc.title}" if doc else ""
+
+
 @router.get("/new", response_class=HTMLResponse)
 async def new_entry_form(
     request: Request,
@@ -112,7 +126,6 @@ async def new_entry_form(
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    documents = await document_service.list_documents(tenant_db)
     return templates.TemplateResponse(
         request,
         "calendar/form.html",
@@ -122,8 +135,8 @@ async def new_entry_form(
             "entry": None,
             "prefill_date": date or dt.date.today().isoformat(),
             "recurrence_presets": recurrence.RECURRENCE_PRESETS,
-            "documents": documents,
             "selected_document_id": document_id,
+            "selected_document_label": await _document_label(tenant_db, document_id),
             "auto_refresh": False,
             "redirect_to": safe_relative_path(redirect, default="/calendar"),
             "error": None,
@@ -180,7 +193,6 @@ async def edit_entry_form(
     entry = await service.get_entry(tenant_db, entry_id)
     if entry is None:
         return RedirectResponse("/calendar", status_code=status.HTTP_303_SEE_OTHER)
-    documents = await document_service.list_documents(tenant_db)
     return templates.TemplateResponse(
         request,
         "calendar/form.html",
@@ -190,8 +202,8 @@ async def edit_entry_form(
             "entry": entry,
             "prefill_date": entry.start_date.isoformat(),
             "recurrence_presets": recurrence.RECURRENCE_PRESETS,
-            "documents": documents,
             "selected_document_id": entry.document_id,
+            "selected_document_label": await _document_label(tenant_db, entry.document_id),
             "auto_refresh": _has_auto_refresh(entry),
             "redirect_to": safe_relative_path(redirect, default="/calendar"),
             "error": None,

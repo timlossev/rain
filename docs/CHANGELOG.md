@@ -26,6 +26,12 @@ drawn from. Updated alongside every push to `main`.
   existing webhook auto-refresh-on-occurrence policy. Existing
   auto-refresh entries get backfilled onto their document's Calendar
   tab automatically.
+- Replaced the plain `<select>` document pickers on the new calendar
+  entry form and a Platform Response Rule's "Attach document" action
+  with the same type-to-search picker already used to link a document
+  to a ticket -- a `<select>` listing every document doesn't scale past
+  a few dozen. Also tightened the calendar entry form's layout into
+  grouped sections with less prose per field.
 
 ## 2026-08-23
 
