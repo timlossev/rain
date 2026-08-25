@@ -861,6 +861,15 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
   flex-direction: column;
   overflow: hidden;
 }
+/* Wider variant for a modal whose body is itself a full record (an
+   event's raw/parsed content, a document preview) rather than a short
+   confirmation or a small form -- the plain 720px .modal-box reads
+   cramped for either. Same width for both so switching from browsing
+   events to opening a linked document's preview doesn't feel like a
+   step down. */
+.modal-box.modal-box-wide {
+  max-width: 1040px;
+}
 .modal-header {
   display: flex;
   align-items: center;

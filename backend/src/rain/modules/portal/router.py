@@ -157,6 +157,7 @@ async def portal_form(
     created: str = "",
     error: str = "",
     ticket_status: str | None = None,
+    page: int | None = None,
     user: CurrentUser | None = Depends(get_current_user_optional),
 ):
     access = await _resolve_portal_access(request, tenant_slug, user)
@@ -181,12 +182,14 @@ async def portal_form(
     # never carried a tab hint before now: a visitor who just filed a
     # report from this tab landing back on Request Something instead,
     # with no sign their submission actually went through in the table
-    # right below where they were, was the same class of bug.
-    active_tab = "tickets" if ticket_status is not None or created else "catalog"
+    # right below where they were, was the same class of bug. `page`
+    # (from clicking Prev/Next on this same table) is the same signal
+    # for the same reason.
+    active_tab = "tickets" if ticket_status is not None or created or page is not None else "catalog"
 
     async with tenant_session(tenant.schema_name) as tenant_db:
         reported = (
-            await ticket_service.list_tickets_reported_by(tenant_db, user.id, status=effective_status)
+            await ticket_service.list_tickets_reported_by(tenant_db, user.id, status=effective_status, page=page or 1)
             if user is not None
             else []
         )

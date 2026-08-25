@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_pagination.html" as pg with context %}
 {% block title %}{{ tenant.name }}: Report an Incident{% endblock %}
 {% block content_alone %}
 {% if branded and branding.portal_background_path %}
@@ -176,7 +177,7 @@
         <table>
           <thead><tr><th>Number</th><th>Title</th><th class="mobile-hide">Severity</th><th>Status</th><th class="mobile-hide">Last update</th><th></th></tr></thead>
           <tbody>
-            {% for row in reported %}
+            {% for row in reported.items %}
             <tr>
               {# Opens the lightweight timeline modal (app.js's [data-
                  ticket-timeline], fetching rain.modules.portal.router.
@@ -211,6 +212,7 @@
           </tbody>
         </table>
         </div>
+        {{ pg.render_pagination(reported) }}
         {% else %}
         <p class="muted portal-signin-hint">Sign in to see tickets you've reported.</p>
         {% endif %}

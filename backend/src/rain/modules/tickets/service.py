@@ -9,6 +9,7 @@ from sqlalchemy import Sequence, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from rain.core.pagination import DEFAULT_PAGE_SIZE, Page
 from rain.core.user_names import resolve_user_emails
 from rain.db.tenant_models import (
     ApprovalFlow,
@@ -1012,7 +1013,9 @@ async def list_tickets_for_asset(db: AsyncSession, asset_id: int) -> list[Ticket
     return list(result.scalars())
 
 
-async def list_tickets_reported_by(db: AsyncSession, user_id: int, *, status: str | None = None) -> list[dict]:
+async def list_tickets_reported_by(
+    db: AsyncSession, user_id: int, *, status: str | None = None, page: int = 1, page_size: int = DEFAULT_PAGE_SIZE
+) -> Page[dict]:
     """Backs the incident portal's "Tickets reported by me" table
     (rain.modules.portal). "Last update" is the more recent of the
     ticket's own updated_at (bumped by any status/severity/title/
@@ -1026,7 +1029,13 @@ async def list_tickets_reported_by(db: AsyncSession, user_id: int, *, status: st
     `status` is the same three-way sentinel ticket_list_stmt's own status
     param is (see that function's docstring): a real TicketStatus.key,
     the "active" sentinel (every status except is_closed-flagged ones),
-    or falsy/None for no filter at all."""
+    or falsy/None for no filter at all.
+
+    Paginated by hand rather than through rain.core.pagination.paginate --
+    that helper's own docstring restricts it to a plain `select(SomeModel)`
+    it can call .scalars() on; this statement selects two columns
+    (Ticket, last_update), so .scalars() would silently drop last_update_at
+    and every row would lose its "Last update" column."""
     latest_comment = (
         select(TicketComment.ticket_id, func.max(TicketComment.created_at).label("latest_comment_at"))
         .group_by(TicketComment.ticket_id)
@@ -1044,8 +1053,13 @@ async def list_tickets_reported_by(db: AsyncSession, user_id: int, *, status: st
     elif status:
         stmt = stmt.where(Ticket.status == status)
     stmt = stmt.order_by(last_update.desc())
-    result = await db.execute(stmt)
-    return [{"ticket": ticket, "last_update_at": last_update_at} for ticket, last_update_at in result.all()]
+
+    page = max(1, page)
+    count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
+    total = (await db.execute(count_stmt)).scalar_one()
+    result = await db.execute(stmt.limit(page_size).offset((page - 1) * page_size))
+    items = [{"ticket": ticket, "last_update_at": last_update_at} for ticket, last_update_at in result.all()]
+    return Page(items=items, page=page, page_size=page_size, total=total)
 
 
 def build_activity(ticket: Ticket) -> list[dict]:

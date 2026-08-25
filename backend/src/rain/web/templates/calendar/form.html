@@ -37,7 +37,7 @@
     <div class="form-section">
       <div class="form-section-title">Syslog bridge</div>
       <div class="form-row">
-        <div class="field" style="flex:0 0 260px;"><label class="checkbox-row"><input type="checkbox" name="emit_syslog_event" {% if entry and entry.emit_syslog_event %}checked{% endif %}> Emit syslog event on occurrence</label></div>
+        <div class="field" style="flex:0 0 260px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="emit_syslog_event" {% if entry and entry.emit_syslog_event %}checked{% endif %}> Emit syslog event on occurrence</label></div>
         <div class="field"><label for="event_program">Event "program" value (optional)</label><input type="text" id="event_program" name="event_program" value="{{ entry.event_program if entry and entry.event_program else '' }}" placeholder="Defaults to the title"></div>
       </div>
       <div class="field-hint">Lets <a href="/tickets/rules/all">Event Promotion Policies</a> react to this occurrence, same as real syslog traffic.</div>

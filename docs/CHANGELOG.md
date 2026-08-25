@@ -31,7 +31,19 @@ drawn from. Updated alongside every push to `main`.
   with the same type-to-search picker already used to link a document
   to a ticket -- a `<select>` listing every document doesn't scale past
   a few dozen. Also tightened the calendar entry form's layout into
-  grouped sections with less prose per field.
+  grouped sections with less prose per field, and fixed the Syslog
+  bridge section's checkbox sitting on a different line than the
+  field next to it.
+- Widened the event-preview modal (Events feed) and the document-
+  preview modal (opened from a document ID anywhere it's linked) to
+  the same larger size -- both show a full record's worth of content
+  and read cramped at the old, generic modal width.
+- Paginated the client portal's "Tickets reported by me" table --
+  previously an unbounded list. `list_tickets_reported_by` couldn't
+  reuse the shared `paginate()` helper as-is (that one's `.scalars()`
+  call assumes a single-entity `select()`; this one also selects a
+  computed "last update" column), so it does its own count + limit/
+  offset instead.
 
 ## 2026-08-23
 
