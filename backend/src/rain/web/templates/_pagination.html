@@ -18,7 +18,7 @@
 {% if page.total_pages > 1 or page.total > 0 %}
 <div class="pagination">
   <span class="pagination-summary muted">
-    {% if page.total == 0 %}No results{% else %}Showing {{ page.start_index }}&ndash;{{ page.end_index }} of {{ page.total }}{% endif %}
+    {% if page.total == 0 %}No results{% else %}Showing {{ page.start_index }}-{{ page.end_index }} of {{ page.total }}{% endif %}
   </span>
   {% if page.total_pages > 1 %}
   <div class="pagination-controls">
