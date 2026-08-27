@@ -235,13 +235,19 @@ async def update_sharing(db: AsyncSession, doc: Document, is_shareable: bool) ->
     await db.commit()
 
 
+def shareable_document_list_stmt():
+    """Same shape as document_list_stmt above (a plain select(Document),
+    safe to hand straight to rain.core.pagination.paginate) -- no
+    search/filtering, unlike that one: this backs the client portal's
+    "Shareable documents" tab (rain.modules.portal.router.portal_form),
+    reachable by an anonymous visitor regardless of portal_require_auth,
+    and nothing here is sensitive enough to need filtering beyond
+    is_shareable itself."""
+    return select(Document).where(Document.is_shareable.is_(True)).order_by(Document.title)
+
+
 async def list_shareable_documents(db: AsyncSession) -> list[Document]:
-    """Backs the client portal's "Shareable documents" tab (rain.modules.
-    portal.router.portal_form) -- every is_shareable document, reachable
-    by an anonymous visitor regardless of portal_require_auth, so this
-    intentionally has none of list_documents' search/filtering (nothing
-    here is sensitive enough to need it) and returns the full set."""
-    result = await db.execute(select(Document).where(Document.is_shareable.is_(True)).order_by(Document.title))
+    result = await db.execute(shareable_document_list_stmt())
     return list(result.scalars())
 
 

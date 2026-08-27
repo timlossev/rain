@@ -37,6 +37,14 @@ drawn from. Updated alongside every push to `main`.
   its label is renamable on Admin > Branding (e.g. "Trust Center").
 - Swept the UI for em dashes and `--`, replacing them with a plain `-`
   -- an explicit style preference, not a functional change.
+- Moved a document's tags, sharing checkbox, and upload date into its
+  "Properties" tab (renamed from "Description," which now also lives
+  there) instead of sitting above the tabs.
+- Paginated the client portal's Document Archive and Shareable
+  documents tabs -- previously unbounded, same issue "Tickets reported
+  by me" had. `_pagination.html`'s macro now takes an optional `param`
+  so more than one paginated list can share a page without one's Next/
+  Prev resetting the other's.
 
 ## 2026-08-25
 

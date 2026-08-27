@@ -9,7 +9,12 @@
    ever evaluated once there's a second page) -- at which point Jinja
    raised `'request' is undefined`, not any earlier during that page's
    otherwise-normal render. #}
-{% macro render_pagination(page) %}
+{% macro render_pagination(page, param="page") %}
+{# `param` lets more than one paginated list share a page (e.g. the
+   client portal's Document Archive and Shareable documents tabs) --
+   each with its own query-string key so paging one doesn't reset the
+   other. Defaults to "page", the only key every single-list screen in
+   the app has ever needed. #}
 {% if page.total_pages > 1 or page.total > 0 %}
 <div class="pagination">
   <span class="pagination-summary muted">
@@ -18,13 +23,13 @@
   {% if page.total_pages > 1 %}
   <div class="pagination-controls">
     {% if page.has_prev %}
-    <a class="btn btn-sm" href="{{ request.url.include_query_params(page=page.page - 1) }}">&larr; Prev</a>
+    <a class="btn btn-sm" href="{{ request.url.include_query_params(**{param: page.page - 1}) }}">&larr; Prev</a>
     {% else %}
     <span class="btn btn-sm" aria-disabled="true">&larr; Prev</span>
     {% endif %}
     <span class="pagination-page muted">Page {{ page.page }} of {{ page.total_pages }}</span>
     {% if page.has_next %}
-    <a class="btn btn-sm" href="{{ request.url.include_query_params(page=page.page + 1) }}">Next &rarr;</a>
+    <a class="btn btn-sm" href="{{ request.url.include_query_params(**{param: page.page + 1}) }}">Next &rarr;</a>
     {% else %}
     <span class="btn btn-sm" aria-disabled="true">Next &rarr;</span>
     {% endif %}

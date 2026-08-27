@@ -125,7 +125,7 @@
           <button type="button" class="tab-btn" data-tab-btn="approvals">Pending Actions{% if pending_approval %} ({{ pending_approval | length }}){% endif %}</button>
           <button type="button" class="tab-btn" data-tab-btn="documents">Document Archive</button>
           {% endif %}
-          {% if shareable_documents %}
+          {% if shareable_documents.total %}
           <button type="button" class="tab-btn {{ 'active' if active_tab == 'shared' else '' }}" data-tab-btn="shared">{{ shareable_documents_label }}</button>
           {% endif %}
           {% if not user %}
@@ -231,13 +231,13 @@
       </div>
       {% endif %}
 
-      {% if shareable_documents %}
+      {% if shareable_documents.total %}
       <div class="tab-panel {{ 'active' if active_tab == 'shared' else '' }}" data-tab-panel="shared">
         <div class="table-scroll">
         <table>
           <thead><tr><th>Number</th><th>Title</th><th>Updated</th></tr></thead>
           <tbody>
-            {% for d in shareable_documents %}
+            {% for d in shareable_documents.items %}
             <tr>
               <td>{{ d.doc_number }}</td>
               <td><a href="/portal/{{ tenant.slug }}/shared-documents/{{ d.doc_number }}/download">{{ d.title }}</a></td>
@@ -247,6 +247,7 @@
           </tbody>
         </table>
         </div>
+        {{ pg.render_pagination(shareable_documents, param="shared_page") }}
       </div>
       {% endif %}
 
@@ -276,7 +277,7 @@
         <table>
           <thead><tr><th>Number</th><th>Title</th><th>Updated</th></tr></thead>
           <tbody>
-            {% for d in documents %}
+            {% for d in documents.items %}
             <tr>
               <td><a href="/documents/{{ d.doc_number }}">{{ d.doc_number }}</a></td>
               <td>{{ d.title }}</td>
@@ -288,6 +289,7 @@
           </tbody>
         </table>
         </div>
+        {{ pg.render_pagination(documents, param="doc_page") }}
       </div>
       {% endif %}
     </div>

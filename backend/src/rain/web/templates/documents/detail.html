@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ doc.doc_number }}: {{ doc.title }} - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}A single document's details - tags, description, contents (with an inline editor for txt/md files), auto-update from a webhook, what it's linked to, and any calendar reminders (e.g. a quarterly revision) tied to it.{% endblock %}
+{% block help_text %}A single document's details - properties (tags, sharing, upload date, description), contents (with an inline editor for txt/md files), auto-update from a webhook, what it's linked to, and any calendar reminders (e.g. a quarterly revision) tied to it.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:space-between; align-items:flex-start;">
   <div>
     <div style="font-size:1.25em; font-weight:600;">{{ doc.doc_number }}: {{ doc.title }}</div>
-    <div class="muted">{{ doc.filename }} ({{ (doc.size_bytes / 1024) | round(1) }} KB)<br>Uploaded {{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</div>
+    <div class="muted">{{ doc.filename }} ({{ (doc.size_bytes / 1024) | round(1) }} KB)</div>
   </div>
   <div>
     <a class="btn" href="/documents/{{ doc.id }}/download">Download</a>
@@ -16,35 +16,12 @@
   </div>
 </div>
 
-<div class="panel-row" style="margin-bottom:16px;">
-  <span class="doc-tags-edit" data-inline-edit>
-    <span class="doc-tags-display" data-inline-edit-display>
-      {% for tag in doc.tags %}<span class="badge">{{ tag }}</span> {% else %}<span class="muted">No tags.</span>{% endfor %}
-      <button type="button" class="inline-edit-btn" data-inline-edit-toggle title="Edit tags" aria-label="Edit tags">
-        <span class="nav-icon">{{ nav_icon("pencil") }}</span>
-      </button>
-    </span>
-    <form method="post" action="/documents/{{ doc.id }}/tags" data-inline-edit-form hidden>
-      <input type="text" name="tags" value="{{ doc.tags | join(', ') }}" placeholder="runbook, security, onboarding" style="min-width:320px;">
-      <button type="submit" class="btn btn-sm">Save</button>
-      <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
-    </form>
-  </span>
-</div>
-
-<div class="panel-row" style="margin-bottom:16px;">
-  <form method="post" action="/documents/{{ doc.id }}/sharing" class="inline">
-    <label class="checkbox-row"><input type="checkbox" name="is_shareable" onchange="this.form.submit()" {% if doc.is_shareable %}checked{% endif %}> Shareable in the client portal</label>
-  </form>
-  {% if doc.is_shareable %}<span class="muted">Visible to every portal visitor, including those without an account.</span>{% endif %}
-</div>
-
 <div class="card" data-tabs>
   <div class="tab-buttons">
     {% if body_kind %}
     <button type="button" class="tab-btn active" data-tab-btn="contents">Contents</button>
     {% endif %}
-    <button type="button" class="tab-btn{{ '' if body_kind else ' active' }}" data-tab-btn="description">Description</button>
+    <button type="button" class="tab-btn{{ '' if body_kind else ' active' }}" data-tab-btn="properties">Properties</button>
     {% if body_kind %}
     <button type="button" class="tab-btn" data-tab-btn="auto-update">Auto-update</button>
     {% endif %}
@@ -79,7 +56,39 @@
   </div>
   {% endif %}
 
-  <div class="tab-panel{{ '' if body_kind else ' active' }}" data-tab-panel="description">
+  <div class="tab-panel{{ '' if body_kind else ' active' }}" data-tab-panel="properties">
+    <div class="field">
+      <label>Tags</label>
+      <span class="doc-tags-edit" data-inline-edit>
+        <span class="doc-tags-display" data-inline-edit-display>
+          {% for tag in doc.tags %}<span class="badge">{{ tag }}</span> {% else %}<span class="muted">No tags.</span>{% endfor %}
+          <button type="button" class="inline-edit-btn" data-inline-edit-toggle title="Edit tags" aria-label="Edit tags">
+            <span class="nav-icon">{{ nav_icon("pencil") }}</span>
+          </button>
+        </span>
+        <form method="post" action="/documents/{{ doc.id }}/tags" data-inline-edit-form hidden>
+          <input type="text" name="tags" value="{{ doc.tags | join(', ') }}" placeholder="runbook, security, onboarding" style="min-width:320px;">
+          <button type="submit" class="btn btn-sm">Save</button>
+          <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
+        </form>
+      </span>
+    </div>
+
+    <div class="field">
+      <label>Sharing</label>
+      <div>
+        <form method="post" action="/documents/{{ doc.id }}/sharing" class="inline">
+          <label class="checkbox-row"><input type="checkbox" name="is_shareable" onchange="this.form.submit()" {% if doc.is_shareable %}checked{% endif %}> Shareable in the client portal</label>
+        </form>
+        {% if doc.is_shareable %}<div class="field-hint">Visible to every portal visitor, including those without an account.</div>{% endif %}
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Uploaded</label>
+      <div class="muted">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</div>
+    </div>
+
     <form method="post" action="/documents/{{ doc.id }}/description">
       <div class="field">
         <label for="description">Description</label>

@@ -38,6 +38,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy import select
 
+from rain.core.pagination import paginate
 from rain.core.tenancy import CurrentUser, get_current_user_optional
 from rain.core.tenant_config import get_tenant_config, get_tenant_configs
 from rain.core.user_names import resolve_user_names
@@ -180,6 +181,8 @@ async def portal_form(
     error: str = "",
     ticket_status: str | None = None,
     page: int | None = None,
+    doc_page: int | None = None,
+    shared_page: int | None = None,
     user: CurrentUser | None = Depends(get_current_user_optional),
 ):
     resolved = await _resolve_portal_tenant_and_flags(request, tenant_slug, user)
@@ -188,7 +191,9 @@ async def portal_form(
     tenant, flags = resolved
 
     async with tenant_session(tenant.schema_name) as tenant_db:
-        shareable_documents = await document_service.list_shareable_documents(tenant_db)
+        shareable_documents = await paginate(
+            tenant_db, document_service.shareable_document_list_stmt(), page=shared_page or 1
+        )
         shareable_documents_label = await get_tenant_config(
             tenant_db, "portal_shareable_documents_label", "Shareable documents"
         )
@@ -204,7 +209,7 @@ async def portal_form(
         # only ever renders the Shareable documents tab -- everything
         # else on this page stays exactly as gated as it already was.
         anonymous_shared_only = flags["portal_require_auth"] and user is None
-        if anonymous_shared_only and not shareable_documents:
+        if anonymous_shared_only and shareable_documents.total == 0:
             return RedirectResponse(f"/login?next=/portal/{tenant_slug}", status_code=status.HTTP_303_SEE_OTHER)
 
         # Same "no filter in the URL at all" -> "active" default as the
@@ -261,7 +266,11 @@ async def portal_form(
         # documents is meant to be reachable, so it's skipped there the
         # same as the signed-in-only tabs.
         pending_approval = await ticket_service.list_tickets_pending_approval_for(tenant_db, user.id) if user is not None else []
-        documents = await document_service.list_documents(tenant_db) if user is not None else []
+        documents = (
+            await paginate(tenant_db, document_service.document_list_stmt(), page=doc_page or 1)
+            if user is not None
+            else []
+        )
         catalog_items = (
             [] if anonymous_shared_only else await catalog_service.list_catalog_items(tenant_db, active_only=True)
         )
