@@ -66,9 +66,9 @@
               <select id="ml_algorithm" name="ml_algorithm" onchange="document.getElementById('ml_algorithm_hint').textContent = this.options[this.selectedIndex].dataset.desc">
                 {% for key, label, desc in ml_algorithms %}<option value="{{ key }}" data-desc="{{ desc }}" {% if key == rule.ml_algorithm %}selected{% endif %}>{{ label }}</option>{% endfor %}
               </select>
+              <div class="field-hint" id="ml_algorithm_hint">{% for key, label, desc in ml_algorithms %}{% if key == rule.ml_algorithm %}{{ desc }}{% endif %}{% endfor %}</div>
             </div>
           </div>
-          <div class="field-hint" id="ml_algorithm_hint">{% for key, label, desc in ml_algorithms %}{% if key == rule.ml_algorithm %}{{ desc }}{% endif %}{% endfor %}</div>
           <div class="form-row">
             <div class="field">
               <label for="group_by">Group by</label>
@@ -101,17 +101,19 @@
         <input type="text" id="title_template" name="title_template" value="{{ rule.title_template }}" placeholder="{message}">
         <div class="field-hint">Placeholders: <code>{message}</code>, <code>{host}</code>, <code>{program}</code>, and for ML anomaly, also <code>{count}</code>, <code>{window}</code>, <code>{score}</code>.</div>
       </div>
-      <div class="field">
-        <label for="asset_match_field">Auto-link asset by</label>
-        <select id="asset_match_field" name="asset_match_field">
-          <option value="">Don't auto-link</option>
-          <option value="host" {% if rule.asset_match_field == "host" %}selected{% endif %}>Event host = asset External ID</option>
-          <option value="program" {% if rule.asset_match_field == "program" %}selected{% endif %}>Event program = asset External ID</option>
-        </select>
-      </div>
-      <div class="field">
-        <label class="checkbox-row"><input type="checkbox" name="is_active" {% if rule.is_active %}checked{% endif %}> Active</label>
-        <div class="field-hint">Inactive policies are skipped entirely - their events fall through to the next policy (or just stay in Events, unpromoted).</div>
+      <div class="form-row">
+        <div class="field">
+          <label for="asset_match_field">Auto-link asset by</label>
+          <select id="asset_match_field" name="asset_match_field">
+            <option value="">Don't auto-link</option>
+            <option value="host" {% if rule.asset_match_field == "host" %}selected{% endif %}>Event host = asset External ID</option>
+            <option value="program" {% if rule.asset_match_field == "program" %}selected{% endif %}>Event program = asset External ID</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_active" {% if rule.is_active %}checked{% endif %}> Active</label>
+          <div class="field-hint">Inactive policies are skipped entirely - fall through to the next policy.</div>
+        </div>
       </div>
     </div>
 

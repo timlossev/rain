@@ -23,31 +23,11 @@
         <td><span class="badge severity-{{ r.severity }}">{{ r.severity }}</span></td>
         <td class="actions">
           <a class="btn btn-sm" href="/tickets/rules/{{ r.id }}/edit">Edit</a>
+          {{ modal.trigger_button("test-rule-" ~ r.id, "Test", variant="btn-sm") }}
         </td>
         <td class="actions">
           <form class="inline" method="post" action="/tickets/rules/{{ r.id }}/delete" data-confirm="Delete policy '{{ r.name }}'?">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
-          </form>
-        </td>
-      </tr>
-      {% if test_result and test_result.rule_id == r.id %}
-      <tr>
-        <td></td>
-        <td colspan="8">
-          {% if test_result.matched %}
-          <span class="flash flash-ok" style="display:inline-block;">Matches: "{{ test_result.sample }}"</span>
-          {% else %}
-          <span class="flash flash-error" style="display:inline-block;">No match: "{{ test_result.sample }}"</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% endif %}
-      <tr>
-        <td></td>
-        <td colspan="8">
-          <form method="post" action="/tickets/rules/{{ r.id }}/test" class="form-row" style="margin:0;">
-            <input type="text" name="sample" placeholder="Paste a sample message to test this policy's pattern against" style="flex:1;">
-            <button class="btn btn-sm" type="submit">Test</button>
           </form>
         </td>
       </tr>
@@ -58,6 +38,26 @@
   </table>
   {{ pg.render_pagination(page) }}
 </div>
+
+{% for r in page.items %}
+{% call modal.modal("test-rule-" ~ r.id, "Test policy: " ~ r.name, open=(test_result and test_result.rule_id == r.id)) %}
+  <p class="field-hint" style="margin-top:0;">Checks a sample message against this policy's pattern (<code>{{ r.pattern }}</code>, matched on {{ r.match_field }}) - it doesn't run the rest of the policy (grouping, thresholds, title template), just the regex.</p>
+  {% if test_result and test_result.rule_id == r.id %}
+  {% if test_result.matched %}
+  <div class="flash flash-ok">Matches: "{{ test_result.sample }}"</div>
+  {% else %}
+  <div class="flash flash-error">No match: "{{ test_result.sample }}"</div>
+  {% endif %}
+  {% endif %}
+  <form method="post" action="/tickets/rules/{{ r.id }}/test">
+    <div class="field">
+      <label for="sample-{{ r.id }}">Sample message</label>
+      <input type="text" id="sample-{{ r.id }}" name="sample" placeholder="Paste a sample message to test this policy's pattern against" value="{{ test_result.sample if test_result and test_result.rule_id == r.id else '' }}" autofocus>
+    </div>
+    <button class="btn btn-primary btn-sm" type="submit">Test</button>
+  </form>
+{% endcall %}
+{% endfor %}
 
 {% call modal.modal("event-policy", "New policy", open=(prefill is not none)) %}
   {% if prefill %}<p class="field-hint">Pre-filled from the event(s) selected in <a href="/tickets/live">Events</a> - review before saving.</p>{% endif %}
@@ -123,9 +123,9 @@
               <select id="ml_algorithm" name="ml_algorithm" onchange="document.getElementById('ml_algorithm_hint').textContent = this.options[this.selectedIndex].dataset.desc">
                 {% for key, label, desc in ml_algorithms %}<option value="{{ key }}" data-desc="{{ desc }}">{{ label }}</option>{% endfor %}
               </select>
+              <div class="field-hint" id="ml_algorithm_hint">{{ ml_algorithms[0][2] if ml_algorithms else '' }}</div>
             </div>
           </div>
-          <div class="field-hint" id="ml_algorithm_hint">{{ ml_algorithms[0][2] if ml_algorithms else '' }}</div>
           <div class="form-row">
             <div class="field">
               <label for="group_by">Group by</label>

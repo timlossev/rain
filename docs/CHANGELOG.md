@@ -45,6 +45,15 @@ drawn from. Updated alongside every push to `main`.
   by me" had. `_pagination.html`'s macro now takes an optional `param`
   so more than one paginated list can share a page without one's Next/
   Prev resetting the other's.
+- Event Promotion Policies: the pattern tester used to sit permanently
+  under every single policy row (two extra table rows each, whether or
+  not anyone was testing anything); it's now an on-demand "Test" button
+  opening a small modal, same pattern the rest of the app already uses
+  for a per-row action. Also fixed a missing gap between the ML
+  anomaly algorithm's description text and the "Group by" dropdown
+  below it (on both the list page's "New policy" modal and the Edit
+  Policy screen), and combined "Auto-link asset by" and "Active" onto
+  one row on the Edit Policy screen.
 
 ## 2026-08-25
 
