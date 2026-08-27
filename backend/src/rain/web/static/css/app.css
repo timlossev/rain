@@ -737,10 +737,16 @@ form.inline { display: inline; }
 
 /* Record-type pills: a segmented-control-style primary filter (a small,
    fixed set of types) in place of the plain <select> it used to be --
-   color-coded per type so the active one reads at a glance instead of
+   a solid fill for the active one so it reads at a glance instead of
    just being "the highlighted one", the same way the ticket status
    stepper already uses a solid fill for its current step rather than a
-   passive badge tint. */
+   passive badge tint. All three record types share the tenant's own
+   accent color when active (incident/vulnerability used to be a fixed
+   red/orange instead, as if they outranked Changes in severity by
+   type alone -- severity is what --danger/severity-critical etc. are
+   for, on the ticket itself, not which record type it is); "All" (no
+   type-modifier class) stays the neutral --text-muted fill, so a type
+   filter still reads as distinct from no filter at all. */
 .filter-bar-types { display: flex; flex-wrap: wrap; gap: 8px; }
 .type-pill {
   display: inline-flex;
@@ -754,11 +760,8 @@ form.inline { display: inline; }
   color: var(--text-muted);
 }
 .type-pill:hover { text-decoration: none; border-color: var(--accent); color: var(--text); }
-.type-pill.active { border-color: transparent; color: #fff; }
-.type-pill.active { background: var(--text-muted); }
-.type-pill-incident.active { background: var(--danger); }
-.type-pill-vulnerability.active { background: #c2410c; }
-.type-pill-change.active { background: var(--accent); }
+.type-pill.active { border-color: transparent; color: #fff; background: var(--text-muted); }
+.type-pill-incident.active, .type-pill-vulnerability.active, .type-pill-change.active { background: var(--accent); }
 
 /* Pill-styled radio group (document detail's "Link to" ticket/asset
    picker) -- same .type-pill look as the filter pills above, but backed

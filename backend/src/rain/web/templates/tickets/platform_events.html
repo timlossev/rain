@@ -36,6 +36,15 @@
   {{ pg.render_pagination(page) }}
 </div>
 
+<div class="card">
+  <h3>Root cause assistance</h3>
+  <p class="muted">The "Analyze root cause" button on a ticket (repeat-occurrence pattern + similar past closed tickets, posted as a comment) is always available. This also runs it automatically, once, the first time a ticket moves into a closed status.</p>
+  <form method="post" action="/tickets/platform-events/automation">
+    <label class="checkbox-row"><input type="checkbox" name="auto_root_cause_on_close" {% if auto_root_cause %}checked{% endif %}> Automatically analyze root cause when a ticket closes</label>
+    <button class="btn btn-sm btn-primary" type="submit" style="margin-top:8px;">Save</button>
+  </form>
+</div>
+
 {% call modal.modal("platform-rule", "New rule") %}
   <form method="post" action="/tickets/platform-events">
     <div class="form-row">

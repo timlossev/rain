@@ -476,6 +476,15 @@ logged both to that rule's own history and to the matching ticket's
 Activity feed, whether or not the action itself succeeded, so a failed
 Slack post never hides the fact that the rule matched.
 
+Below the rule list, a "Root cause assistance" checkbox: "Automatically
+analyze root cause when a ticket closes" runs the same "Analyze root
+cause" that's always available on the ticket detail page, once,
+automatically, the first time a ticket moves into any status flagged
+"closed" (Admin > Ticket Statuses). Off by default. It lives here
+rather than on that Ticket Statuses screen since it reacts to a ticket
+event (closure) the same way every rule above does, not because it's a
+property of the statuses themselves.
+
 ## Calendar
 
 Each tenant has its own calendar, reached from the Calendar entry in
@@ -923,13 +932,10 @@ stamps a closed date on a ticket moved there), and an active toggle.
 "+ New status" asks for a Label, a Key, a Color (color picker), a
 "Counts as closed" checkbox, and an Order. Deactivating a status hides
 it from new selections without affecting tickets already set to it;
-deleting one behaves the same way.
-
-Below the table, a "Root cause assistance" checkbox: "Automatically
-analyze root cause when a ticket closes" runs the same "Analyze root
-cause" that's always available on the ticket detail page, once,
-automatically, the first time a ticket moves into any status flagged
-"closed" above. Off by default.
+deleting one behaves the same way. (The "Root cause assistance"
+automation toggle lives under Platform Response Rules, below, not
+here -- it reacts to a ticket closing, the same as every other rule on
+that screen, rather than being a property of the statuses themselves.)
 
 **Notification Channels.** Named destinations a Platform Response Rule
 can notify. Each channel has a Type (email, Slack, or webhook) and a

@@ -36,8 +36,11 @@ DEFAULTS: dict[str, Any] = {
     "portal_shareable_documents_label": "Shareable documents",
     # rain.modules.tickets.rootcause.analyze: off by default -- a comment
     # on every single closed ticket is noise for a tenant that never asked
-    # for it. An admin opts in under Admin > Ticket Statuses; the on-demand
-    # "Analyze root cause" button on a ticket works regardless of this flag.
+    # for it. An admin opts in under Tickets > Platform Response Rules
+    # (it's a reaction to a ticket event, closure, same as every rule on
+    # that screen -- not a property of the statuses themselves); the
+    # on-demand "Analyze root cause" button on a ticket works regardless
+    # of this flag.
     "auto_root_cause_on_close": False,
 }
 

@@ -35,7 +35,8 @@ from rain.db.tenant_models import SyslogEvent, Ticket, TicketStatus
 # rain.core.tenant_config key: opt-in, default off (see that module's
 # DEFAULTS) -- an automatic comment on every closed ticket is noise for a
 # tenant that never wanted it, so this only fires once an admin turns it
-# on under Admin > Ticket Statuses.
+# on under Tickets > Platform Response Rules (a reaction to a ticket
+# event, same as every rule on that screen, not a status property).
 AUTO_ROOT_CAUSE_CONFIG_KEY = "auto_root_cause_on_close"
 
 # Cap how many promoted events summarize_chronic pulls back -- a genuinely

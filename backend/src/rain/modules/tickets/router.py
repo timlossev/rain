@@ -18,7 +18,7 @@ from rain.core.field_pack import sniff_columns
 from rain.core.pagination import paginate
 from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
-from rain.core.tenant_config import get_tenant_config
+from rain.core.tenant_config import get_tenant_config, set_tenant_config
 from rain.core.user_names import is_assignable_user, resolve_user_names
 from rain.db.base import control_session
 from rain.db.control_models import User
@@ -1413,6 +1413,7 @@ async def platform_events_list(
         .order_by(PlatformEventRule.sort_order)
     )
     rule_page = await paginate(tenant_db, stmt, page=page)
+    auto_root_cause = await get_tenant_config(tenant_db, "auto_root_cause_on_close", False)
     return templates.TemplateResponse(
         request,
         "tickets/platform_events.html",
@@ -1423,8 +1424,27 @@ async def platform_events_list(
             "trigger_events": platform_events.TRIGGER_EVENTS,
             "trigger_event_labels": dict(platform_events.TRIGGER_EVENTS),
             "match_fields": platform_events.MATCH_FIELDS,
+            "auto_root_cause": auto_root_cause,
         },
     )
+
+
+@router.post("/platform-events/automation")
+async def platform_events_automation(
+    auto_root_cause_on_close: bool = Form(False),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    ctx: RequestContext = Depends(get_request_context),
+    _: CurrentUser = Depends(require_admin),
+):
+    """Saves rain.modules.tickets.rootcause's opt-in auto-analyze-at-
+    closure flag for the active tenant. Off by default (see
+    rain.core.tenant_config.DEFAULTS) -- the on-demand "Analyze root
+    cause" button on a ticket works regardless of this setting. Lives
+    here, not Admin > Ticket Statuses, since it's a reaction to a
+    ticket event (closure) the same way every Platform Response Rule
+    is, not a property of the statuses themselves."""
+    await set_tenant_config(tenant_db, "auto_root_cause_on_close", auto_root_cause_on_close, updated_by=ctx.user.id)
+    return RedirectResponse("/tickets/platform-events", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/platform-events")

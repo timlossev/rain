@@ -779,26 +779,11 @@ async def ticket_statuses_list(
     nav = await build_nav_context(ctx)
     stmt = select(TicketStatus).order_by(TicketStatus.sort_order, TicketStatus.label)
     status_page = await paginate(tenant_db, stmt, page=page)
-    auto_root_cause = await get_tenant_config(tenant_db, "auto_root_cause_on_close", False)
     return templates.TemplateResponse(
         request,
         "admin/ticket_statuses.html",
-        {**nav, "ctx": ctx, "page": status_page, "auto_root_cause": auto_root_cause},
+        {**nav, "ctx": ctx, "page": status_page},
     )
-
-
-@router.post("/ticket-statuses/automation")
-async def ticket_statuses_automation(
-    auto_root_cause_on_close: bool = Form(False),
-    tenant_db: AsyncSession = Depends(get_tenant_db),
-    user: CurrentUser = Depends(require_admin),
-):
-    """Saves rain.modules.tickets.rootcause's opt-in auto-analyze-at-
-    closure flag for the active tenant. Off by default (see
-    rain.core.tenant_config.DEFAULTS) -- the on-demand "Analyze root
-    cause" button on a ticket works regardless of this setting."""
-    await set_tenant_config(tenant_db, "auto_root_cause_on_close", auto_root_cause_on_close, updated_by=user.id)
-    return RedirectResponse("/admin/ticket-statuses", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/ticket-statuses")

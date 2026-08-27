@@ -8,6 +8,16 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-27
 
+- Moved the "Root cause assistance" auto-analyze-at-closure toggle from
+  Admin > Ticket Statuses to Tickets > Platform Response Rules -- it
+  reacts to a ticket event (closure), the same as every rule on that
+  screen, not a property of the statuses themselves.
+- Record-type filter pills (Tickets list) all use the tenant's accent
+  color when active now, instead of Incidents/Vulnerabilities getting a
+  fixed red/orange while Changes got the accent -- that read as if
+  incidents/vulnerabilities outranked changes in severity by type
+  alone, which isn't what the color was meant to convey (severity is
+  what the badges on the ticket itself are for).
 - A round of small layout fixes: Admin > Branding's two cards now sit
   side by side on a wide screen instead of stacking in one narrow,
   individually width-capped column (new `.two-col-cards` utility, also
