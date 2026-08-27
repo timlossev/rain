@@ -230,6 +230,21 @@ async def update_tags(db: AsyncSession, doc: Document, tags: list[str]) -> None:
     await db.commit()
 
 
+async def update_sharing(db: AsyncSession, doc: Document, is_shareable: bool) -> None:
+    doc.is_shareable = is_shareable
+    await db.commit()
+
+
+async def list_shareable_documents(db: AsyncSession) -> list[Document]:
+    """Backs the client portal's "Shareable documents" tab (rain.modules.
+    portal.router.portal_form) -- every is_shareable document, reachable
+    by an anonymous visitor regardless of portal_require_auth, so this
+    intentionally has none of list_documents' search/filtering (nothing
+    here is sensitive enough to need it) and returns the full set."""
+    result = await db.execute(select(Document).where(Document.is_shareable.is_(True)).order_by(Document.title))
+    return list(result.scalars())
+
+
 async def update_webhook_config(
     db: AsyncSession,
     doc: Document,

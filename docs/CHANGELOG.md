@@ -6,6 +6,38 @@ the honest anchor point. Each entry is a synthesis of that day's commits,
 not a 1:1 commit dump; see `git log` for the literal history this is
 drawn from. Updated alongside every push to `main`.
 
+## 2026-08-27
+
+- **Root cause assistance for tickets**: an "Analyze root cause" button
+  on any ticket (and an opt-in "run automatically when a ticket closes"
+  toggle, off by default, under Admin > Ticket Statuses) posts a
+  comment summarizing two honest, non-causal signals -- a repeat-
+  occurrence pattern (host/program distribution and time span across
+  every syslog event promoted into the ticket) and similar past
+  *closed* tickets (the existing full-text search, ranked). This is
+  statistical/historical pattern-matching, not causal reasoning --
+  nothing in the app (or `river`, its only ML dependency) determines
+  *why* something happened, and the comment says so.
+- **Selectable ML anomaly detection algorithm**: an Event Promotion
+  Policy using "ML anomaly" now picks which `river.anomaly` detector
+  it runs -- Half-Space Trees (the previous, still-default, hardcoded
+  choice), Local Outlier Factor, or One-Class SVM -- each with a plain-
+  language explanation of what it's better at, shown on the policy
+  form. A firing ticket's description also now names the single most-
+  deviated feature (severity, message length, or time of day) and how
+  many standard deviations off this group's own history it was,
+  computed from a running per-feature mean/variance (Welford's online
+  algorithm) kept alongside the model.
+- **Shareable documents / "Trust Center"**: a document can be marked
+  "Shareable in the client portal," which exposes it through a new
+  portal tab -- reachable by literally every visitor, including one
+  with no account at all, even on a tenant that otherwise requires
+  sign-in for the rest of the portal (`portal_require_auth`). The tab
+  only appears once a tenant has at least one shareable document, and
+  its label is renamable on Admin > Branding (e.g. "Trust Center").
+- Swept the UI for em dashes and `--`, replacing them with a plain `-`
+  -- an explicit style preference, not a functional change.
+
 ## 2026-08-25
 
 - **Document tags**: optional, freeform, comma-separated tags on a

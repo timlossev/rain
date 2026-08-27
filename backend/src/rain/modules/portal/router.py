@@ -30,11 +30,12 @@ get_tenant_db, which both assume a session already picked a tenant.
 """
 from __future__ import annotations
 
+import io
 import re
 from typing import Any
 
-from fastapi import APIRouter, Depends, Form, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy import select
 
 from rain.core.tenancy import CurrentUser, get_current_user_optional
@@ -45,6 +46,7 @@ from rain.db.control_models import Tenant
 from rain.modules.calendar import service as calendar_service
 from rain.modules.catalog import service as catalog_service
 from rain.modules.documents import service as document_service
+from rain.modules.documents import storage as document_storage
 from rain.modules.tickets import service as ticket_service
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
 from rain.web.templating import templates
@@ -114,20 +116,17 @@ def _is_wrong_tenant(user: CurrentUser | None, tenant: Tenant) -> bool:
     return user.home_tenant_id != tenant.id
 
 
-async def _resolve_portal_access(
+async def _resolve_portal_tenant_and_flags(
     request: Request, tenant_slug: str, user: CurrentUser | None
-) -> tuple[Tenant, dict[str, Any]] | HTMLResponse | RedirectResponse:
-    """Single choke point for tenant resolution and the wrong-tenant/
-    require-auth gate, shared by both routes below so the two can't
-    silently drift on what's allowed to through -- which is exactly how
-    an earlier version of this module let a signed-in wrong-tenant
-    visitor reach GET (disclosing the target tenant's name) while POST
-    correctly blocked the same visitor.
-
-    Returns either (tenant, portal_flags) for the caller to proceed
-    with -- `user` was confirmed to belong to `tenant` (or be None and
-    anonymous access is allowed) -- or a Response the caller should
-    return immediately as-is."""
+) -> tuple[Tenant, dict[str, Any]] | HTMLResponse:
+    """Tenant resolution + the wrong-tenant check only -- no require-auth
+    gate. Shared by _resolve_portal_access below (which adds that gate
+    for every route that always needs it: submitting a ticket, opening a
+    catalog form, the ticket timeline) and by portal_form (which applies
+    its own looser gate: an anonymous visitor is let onto the page, in a
+    restricted "Shareable documents only" mode, when portal_require_auth
+    is on but this tenant has at least one document marked shareable --
+    see that route)."""
     tenant = await _resolve_portal_tenant(tenant_slug)
     if tenant is None:
         return templates.TemplateResponse(request, "errors/404.html", {}, status_code=404)
@@ -143,6 +142,29 @@ async def _resolve_portal_access(
 
     async with tenant_session(tenant.schema_name) as tenant_db:
         flags = await get_tenant_configs(tenant_db, ["portal_require_auth", "portal_branded"])
+
+    return tenant, flags
+
+
+async def _resolve_portal_access(
+    request: Request, tenant_slug: str, user: CurrentUser | None
+) -> tuple[Tenant, dict[str, Any]] | HTMLResponse | RedirectResponse:
+    """Single choke point for tenant resolution and the wrong-tenant/
+    require-auth gate, shared by every route below except portal_form
+    (see _resolve_portal_tenant_and_flags) so those can't silently drift
+    on what's allowed through -- which is exactly how an earlier version
+    of this module let a signed-in wrong-tenant visitor reach GET
+    (disclosing the target tenant's name) while POST correctly blocked
+    the same visitor.
+
+    Returns either (tenant, portal_flags) for the caller to proceed
+    with -- `user` was confirmed to belong to `tenant` (or be None and
+    anonymous access is allowed) -- or a Response the caller should
+    return immediately as-is."""
+    resolved = await _resolve_portal_tenant_and_flags(request, tenant_slug, user)
+    if not isinstance(resolved, tuple):
+        return resolved
+    tenant, flags = resolved
 
     if flags["portal_require_auth"] and user is None:
         return RedirectResponse(f"/login?next=/portal/{tenant_slug}", status_code=status.HTTP_303_SEE_OTHER)
@@ -160,34 +182,59 @@ async def portal_form(
     page: int | None = None,
     user: CurrentUser | None = Depends(get_current_user_optional),
 ):
-    access = await _resolve_portal_access(request, tenant_slug, user)
-    if not isinstance(access, tuple):
-        return access
-    tenant, flags = access
-
-    # Same "no filter in the URL at all" -> "active" default as the main
-    # app's ticket list (rain.modules.tickets.router.list_tickets) --
-    # ticket_status="" (the "All statuses" dropdown option, which always
-    # submits the param) explicitly opts back into everything.
-    effective_status = "active" if ticket_status is None else ticket_status
-    # This whole page has no server-tracked "which tab is open" state
-    # (app.js's [data-tabs] is purely client-side, reset on every full
-    # page load) -- a GET reload triggered by the status filter would
-    # otherwise silently bounce the visitor back to the first tab
-    # (Request Something), losing their place on Report Something right
-    # after they used the very control that's on that tab. ticket_status
-    # being present in the URL at all (even "", from "All statuses") is
-    # the signal this reload was that filter, not a fresh page visit --
-    # same reasoning extends to `created`, whose redirect (below) also
-    # never carried a tab hint before now: a visitor who just filed a
-    # report from this tab landing back on Request Something instead,
-    # with no sign their submission actually went through in the table
-    # right below where they were, was the same class of bug. `page`
-    # (from clicking Prev/Next on this same table) is the same signal
-    # for the same reason.
-    active_tab = "tickets" if ticket_status is not None or created or page is not None else "catalog"
+    resolved = await _resolve_portal_tenant_and_flags(request, tenant_slug, user)
+    if not isinstance(resolved, tuple):
+        return resolved
+    tenant, flags = resolved
 
     async with tenant_session(tenant.schema_name) as tenant_db:
+        shareable_documents = await document_service.list_shareable_documents(tenant_db)
+        shareable_documents_label = await get_tenant_config(
+            tenant_db, "portal_shareable_documents_label", "Shareable documents"
+        )
+
+        # portal_require_auth normally bounces an anonymous visitor to
+        # /login before this page renders at all (see _resolve_portal_
+        # access, used by every other route below) -- but a document
+        # marked shareable is meant to be reachable by literally anyone,
+        # "Trust Center"-style, even on a tenant that otherwise locks the
+        # rest of the portal down. So: still redirect if there's nothing
+        # shareable to show (nothing here for an anonymous visitor to see
+        # anyway); otherwise let them through in a restricted mode that
+        # only ever renders the Shareable documents tab -- everything
+        # else on this page stays exactly as gated as it already was.
+        anonymous_shared_only = flags["portal_require_auth"] and user is None
+        if anonymous_shared_only and not shareable_documents:
+            return RedirectResponse(f"/login?next=/portal/{tenant_slug}", status_code=status.HTTP_303_SEE_OTHER)
+
+        # Same "no filter in the URL at all" -> "active" default as the
+        # main app's ticket list (rain.modules.tickets.router.
+        # list_tickets) -- ticket_status="" (the "All statuses" dropdown
+        # option, which always submits the param) explicitly opts back
+        # into everything.
+        effective_status = "active" if ticket_status is None else ticket_status
+        # This whole page has no server-tracked "which tab is open" state
+        # (app.js's [data-tabs] is purely client-side, reset on every full
+        # page load) -- a GET reload triggered by the status filter would
+        # otherwise silently bounce the visitor back to the first tab
+        # (Request Something), losing their place on Report Something
+        # right after they used the very control that's on that tab.
+        # ticket_status being present in the URL at all (even "", from
+        # "All statuses") is the signal this reload was that filter, not
+        # a fresh page visit -- same reasoning extends to `created`,
+        # whose redirect (below) also never carried a tab hint before
+        # now: a visitor who just filed a report from this tab landing
+        # back on Request Something instead, with no sign their
+        # submission actually went through in the table right below
+        # where they were, was the same class of bug. `page` (from
+        # clicking Prev/Next on this same table) is the same signal for
+        # the same reason.
+        active_tab = (
+            "shared"
+            if anonymous_shared_only
+            else "tickets" if ticket_status is not None or created or page is not None else "catalog"
+        )
+
         reported = (
             await ticket_service.list_tickets_reported_by(tenant_db, user.id, status=effective_status, page=page or 1)
             if user is not None
@@ -206,18 +253,25 @@ async def portal_form(
         # Pending Actions and Document Archive stay signed-in-only --
         # report.html gates both tabs behind {% if user %}, so there's no
         # reason to run either query for an anonymous visitor. Request
-        # Something (catalog_items) is not: that tab, like Report
-        # Something, is open to every visitor regardless of sign-in
-        # status (gated only by this tenant's own portal_require_auth,
-        # same as tickets always were -- see portal_catalog_form/submit
-        # below), so it's fetched unconditionally.
+        # Something (catalog_items) is normally open to every visitor
+        # regardless of sign-in status too (gated only by this tenant's
+        # own portal_require_auth, same as tickets always were -- see
+        # portal_catalog_form/submit below) -- except in
+        # anonymous_shared_only mode, where nothing but Shareable
+        # documents is meant to be reachable, so it's skipped there the
+        # same as the signed-in-only tabs.
         pending_approval = await ticket_service.list_tickets_pending_approval_for(tenant_db, user.id) if user is not None else []
         documents = await document_service.list_documents(tenant_db) if user is not None else []
-        catalog_items = await catalog_service.list_catalog_items(tenant_db, active_only=True)
+        catalog_items = (
+            [] if anonymous_shared_only else await catalog_service.list_catalog_items(tenant_db, active_only=True)
+        )
         # Shown to every visitor, signed in or not -- operational notices
         # (a maintenance window, a renewal due today) are tenant-wide
-        # information, not tied to one person's account.
-        todays_events = await calendar_service.list_entries_due_today(tenant_db)
+        # information, not tied to one person's account. Still suppressed
+        # in anonymous_shared_only mode for the same reason as
+        # catalog_items above: that mode renders nothing but the
+        # Shareable documents tab.
+        todays_events = [] if anonymous_shared_only else await calendar_service.list_entries_due_today(tenant_db)
         # Same webhook the ticket detail page's own Escalate button uses
         # (Admin > Branding); only meaningful once signed in, since the
         # "Tickets reported by me" table it appears next to only renders
@@ -231,6 +285,7 @@ async def portal_form(
             "tenant": tenant,
             "user": user,
             "branded": flags["portal_branded"],
+            "anonymous_shared_only": anonymous_shared_only,
             "interactions": PORTAL_INTERACTIONS,
             "severities": SEVERITIES,
             "reported": reported,
@@ -239,6 +294,8 @@ async def portal_form(
             "active_tab": active_tab,
             "pending_approval": pending_approval,
             "documents": documents,
+            "shareable_documents": shareable_documents,
+            "shareable_documents_label": shareable_documents_label,
             "catalog_items": catalog_items,
             "todays_events": todays_events,
             "can_escalate": escalation_webhook_id is not None,
@@ -434,4 +491,30 @@ async def portal_ticket_timeline(
             "asset_names": asset_names,
             "status_labels": status_labels,
         },
+    )
+
+
+@router.get("/{tenant_slug}/shared-documents/{doc_ref}/download")
+async def portal_shared_document_download(tenant_slug: str, doc_ref: str):
+    """The Shareable documents tab's own download link -- deliberately not
+    rain.modules.documents.router.download_document (require_login, and
+    resolves its tenant from the session via get_tenant_db, neither of
+    which fits a visitor with no account at all). Public by design, same
+    as the tab itself: no _resolve_portal_access call, no user parameter,
+    404 for a document that either doesn't exist in this tenant or exists
+    but isn't marked is_shareable -- a signed-out visitor guessing a
+    document's id must not be able to fetch anything past what the tab
+    already shows."""
+    tenant = await _resolve_portal_tenant(tenant_slug)
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    async with tenant_session(tenant.schema_name) as tenant_db:
+        doc = await document_service.get_document_by_ref(tenant_db, doc_ref)
+        if doc is None or not doc.is_shareable:
+            raise HTTPException(status.HTTP_404_NOT_FOUND)
+        data = document_storage.get_storage().read(doc.storage_key)
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type=doc.mime_type or "application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{doc.filename}"'},
     )

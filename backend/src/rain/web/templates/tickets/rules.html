@@ -2,7 +2,7 @@
 {% import "_pagination.html" as pg with context %}
 {% import "_modal.html" as modal %}
 {% block title %}Event Promotion Policies - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}{% raw %}A syslog event whose match_field matches pattern (regex) is evaluated against every active policy, in order. "Single event" promotes it into its own ticket; "Repetition" does the same but folds a repeat occurrence (same computed title, still-open ticket) into the existing one instead of creating a new one, flagging it Problematic -- the first single/repetition match wins, so an event never spawns two tickets. "ML anomaly" is different: it never "wins" the event away from the others -- every active ML policy scores it against its own running model regardless, and fires a ticket once that score clears its threshold. The title template fills in {message}, {host}, and {program} (plus {count}, {window}, {score} for ML anomaly) from single braces (Python's plain string formatting), not the double-brace {{...}} placeholders webhook payloads and notification channel templates use.{% endraw %}{% endblock %}
+{% block help_text %}{% raw %}A syslog event whose match_field matches pattern (regex) is evaluated against every active policy, in order. "Single event" promotes it into its own ticket; "Repetition" does the same but folds a repeat occurrence (same computed title, still-open ticket) into the existing one instead of creating a new one, flagging it Problematic - the first single/repetition match wins, so an event never spawns two tickets. "ML anomaly" is different: it never "wins" the event away from the others - every active ML policy scores it against its own running model regardless, and fires a ticket once that score clears its threshold. The title template fills in {message}, {host}, and {program} (plus {count}, {window}, {score} for ML anomaly) from single braces (Python's plain string formatting), not the double-brace {{...}} placeholders webhook payloads and notification channel templates use.{% endraw %}{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   {{ modal.trigger_button("event-policy", "+ New policy") }}
@@ -52,7 +52,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="9" class="muted">No policies yet -- every event just shows up in Events.</td></tr>
+      <tr><td colspan="9" class="muted">No policies yet - every event just shows up in Events.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -60,7 +60,7 @@
 </div>
 
 {% call modal.modal("event-policy", "New policy", open=(prefill is not none)) %}
-  {% if prefill %}<p class="field-hint">Pre-filled from the event(s) selected in <a href="/tickets/live">Events</a> -- review before saving.</p>{% endif %}
+  {% if prefill %}<p class="field-hint">Pre-filled from the event(s) selected in <a href="/tickets/live">Events</a> - review before saving.</p>{% endif %}
   <form method="post" action="/tickets/rules/all">
     <div class="form-section">
       <div class="form-section-title">Basic info</div>
@@ -119,6 +119,15 @@
         <div class="tab-panel" data-tab-panel="ml">
           <div class="form-row">
             <div class="field">
+              <label for="ml_algorithm">Algorithm</label>
+              <select id="ml_algorithm" name="ml_algorithm" onchange="document.getElementById('ml_algorithm_hint').textContent = this.options[this.selectedIndex].dataset.desc">
+                {% for key, label, desc in ml_algorithms %}<option value="{{ key }}" data-desc="{{ desc }}">{{ label }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="field-hint" id="ml_algorithm_hint">{{ ml_algorithms[0][2] if ml_algorithms else '' }}</div>
+          <div class="form-row">
+            <div class="field">
               <label for="group_by">Group by</label>
               <select id="group_by" name="group_by">
                 {% for g in group_by_fields %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
@@ -137,7 +146,7 @@
               <input type="number" id="ml_warmup_count" name="ml_warmup_count" value="250" min="1">
             </div>
           </div>
-          <div class="field-hint">Learns what's normal from each matching event's severity, length, and time of day -- no threshold count to tune by hand. Score is 0-1 (higher = more unusual); it stays quiet until it's seen the warm-up count of events, so a brand new policy doesn't flag its own cold start. Runs alongside single/repetition policies, not instead of them -- it never "wins" an event away from them.</div>
+          <div class="field-hint">Learns what's normal from each matching event's severity, length, and time of day - no threshold count to tune by hand. Score is 0-1 (higher = more unusual); it stays quiet until it's seen the warm-up count of events, so a brand new policy doesn't flag its own cold start. Runs alongside single/repetition policies, not instead of them - it never "wins" an event away from them.</div>
         </div>
       </div>
     </div>

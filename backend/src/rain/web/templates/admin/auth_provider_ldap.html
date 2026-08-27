@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}LDAP - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Connect one LDAP/Active Directory server. On the configured interval (or on demand, below), RAIN searches it for users and groups and mirrors them into the target tenant you pick here -- synced users never get a local password; every one of their logins binds live against this server instead. Local sign-in for everyone else is unaffected.{% endblock %}
+{% block help_text %}Connect one LDAP/Active Directory server. On the configured interval (or on demand, below), RAIN searches it for users and groups and mirrors them into the target tenant you pick here - synced users never get a local password; every one of their logins binds live against this server instead. Local sign-in for everyone else is unaffected.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
@@ -30,7 +30,7 @@
 
 <div class="card">
   <form method="post" action="/admin/auth-providers/ldap">
-    <div class="field"><label class="checkbox-row"><input type="checkbox" name="is_enabled" {% if is_enabled %}checked{% endif %}> Enabled -- required for both login binds and the periodic sync to actually run</label></div>
+    <div class="field"><label class="checkbox-row"><input type="checkbox" name="is_enabled" {% if is_enabled %}checked{% endif %}> Enabled - required for both login binds and the periodic sync to actually run</label></div>
 
     <h3>Connection</h3>
     <div class="form-row">
@@ -61,7 +61,7 @@
     <div class="form-row">
       <div class="field"><label for="group_name_attr">Group name attribute</label><input type="text" id="group_name_attr" name="group_name_attr" value="{{ config.group_name_attr }}" required></div>
       <div class="field"><label for="group_member_attr">Group member attribute</label><input type="text" id="group_member_attr" name="group_member_attr" value="{{ config.group_member_attr }}" placeholder="member" required></div>
-      <div class="field-hint" style="flex-basis:100%; margin-top:-8px;">Expected to hold each member's full DN (e.g. <code>groupOfNames</code>'s <code>member</code>, or Active Directory's <code>member</code>) -- a UID-list attribute like <code>memberUid</code> isn't supported.</div>
+      <div class="field-hint" style="flex-basis:100%; margin-top:-8px;">Expected to hold each member's full DN (e.g. <code>groupOfNames</code>'s <code>member</code>, or Active Directory's <code>member</code>) - a UID-list attribute like <code>memberUid</code> isn't supported.</div>
     </div>
 
     <h3>Target &amp; schedule</h3>
@@ -74,7 +74,7 @@
           <option value="{{ t.id }}" {% if t.id == config.target_tenant_id %}selected{% endif %}>{{ t.name }}</option>
           {% endfor %}
         </select>
-        <div class="field-hint">Every synced user and group lands in this one tenant, as role "Client". One directory, one tenant -- if you need more than one LDAP-backed tenant, that's a bigger change this page doesn't support yet.</div>
+        <div class="field-hint">Every synced user and group lands in this one tenant, as role "Client". One directory, one tenant - if you need more than one LDAP-backed tenant, that's a bigger change this page doesn't support yet.</div>
       </div>
       <div class="field" style="flex:0 0 160px;"><label for="sync_interval_minutes">Sync every (minutes)</label><input type="number" id="sync_interval_minutes" name="sync_interval_minutes" value="{{ config.sync_interval_minutes }}" min="5"></div>
     </div>

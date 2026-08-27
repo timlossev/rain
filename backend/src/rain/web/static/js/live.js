@@ -160,7 +160,7 @@
         if (!hosts.length) return; // nothing with a host among the selection to build a rule from
         discardForm.dataset.confirm =
           `Add a discard rule for ${hosts.length} host(s) (${hosts.join(", ")})? ` +
-          "Future events from them will be dropped before reaching any tenant -- this doesn't delete what's already here.";
+          "Future events from them will be dropped before reaching any tenant - this doesn't delete what's already here.";
         discardForm.querySelector("[name=hosts]").value = hosts.join(",");
         discardForm.submit();
       } else if (action === "new-policy") {
@@ -182,7 +182,7 @@
       statusBadge.classList.add("badge-accent");
     };
     ws.onclose = () => {
-      statusBadge.textContent = "disconnected -- retrying…";
+      statusBadge.textContent = "disconnected - retrying…";
       statusBadge.classList.remove("badge-accent");
       setTimeout(connect, 3000);
     };

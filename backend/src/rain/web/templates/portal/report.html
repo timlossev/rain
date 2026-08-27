@@ -58,6 +58,7 @@
     {% endif %}
   </div>
 
+  {% if not anonymous_shared_only %}
   <div class="card portal-card portal-today">
     <div class="portal-section-title" style="margin-top:0;">Today's events</div>
     {% if todays_events %}
@@ -68,6 +69,7 @@
     <p class="muted" style="margin:0;">None</p>
     {% endif %}
   </div>
+  {% endif %}
 
   <div class="card portal-card">
     {% if created %}<div class="flash flash-ok">Submitted as <strong>{{ created }}</strong>.</div>{% endif %}
@@ -89,11 +91,14 @@
        visitor regardless of sign-in status, the same as this page's
        original bare incident form always was (gated only by this
        tenant's own portal_require_auth, same as before, not by whether
-       a session exists). Pending Actions and Document Archive stay
-       signed-in-only: an approval decision needs a specific accountable
-       approver, and the document repository was never opened up to
-       anonymous visitors in the first place -- neither of those is
-       changing here, only Catalog joining Tickets as the two that are. #}
+       a session exists) -- except in anonymous_shared_only mode (an
+       anonymous visitor let through solely because this tenant has
+       shareable documents), where they're hidden the same as Pending
+       Actions/Document Archive: nothing but Shareable documents is
+       reachable without an account there. Pending Actions and Document
+       Archive otherwise stay signed-in-only: an approval decision needs
+       a specific accountable approver, and the document repository was
+       never opened up to anonymous visitors in the first place. #}
     <div data-tabs>
       {# Same buttons drive the tab switching either way -- only how
          they're revealed changes. Above the mobile breakpoint,
@@ -112,18 +117,25 @@
           <span class="nav-icon">{{ nav_icon("menu") }}</span> Menu
         </button>
         <div class="tab-buttons" data-menu-panel hidden>
+          {% if not anonymous_shared_only %}
           <button type="button" class="tab-btn {{ 'active' if active_tab == 'catalog' else '' }}" data-tab-btn="catalog">Request Something</button>
           <button type="button" class="tab-btn {{ 'active' if active_tab == 'tickets' else '' }}" data-tab-btn="tickets">Report Something</button>
+          {% endif %}
           {% if user %}
           <button type="button" class="tab-btn" data-tab-btn="approvals">Pending Actions{% if pending_approval %} ({{ pending_approval | length }}){% endif %}</button>
           <button type="button" class="tab-btn" data-tab-btn="documents">Document Archive</button>
-          {% else %}
+          {% endif %}
+          {% if shareable_documents %}
+          <button type="button" class="tab-btn {{ 'active' if active_tab == 'shared' else '' }}" data-tab-btn="shared">{{ shareable_documents_label }}</button>
+          {% endif %}
+          {% if not user %}
           <div class="portal-nav-divider"></div>
           <a class="tab-btn" href="/login?next={{ ('/portal/' ~ tenant.slug) | urlencode }}">Sign in</a>
           {% endif %}
         </div>
       </div>
 
+      {% if not anonymous_shared_only %}
       <div class="tab-panel {{ 'active' if active_tab == 'catalog' else '' }}" data-tab-panel="catalog">
         {% with items = catalog_items, base_href = "/portal/" ~ tenant.slug ~ "/catalog" %}{% include "catalog/_grid_fragment.html" %}{% endwith %}
       </div>
@@ -217,6 +229,26 @@
         <p class="muted portal-signin-hint">Sign in to see tickets you've reported.</p>
         {% endif %}
       </div>
+      {% endif %}
+
+      {% if shareable_documents %}
+      <div class="tab-panel {{ 'active' if active_tab == 'shared' else '' }}" data-tab-panel="shared">
+        <div class="table-scroll">
+        <table>
+          <thead><tr><th>Number</th><th>Title</th><th>Updated</th></tr></thead>
+          <tbody>
+            {% for d in shareable_documents %}
+            <tr>
+              <td>{{ d.doc_number }}</td>
+              <td><a href="/portal/{{ tenant.slug }}/shared-documents/{{ d.doc_number }}/download">{{ d.title }}</a></td>
+              <td class="muted">{{ d.updated_at.strftime("%Y-%m-%d %H:%M") if d.updated_at else "-" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+      {% endif %}
 
       {% if user %}
       <div class="tab-panel" data-tab-panel="approvals">

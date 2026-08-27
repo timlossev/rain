@@ -271,6 +271,19 @@ async def update_document_body(
     return RedirectResponse(f"/documents/{doc.doc_number}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.post("/{document_id:int}/sharing")
+async def update_document_sharing(
+    document_id: int,
+    is_shareable: bool = Form(False),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is not None:
+        await service.update_sharing(tenant_db, doc, is_shareable)
+    return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.post("/{document_id:int}/webhook-config")
 async def set_document_webhook_config(
     document_id: int,

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Import Field Pack - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Upload a spreadsheet whose header row names the custom fields you want to define -- an Excel file with a row or two of real/representative data underneath each column lets this guess a field type (text, number, boolean, date, URL, email, or select) for you; a header-only file still works, everything just starts as "Text" on the next screen. Nothing from the data rows themselves is imported or stored -- only the field definitions you confirm are.{% endblock %}
+{% block help_text %}Upload a spreadsheet whose header row names the custom fields you want to define - an Excel file with a row or two of real/representative data underneath each column lets this guess a field type (text, number, boolean, date, URL, email, or select) for you; a header-only file still works, everything just starts as "Text" on the next screen. Nothing from the data rows themselves is imported or stored - only the field definitions you confirm are.{% endblock %}
 {% block content %}
 <div class="card" style="max-width:560px;">
   <form method="post" action="/tickets/fields/import-pack/preview" enctype="multipart/form-data">

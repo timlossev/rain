@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 import re
 from typing import Any
 
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from rain.core.pagination import DEFAULT_PAGE_SIZE, Page
+from rain.core.tenant_config import get_tenant_config
 from rain.core.user_names import resolve_user_emails
 from rain.db.tenant_models import (
     ApprovalFlow,
@@ -33,8 +35,11 @@ from rain.db.tenant_models import (
     WebhookConfig,
 )
 from rain.modules.tickets import notifications
+from rain.modules.tickets import rootcause
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
 from rain.modules.tickets.syslog_parser import severity_label
+
+logger = logging.getLogger("rain.tickets")
 
 _SEQUENCE_NAMES = {"incident": "inc_number_seq", "vulnerability": "vuln_number_seq", "change": "chg_number_seq"}
 
@@ -450,12 +455,21 @@ async def update_status(
     """Returns False (no-op) if new_status isn't one of this tenant's
     configured statuses -- the caller decides how to surface that. A no-op
     if new_status already equals the current status (no duplicate log
-    entry for re-clicking the current pill)."""
+    entry for re-clicking the current pill).
+
+    A transition into an is_closed status, from a status that wasn't
+    already is_closed, also triggers rootcause.analyze if the tenant has
+    opted into it (rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY, off by default) --
+    see that module for what it actually looks at. Never fires again on a
+    later closed->closed move (e.g. "Closed" -> "Cancelled"), and never
+    blocks the status change itself if it turns up nothing or errors."""
     if new_status == ticket.status:
         return True
     status_row = await get_status_by_key(db, new_status)
     if status_row is None:
         return False
+    old_status_row = await get_status_by_key(db, ticket.status)
+    newly_closed = status_row.is_closed and not (old_status_row is not None and old_status_row.is_closed)
     old_status = ticket.status
     ticket.status = new_status
     ticket.closed_at = dt.datetime.now(dt.timezone.utc) if status_row.is_closed else None
@@ -472,6 +486,14 @@ async def update_status(
         subject=f"[RAIN] {ticket.ticket_number} status changed",
         body=f"{ticket.ticket_number}: {ticket.title}\n\nStatus changed from {old_status} to {new_status}.",
     )
+    if newly_closed and await get_tenant_config(db, rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY, False):
+        try:
+            analysis = await rootcause.analyze(db, ticket)
+        except Exception:
+            logger.exception("automatic root-cause analysis failed for ticket %s", ticket.ticket_number)
+            analysis = None
+        if analysis:
+            await add_comment(db, ticket.id, author_user_id=None, body=analysis)
     return True
 
 

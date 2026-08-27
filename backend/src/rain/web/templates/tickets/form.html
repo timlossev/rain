@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_search_picker.html" as picker %}
 {% block title %}New ticket - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Manually create a ticket -- incident, vulnerability, or change. Tickets can also be created automatically from Events via Event Promotion Policies.{% endblock %}
+{% block help_text %}Manually create a ticket - incident, vulnerability, or change. Tickets can also be created automatically from Events via Event Promotion Policies.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
@@ -29,8 +29,8 @@
           {% endfor %}
         </select>
       </div>
-      {{ picker.search_picker("asset_id", "/tickets/assets/search", label="Affected asset", initial_value=suggested_asset_id, initial_label=suggested_asset_name, placeholder="No asset -- search to link") }}
-      {{ picker.search_picker("assignee_user_id", "/tickets/users/search", label="Assignee", placeholder="Unassigned -- search to assign") }}
+      {{ picker.search_picker("asset_id", "/tickets/assets/search", label="Affected asset", initial_value=suggested_asset_id, initial_label=suggested_asset_name, placeholder="No asset - search to link") }}
+      {{ picker.search_picker("assignee_user_id", "/tickets/users/search", label="Assignee", placeholder="Unassigned - search to assign") }}
     </div>
     <div class="field">
       <label for="title">Title</label>
@@ -54,7 +54,7 @@
             <option value="{{ f.id }}" {% if f.id == default_flow_id %}selected{% endif %}>{{ f.name }}{% if f.is_default %} (default){% endif %}</option>
             {% endfor %}
           </select>
-          {% if not flows %}<div class="field-hint">Changes require an approval flow, and this tenant has none yet -- <a href="/admin/approval-flows/new">create one</a> before filing a change.</div>{% endif %}
+          {% if not flows %}<div class="field-hint">Changes require an approval flow, and this tenant has none yet - <a href="/admin/approval-flows/new">create one</a> before filing a change.</div>{% endif %}
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@
 {% import "_pagination.html" as pg with context %}
 {% import "_modal.html" as modal %}
 {% block title %}Syslog Listener - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Point your syslog-ng destination at this host and route incoming events to the correct tenant by matching host or program against a pattern -- the first matching rule wins; unmatched events are dropped. A "discard" rule matches the same way but drops the event instead of routing it, for muting a noisy source before it ever reaches a tenant.{% endblock %}
+{% block help_text %}Point your syslog-ng destination at this host and route incoming events to the correct tenant by matching host or program against a pattern - the first matching rule wins; unmatched events are dropped. A "discard" rule matches the same way but drops the event instead of routing it, for muting a noisy source before it ever reaches a tenant.{% endblock %}
 {% block content %}
 {% if request.query_params.get('ok') %}<div class="flash flash-ok">Saved.</div>{% endif %}
 
@@ -22,7 +22,7 @@
     </div>
     <button class="btn btn-sm" type="submit">Save</button>
   </form>
-  <div class="field-hint" style="margin-top:8px;">An event that never got promoted into a ticket is deleted once it's older than this. Never applies to an event that <em>was</em> promoted -- its ticket keeps the link valid. For this tenant only ({{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}).</div>
+  <div class="field-hint" style="margin-top:8px;">An event that never got promoted into a ticket is deleted once it's older than this. Never applies to an event that <em>was</em> promoted - its ticket keeps the link valid. For this tenant only ({{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}).</div>
 </div>
 
 <div class="panel-row" style="justify-content:flex-end; margin-top:16px;">
@@ -54,7 +54,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="7" class="muted">No rules yet -- every event will be dropped until a routing rule is added.</td></tr>
+      <tr><td colspan="7" class="muted">No rules yet - every event will be dropped until a routing rule is added.</td></tr>
       {% endfor %}
     </tbody>
   </table>

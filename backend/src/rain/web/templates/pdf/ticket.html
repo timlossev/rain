@@ -97,7 +97,7 @@
     </div>
     {% elif entry.kind == "approval_decision" %}
     <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ ("RAIN System" if entry.item.decided_by_user_id is none else user_names.get(entry.item.decided_by_user_id, "Deleted user")) }}</div>
-    <div>{{ entry.item.decision | capitalize }} step "{{ entry.item.step_label }}"{% if entry.item.comment %} -- {{ entry.item.comment }}{% endif %}</div>
+    <div>{{ entry.item.decision | capitalize }} step "{{ entry.item.step_label }}"{% if entry.item.comment %} - {{ entry.item.comment }}{% endif %}</div>
     {% else %}
     <div class="pdf-comment-meta">{{ entry.at.strftime("%Y-%m-%d %H:%M") if entry.at else "" }} - {{ ("RAIN System" if entry.item.changed_by_user_id is none else user_names.get(entry.item.changed_by_user_id, "Deleted user")) }}</div>
     <div>Changed status{% if entry.item.from_status %} from {{ status_labels.get(entry.item.from_status, entry.item.from_status) }}{% endif %} to {{ status_labels.get(entry.item.to_status, entry.item.to_status) }}</div>

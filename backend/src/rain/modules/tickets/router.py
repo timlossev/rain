@@ -36,8 +36,8 @@ from rain.db.tenant_models import (
 from rain.modules.assets import service as asset_service
 from rain.modules.assets.schemas import coerce_field_value
 from rain.modules.documents import service as document_service
-from rain.modules.tickets import exporter, importer, platform_events, service
-from rain.modules.tickets.rules import GROUP_BY_FIELDS, PROMOTION_TYPES
+from rain.modules.tickets import exporter, importer, platform_events, rootcause, service
+from rain.modules.tickets.rules import DEFAULT_ML_ALGORITHM, GROUP_BY_FIELDS, ML_ALGORITHMS, PROMOTION_TYPES
 from rain.modules.tickets.schemas import MATCH_FIELDS, SEVERITIES, TICKET_TYPES
 from rain.modules.webhooks import service as webhook_service
 from rain.web.nav import build_nav_context
@@ -682,6 +682,27 @@ async def escalate_ticket(
     )
 
 
+@router.post("/{ticket_id:int}/analyze")
+async def analyze_root_cause(
+    ticket_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """On-demand version of the same rootcause.analyze the tenant can also
+    opt into running automatically at closure (Admin > Ticket Statuses,
+    rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY) -- always available regardless
+    of that setting, since a signed-in user asking for it right now is a
+    different thing from every closed ticket getting one unasked."""
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is not None:
+        analysis = await rootcause.analyze(tenant_db, ticket)
+        if analysis:
+            await service.add_comment(tenant_db, ticket.id, author_user_id=None, body=analysis)
+    return RedirectResponse(
+        f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
 # ---------------------------------------------------- list quick-actions -
 
 # The three actions below back the per-row [...] menu on the tickets list
@@ -1112,7 +1133,7 @@ async def import_commit(
 
 
 def _clamp_rule_ml_fields(
-    *, group_by: str, window_minutes: int, ml_score_threshold: float, ml_warmup_count: int
+    *, group_by: str, window_minutes: int, ml_score_threshold: float, ml_warmup_count: int, ml_algorithm: str
 ) -> dict:
     return dict(
         group_by=group_by if group_by in GROUP_BY_FIELDS else "none",
@@ -1122,6 +1143,7 @@ def _clamp_rule_ml_fields(
         # warmup of 0 (a rule fires on its very first, baseline-free event).
         ml_score_threshold=min(1.0, max(0.0, ml_score_threshold)),
         ml_warmup_count=max(1, ml_warmup_count),
+        ml_algorithm=ml_algorithm if ml_algorithm in ML_ALGORITHMS else DEFAULT_ML_ALGORITHM,
     )
 
 
@@ -1166,6 +1188,7 @@ async def rules_list(
             "severities": SEVERITIES,
             "match_fields": MATCH_FIELDS,
             "group_by_fields": GROUP_BY_FIELDS,
+            "ml_algorithms": [(k, label, desc) for k, (label, desc, _) in ML_ALGORITHMS.items()],
             "prefill": prefill,
             "test_result": None,
         },
@@ -1187,6 +1210,7 @@ async def rules_create(
     window_minutes: int = Form(5),
     ml_score_threshold: float = Form(0.7),
     ml_warmup_count: int = Form(250),
+    ml_algorithm: str = Form(DEFAULT_ML_ALGORITHM),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
@@ -1194,7 +1218,11 @@ async def rules_create(
     if promotion_type not in PROMOTION_TYPES:
         promotion_type = "single"
     ml_fields = _clamp_rule_ml_fields(
-        group_by=group_by, window_minutes=window_minutes, ml_score_threshold=ml_score_threshold, ml_warmup_count=ml_warmup_count
+        group_by=group_by,
+        window_minutes=window_minutes,
+        ml_score_threshold=ml_score_threshold,
+        ml_warmup_count=ml_warmup_count,
+        ml_algorithm=ml_algorithm,
     )
     tenant_db.add(
         TicketRule(
@@ -1238,6 +1266,7 @@ async def rules_edit_form(
             "severities": SEVERITIES,
             "match_fields": MATCH_FIELDS,
             "group_by_fields": GROUP_BY_FIELDS,
+            "ml_algorithms": [(k, label, desc) for k, (label, desc, _) in ML_ALGORITHMS.items()],
         },
     )
 
@@ -1258,6 +1287,7 @@ async def rules_edit(
     window_minutes: int = Form(5),
     ml_score_threshold: float = Form(0.7),
     ml_warmup_count: int = Form(250),
+    ml_algorithm: str = Form(DEFAULT_ML_ALGORITHM),
     is_active: bool = Form(False),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
@@ -1265,7 +1295,11 @@ async def rules_edit(
     rule = await tenant_db.get(TicketRule, rule_id)
     if rule is not None:
         ml_fields = _clamp_rule_ml_fields(
-            group_by=group_by, window_minutes=window_minutes, ml_score_threshold=ml_score_threshold, ml_warmup_count=ml_warmup_count
+            group_by=group_by,
+            window_minutes=window_minutes,
+            ml_score_threshold=ml_score_threshold,
+            ml_warmup_count=ml_warmup_count,
+            ml_algorithm=ml_algorithm,
         )
         rule.name = name.strip()
         rule.promotion_type = promotion_type if promotion_type in PROMOTION_TYPES else "single"
@@ -1322,6 +1356,7 @@ async def rules_test(
             "severities": SEVERITIES,
             "match_fields": MATCH_FIELDS,
             "group_by_fields": GROUP_BY_FIELDS,
+            "ml_algorithms": [(k, label, desc) for k, (label, desc, _) in ML_ALGORITHMS.items()],
             "prefill": None,
             "test_result": {"rule_id": rule_id, "sample": sample, "matched": matched},
         },

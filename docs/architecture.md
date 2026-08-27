@@ -305,16 +305,43 @@ that split didn't earn its keep:
   instead (`service.combine_event_into_ticket` -- a comment noting the
   repeat + `is_problematic` turned on) rather than creating a new one.
 - `ml_anomaly`: scores every matching event (blank/`.*` pattern to mean
-  "every event") against a per rule+group_key online model
-  (`river.anomaly.HalfSpaceTrees`, trained on severity/message-length/
-  hour-of-day -- deliberately small and numeric, not an NLP pass over the
-  message) and fires once the score clears a threshold, after a warm-up
-  count of events. A model's pickled state persists on
+  "every event") against a per rule+group_key online model, trained on
+  severity/message-length/hour-of-day -- deliberately small and numeric,
+  not an NLP pass over the message -- and fires once the score clears a
+  threshold, after a warm-up count of events. Which `river.anomaly`
+  detector scores it is a per-policy choice (`TicketRule.ml_algorithm`,
+  `rain.modules.tickets.rules.ML_ALGORITHMS`): Half-Space Trees (the
+  default; a tree ensemble good at point anomalies), Local Outlier
+  Factor (density-based, better at contextual anomalies, pricier per
+  event), or One-Class SVM (a smooth boundary around "normal," best
+  when normal behavior is stable) -- the only three of `river`'s six
+  anomaly detectors that share the app's unsupervised `score_one(x)`/
+  `learn_one(x)` call shape; the other three need a supervised target
+  this app has no ground truth for. A model's pickled state persists on
   `TicketRuleState.ml_model`, read/written under `SELECT ... FOR UPDATE`
   since scoring-then-training is a read-modify-write, not a single atomic
   statement; the row is only ever written with bytes this module just
   pickled itself, never with anything from a request, so unpickling it
-  back isn't a deserialization-of-untrusted-input concern.
+  back isn't a deserialization-of-untrusted-input concern. A running
+  per-feature mean/variance (Welford's online algorithm,
+  `TicketRuleState.ml_feature_stats`, plain JSON) rides alongside the
+  model so a firing event's description can name the single most-
+  deviated feature and how many standard deviations off this group's
+  own history it was, instead of just a bare score.
+
+Root cause assistance (`rain.modules.tickets.rootcause`) revisits a
+ticket -- on demand (an "Analyze root cause" button) or automatically,
+once, the first time it's moved into an `is_closed` status, opt-in per
+tenant (`auto_root_cause_on_close` tenant_config, off by default) -- and
+posts a comment with two honest, non-causal signals: a repeat-occurrence
+pattern (host/program distribution and time span across every
+`SyslogEvent` promoted into the ticket via `promoted_ticket_id`) and
+similar past *closed* tickets (the same `websearch_to_tsquery`/`ts_rank`
+full-text search the global search bar uses, scoped to `is_closed`
+statuses). Deliberately not framed as "AI root cause analysis" -- nothing
+here, or in `river`, does causal reasoning; both signals are things a
+human would otherwise do by hand scrolling the timeline or searching
+past tickets, just automated.
 
 `single`/`repetition` are evaluated first-match-wins (an event never
 spawns two tickets that way); `ml_anomaly` policies never "consume" the
@@ -639,10 +666,13 @@ from the URL slug, not the session (`_resolve_portal_tenant`), which is
 the whole reason this is its own module instead of a route on
 `rain.modules.tickets.router`: it can't use `get_request_context`/
 `get_tenant_db`, both of which assume a session already picked a
-tenant. `_resolve_portal_access` is the single choke point both the
-GET and POST route share for tenant resolution and the wrong-tenant/
-require-auth gate, so the two can't silently drift on what's allowed
-through.
+tenant. `_resolve_portal_access` is the choke point every route except
+the page itself shares for tenant resolution and the wrong-tenant/
+require-auth gate, so those routes (submitting a ticket, opening a
+catalog form, the ticket timeline) can't silently drift on what's
+allowed through. `portal_form` (the page itself) uses the narrower
+`_resolve_portal_tenant_and_flags` instead and applies its own looser
+gate -- see "Shareable documents" below for why.
 
 **Gating.** Two `TenantConfig` flags an admin sets on Admin > Branding:
 `portal_require_auth` (off: anyone with the link can file anonymously,
@@ -709,6 +739,30 @@ wording are shared via `tickets/_activity_entry.html`'s `entry_content`
 macro, which both this fragment and `tickets/detail.html` call; only
 the wrapper differs (a ServiceNow-style dotted vertical timeline here,
 a flat list there). Client-side "Newest first"/"Oldest first" re-sorts
+
+**Shareable documents.** A `Document.is_shareable` flag (set from the
+document's own page) exposes it through a portal tab reachable by
+*every* visitor, including one with no session at all, even on a
+tenant with `portal_require_auth` on -- "Trust Center"-style content is
+meant to stay public regardless of whether the rest of the portal
+requires an account. `portal_form` fetches this tenant's shareable
+documents before applying its own auth gate: with none, an anonymous
+visitor on a `portal_require_auth` tenant is still redirected to
+`/login` exactly as before; with at least one, they're let through in
+an `anonymous_shared_only` mode that renders nothing but this tab (Today's
+events, Request/Report Something, and the two signed-in-only tabs are
+all suppressed in that mode -- letting shareable documents through
+isn't meant to loosen anything else `portal_require_auth` was gating).
+The tab's label is a tenant_config value
+(`portal_shareable_documents_label`, default "Shareable documents",
+renamable on Admin > Branding) rather than a fixed string, and the tab
+itself only renders once the tenant has at least one shareable
+document. Downloads go through a dedicated, always-public
+`GET /portal/<slug>/shared-documents/<doc_ref>/download` -- not
+`rain.modules.documents.router.download_document`, which is
+`require_login` and resolves its tenant from the session, neither of
+which fits a visitor with no account -- 404 for a document that
+doesn't exist in this tenant or exists but isn't `is_shareable`.
 already-rendered `[data-at]` entries in place, no re-fetch -- the exact
 same mechanism the ticket detail page's own toggle uses
 (`activateActivitySortToggle` in app.js), refactored into a named,

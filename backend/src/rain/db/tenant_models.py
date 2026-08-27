@@ -217,7 +217,9 @@ class SyslogEvent(TenantBase):
     raw: Mapped[str] = mapped_column(Text)
     event_format: Mapped[str] = mapped_column(String(15), default="plain", server_default="plain")
     parsed_fields: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    promoted_ticket_id: Mapped[int | None] = mapped_column(ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True)
+    promoted_ticket_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
 
 class TicketRule(TenantBase):
@@ -243,16 +245,21 @@ class TicketRule(TenantBase):
       promoted to its own promotion_type here since it's a genuinely
       different shape of policy, not a modifier on "single".
     - "ml_anomaly": scores every matching event (blank/`.*` `pattern` to
-      mean "every event") against a per rule+group_key river.anomaly.
-      HalfSpaceTrees online model (rain.modules.tickets.rules.
-      _ml_features), firing once its anomaly score clears
-      `ml_score_threshold` and the group has seen at least
-      `ml_warmup_count` events (so a freshly-created rule doesn't flag
-      its own cold-start baseline). `group_by` (none|host|program) keeps
-      a separate model per group-key value; `window_minutes` is this
-      type's re-arm cooldown between fires for a given group -- unused by
-      "single"/"repetition", which have no window concept at all.
-      Per-group model state lives in TicketRuleState, not here.
+      mean "every event") against a per rule+group_key river.anomaly
+      online model (rain.modules.tickets.rules._ml_features), firing
+      once its anomaly score clears `ml_score_threshold` and the group
+      has seen at least `ml_warmup_count` events (so a freshly-created
+      rule doesn't flag its own cold-start baseline). `ml_algorithm`
+      picks which river.anomaly detector (see rules.ML_ALGORITHMS for
+      the full set and why only three of river's six qualify -- the
+      other three need a supervised target this app has no ground truth
+      for). `group_by` (none|host|program) keeps a separate model per
+      group-key value; `window_minutes` is this type's re-arm cooldown
+      between fires for a given group -- unused by "single"/
+      "repetition", which have no window concept at all. Per-group
+      model state (and the running per-feature stats a firing event's
+      "why" explanation is computed from) lives in TicketRuleState, not
+      here.
 
     This table used to be two: TicketRule (single-event, "does this one
     event become a ticket") and a separate CorrelationRule (multi-event:
@@ -282,6 +289,7 @@ class TicketRule(TenantBase):
     window_minutes: Mapped[int] = mapped_column(Integer, default=5, server_default="5")
     ml_score_threshold: Mapped[float] = mapped_column(Float, default=0.7, server_default="0.7")
     ml_warmup_count: Mapped[int] = mapped_column(Integer, default=250, server_default="250")
+    ml_algorithm: Mapped[str] = mapped_column(String(20), default="half_space_trees", server_default="half_space_trees")
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -292,11 +300,12 @@ class TicketRuleState(TenantBase):
     "single"/"repetition" rules never touch this table; they have no
     window/cooldown concept and no per-group model to persist.
 
-    `ml_model` is a pickled river.anomaly.HalfSpaceTrees (see TicketRule's
-    own docstring) and `ml_event_count` is how many events it's been fed,
-    checked against the rule's ml_warmup_count. `last_triggered_at` tracks
-    when this group last fired a ticket, so a model that keeps scoring
-    above threshold doesn't spawn a new one on every subsequent matching
+    `ml_model` is a pickled river.anomaly detector (whichever the rule's
+    own `ml_algorithm` names, see TicketRule's own docstring) and
+    `ml_event_count` is how many events it's been fed, checked against
+    the rule's ml_warmup_count. `last_triggered_at` tracks when this
+    group last fired a ticket, so a model that keeps scoring above
+    threshold doesn't spawn a new one on every subsequent matching
     event -- it re-arms once window_minutes has elapsed since the last
     trigger; null until the group's first fire (or simply while still
     warming up). Only rain.modules.tickets.rules ever writes ml_model,
@@ -304,6 +313,17 @@ class TicketRuleState(TenantBase):
     model -- never with anything read from a request -- so unpickling it
     back here doesn't cross a trust boundary the way unpickling arbitrary
     user input would.
+
+    `ml_feature_stats` is a plain-JSON running mean/variance per feature
+    (Welford's online algorithm -- {"severity": {"n":, "mean":, "m2":},
+    ...}), updated alongside the model on every scored event. It's what
+    lets a firing event get a one-line "why" (which feature deviated
+    most, and by how many standard deviations) baked into the ticket's
+    own description at creation time, instead of just a bare score --
+    see rules._fire_ml. Plain JSON rather than pickling river.stats
+    objects into ml_model itself: one fewer moving part, and directly
+    inspectable if ever queried by hand. Null until this group's first
+    scored event.
 
     `group_key` is `""` (never NULL) for an ungrouped (group_by="none")
     rule -- Postgres unique constraints treat every NULL as distinct from
@@ -320,6 +340,7 @@ class TicketRuleState(TenantBase):
     last_triggered_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ml_model: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     ml_event_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    ml_feature_stats: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 
 class Group(TenantBase):
@@ -846,6 +867,14 @@ class Document(TenantBase):
     # "no tags" is an empty array, not a null one, so callers can always
     # iterate it without a None-check.
     tags: Mapped[list[str]] = mapped_column(ARRAY(String), default=list, server_default="{}")
+    # Opt-in (see migration 0042): exposed through the client portal's
+    # "Shareable documents" tab (rain.modules.portal.router.portal_form)
+    # to every visitor, including one with no session at all, even on a
+    # tenant that otherwise requires an account for the rest of the
+    # portal (portal_require_auth) -- the whole point of a tenant-
+    # renamable "Trust Center"-style tab is that it stays reachable
+    # without logging in. Off by default; unrelated to tags/search_vector.
+    is_shareable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # DB-generated (GENERATED ALWAYS AS ... STORED, see migrations 0023
     # and 0039) from doc_number/title/tags/description -- never written
     # from Python, only ever read (search_vector.op("@@")(...)), see

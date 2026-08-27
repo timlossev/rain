@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import math
 import pickle
 import re
 
@@ -33,6 +34,35 @@ logger = logging.getLogger("rain.rules")
 
 GROUP_BY_FIELDS = ("none", "host", "program")
 PROMOTION_TYPES = ("single", "repetition", "ml_anomaly")
+
+# Every river.anomaly detector that shares evaluate_and_promote's
+# score_one(x)/learn_one(x) call shape (no supervised target `y`) --
+# confirmed against the installed river==0.21.2: the other three
+# detectors in that module (GaussianScorer, StandardAbsoluteDeviation,
+# PredictiveAnomalyDetection) all require a `y` this app has no ground
+# truth to supply, so they aren't real options here, not just omitted
+# for brevity. Keyed by what TicketRule.ml_algorithm stores; each value
+# is (display label, plain-language explanation shown on the rule form,
+# zero-arg factory). New model each time a rule/group needs a fresh one
+# (never reused across group keys -- every group gets its own instance).
+ML_ALGORITHMS: dict[str, tuple[str, str, "type[anomaly.base.AnomalyDetector]"]] = {
+    "half_space_trees": (
+        "Half-Space Trees",
+        "Tree-ensemble that isolates points via random splits. Fast, low-memory, a solid general-purpose default - best at point anomalies: a single event whose values are just far outside the norm.",
+        anomaly.HalfSpaceTrees,
+    ),
+    "local_outlier_factor": (
+        "Local Outlier Factor",
+        "Compares a point's local neighborhood density to its neighbors'. Better at contextual anomalies - values that aren't extreme in isolation but are unusual for that particular time or place - at the cost of keeping a window of recent points, pricier per event than Half-Space Trees.",
+        anomaly.LocalOutlierFactor,
+    ),
+    "one_class_svm": (
+        "One-Class SVM",
+        "Learns a smooth boundary around \"normal.\" Works best when normal behavior is fairly stable and anomalies are moderate deviations rather than wild spikes; more sensitive to feature scaling than the other two.",
+        anomaly.OneClassSVM,
+    ),
+}
+DEFAULT_ML_ALGORITHM = "half_space_trees"
 
 
 def field_matches(match_field: str, pattern: str, event: SyslogEvent) -> bool:
@@ -162,13 +192,14 @@ def _ml_features(event: SyslogEvent) -> dict[str, float]:
     }
 
 
-def _new_ml_model() -> anomaly.HalfSpaceTrees:
-    return anomaly.HalfSpaceTrees()
+def _new_ml_model(algorithm: str):
+    _, _, factory = ML_ALGORITHMS.get(algorithm, ML_ALGORITHMS[DEFAULT_ML_ALGORITHM])
+    return factory()
 
 
-def _load_ml_model(blob: bytes | None) -> anomaly.HalfSpaceTrees:
+def _load_ml_model(blob: bytes | None, algorithm: str):
     if blob is None:
-        return _new_ml_model()
+        return _new_ml_model(algorithm)
     try:
         return pickle.loads(blob)
     except Exception:
@@ -176,7 +207,61 @@ def _load_ml_model(blob: bytes | None) -> anomaly.HalfSpaceTrees:
         # the model's pickled shape) -- start over rather than take event
         # ingestion down over one rule's stale model.
         logger.exception("failed to deserialize ML anomaly model, starting a fresh one")
-        return _new_ml_model()
+        return _new_ml_model(algorithm)
+
+
+def _feature_zscores(stats: dict, features: dict[str, float]) -> dict[str, float]:
+    """z-score of each feature value against its OWN running mean/stdev
+    for this rule+group -- how many standard deviations off "typical"
+    this event's value is, computed BEFORE this event updates those
+    stats (so "typical" reflects prior history, not including the very
+    event being scored). Skips a feature with fewer than 2 prior samples
+    (no variance to compare against yet) or zero historical variance
+    (every prior value identical -- would divide by zero)."""
+    zscores = {}
+    for key, value in features.items():
+        feat_stats = stats.get(key)
+        if not feat_stats or feat_stats["n"] < 2:
+            continue
+        variance = feat_stats["m2"] / (feat_stats["n"] - 1)
+        if variance <= 0:
+            continue
+        zscores[key] = (value - feat_stats["mean"]) / math.sqrt(variance)
+    return zscores
+
+
+def _update_feature_stats(stats: dict, features: dict[str, float]) -> dict:
+    """Welford's online algorithm, one feature at a time -- (n, mean, m2)
+    per feature is all that's kept, no stored history, safe to run on
+    every scored event regardless of how many there have been so far."""
+    updated = dict(stats)
+    for key, value in features.items():
+        feat_stats = updated.get(key, {"n": 0, "mean": 0.0, "m2": 0.0})
+        n = feat_stats["n"] + 1
+        delta = value - feat_stats["mean"]
+        mean = feat_stats["mean"] + delta / n
+        m2 = feat_stats["m2"] + delta * (value - mean)
+        updated[key] = {"n": n, "mean": mean, "m2": m2}
+    return updated
+
+
+_FEATURE_LABELS = {"severity": "severity", "message_length": "message length", "hour_of_day": "hour of day"}
+
+
+def _describe_deviation(zscores: dict[str, float], features: dict[str, float]) -> str | None:
+    """Plain-language "why this looked unusual," for the single
+    most-deviated feature -- not causal reasoning (nothing here
+    understands *why* severity or message length changed), just which
+    of the three numeric signals the model saw was furthest from this
+    rule+group's own history, and by how much. None if there isn't
+    enough history yet to say anything (see _feature_zscores)."""
+    if not zscores:
+        return None
+    key, z = max(zscores.items(), key=lambda kv: abs(kv[1]))
+    return (
+        f"Most unusual signal: {_FEATURE_LABELS.get(key, key)} ({features[key]:.0f}), "
+        f"{abs(z):.1f} standard deviations from this group's typical value."
+    )
 
 
 async def _get_or_create_ml_state(db: AsyncSession, rule_id: int, group_key: str) -> TicketRuleState:
@@ -209,12 +294,18 @@ async def _evaluate_ml_one(db: AsyncSession, rule: TicketRule, event: SyslogEven
             return  # can't form a group key for this event, so it can't contribute to a grouped rule
 
     state = await _get_or_create_ml_state(db, rule.id, group_key)
-    model = _load_ml_model(state.ml_model)
+    model = _load_ml_model(state.ml_model, rule.ml_algorithm)
 
     x = _ml_features(event)
     score = model.score_one(x)
+    # zscores computed against the stats as they stood BEFORE this event
+    # -- deliberately before _update_feature_stats below folds this
+    # event's own values in, so "typical" means "typical so far," not
+    # "typical including the possible anomaly itself."
+    zscores = _feature_zscores(state.ml_feature_stats or {}, x)
     model.learn_one(x)
     state.ml_model = pickle.dumps(model)
+    state.ml_feature_stats = _update_feature_stats(state.ml_feature_stats or {}, x)
     state.ml_event_count += 1
 
     # Still building its baseline -- never fire until it's seen enough
@@ -233,12 +324,14 @@ async def _evaluate_ml_one(db: AsyncSession, rule: TicketRule, event: SyslogEven
         await db.commit()  # still within the cooldown from the last trigger for this rule+group
         return
 
-    await _fire_ml(db, rule, group_key, event, score)
+    await _fire_ml(db, rule, group_key, event, score, _describe_deviation(zscores, x))
     state.last_triggered_at = now
     await db.commit()
 
 
-async def _fire_ml(db: AsyncSession, rule: TicketRule, group_key: str, event: SyslogEvent, score: float) -> None:
+async def _fire_ml(
+    db: AsyncSession, rule: TicketRule, group_key: str, event: SyslogEvent, score: float, deviation: str | None
+) -> None:
     asset_id = None
     if rule.asset_match_field:
         value = getattr(event, rule.asset_match_field, None)
@@ -255,9 +348,14 @@ async def _fire_ml(db: AsyncSession, rule: TicketRule, group_key: str, event: Sy
         message=event.message or "",
         score=round(score, 3),
     )
+    algorithm_label = ML_ALGORITHMS.get(rule.ml_algorithm, ML_ALGORITHMS[DEFAULT_ML_ALGORITHM])[0]
     description_lines = [
-        f"Anomaly score {score:.3f} (threshold {rule.ml_score_threshold}) on an online model trained over "
-        f"{rule.ml_warmup_count}+ prior events" + (f" (grouped by {rule.group_by} = {group_key})" if group_key else ""),
+        f"Anomaly score {score:.3f} (threshold {rule.ml_score_threshold}) on a {algorithm_label} model trained "
+        f"over {rule.ml_warmup_count}+ prior events" + (f" (grouped by {rule.group_by} = {group_key})" if group_key else ""),
+    ]
+    if deviation:
+        description_lines.append(deviation)
+    description_lines += [
         "",
         "Triggering event:",
         f"  {event.received_at.strftime('%Y-%m-%d %H:%M:%S') if event.received_at else ''}  "

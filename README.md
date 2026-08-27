@@ -104,9 +104,17 @@ Ticketing below.
   event per ticket ("single"), or repeats of the same thing folded into
   one already-open ticket instead of a fresh one each time (marked
   Problematic, "repetition"); an "ML anomaly" policy instead learns
-  normal traffic per rule (optionally grouped per host/program) and
-  fires on a genuinely unusual event, running alongside the other two
-  rather than competing with them for the same event
+  normal traffic per rule (optionally grouped per host/program), on a
+  selectable `river.anomaly` algorithm (Half-Space Trees, Local Outlier
+  Factor, or One-Class SVM, each with a plain-language explanation of
+  what it's better at), and fires on a genuinely unusual event, running
+  alongside the other two rather than competing with them for the same
+  event
+- **Root cause assistance**: an "Analyze root cause" button on any
+  ticket (or automatically at closure, opt-in per tenant) posts a
+  comment summarizing a repeat-occurrence pattern and similar past
+  closed tickets -- honest statistical/historical signals, not causal
+  reasoning
 - **Platform Response Rules**: react to new tickets by notifying Slack or
   email, calling a webhook, attaching a document or asset, marking the
   ticket problematic, or adding a watcher (a system user or a bare
@@ -170,6 +178,11 @@ Ticketing below.
 - An optional full-page background image (Admin > Branding), shown for
   any tenant with that branding setting on; unset by default, same
   plain background as ever
+- **Shareable documents**: a document flagged "Shareable in the client
+  portal" appears in a tab reachable by every visitor, including one
+  with no account at all, even on a tenant that requires sign-in for
+  the rest of the portal; the tab (renamable, e.g. "Trust Center", on
+  Admin > Branding) only shows up once a shareable document exists
 
 **Calendar**
 - Per-tenant calendar with a visual month-grid editor

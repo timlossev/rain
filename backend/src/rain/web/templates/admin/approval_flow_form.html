@@ -17,13 +17,13 @@
     <div class="form-row">
       <div class="field">
         <label class="checkbox-row"><input type="checkbox" name="notify_syslog_on_approval" {% if flow and flow.notify_syslog_on_approval %}checked{% endif %}> Emit a Syslog event when a Change running this flow is fully approved</label>
-        <p class="field-hint">Fires once, right after the last step clears -- the same synthetic-event pipeline a document's "alert on change" already uses, so it can match Event Promotion Policies like any real syslog line.</p>
+        <p class="field-hint">Fires once, right after the last step clears - the same synthetic-event pipeline a document's "alert on change" already uses, so it can match Event Promotion Policies like any real syslog line.</p>
       </div>
     </div>
 
     <h3>Steps, in order</h3>
-    <p class="field-hint">Each step needs either a group or an individual user -- not both. If both are filled in, the group wins.
-      {% if not groups %}No groups exist yet -- <a href="/admin/groups">create one</a> first if you want a group-based step.{% endif %}</p>
+    <p class="field-hint">Each step needs either a group or an individual user - not both. If both are filled in, the group wins.
+      {% if not groups %}No groups exist yet - <a href="/admin/groups">create one</a> first if you want a group-based step.{% endif %}</p>
 
     {% set initial_visible = [(step_prefill | length), 1] | max %}
     <div data-step-field data-step-min="1" data-step-max="{{ step_range | length }}">
@@ -52,7 +52,7 @@
           </div>
           <div class="field">
             <label for="step_label_{{ i }}">Label</label>
-            <input type="text" id="step_label_{{ i }}" name="step_label_{{ i }}" value="{{ prefill.label if prefill else '' }}" placeholder="{% if i == 1 %}Peer review{% elif i == 2 %}CAB sign-off{% else %}(optional)-- e.g. Final approval{% endif %}">
+            <input type="text" id="step_label_{{ i }}" name="step_label_{{ i }}" value="{{ prefill.label if prefill else '' }}" placeholder="{% if i == 1 %}Peer review{% elif i == 2 %}CAB sign-off{% else %}(optional) - e.g. Final approval{% endif %}">
           </div>
           <div class="field">
             <label for="step_group_{{ i }}">Group</label>

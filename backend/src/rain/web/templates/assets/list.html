@@ -29,8 +29,8 @@
 
 <div class="panel-row" style="justify-content:flex-end; gap:8px;">
   {% if invalid_status_count and ctx.user.role_key in ("internal_admin", "client_admin") %}
-  <form method="post" action="/assets/repair-statuses" data-confirm="Reset {{ invalid_status_count }} asset(s) with an unrecognized status to 'active'? This is what an import written before status normalization existed can leave behind -- see the Import page's warnings for which rows.">
-    <button type="submit" class="btn" title="{{ invalid_status_count }} asset(s) have a status outside active/in_repair/retired/decommissioned -- not counted on the sidebar until fixed">Fix {{ invalid_status_count }} imported status{{ "es" if invalid_status_count != 1 else "" }}</button>
+  <form method="post" action="/assets/repair-statuses" data-confirm="Reset {{ invalid_status_count }} asset(s) with an unrecognized status to 'active'? This is what an import written before status normalization existed can leave behind - see the Import page's warnings for which rows.">
+    <button type="submit" class="btn" title="{{ invalid_status_count }} asset(s) have a status outside active/in_repair/retired/decommissioned - not counted on the sidebar until fixed">Fix {{ invalid_status_count }} imported status{{ "es" if invalid_status_count != 1 else "" }}</button>
   </form>
   {% endif %}
   <a class="btn btn-primary" href="/assets/new">+ New asset</a>

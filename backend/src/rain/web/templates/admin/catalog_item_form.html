@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_search_picker.html" as picker %}
 {% block title %}{{ "Edit" if item else "New" }} Service - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}A service produces one ticket per submission, of the selected type, with the answers serialized (JSON or key=value lines) into its description. Use + Add question / Remove to size the form anywhere from 0 to {{ field_range | length }} questions. A question can pull its value from a Document instead of free-form entry -- "Content" uses the whole document (each line an option, for a dropdown); "Regex"/"JSONPath" extract from it (a regex's first capturing group, or every match, for a dropdown). Preview checks what a pattern currently resolves to before you save.{% endblock %}
+{% block help_text %}A service produces one ticket per submission, of the selected type, with the answers serialized (JSON or key=value lines) into its description. Use + Add question / Remove to size the form anywhere from 0 to {{ field_range | length }} questions. A question can pull its value from a Document instead of free-form entry - "Content" uses the whole document (each line an option, for a dropdown); "Regex"/"JSONPath" extract from it (a regex's first capturing group, or every match, for a dropdown). Preview checks what a pattern currently resolves to before you save.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
@@ -65,8 +65,8 @@
           </select>
         </div>
       </div>
-      <p class="field-hint">A "Change" service must require approval, with a flow selected -- same rule the manual New Ticket form enforces for changes.
-        {% if not flows %}No approval flows exist yet -- <a href="/admin/approval-flows/new">create one</a> first if this service needs one.{% endif %}</p>
+      <p class="field-hint">A "Change" service must require approval, with a flow selected - same rule the manual New Ticket form enforces for changes.
+        {% if not flows %}No approval flows exist yet - <a href="/admin/approval-flows/new">create one</a> first if this service needs one.{% endif %}</p>
     </div>
 
     <div class="form-section">

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ doc.doc_number }}: {{ doc.title }} - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}A single document's details -- tags, description, contents (with an inline editor for txt/md files), auto-update from a webhook, what it's linked to, and any calendar reminders (e.g. a quarterly revision) tied to it.{% endblock %}
+{% block help_text %}A single document's details - tags, description, contents (with an inline editor for txt/md files), auto-update from a webhook, what it's linked to, and any calendar reminders (e.g. a quarterly revision) tied to it.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:space-between; align-items:flex-start;">
   <div>
@@ -30,6 +30,13 @@
       <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
     </form>
   </span>
+</div>
+
+<div class="panel-row" style="margin-bottom:16px;">
+  <form method="post" action="/documents/{{ doc.id }}/sharing" class="inline">
+    <label class="checkbox-row"><input type="checkbox" name="is_shareable" onchange="this.form.submit()" {% if doc.is_shareable %}checked{% endif %}> Shareable in the client portal</label>
+  </form>
+  {% if doc.is_shareable %}<span class="muted">Visible to every portal visitor, including those without an account.</span>{% endif %}
 </div>
 
 <div class="card" data-tabs>
@@ -63,7 +70,7 @@
           <textarea name="body" rows="18" class="doc-body-editor" data-md-source>{{ body_text }}</textarea>
         </div>
       </div>
-      <div class="field-hint">Markdown -- rendered the same way in the Preview tab and in "Export to PDF".</div>
+      <div class="field-hint">Markdown - rendered the same way in the Preview tab and in "Export to PDF".</div>
       {% else %}
       <textarea name="body" rows="18" class="doc-body-editor">{{ body_text }}</textarea>
       {% endif %}
@@ -84,24 +91,24 @@
 
   {% if body_kind %}
   <div class="tab-panel" data-tab-panel="auto-update">
-    {% if request.query_params.get('refreshed') == '1' %}<div class="flash flash-ok">Refreshed -- content changed.</div>{% endif %}
-    {% if request.query_params.get('refreshed') == '0' %}<div class="flash flash-ok">Refreshed -- no change from webhook response.</div>{% endif %}
+    {% if request.query_params.get('refreshed') == '1' %}<div class="flash flash-ok">Refreshed - content changed.</div>{% endif %}
+    {% if request.query_params.get('refreshed') == '0' %}<div class="flash flash-ok">Refreshed - no change from webhook response.</div>{% endif %}
     {% if request.query_params.get('json_note') %}<div class="flash flash-ok">{{ request.query_params.get('json_note') }}</div>{% endif %}
     <form method="post" action="/documents/{{ doc.id }}/webhook-config">
       <div class="field">
         <label for="webhook_id">Webhook</label>
         <select id="webhook_id" name="webhook_id">
-          <option value="">-- none --</option>
+          <option value="">- none -</option>
           {% for w in webhooks %}<option value="{{ w.id }}" {% if doc.webhook_id == w.id %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
         </select>
-        {% if not webhooks %}<div class="field-hint">No webhooks yet -- create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.</div>{% endif %}
+        {% if not webhooks %}<div class="field-hint">No webhooks yet - create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.</div>{% endif %}
       </div>
       <div class="field">
         <label class="checkbox-row"><input type="checkbox" name="alert_on_change" {% if doc.alert_on_change %}checked{% endif %}> Emit syslog alert on change</label>
       </div>
       <div class="field">
         <label class="checkbox-row"><input type="checkbox" name="webhook_response_is_json" {% if doc.webhook_response_is_json %}checked{% endif %}> Interpret response as JSON</label>
-        <div class="field-hint">Parses the webhook's response body as a JSON object before saving it. Invalid JSON is never treated as an error -- it just falls back to saving the raw response verbatim, same as leaving this off.</div>
+        <div class="field-hint">Parses the webhook's response body as a JSON object before saving it. Invalid JSON is never treated as an error - it just falls back to saving the raw response verbatim, same as leaving this off.</div>
       </div>
       <div class="field">
         <label for="webhook_json_path">Extract payload from JSONPath</label>
@@ -180,7 +187,7 @@
   </div>
 
   <div class="tab-panel" data-tab-panel="calendar">
-    <p class="field-hint">Calendar entries tied to this document -- e.g. "due for revision every quarter." Manual reminders unless one also has auto-refresh turned on (shown below).</p>
+    <p class="field-hint">Calendar entries tied to this document - e.g. "due for revision every quarter." Manual reminders unless one also has auto-refresh turned on (shown below).</p>
     <table>
       <thead><tr><th>Title</th><th>Date</th><th>Repeats</th><th></th><th></th><th></th></tr></thead>
       <tbody>

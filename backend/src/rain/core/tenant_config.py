@@ -27,6 +27,18 @@ DEFAULTS: dict[str, Any] = {
     # branding, not the other way around.
     "portal_require_auth": True,
     "portal_branded": True,
+    # rain.modules.portal's "Shareable documents" tab -- reachable by
+    # every visitor (even anonymous, even with portal_require_auth on)
+    # whenever the tenant has at least one Document.is_shareable row. Free
+    # text so an admin can rename it to e.g. "Trust Center" on Admin >
+    # Branding; the tab itself only appears once a shareable document
+    # exists, so there's no separate on/off flag to go with this one.
+    "portal_shareable_documents_label": "Shareable documents",
+    # rain.modules.tickets.rootcause.analyze: off by default -- a comment
+    # on every single closed ticket is noise for a tenant that never asked
+    # for it. An admin opts in under Admin > Ticket Statuses; the on-demand
+    # "Analyze root cause" button on a ticket works regardless of this flag.
+    "auto_root_cause_on_close": False,
 }
 
 # Distinguishes "caller passed no default" from "caller explicitly passed

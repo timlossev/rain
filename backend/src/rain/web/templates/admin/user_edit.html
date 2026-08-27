@@ -12,13 +12,13 @@
     <div class="field">
       <label>Email</label>
       <input type="text" value="{{ edit_user.email }}" disabled>
-      <div class="field-hint">Email is permanent -- deactivate and create a new account to change it.</div>
+      <div class="field-hint">Email is permanent - deactivate and create a new account to change it.</div>
     </div>
     {% if edit_user.auth_source == "ldap" %}
     <div class="field">
       <label>Sign-in</label>
       <input type="text" value="LDAP ({{ edit_user.ldap_dn }})" disabled>
-      <div class="field-hint">Managed by the LDAP sync (Admin &gt; Auth Providers &gt; LDAP) -- name, tenant, and active status are overwritten on the next sync run if they still differ from the directory. Role isn't touched by sync, so a manual change here sticks.</div>
+      <div class="field-hint">Managed by the LDAP sync (Admin &gt; Auth Providers &gt; LDAP) - name, tenant, and active status are overwritten on the next sync run if they still differ from the directory. Role isn't touched by sync, so a manual change here sticks.</div>
     </div>
     {% endif %}
     <div class="field">

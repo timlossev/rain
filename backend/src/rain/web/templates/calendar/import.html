@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Import Calendar - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Best-effort iCalendar import -- SUMMARY, DESCRIPTION, DTSTART, and RRULE (YEARLY, or MONTHLY with a 3- or 6-month interval -- mapped to Annually/Quarterly/Every 6 months) are read; anything else in the file is ignored.{% endblock %}
+{% block help_text %}Best-effort iCalendar import - SUMMARY, DESCRIPTION, DTSTART, and RRULE (YEARLY, or MONTHLY with a 3- or 6-month interval - mapped to Annually/Quarterly/Every 6 months) are read; anything else in the file is ignored.{% endblock %}
 {% block content %}
 {% if imported is not none %}
 <div class="flash flash-ok">Imported {{ imported }} entr{{ "y" if imported == 1 else "ies" }}.</div>

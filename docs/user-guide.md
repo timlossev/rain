@@ -180,7 +180,12 @@ button is for anyone else), "Escalate" (only shown once your tenant has
 an escalation webhook configured -- Admin > Branding -- fires it for
 this one ticket on demand, filling in that webhook's placeholders from
 this exact ticket -- see "Placeholders reference" under Webhooks below),
-and "Export to PDF".
+"Analyze root cause" (posts a comment summarizing a repeat-occurrence
+pattern, if this ticket accumulated more than one promoted syslog
+event, and similar past *closed* tickets by title/description match --
+statistical/historical signals, not a determined cause, and available
+regardless of the automatic-at-closure setting below), and "Export to
+PDF".
 
 Below that is the main card:
 
@@ -353,6 +358,15 @@ normally looks like (from each matching event's severity, message
 length, and time of day) and fires on an event that doesn't fit,
 instead of any fixed pattern of repeats.
 
+- Algorithm: which model scores events, each with its own trade-off,
+  picked from the dropdown (the description below it updates to match):
+  **Half-Space Trees** (the default) -- a solid general-purpose choice,
+  best at a single event whose values are just far outside the norm.
+  **Local Outlier Factor** -- better at values that aren't extreme in
+  isolation but are unusual for that particular time or place, at the
+  cost of being pricier per event. **One-Class SVM** -- best when normal
+  behavior is fairly stable and anomalies are moderate deviations rather
+  than wild spikes.
 - Group by: none, host, or program. "None" trains across every matching
   event tenant-wide as one model; "host" or "program" gives each
   distinct value its own model and, if it fires, its own ticket.
@@ -365,6 +379,11 @@ instead of any fixed pattern of repeats.
 - Warm-up events: how many events the model sees before it's allowed to
   fire at all, so a brand new policy doesn't flag its own cold start as
   anomalous.
+
+A ticket this policy creates also names the single most-deviated
+feature (severity, message length, or time of day) and how many
+standard deviations off this group's own typical value it was, once
+enough history has built up to say so.
 
 **Single** and **Repetition** policies compete for each event -- the
 first one (in Order) whose pattern matches wins, so an event never
@@ -619,7 +638,12 @@ record automatically and the page says so.
 
 Above the tabs, next to the header, tags show as badges with a pencil
 icon to edit them (comma-separated, same as on upload) -- "No tags."
-if none are set yet. Below that, the page is split into tabs:
+if none are set yet. Below that, a "Shareable in the client portal"
+checkbox: on, this document appears in the [Client Portal](#client-portal)'s
+Shareable documents tab for every visitor, including one with no
+account at all, regardless of that tenant's require-sign-in setting --
+off by default, so nothing is exposed until you opt it in here. Below
+that, the page is split into tabs:
 
 - Description: a plain textarea, saved independently of the file
   itself.
@@ -715,13 +739,26 @@ reassign, or change status.
 calendar today (recurring or one-time), or "None" if nothing is. Shown
 to every visitor regardless of sign-in status.
 
-Three settings control this page, all under Admin > Branding > "Public
+**Shareable documents** (only shown once at least one exists): a tab
+listing every document marked "Shareable in the client portal" from its
+own page (see [Document detail](#document-detail)). This tab is
+reachable by *every* visitor, including one with no account at all --
+even on a tenant with "Require sign-in" (below) turned on. In that
+case, an anonymous visitor lands on a stripped-down version of this page
+showing only this tab (nothing else the portal normally offers is
+reachable without signing in); with require-sign-in off, or once
+you're signed in, it just sits alongside the other tabs as usual. Its
+name defaults to "Shareable documents" but is renamable per tenant
+(e.g. "Trust Center") under Admin > Branding.
+
+Four settings control this page, all under Admin > Branding > "Public
 incident portal" (client_admin can reach this section for their own
 tenant; internal_admin needs to switch to a tenant first):
 
 - **Require sign-in**: on, only signed-in users of this tenant can file
   through the portal; off, anyone with the link can, and the ticket
-  records "an unauthenticated user" as the reporter.
+  records "an unauthenticated user" as the reporter. Shareable documents
+  (above) are reachable either way.
 - **Show instance branding**: on, the portal shows this instance's
   logo/name/accent color, same as every signed-in page; off, a plain,
   unaccented page showing only the tenant's own name -- for a portal
@@ -730,6 +767,8 @@ tenant; internal_admin needs to switch to a tenant first):
   (Admin > Webhooks) the Escalate button calls, on the ticket detail
   page and here. Leave unset and no Escalate button shows anywhere for
   this tenant.
+- **Shareable documents tab name**: what the tab above is labeled;
+  defaults to "Shareable documents."
 
 A signed-in visitor of a *different* tenant than the one in the URL is
 always turned away with a 403, regardless of the require-sign-in
@@ -870,6 +909,12 @@ stamps a closed date on a ticket moved there), and an active toggle.
 "Counts as closed" checkbox, and an Order. Deactivating a status hides
 it from new selections without affecting tickets already set to it;
 deleting one behaves the same way.
+
+Below the table, a "Root cause assistance" checkbox: "Automatically
+analyze root cause when a ticket closes" runs the same "Analyze root
+cause" that's always available on the ticket detail page, once,
+automatically, the first time a ticket moves into any status flagged
+"closed" above. Off by default.
 
 **Notification Channels.** Named destinations a Platform Response Rule
 can notify. Each channel has a Type (email, Slack, or webhook) and a

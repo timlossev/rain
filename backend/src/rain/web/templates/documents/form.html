@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Upload Document - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Add a new document into the repository -- upload a file, or type its contents directly to create a text/Markdown placeholder on the spot. txt/md files get an inline editor and Markdown preview afterward.{% endblock %}
+{% block help_text %}Add a new document into the repository - upload a file, or type its contents directly to create a text/Markdown placeholder on the spot. txt/md files get an inline editor and Markdown preview afterward.{% endblock %}
 {% block content %}
 {% if linked_type and linked_id %}
 <p class="muted">This will be attached to the {{ linked_type }} #{{ linked_id }} automatically.</p>

@@ -8,7 +8,7 @@
    approval to any ticket type -- see tickets/router.py's ticket_detail
    for the full reasoning. #}
 {% set approval_will_reset = ticket.approval and ticket.approval.overall_status == "approved" %}
-{% set approval_reset_warning = "Editing this will nullify its collected approvals -- it will need to be re-approved. Continue?" %}
+{% set approval_reset_warning = "Editing this will nullify its collected approvals - it will need to be re-approved. Continue?" %}
 <div class="panel-row">
   <div class="status-stepper">
     {% for s in statuses %}
@@ -38,6 +38,9 @@
       <button type="submit" class="btn btn-sm btn-danger">Escalate</button>
     </form>
     {% endif %}
+    <form method="post" action="/tickets/{{ ticket.id }}/analyze" class="inline">
+      <button type="submit" class="btn btn-sm" title="Looks for a repeat-occurrence pattern and similar past closed tickets, posted as a comment">Analyze root cause</button>
+    </form>
     <a class="btn btn-sm" href="/tickets/{{ ticket.id }}/pdf">Export to PDF</a>
   </div>
 </div>
@@ -93,13 +96,13 @@
     <tbody>
       <tr><th>Assignee</th><td>
         <form method="post" action="/tickets/{{ ticket.id }}/assign" class="form-row" style="margin:0; align-items:center;" {% if approval_will_reset %}data-confirm="{{ approval_reset_warning }}"{% endif %}>
-          {{ picker.search_picker("assignee_user_id", "/tickets/users/search", initial_value=ticket.assignee_user_id, initial_label=user_names.get(ticket.assignee_user_id, ""), placeholder="Unassigned -- search to assign") }}
+          {{ picker.search_picker("assignee_user_id", "/tickets/users/search", initial_value=ticket.assignee_user_id, initial_label=user_names.get(ticket.assignee_user_id, ""), placeholder="Unassigned - search to assign") }}
           <button class="btn btn-sm" type="submit">Save</button>
         </form>
       </td></tr>
       <tr><th>Asset</th><td>
         <form method="post" action="/tickets/{{ ticket.id }}/asset" class="form-row" style="margin:0; align-items:center;" {% if approval_will_reset %}data-confirm="{{ approval_reset_warning }}"{% endif %}>
-          {{ picker.search_picker("asset_id", "/tickets/assets/search", initial_value=ticket.asset_id, initial_label=asset_names.get(ticket.asset_id, ""), placeholder="No asset -- search to link") }}
+          {{ picker.search_picker("asset_id", "/tickets/assets/search", initial_value=ticket.asset_id, initial_label=asset_names.get(ticket.asset_id, ""), placeholder="No asset - search to link") }}
           <button class="btn btn-sm" type="submit">Save</button>
         </form>
       </td></tr>
@@ -177,7 +180,7 @@
     </div>
     <button class="btn btn-sm" type="submit">Attach</button>
   </form>
-  {% if not flows %}<p class="field-hint">No approval flows configured yet -- <a href="/admin/approval-flows/new">create one</a>.</p>{% endif %}
+  {% if not flows %}<p class="field-hint">No approval flows configured yet - <a href="/admin/approval-flows/new">create one</a>.</p>{% endif %}
   {% endif %}
 </div>
 {% endif %}

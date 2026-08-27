@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Review Field Pack - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Detected {{ guesses | length }} column(s). Type and key are guessed from the column header and its sample values -- review and edit before creating anything; nothing is saved until you submit below.{% endblock %}
+{% block help_text %}Detected {{ guesses | length }} column(s). Type and key are guessed from the column header and its sample values - review and edit before creating anything; nothing is saved until you submit below.{% endblock %}
 {% block content %}
 <div class="card" style="max-width:900px;">
   {% if not guesses %}
