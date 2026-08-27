@@ -1132,6 +1132,30 @@ async def import_commit(
 # --------------------------------------------------------------- rules ---
 
 
+class _NewRuleDefaults:
+    """A lightweight stand-in for TicketRule, shaped just enough (same
+    attribute names tickets/_promotion_type_fields.html reads) for the
+    "New policy" modal to render from -- so that partial can be shared
+    verbatim with rule_form.html's real TicketRule instead of needing
+    two near-identical copies of the same tab/field markup kept in sync
+    by hand. ml_algorithm/ml_sidecar_enabled/group_by/window_minutes/
+    ml_score_threshold/ml_warmup_count are literally the same
+    "recommended standard configuration" every newly created rule gets
+    regardless of promotion_type (see _clamp_rule_ml_fields's own
+    defaults) -- this is just that same set of defaults, reachable by
+    attribute instead of by dict key, for a rule that doesn't exist
+    yet."""
+
+    def __init__(self, *, promotion_type: str = "single"):
+        self.promotion_type = promotion_type
+        self.ml_algorithm = DEFAULT_ML_ALGORITHM
+        self.ml_sidecar_enabled = True
+        self.group_by = "none"
+        self.window_minutes = 5
+        self.ml_score_threshold = 0.7
+        self.ml_warmup_count = 250
+
+
 def _clamp_rule_ml_fields(
     *, group_by: str, window_minutes: int, ml_score_threshold: float, ml_warmup_count: int, ml_algorithm: str
 ) -> dict:
@@ -1190,6 +1214,8 @@ async def rules_list(
             "group_by_fields": GROUP_BY_FIELDS,
             "ml_algorithms": [(k, label, desc) for k, (label, desc, _) in ML_ALGORITHMS.items()],
             "prefill": prefill,
+            "rule": _NewRuleDefaults(promotion_type="repetition" if prefill else "single"),
+            "tested_rule": None,
             "test_result": None,
         },
     )
@@ -1343,8 +1369,8 @@ async def rules_test(
 ):
     import re
 
-    rule = await tenant_db.get(TicketRule, rule_id)
-    matched = bool(rule and re.search(rule.pattern, sample))
+    tested_rule = await tenant_db.get(TicketRule, rule_id)
+    matched = bool(tested_rule and re.search(tested_rule.pattern, sample))
 
     nav = await build_nav_context(ctx)
     stmt = select(TicketRule).order_by(TicketRule.sort_order)
@@ -1362,6 +1388,8 @@ async def rules_test(
             "group_by_fields": GROUP_BY_FIELDS,
             "ml_algorithms": [(k, label, desc) for k, (label, desc, _) in ML_ALGORITHMS.items()],
             "prefill": None,
+            "rule": _NewRuleDefaults(),
+            "tested_rule": tested_rule,
             "test_result": {"rule_id": rule_id, "sample": sample, "matched": matched},
         },
     )

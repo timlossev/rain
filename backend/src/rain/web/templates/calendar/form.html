@@ -29,7 +29,7 @@
         </div>
         <div class="field"><label for="recurrence_end">Repeat until (optional)</label><input type="date" id="recurrence_end" name="recurrence_end" value="{{ entry.recurrence_end.isoformat() if entry and entry.recurrence_end else '' }}"></div>
         {% if entry %}
-        <div class="field" style="flex:0 0 100px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_active" {% if entry.is_active %}checked{% endif %}> Active</label></div>
+        <div class="field field-w100"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="is_active" {% if entry.is_active %}checked{% endif %}> Active</label></div>
         {% endif %}
       </div>
     </div>
@@ -37,7 +37,7 @@
     <div class="form-section">
       <div class="form-section-title">Syslog bridge</div>
       <div class="form-row">
-        <div class="field" style="flex:0 0 260px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="emit_syslog_event" {% if entry and entry.emit_syslog_event %}checked{% endif %}> Emit syslog event on occurrence</label></div>
+        <div class="field" style="flex:0 0 260px;"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="emit_syslog_event" {% if entry and entry.emit_syslog_event %}checked{% endif %}> Emit syslog event on occurrence</label></div>
         <div class="field"><label for="event_program">Event "program" value (optional)</label><input type="text" id="event_program" name="event_program" value="{{ entry.event_program if entry and entry.event_program else '' }}" placeholder="Defaults to the title"></div>
       </div>
       <div class="field-hint">Lets <a href="/tickets/rules/all">Event Promotion Policies</a> react to this occurrence, same as real syslog traffic.</div>
@@ -47,7 +47,7 @@
       <div class="form-section-title">Related document</div>
       <div class="form-row">
         {{ picker.search_picker("document_id", "/documents/search", label="Document (optional)", initial_value=selected_document_id, initial_label=selected_document_label, placeholder="Search documents...") }}
-        <div class="field"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="auto_refresh" {% if auto_refresh %}checked{% endif %}> Also auto-refresh from its webhook</label></div>
+        <div class="field"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="auto_refresh" {% if auto_refresh %}checked{% endif %}> Also auto-refresh from its webhook</label></div>
       </div>
       <div class="field-hint">Shows up on the document's own Calendar tab (e.g. "due for revision every quarter"). Auto-refresh only takes effect for a document with a webhook configured.</div>
     </div>

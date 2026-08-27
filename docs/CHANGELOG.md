@@ -8,6 +8,27 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-27
 
+- A round of small layout fixes: Admin > Branding's two cards now sit
+  side by side on a wide screen instead of stacking in one narrow,
+  individually width-capped column (new `.two-col-cards` utility, also
+  usable elsewhere); the "Open incident portal" link moved off the
+  topbar's tenant-name badge (now a plain label, not a link) into the
+  user menu, next to Sign out, matching how the client portal's own
+  "Back to full app" link already works; the sidebar's top-level accent
+  color (below) uses a lightened `--accent-on-dark` derived color
+  instead of the raw tenant accent, so a dark tenant-chosen accent
+  doesn't read poorly against the sidebar's near-black background;
+  `flex:0 0 Npx` and the "align a checkbox next to a labeled field"
+  `margin-top:30px` -- both hand-typed the same way in a couple dozen
+  places -- are now utility classes (`.field-w90/100/140/160`,
+  `.field-narrow`, `.field-align-checkbox`), applied wherever they
+  already matched exactly. Event Promotion Policies' "Test policy"
+  dialog is one shared modal now, populated by whichever row's Test
+  button was clicked, instead of one hidden modal per policy; and its
+  "Promotion type" section (tabs, the ML sidecar checkbox, the shared
+  algorithm field) is a single partial reused by both the list page's
+  "New policy" modal and the Edit Policy screen, instead of two
+  hand-kept-in-sync copies.
 - Sidebar top-level categories (Records Authority, Assets, Documents,
   Calendar, Admin) now render in the tenant's own accent color instead
   of the flat sidebar palette every nested item uses, so the sidebar

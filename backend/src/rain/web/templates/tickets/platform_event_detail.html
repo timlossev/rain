@@ -22,7 +22,7 @@
           {% for value, label in trigger_events %}<option value="{{ value }}" {% if value == rule.trigger_event %}selected{% endif %}>{{ label }}</option>{% endfor %}
         </select>
       </div>
-      <div class="field" style="flex:0 0 100px;"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="{{ rule.sort_order }}"></div>
+      <div class="field field-w100"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="{{ rule.sort_order }}"></div>
     </div>
     <div class="form-row">
       <div class="field">
@@ -32,7 +32,7 @@
         </select>
       </div>
       <div class="field"><label for="pattern">Pattern (regex)</label><input type="text" id="pattern" name="pattern" value="{{ rule.pattern }}" required></div>
-      <div class="field" style="flex:0 0 140px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="is_active" {% if rule.is_active %}checked{% endif %}> Active</label></div>
+      <div class="field field-w140"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="is_active" {% if rule.is_active %}checked{% endif %}> Active</label></div>
     </div>
     <button class="btn btn-primary" type="submit">Save changes</button>
   </form>

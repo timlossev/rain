@@ -122,7 +122,7 @@
           <input type="text" name="q" placeholder="Search tickets, documents... or INC-000001" value="{{ q if request.url.path == '/search' else '' }}" aria-label="Search tickets and documents" autocomplete="off">
         </form>
         {% if ctx.active_tenant %}
-        <a class="session-tenant-badge" href="/portal/{{ ctx.active_tenant.slug }}" title="Open {{ ctx.active_tenant.name }}'s incident portal"><strong>{{ ctx.active_tenant.name }}</strong></a>
+        <span class="session-tenant-badge" title="{{ ctx.active_tenant.name }}"><strong>{{ ctx.active_tenant.name }}</strong></span>
         {% endif %}
         <div class="dropdown-menu" data-menu>
           <button type="button" class="dropdown-menu-btn user-menu-btn" data-menu-toggle aria-haspopup="true" aria-expanded="false" title="{{ ctx.user.display_name }}">
@@ -133,6 +133,13 @@
             <span class="badge badge-accent">{{ ctx.user.role_key }}</span>
             <div class="dropdown-menu-divider"></div>
             <div class="user-menu-build muted" title="Current database schema revision">Build {{ db_build }}</div>
+            {% if ctx.active_tenant %}
+            <div class="dropdown-menu-divider"></div>
+            <a class="btn btn-sm" href="/portal/{{ ctx.active_tenant.slug }}" style="width:100%; justify-content:center;">
+              <span class="nav-icon">{{ nav_icon("swap") }}</span>
+              <span class="label-text">Open incident portal</span>
+            </a>
+            {% endif %}
             <div class="dropdown-menu-divider"></div>
             <form method="post" action="/logout">
               <button class="btn btn-sm" type="submit" style="width:100%; justify-content:center;">

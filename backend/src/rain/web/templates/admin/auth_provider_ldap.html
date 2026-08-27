@@ -35,7 +35,7 @@
     <h3>Connection</h3>
     <div class="form-row">
       <div class="field"><label for="server_uri">Server URI</label><input type="text" id="server_uri" name="server_uri" value="{{ config.server_uri }}" placeholder="ldaps://ldap.example.com:636" required></div>
-      <div class="field" style="flex:0 0 160px;"><label class="checkbox-row" style="margin-top:30px;"><input type="checkbox" name="use_starttls" {% if config.use_starttls %}checked{% endif %}> Use StartTLS</label></div>
+      <div class="field field-w160"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="use_starttls" {% if config.use_starttls %}checked{% endif %}> Use StartTLS</label></div>
     </div>
     <div class="field-hint" style="margin:-8px 0 14px;">StartTLS applies to a plain <code>ldap://</code> URI; an <code>ldaps://</code> URI is already encrypted and doesn't need it.</div>
     <div class="form-row">
@@ -76,7 +76,7 @@
         </select>
         <div class="field-hint">Every synced user and group lands in this one tenant, as role "Client". One directory, one tenant - if you need more than one LDAP-backed tenant, that's a bigger change this page doesn't support yet.</div>
       </div>
-      <div class="field" style="flex:0 0 160px;"><label for="sync_interval_minutes">Sync every (minutes)</label><input type="number" id="sync_interval_minutes" name="sync_interval_minutes" value="{{ config.sync_interval_minutes }}" min="5"></div>
+      <div class="field field-w160"><label for="sync_interval_minutes">Sync every (minutes)</label><input type="number" id="sync_interval_minutes" name="sync_interval_minutes" value="{{ config.sync_interval_minutes }}" min="5"></div>
     </div>
 
     <button class="btn btn-primary" type="submit">Save</button>

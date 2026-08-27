@@ -8,7 +8,7 @@
   <form method="post" action="/admin/smtp">
     <div class="form-row">
       <div class="field"><label for="smtp_host">Host</label><input type="text" id="smtp_host" name="smtp_host" value="{{ branding.get('smtp_host', '') }}" placeholder="smtp.example.com"></div>
-      <div class="field" style="flex:0 0 100px;"><label for="smtp_port">Port</label><input type="number" id="smtp_port" name="smtp_port" value="{{ branding.get('smtp_port', 587) }}"></div>
+      <div class="field field-w100"><label for="smtp_port">Port</label><input type="number" id="smtp_port" name="smtp_port" value="{{ branding.get('smtp_port', 587) }}"></div>
     </div>
     <div class="field"><label for="smtp_from_address">From address</label><input type="text" id="smtp_from_address" name="smtp_from_address" value="{{ branding.get('smtp_from_address', '') }}" placeholder="rain@example.com"></div>
     <div class="form-row">

@@ -4,8 +4,9 @@
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
+<div class="two-col-cards">
 {% if ctx.user.is_internal_admin %}
-<div class="card" style="max-width:520px;">
+<div class="card">
   <div class="card-title">Instance branding</div>
   <form method="post" action="/admin/branding" enctype="multipart/form-data">
     <div class="form-row">
@@ -13,7 +14,7 @@
         <label for="instance_name">Instance name</label>
         <input type="text" id="instance_name" name="instance_name" value="{{ branding.instance_name }}" required>
       </div>
-      <div class="field" style="flex:0 0 100px;">
+      <div class="field field-w100">
         <label for="accent_color">Accent color</label>
         <input type="color" id="accent_color" name="accent_color" value="{{ branding.accent_color }}">
       </div>
@@ -44,7 +45,7 @@
 </div>
 {% endif %}
 
-<div class="card" style="max-width:520px; margin-top:16px;">
+<div class="card">
   <div class="card-title">Public incident portal</div>
   {% if not portal_tenant %}
   <p class="muted">Select a tenant (Admin &gt; Tenants &gt; Switch to) to configure its portal.</p>
@@ -75,5 +76,6 @@
     <button class="btn btn-primary" type="submit">Save</button>
   </form>
   {% endif %}
+</div>
 </div>
 {% endblock %}

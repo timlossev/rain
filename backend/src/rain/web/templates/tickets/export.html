@@ -32,7 +32,7 @@
           {% for s in statuses %}<option value="{{ s.key }}">{{ s.label }}</option>{% endfor %}
         </select>
       </div>
-      <div class="field" style="flex:0 0 160px;">
+      <div class="field field-w160">
         <label for="fmt">Format</label>
         <select id="fmt" name="fmt">
           <option value="csv" {% if selected_fmt == "csv" %}selected{% endif %}>CSV</option>

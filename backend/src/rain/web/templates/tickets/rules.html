@@ -23,7 +23,7 @@
         <td><span class="badge severity-{{ r.severity }}">{{ r.severity }}</span></td>
         <td class="actions">
           <a class="btn btn-sm" href="/tickets/rules/{{ r.id }}/edit">Edit</a>
-          {{ modal.trigger_button("test-rule-" ~ r.id, "Test", variant="btn-sm") }}
+          <button type="button" class="btn btn-sm" data-test-rule-open data-rule-id="{{ r.id }}" data-rule-name="{{ r.name }}" data-rule-pattern="{{ r.pattern }}" data-rule-match-field="{{ r.match_field }}">Test</button>
         </td>
         <td class="actions">
           <form class="inline" method="post" action="/tickets/rules/{{ r.id }}/delete" data-confirm="Delete policy '{{ r.name }}'?">
@@ -39,25 +39,42 @@
   {{ pg.render_pagination(page) }}
 </div>
 
-{% for r in page.items %}
-{% call modal.modal("test-rule-" ~ r.id, "Test policy: " ~ r.name, open=(test_result and test_result.rule_id == r.id)) %}
-  <p class="field-hint" style="margin-top:0;">Checks a sample message against this policy's pattern (<code>{{ r.pattern }}</code>, matched on {{ r.match_field }}) - it doesn't run the rest of the policy (grouping, thresholds, title template), just the regex.</p>
-  {% if test_result and test_result.rule_id == r.id %}
-  {% if test_result.matched %}
-  <div class="flash flash-ok">Matches: "{{ test_result.sample }}"</div>
-  {% else %}
-  <div class="flash flash-error">No match: "{{ test_result.sample }}"</div>
-  {% endif %}
-  {% endif %}
-  <form method="post" action="/tickets/rules/{{ r.id }}/test">
-    <div class="field">
-      <label for="sample-{{ r.id }}">Sample message</label>
-      <input type="text" id="sample-{{ r.id }}" name="sample" placeholder="Paste a sample message to test this policy's pattern against" value="{{ test_result.sample if test_result and test_result.rule_id == r.id else '' }}" autofocus>
+{# One "Test policy" modal, not one per row -- populated (title, hint,
+   form action) by whichever row's Test button was clicked (see app.js's
+   [data-test-rule-open] handler), instead of a hidden modal-overlay per
+   policy sitting unused in the DOM for every policy this tenant has.
+   Server-rendered open + already filled in when the page just reloaded
+   from a submitted test (rules_test in rain.modules.tickets.router,
+   which passes tested_rule alongside test_result for exactly this) --
+   the JS only takes over from there, for opening it against a
+   *different* row without a reload. #}
+<div class="modal-overlay" id="modal-test-rule" {% if not test_result %}hidden{% endif %} data-modal>
+  <div class="modal-box">
+    <div class="modal-header">
+      <span id="test-rule-title">Test policy{% if tested_rule %}: {{ tested_rule.name }}{% endif %}</span>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
     </div>
-    <button class="btn btn-primary btn-sm" type="submit">Test</button>
-  </form>
-{% endcall %}
-{% endfor %}
+    <div class="modal-body">
+      <p class="field-hint" style="margin-top:0;" id="test-rule-hint">{% if tested_rule %}Checks a sample message against this policy's pattern (<code>{{ tested_rule.pattern }}</code>, matched on {{ tested_rule.match_field }}) - it doesn't run the rest of the policy (grouping, thresholds, title template), just the regex.{% endif %}</p>
+      <div id="test-rule-result">
+        {% if test_result %}
+        {% if test_result.matched %}
+        <div class="flash flash-ok">Matches: "{{ test_result.sample }}"</div>
+        {% else %}
+        <div class="flash flash-error">No match: "{{ test_result.sample }}"</div>
+        {% endif %}
+        {% endif %}
+      </div>
+      <form method="post" id="test-rule-form" action="/tickets/rules/{{ test_result.rule_id if test_result else 0 }}/test">
+        <div class="field">
+          <label for="test-rule-sample">Sample message</label>
+          <input type="text" id="test-rule-sample" name="sample" placeholder="Paste a sample message to test this policy's pattern against" value="{{ test_result.sample if test_result else '' }}" autofocus>
+        </div>
+        <button class="btn btn-primary btn-sm" type="submit">Test</button>
+      </form>
+    </div>
+  </div>
+</div>
 
 {% call modal.modal("event-policy", "New policy", open=(prefill is not none)) %}
   {% if prefill %}<p class="field-hint">Pre-filled from the event(s) selected in <a href="/tickets/live">Events</a> - review before saving.</p>{% endif %}
@@ -91,80 +108,11 @@
           </select>
         </div>
         <div class="field"><label for="pattern">Pattern (regex)</label><input type="text" id="pattern" name="pattern" value="{{ prefill.pattern if prefill else '' }}" placeholder="failed password" required></div>
-        <div class="field" style="flex:0 0 100px;"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="0"></div>
+        <div class="field field-w100"><label for="sort_order">Order</label><input type="number" id="sort_order" name="sort_order" value="0"></div>
       </div>
     </div>
 
-    <div class="form-section">
-      <div class="form-section-title">Promotion type</div>
-      {# Defaults to "repetition" when opened pre-filled from a live-event
-         selection -- bundling repeats of the same thing into one ticket
-         is what that action is for -- and to "single" otherwise; either
-         way this hidden field's initial value has to agree with whichever
-         tab button starts "active" below, kept in sync from then on by
-         each button's own onclick. #}
-      <input type="hidden" id="promotion_type_field" name="promotion_type" value="{{ 'repetition' if prefill else 'single' }}">
-      <div class="tabs" data-tabs>
-        <div class="tab-buttons">
-          <button type="button" class="tab-btn {% if not prefill %}active{% endif %}" data-tab-btn="single" onclick="document.getElementById('promotion_type_field').value='single'; document.getElementById('ml_algorithm_field').hidden=true;">Single event</button>
-          <button type="button" class="tab-btn {% if prefill %}active{% endif %}" data-tab-btn="repetition" onclick="document.getElementById('promotion_type_field').value='repetition'; document.getElementById('ml_algorithm_field').hidden=!document.getElementById('ml_sidecar_enabled').checked;">Repetition</button>
-          <button type="button" class="tab-btn" data-tab-btn="ml" onclick="document.getElementById('promotion_type_field').value='ml_anomaly'; document.getElementById('ml_algorithm_field').hidden=false;">ML anomaly</button>
-        </div>
-        <div class="tab-panel {% if not prefill %}active{% endif %}" data-tab-panel="single">
-          <p class="field-hint">Every match becomes its own new ticket.</p>
-        </div>
-        <div class="tab-panel {% if prefill %}active{% endif %}" data-tab-panel="repetition">
-          <p class="field-hint">If a match's computed title (below) equals an already-open ticket of this type, the event is added to that ticket as a "last occurred on ..." comment and the ticket is flagged Problematic, instead of creating a new ticket. No open match &rarr; a new ticket is created as usual.</p>
-          <div class="field">
-            <label class="checkbox-row"><input type="checkbox" id="ml_sidecar_enabled" name="ml_sidecar_enabled" checked onchange="document.getElementById('ml_algorithm_field').hidden=!this.checked;"> Also flag statistically unusual occurrences (recommended)</label>
-            <div class="field-hint">Learns what's typical for these repeated events (severity, length, time of day) and adds a note to the ticket when one stands out - using the standard settings below, no extra tuning needed. Leave this checked unless you'd rather skip it.</div>
-          </div>
-        </div>
-        <div class="tab-panel" data-tab-panel="ml">
-          <div class="form-row">
-            <div class="field">
-              <label for="group_by">Group by</label>
-              <select id="group_by" name="group_by">
-                {% for g in group_by_fields %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
-              </select>
-              <div class="field-hint">None scores every matching event with one model. Host/program keeps a separate model (and cooldown) per value.</div>
-            </div>
-            <div class="field" style="flex:0 0 200px;"><label for="window_minutes">Re-arm cooldown (minutes)</label><input type="number" id="window_minutes" name="window_minutes" value="5" min="1"></div>
-          </div>
-          <div class="form-row">
-            <div class="field" style="flex:0 0 200px;">
-              <label for="ml_score_threshold">Anomaly score threshold</label>
-              <input type="number" id="ml_score_threshold" name="ml_score_threshold" value="0.7" min="0" max="1" step="0.05">
-            </div>
-            <div class="field" style="flex:0 0 200px;">
-              <label for="ml_warmup_count">Warm-up events</label>
-              <input type="number" id="ml_warmup_count" name="ml_warmup_count" value="250" min="1">
-            </div>
-          </div>
-          <div class="field-hint">Learns what's normal from each matching event's severity, length, and time of day - no threshold count to tune by hand. Score is 0-1 (higher = more unusual); it stays quiet until it's seen the warm-up count of events, so a brand new policy doesn't flag its own cold start. Runs alongside single/repetition policies, not instead of them - it never "wins" an event away from them.</div>
-        </div>
-      </div>
-
-      {# Lives outside the three tab-panels above (not just inside "ml")
-         since it's shared by two of them: a standalone ML anomaly policy
-         always needs it, and a repetition policy needs it too whenever
-         its "Also flag..." checkbox above is on. One <select> in the
-         DOM either way - each promotion-type button's own onclick (and
-         the checkbox's onchange) toggles this field's [hidden], never
-         duplicates the control itself. Group by/cooldown/threshold/
-         warm-up stay ML-anomaly-only, reachable for a repetition policy
-         by visiting that tab directly if the standard settings above
-         ever need changing - deliberately not surfaced here too, so
-         this doesn't turn into the same wall of settings for the common
-         case of just wanting the recommended default. #}
-      <div class="field" id="ml_algorithm_field" {% if not prefill %}hidden{% endif %}>
-        <label for="ml_algorithm">Algorithm</label>
-        <select id="ml_algorithm" name="ml_algorithm" onchange="document.getElementById('ml_algorithm_hint').textContent = this.options[this.selectedIndex].dataset.desc">
-          {% for key, label, desc in ml_algorithms %}<option value="{{ key }}" data-desc="{{ desc }}">{{ label }}</option>{% endfor %}
-        </select>
-        <div class="field-hint" id="ml_algorithm_hint">{{ ml_algorithms[0][2] if ml_algorithms else '' }}</div>
-      </div>
-    </div>
+    {% include "tickets/_promotion_type_fields.html" %}
 
     <div class="form-section">
       <div class="form-section-title">Output</div>

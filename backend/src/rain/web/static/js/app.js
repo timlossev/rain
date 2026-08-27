@@ -435,6 +435,32 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".modal-overlay[data-modal]:not([hidden])").forEach((modal) => { modal.hidden = true; });
   });
 
+  // Event Promotion Policies' "Test policy" modal (tickets/rules.html) --
+  // one modal in the DOM regardless of how many policies the table has,
+  // populated from whichever row's Test button was clicked, instead of
+  // one modal per row sitting unused (this replaced exactly that). Opens
+  // itself directly rather than going through [data-modal-open] above,
+  // since it needs to fill in the modal's content first.
+  const testRuleModal = document.querySelector("#modal-test-rule");
+  if (testRuleModal) {
+    const titleEl = document.querySelector("#test-rule-title");
+    const hintEl = document.querySelector("#test-rule-hint");
+    const resultEl = document.querySelector("#test-rule-result");
+    const formEl = document.querySelector("#test-rule-form");
+    const sampleEl = document.querySelector("#test-rule-sample");
+    document.querySelectorAll("[data-test-rule-open]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        titleEl.textContent = "Test policy: " + btn.dataset.ruleName;
+        hintEl.textContent =
+          `Checks a sample message against this policy's pattern (${btn.dataset.rulePattern}, matched on ${btn.dataset.ruleMatchField}) - it doesn't run the rest of the policy (grouping, thresholds, title template), just the regex.`;
+        formEl.action = "/tickets/rules/" + btn.dataset.ruleId + "/test";
+        resultEl.innerHTML = "";
+        sampleEl.value = "";
+        testRuleModal.hidden = false;
+      });
+    });
+  }
+
   // Generic click-toggle dropdown: a trigger button ([data-menu-toggle])
   // opens an absolutely-positioned panel ([data-menu-panel]) inside a
   // [data-menu] wrapper. Click-toggle + click-outside/Escape-to-close

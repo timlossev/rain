@@ -21,6 +21,17 @@
 :root {
   --accent: #3d6b73;
   --accent-contrast: #ffffff;
+  /* --accent lightened toward white for use as *text* on the sidebar's
+     near-black background (--sidebar-bg) -- --accent itself is tuned to
+     read well as a background/foreground color on --surface's white,
+     which says nothing about how it'll read on something this dark, and
+     --accent is tenant-overridable (Admin > Branding), so this can't
+     assume the shipped default's own contrast holds for whatever a
+     tenant actually picks. Not a true contrast guarantee (color-mix
+     can't branch on --accent's own lightness), just a floor: mixing
+     toward white always lightens, which is the direction a dark
+     surface needs. */
+  --accent-on-dark: color-mix(in srgb, var(--accent) 65%, white);
   --bg: #eef0f1;
   --surface: #ffffff;
   --surface-sunken: #f1f4f4;
@@ -139,8 +150,11 @@ p { margin: 0 0 1em; }
 .topbar-user { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; color: var(--text-muted); }
 .search-snippet { font-size: 0.82rem; color: var(--text-muted); margin-top: 3px; }
 .search-snippet mark { background: color-mix(in srgb, var(--accent) 35%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }
-.session-tenant-badge { display: inline-flex; font-size: 0.8rem; color: var(--text-muted); padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-sunken); white-space: nowrap; text-decoration: none; }
-.session-tenant-badge:hover { border-color: var(--accent); text-decoration: none; }
+/* Plain informational label now (which tenant's session this is), not a
+   link -- "Open incident portal" moved into the user menu below, next
+   to "Sign out," instead of living on this badge; no :hover affordance
+   left to suggest it's still clickable. */
+.session-tenant-badge { display: inline-flex; font-size: 0.8rem; color: var(--text-muted); padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-sunken); white-space: nowrap; }
 .session-tenant-badge strong { color: var(--text); }
 
 /* Generic click-toggle dropdown (rain.web.static.js.app.js's [data-menu]
@@ -424,13 +438,15 @@ p { margin: 0 0 1em; }
    rules above (four classes here vs. one or two there) is what lets this
    override them without !important; the :hover pair right after restores
    the plain hover-to-white feedback those same base rules already give
-   every other nav item, which this would otherwise also outrank. */
+   every other nav item, which this would otherwise also outrank.
+   --accent-on-dark, not raw --accent, since this sits on --sidebar-bg's
+   near-black -- see that variable's own definition. */
 nav > .nav-tree > .nav-item > .nav-link,
 nav > .nav-tree > .nav-item > .nav-toggle,
 nav > .nav-tree > .nav-item > .nav-link .nav-icon,
 nav > .nav-tree > .nav-item > .nav-toggle .nav-icon,
 nav > .nav-tree > .nav-item > .nav-toggle .nav-label {
-  color: var(--accent);
+  color: var(--accent-on-dark);
 }
 nav > .nav-tree > .nav-item > .nav-link:hover,
 nav > .nav-tree > .nav-item > .nav-toggle:hover,
@@ -587,6 +603,27 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 input[type=color] { padding: 3px; height: 38px; width: 64px; }
 input[type=checkbox] { width: auto; margin-right: 6px; }
 .checkbox-row { display: flex; align-items: center; font-weight: 400; color: var(--text); }
+/* A checkbox sitting next to a labeled input/select in the same
+   .form-row has no label of its own to push it down level with its
+   neighbors' controls -- this nudges it down by roughly one label's
+   height instead. The exact "30px" had been hand-typed as an inline
+   style on well over a dozen checkboxes across the app (approval
+   flows, LDAP config, service catalog items, calendar entries, syslog
+   sources, event promotion policies, ...) before this existed; one
+   utility class instead of that many places to keep in sync if the
+   label's own size ever changes. */
+.field-align-checkbox { margin-top: 30px; }
+/* Fixed-width companions for a .form-row field that shouldn't grow
+   with its siblings (a number/short-select next to a free-text one) --
+   the four sizes actually repeated enough to be worth naming instead
+   of re-typing "flex:0 0 Npx" by hand each time; anything narrower or
+   wider than these four still gets a one-off inline style, same as
+   before. */
+.field-w90 { flex: 0 0 90px; }
+.field-w100 { flex: 0 0 100px; }
+.field-w140 { flex: 0 0 140px; }
+.field-w160 { flex: 0 0 160px; }
+.field-narrow { flex: 0 0 200px; }
 .form-row { display: flex; gap: 16px; }
 .form-row > .field { flex: 1; }
 /* A form-row whose fields have unequal-height content (e.g. one field's
@@ -647,6 +684,19 @@ form.inline { display: inline; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
 .card + .card { margin-top: 16px; }
 .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; }
+
+/* A handful of logically-separate cards (e.g. Admin > Branding's
+   "Instance branding" and "Public incident portal") that used to stack
+   in one narrow, individually max-width-capped column -- wasting the
+   rest of a wide screen even though .content itself is full-width.
+   flex (not grid): however many cards are actually present (one for a
+   client_admin who can't see Instance branding, two for an
+   internal_admin) just flow left-to-right and wrap, no empty grid
+   cells to account for. flex-grow:0 keeps each card at its own natural
+   ~480px width rather than stretching to fill the row when it's alone. */
+.two-col-cards { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.two-col-cards > .card { flex: 0 1 480px; }
+.two-col-cards .card + .card { margin-top: 0; } /* override the generic stacked-card rule -- these sit in a row, not a column */
 
 /* Service Catalog's browse page (rain.modules.catalog, and the customer
    portal's own Catalog tab) -- a grid of requestable items, each a plain

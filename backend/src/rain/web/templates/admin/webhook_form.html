@@ -13,7 +13,7 @@
         <label for="name">Name</label>
         <input type="text" id="name" name="name" value="{{ webhook.name if webhook else '' }}" placeholder="Ops ticket relay" required autofocus>
       </div>
-      <div class="field" style="flex:0 0 140px;">
+      <div class="field field-w140">
         <label for="http_method">Method</label>
         <select id="http_method" name="http_method">
           {% for m in ["POST", "GET", "PUT", "PATCH"] %}
@@ -28,7 +28,7 @@
       <div class="field-hint">The hostname must resolve via DNS from this server before you can save - a name that doesn't exist yet (or a typo) is rejected with "URL rejected: could not resolve host ...". A private/internal address (10.x, 172.16-31.x, 192.168.x) is fine, RAIN is built to reach a tenant's own network; only loopback and link-local addresses (which would reach this app itself, or a cloud metadata endpoint) are ever blocked.</div>
     </div>
     <div class="form-row">
-      <div class="field" style="flex:0 0 160px;">
+      <div class="field field-w160">
         <label for="timeout_seconds">Timeout (seconds)</label>
         <input type="number" id="timeout_seconds" name="timeout_seconds" min="1" value="{{ webhook.timeout_seconds if webhook else 10 }}">
       </div>
