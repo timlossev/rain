@@ -8,6 +8,12 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-27
 
+- **Two new Platform Response Rule triggers**: "When an incident/
+  vulnerability/change is closed" (any status flagged "closed") and
+  "When a change is fully approved" (its last approval step clearing),
+  alongside the existing three "created" triggers -- same rule shape
+  (pattern match, any number of actions) either way, just a different
+  moment in a ticket's life to react to.
 - Tickets list: "Mine" and "Unassigned" now un-toggle themselves on a
   second click, same as "Problematic" already did, instead of needing
   a separate "All" link (removed) to clear the assignee filter.

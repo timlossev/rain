@@ -117,11 +117,11 @@ Ticketing below.
   comment summarizing a repeat-occurrence pattern and similar past
   closed tickets -- honest statistical/historical signals, not causal
   reasoning
-- **Platform Response Rules**: react to new tickets by notifying Slack or
-  email, calling a webhook, attaching a document or asset, marking the
-  ticket problematic, or adding a watcher (a system user or a bare
-  email) -- every matching rule fires, and every firing is logged to
-  the ticket
+- **Platform Response Rules**: react to a ticket being created, closed,
+  or (change tickets) fully approved by notifying Slack or email,
+  calling a webhook, attaching a document or asset, marking the ticket
+  problematic, or adding a watcher (a system user or a bare email) --
+  every matching rule fires, and every firing is logged to the ticket
 - **Watchers**: opt in ("Watch" on the ticket detail page) or added
   automatically (reporter, assignee, or a Platform Response Rule) to get
   emailed on a ticket's new comments and status changes

@@ -398,9 +398,22 @@ action, below.
 
 **Platform Response Rules.** `rain.modules.tickets.platform_events`, a
 second, independent rule layer on top of ticket creation -- reacts
-*after* a ticket already exists (auto-promoted or manual), and every
-active, pattern-matching rule fires, not just the first (unlike the
-single-event rule engine above). Actions: notify Slack/email (reusing
+*after* a ticket already exists (auto-promoted or manual), to one of
+`TRIGGER_EVENTS`' seven triggers: an incident/vulnerability/change
+being created (`evaluate_ticket_created`, hooked into `service.
+create_ticket`, covering both origins), one of those three being
+closed (`evaluate_ticket_closed`, hooked into `service.update_status`'s
+`newly_closed` transition), or a change's approval flow clearing its
+last step (`evaluate_change_approved`, hooked into `service.
+decide_approval_step`'s `fully_approved` branch, alongside that
+function's own `_emit_syslog_on_full_approval` sibling). Every active,
+pattern-matching rule for the trigger that just fired runs, not just
+the first (unlike the single-event rule engine above); all three
+hooks funnel into the same `_evaluate_and_fire` core. Each hook is
+imported locally at its call site (not at module level) to avoid a
+cycle -- `platform_events` imports `service` at its own top level for
+the actions below, so `service` importing `platform_events` back at
+module level would be circular. Actions: notify Slack/email (reusing
 `NotificationChannel`), call a webhook, attach a document or asset,
 mark the ticket problematic, or add a watcher (email or system user,
 see above). Every firing -- and each action's individual outcome, even

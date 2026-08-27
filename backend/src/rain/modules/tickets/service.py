@@ -459,10 +459,13 @@ async def update_status(
 
     A transition into an is_closed status, from a status that wasn't
     already is_closed, also triggers rootcause.analyze if the tenant has
-    opted into it (rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY, off by default) --
-    see that module for what it actually looks at. Never fires again on a
-    later closed->closed move (e.g. "Closed" -> "Cancelled"), and never
-    blocks the status change itself if it turns up nothing or errors."""
+    opted into it (rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY, off by default --
+    see that module for what it actually looks at) and evaluates this
+    ticket's type against any active "<type> is closed" Platform Response
+    Rules (rain.modules.tickets.platform_events.evaluate_ticket_closed).
+    Never fires again on a later closed->closed move (e.g. "Closed" ->
+    "Cancelled"), and never blocks the status change itself if either
+    turns up nothing or errors."""
     if new_status == ticket.status:
         return True
     status_row = await get_status_by_key(db, new_status)
@@ -494,6 +497,14 @@ async def update_status(
             analysis = None
         if analysis:
             await add_comment(db, ticket.id, author_user_id=None, body=analysis)
+    if newly_closed:
+        # Imported locally to avoid a module-load-time cycle -- same
+        # reason create_ticket's own evaluate_ticket_created import is
+        # local (platform_events imports this module at its own top
+        # level).
+        from rain.modules.tickets.platform_events import evaluate_ticket_closed
+
+        await evaluate_ticket_closed(db, ticket)
     return True
 
 
@@ -901,6 +912,13 @@ async def decide_approval_step(
             await _notify_approvers(db, ticket, next_step)
     elif fully_approved:
         await _emit_syslog_on_full_approval(db, approval)
+        ticket = await db.get(Ticket, approval.ticket_id)
+        if ticket is not None:
+            # Imported locally -- see create_ticket's own
+            # evaluate_ticket_created import for why.
+            from rain.modules.tickets.platform_events import evaluate_change_approved
+
+            await evaluate_change_approved(db, ticket)
 
 
 async def _emit_syslog_on_full_approval(db: AsyncSession, approval: ChangeApproval) -> None:

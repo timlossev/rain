@@ -2,12 +2,14 @@
 creation. Where TicketRule/rules.py decides *whether an incoming syslog
 event becomes a ticket at all* (first match wins, evaluated by the
 worker), this layer reacts *after* a ticket already exists -- of either
-origin, auto-promoted or manually created -- and every active, matching
-rule fires (not just the first), each running one or more actions:
-notify Slack, notify email, call a webhook, attach a document, attach an
-asset, mark the ticket problematic, or add a watcher (a system user or a
-bare email). Every firing is logged to platform_event_triggers and shown
-on the ticket detail page, regardless of whether the individual actions
+origin, auto-promoted or manually created -- to one of several
+lifecycle triggers (see TRIGGER_EVENTS: created, closed, or, change
+tickets only, fully approved), and every active, matching rule fires
+(not just the first), each running one or more actions: notify Slack,
+notify email, call a webhook, attach a document, attach an asset, mark
+the ticket problematic, or add a watcher (a system user or a bare
+email). Every firing is logged to platform_event_triggers and shown on
+the ticket detail page, regardless of whether the individual actions
 succeeded -- a failed Slack post shouldn't hide the fact the rule matched.
 """
 from __future__ import annotations
@@ -48,6 +50,10 @@ TRIGGER_EVENTS = [
     ("incident_created", "When an incident is created"),
     ("vulnerability_created", "When a vulnerability is created"),
     ("change_created", "When a change is created"),
+    ("incident_closed", "When an incident is closed"),
+    ("vulnerability_closed", "When a vulnerability is closed"),
+    ("change_closed", "When a change is closed"),
+    ("change_approved", "When a change is fully approved"),
 ]
 MATCH_FIELDS = ["title", "description"]
 ACTION_TYPES = [
@@ -65,18 +71,47 @@ _TRIGGER_BY_TICKET_TYPE = {
     "vulnerability": "vulnerability_created",
     "change": "change_created",
 }
+_TRIGGER_BY_TICKET_TYPE_CLOSED = {
+    "incident": "incident_closed",
+    "vulnerability": "vulnerability_closed",
+    "change": "change_closed",
+}
 
 
 async def evaluate_ticket_created(db: AsyncSession, ticket: Ticket) -> None:
     """Called once, right after a ticket is committed (both the manual
     creation route and the syslog auto-promotion path go through
     rain.modules.tickets.service.create_ticket, so hooking it there covers
-    both origins). Never raises -- a broken rule/action must not take down
-    ticket creation itself."""
+    both origins)."""
     trigger_event = _TRIGGER_BY_TICKET_TYPE.get(ticket.ticket_type)
-    if trigger_event is None:
-        return
+    if trigger_event is not None:
+        await _evaluate_and_fire(db, trigger_event, ticket)
 
+
+async def evaluate_ticket_closed(db: AsyncSession, ticket: Ticket) -> None:
+    """Called from rain.modules.tickets.service.update_status, once, on a
+    transition into an is_closed status from one that wasn't -- see that
+    function's own docstring for why "once" (a later closed -> closed
+    move, e.g. Closed -> Cancelled, doesn't fire this again)."""
+    trigger_event = _TRIGGER_BY_TICKET_TYPE_CLOSED.get(ticket.ticket_type)
+    if trigger_event is not None:
+        await _evaluate_and_fire(db, trigger_event, ticket)
+
+
+async def evaluate_change_approved(db: AsyncSession, ticket: Ticket) -> None:
+    """Called from rain.modules.tickets.service.decide_approval_step, once,
+    the moment a change's approval flow clears its last step (mirrors
+    _emit_syslog_on_full_approval, that function's own opt-in-per-flow
+    sibling for the syslog/Event-Promotion-Policy pipeline instead of
+    this one)."""
+    await _evaluate_and_fire(db, "change_approved", ticket)
+
+
+async def _evaluate_and_fire(db: AsyncSession, trigger_event: str, ticket: Ticket) -> None:
+    """Shared by every evaluate_* entry point above -- load this trigger's
+    active rules, run every match, fire every one that matches (not just
+    the first). Never raises -- a broken rule/action must not take down
+    whatever ticket-lifecycle step called this."""
     try:
         stmt = (
             select(PlatformEventRule)
@@ -86,7 +121,7 @@ async def evaluate_ticket_created(db: AsyncSession, ticket: Ticket) -> None:
         )
         rules = list((await db.execute(stmt)).scalars())
     except Exception:
-        logger.exception("failed to load platform event rules for ticket %s", ticket.id)
+        logger.exception("failed to load platform event rules (%s) for ticket %s", trigger_event, ticket.id)
         return
 
     for rule in rules:

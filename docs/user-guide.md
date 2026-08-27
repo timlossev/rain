@@ -445,11 +445,13 @@ created by hand. Unlike the previous two rule types, every active rule
 whose pattern matches fires, not just the first, and each one can run
 several actions.
 
-The list page's "New rule" form only asks for the rule itself: name,
-trigger (when an incident is created, when a vulnerability is created,
-or when a change is created), match on (the new ticket's title or
-description), pattern, and order. Saving takes you to that rule's own
-detail page to add actions.
+The list page's "New rule" form only asks for the rule itself: name, a
+trigger, match on (the ticket's title or description), pattern, and
+order. Saving takes you to that rule's own detail page to add actions.
+The trigger is one of seven: an incident/vulnerability/change being
+created, one of those three being closed (any status flagged "closed"
+under Admin > Ticket Statuses), or a change being fully approved (its
+last approval step clearing).
 
 On a rule's detail page, its own name/trigger/match-on/pattern/order
 and an Active checkbox stay editable at the top. Below that, an
