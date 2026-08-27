@@ -353,10 +353,25 @@ rather than creating a new one. No open match, and it's created as
 usual. Use this for "the same kind of thing happening repeatedly should
 be one ticket accumulating history, not a new one every time."
 
+"Also flag statistically unusual occurrences" (checked by default) adds
+anomaly detection on top of that -- the same kind of model the ML
+anomaly type below uses, at its standard settings, no separate tuning
+needed. When one of these repeated events looks statistically unusual,
+a note is added to whichever ticket the occurrence was just folded
+into (or the new one it started), instead of spawning a second ticket.
+Uncheck it to skip this. The algorithm it uses is the same dropdown ML
+anomaly has (below); everything else (group by, cooldown, threshold,
+warm-up) stays at its standard value unless changed from the ML anomaly
+tab itself.
+
 **ML anomaly** -- an online model learns what this policy's traffic
 normally looks like (from each matching event's severity, message
-length, and time of day) and fires on an event that doesn't fit,
-instead of any fixed pattern of repeats.
+length, and time of day) and fires its own new ticket on an event that
+doesn't fit, instead of any fixed pattern of repeats. Use this for
+watching a broad or unfiltered event stream (a blank/`.*` pattern) that
+isn't otherwise being repetition-tracked -- for a specific pattern
+that's already a Repetition policy, the checkbox above is usually the
+better fit, since it doesn't need a second policy definition.
 
 - Algorithm: which model scores events, each with its own trade-off,
   picked from the dropdown (the description below it updates to match):
@@ -380,10 +395,10 @@ instead of any fixed pattern of repeats.
   fire at all, so a brand new policy doesn't flag its own cold start as
   anomalous.
 
-A ticket this policy creates also names the single most-deviated
-feature (severity, message length, or time of day) and how many
-standard deviations off this group's own typical value it was, once
-enough history has built up to say so.
+A firing ticket (or, for Repetition's checkbox above, the note it adds)
+also names the single most-deviated feature (severity, message length,
+or time of day) and how many standard deviations off this group's own
+typical value it was, once enough history has built up to say so.
 
 **Single** and **Repetition** policies compete for each event -- the
 first one (in Order) whose pattern matches wins, so an event never

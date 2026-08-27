@@ -106,26 +106,21 @@
       <input type="hidden" id="promotion_type_field" name="promotion_type" value="{{ 'repetition' if prefill else 'single' }}">
       <div class="tabs" data-tabs>
         <div class="tab-buttons">
-          <button type="button" class="tab-btn {% if not prefill %}active{% endif %}" data-tab-btn="single" onclick="document.getElementById('promotion_type_field').value='single'">Single event</button>
-          <button type="button" class="tab-btn {% if prefill %}active{% endif %}" data-tab-btn="repetition" onclick="document.getElementById('promotion_type_field').value='repetition'">Repetition</button>
-          <button type="button" class="tab-btn" data-tab-btn="ml" onclick="document.getElementById('promotion_type_field').value='ml_anomaly'">ML anomaly</button>
+          <button type="button" class="tab-btn {% if not prefill %}active{% endif %}" data-tab-btn="single" onclick="document.getElementById('promotion_type_field').value='single'; document.getElementById('ml_algorithm_field').hidden=true;">Single event</button>
+          <button type="button" class="tab-btn {% if prefill %}active{% endif %}" data-tab-btn="repetition" onclick="document.getElementById('promotion_type_field').value='repetition'; document.getElementById('ml_algorithm_field').hidden=!document.getElementById('ml_sidecar_enabled').checked;">Repetition</button>
+          <button type="button" class="tab-btn" data-tab-btn="ml" onclick="document.getElementById('promotion_type_field').value='ml_anomaly'; document.getElementById('ml_algorithm_field').hidden=false;">ML anomaly</button>
         </div>
         <div class="tab-panel {% if not prefill %}active{% endif %}" data-tab-panel="single">
           <p class="field-hint">Every match becomes its own new ticket.</p>
         </div>
         <div class="tab-panel {% if prefill %}active{% endif %}" data-tab-panel="repetition">
           <p class="field-hint">If a match's computed title (below) equals an already-open ticket of this type, the event is added to that ticket as a "last occurred on ..." comment and the ticket is flagged Problematic, instead of creating a new ticket. No open match &rarr; a new ticket is created as usual.</p>
+          <div class="field">
+            <label class="checkbox-row"><input type="checkbox" id="ml_sidecar_enabled" name="ml_sidecar_enabled" checked onchange="document.getElementById('ml_algorithm_field').hidden=!this.checked;"> Also flag statistically unusual occurrences (recommended)</label>
+            <div class="field-hint">Learns what's typical for these repeated events (severity, length, time of day) and adds a note to the ticket when one stands out - using the standard settings below, no extra tuning needed. Leave this checked unless you'd rather skip it.</div>
+          </div>
         </div>
         <div class="tab-panel" data-tab-panel="ml">
-          <div class="form-row">
-            <div class="field">
-              <label for="ml_algorithm">Algorithm</label>
-              <select id="ml_algorithm" name="ml_algorithm" onchange="document.getElementById('ml_algorithm_hint').textContent = this.options[this.selectedIndex].dataset.desc">
-                {% for key, label, desc in ml_algorithms %}<option value="{{ key }}" data-desc="{{ desc }}">{{ label }}</option>{% endfor %}
-              </select>
-              <div class="field-hint" id="ml_algorithm_hint">{{ ml_algorithms[0][2] if ml_algorithms else '' }}</div>
-            </div>
-          </div>
           <div class="form-row">
             <div class="field">
               <label for="group_by">Group by</label>
@@ -148,6 +143,26 @@
           </div>
           <div class="field-hint">Learns what's normal from each matching event's severity, length, and time of day - no threshold count to tune by hand. Score is 0-1 (higher = more unusual); it stays quiet until it's seen the warm-up count of events, so a brand new policy doesn't flag its own cold start. Runs alongside single/repetition policies, not instead of them - it never "wins" an event away from them.</div>
         </div>
+      </div>
+
+      {# Lives outside the three tab-panels above (not just inside "ml")
+         since it's shared by two of them: a standalone ML anomaly policy
+         always needs it, and a repetition policy needs it too whenever
+         its "Also flag..." checkbox above is on. One <select> in the
+         DOM either way - each promotion-type button's own onclick (and
+         the checkbox's onchange) toggles this field's [hidden], never
+         duplicates the control itself. Group by/cooldown/threshold/
+         warm-up stay ML-anomaly-only, reachable for a repetition policy
+         by visiting that tab directly if the standard settings above
+         ever need changing - deliberately not surfaced here too, so
+         this doesn't turn into the same wall of settings for the common
+         case of just wanting the recommended default. #}
+      <div class="field" id="ml_algorithm_field" {% if not prefill %}hidden{% endif %}>
+        <label for="ml_algorithm">Algorithm</label>
+        <select id="ml_algorithm" name="ml_algorithm" onchange="document.getElementById('ml_algorithm_hint').textContent = this.options[this.selectedIndex].dataset.desc">
+          {% for key, label, desc in ml_algorithms %}<option value="{{ key }}" data-desc="{{ desc }}">{{ label }}</option>{% endfor %}
+        </select>
+        <div class="field-hint" id="ml_algorithm_hint">{{ ml_algorithms[0][2] if ml_algorithms else '' }}</div>
       </div>
     </div>
 

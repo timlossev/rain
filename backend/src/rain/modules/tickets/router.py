@@ -1211,6 +1211,7 @@ async def rules_create(
     ml_score_threshold: float = Form(0.7),
     ml_warmup_count: int = Form(250),
     ml_algorithm: str = Form(DEFAULT_ML_ALGORITHM),
+    ml_sidecar_enabled: bool = Form(False),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
@@ -1236,6 +1237,7 @@ async def rules_create(
             asset_match_field=asset_match_field or None,
             sort_order=sort_order,
             created_by=ctx.user.id,
+            ml_sidecar_enabled=ml_sidecar_enabled if promotion_type == "repetition" else False,
             **ml_fields,
         )
     )
@@ -1288,6 +1290,7 @@ async def rules_edit(
     ml_score_threshold: float = Form(0.7),
     ml_warmup_count: int = Form(250),
     ml_algorithm: str = Form(DEFAULT_ML_ALGORITHM),
+    ml_sidecar_enabled: bool = Form(False),
     is_active: bool = Form(False),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
@@ -1311,6 +1314,7 @@ async def rules_edit(
         rule.asset_match_field = asset_match_field or None
         rule.sort_order = sort_order
         rule.is_active = is_active
+        rule.ml_sidecar_enabled = ml_sidecar_enabled if rule.promotion_type == "repetition" else False
         for key, value in ml_fields.items():
             setattr(rule, key, value)
         await tenant_db.commit()

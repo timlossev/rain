@@ -49,26 +49,21 @@
       <input type="hidden" id="promotion_type_field" name="promotion_type" value="{{ rule.promotion_type }}">
       <div class="tabs" data-tabs>
         <div class="tab-buttons">
-          <button type="button" class="tab-btn {% if rule.promotion_type == 'single' %}active{% endif %}" data-tab-btn="single" onclick="document.getElementById('promotion_type_field').value='single'">Single event</button>
-          <button type="button" class="tab-btn {% if rule.promotion_type == 'repetition' %}active{% endif %}" data-tab-btn="repetition" onclick="document.getElementById('promotion_type_field').value='repetition'">Repetition</button>
-          <button type="button" class="tab-btn {% if rule.promotion_type == 'ml_anomaly' %}active{% endif %}" data-tab-btn="ml" onclick="document.getElementById('promotion_type_field').value='ml_anomaly'">ML anomaly</button>
+          <button type="button" class="tab-btn {% if rule.promotion_type == 'single' %}active{% endif %}" data-tab-btn="single" onclick="document.getElementById('promotion_type_field').value='single'; document.getElementById('ml_algorithm_field').hidden=true;">Single event</button>
+          <button type="button" class="tab-btn {% if rule.promotion_type == 'repetition' %}active{% endif %}" data-tab-btn="repetition" onclick="document.getElementById('promotion_type_field').value='repetition'; document.getElementById('ml_algorithm_field').hidden=!document.getElementById('ml_sidecar_enabled').checked;">Repetition</button>
+          <button type="button" class="tab-btn {% if rule.promotion_type == 'ml_anomaly' %}active{% endif %}" data-tab-btn="ml" onclick="document.getElementById('promotion_type_field').value='ml_anomaly'; document.getElementById('ml_algorithm_field').hidden=false;">ML anomaly</button>
         </div>
         <div class="tab-panel {% if rule.promotion_type == 'single' %}active{% endif %}" data-tab-panel="single">
           <p class="field-hint">Every match becomes its own new ticket.</p>
         </div>
         <div class="tab-panel {% if rule.promotion_type == 'repetition' %}active{% endif %}" data-tab-panel="repetition">
           <p class="field-hint">If a match's computed title (below) equals an already-open ticket of this type, the event is added to that ticket as a "last occurred on ..." comment and the ticket is flagged Problematic, instead of creating a new ticket. No open match &rarr; a new ticket is created as usual.</p>
+          <div class="field">
+            <label class="checkbox-row"><input type="checkbox" id="ml_sidecar_enabled" name="ml_sidecar_enabled" {% if rule.ml_sidecar_enabled %}checked{% endif %} onchange="document.getElementById('ml_algorithm_field').hidden=!this.checked;"> Also flag statistically unusual occurrences (recommended)</label>
+            <div class="field-hint">Learns what's typical for these repeated events (severity, length, time of day) and adds a note to the ticket when one stands out - using the standard settings below, no extra tuning needed. Leave this checked unless you'd rather skip it.</div>
+          </div>
         </div>
         <div class="tab-panel {% if rule.promotion_type == 'ml_anomaly' %}active{% endif %}" data-tab-panel="ml">
-          <div class="form-row">
-            <div class="field">
-              <label for="ml_algorithm">Algorithm</label>
-              <select id="ml_algorithm" name="ml_algorithm" onchange="document.getElementById('ml_algorithm_hint').textContent = this.options[this.selectedIndex].dataset.desc">
-                {% for key, label, desc in ml_algorithms %}<option value="{{ key }}" data-desc="{{ desc }}" {% if key == rule.ml_algorithm %}selected{% endif %}>{{ label }}</option>{% endfor %}
-              </select>
-              <div class="field-hint" id="ml_algorithm_hint">{% for key, label, desc in ml_algorithms %}{% if key == rule.ml_algorithm %}{{ desc }}{% endif %}{% endfor %}</div>
-            </div>
-          </div>
           <div class="form-row">
             <div class="field">
               <label for="group_by">Group by</label>
@@ -91,6 +86,17 @@
           </div>
           <div class="field-hint">Learns what's normal from each matching event's severity, length, and time of day. Score is 0-1 (higher = more unusual); stays quiet until it's seen the warm-up count of events. Runs alongside single/repetition policies, not instead of them.</div>
         </div>
+      </div>
+
+      {# Outside the three tab-panels above since it's shared by two of
+         them -- see rules.html's own copy of this comment for the full
+         reasoning. #}
+      <div class="field" id="ml_algorithm_field" {% if not (rule.promotion_type == 'ml_anomaly' or (rule.promotion_type == 'repetition' and rule.ml_sidecar_enabled)) %}hidden{% endif %}>
+        <label for="ml_algorithm">Algorithm</label>
+        <select id="ml_algorithm" name="ml_algorithm" onchange="document.getElementById('ml_algorithm_hint').textContent = this.options[this.selectedIndex].dataset.desc">
+          {% for key, label, desc in ml_algorithms %}<option value="{{ key }}" data-desc="{{ desc }}" {% if key == rule.ml_algorithm %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        <div class="field-hint" id="ml_algorithm_hint">{% for key, label, desc in ml_algorithms %}{% if key == rule.ml_algorithm %}{{ desc }}{% endif %}{% endfor %}</div>
       </div>
     </div>
 

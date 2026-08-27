@@ -243,7 +243,10 @@ class TicketRule(TenantBase):
       become one ticket accumulating history rather than N separate ones.
       This used to be a combine_by_title checkbox on every rule (0035);
       promoted to its own promotion_type here since it's a genuinely
-      different shape of policy, not a modifier on "single".
+      different shape of policy, not a modifier on "single". Optionally
+      (`ml_sidecar_enabled`, see below) also runs ML anomaly detection
+      on the same matched events, annotating rather than duplicating
+      whatever ticket repetition already touched.
     - "ml_anomaly": scores every matching event (blank/`.*` `pattern` to
       mean "every event") against a per rule+group_key river.anomaly
       online model (rain.modules.tickets.rules._ml_features), firing
@@ -269,7 +272,23 @@ class TicketRule(TenantBase):
     it duplicated what "repetition" already does more simply (one open
     ticket accumulating repeat occurrences, flagged problematic, instead
     of a fresh aggregated ticket per window), so there was no reason to
-    keep both. See migration 0038 for the consolidation."""
+    keep both. See migration 0038 for the consolidation.
+
+    `ml_sidecar_enabled` (migration 0043): repetition and ML anomaly
+    detection aren't really competing concerns the way the three
+    promotion_type tabs make them look -- repetition decides whether an
+    event folds into an open ticket or starts a new one, while anomaly
+    detection is an orthogonal statistical layer that can just as well
+    watch the same population repetition is tracking. Rather than force
+    every repetition rule to also configure the full ML settings, this
+    is one opt-in checkbox (defaulting on for a newly created repetition
+    rule, at the form level -- this column's own server_default stays
+    False so no existing rule silently starts scoring events), reusing
+    whichever ml_algorithm/group_by/window_minutes/ml_score_threshold/
+    ml_warmup_count values this same row already holds. A fired anomaly
+    becomes a comment on whatever ticket repetition already touched,
+    never a second ticket -- see rules._annotate_if_anomalous. Ignored
+    entirely by "single"/"ml_anomaly" rules."""
 
     __tablename__ = "ticket_rules"
 
@@ -290,6 +309,9 @@ class TicketRule(TenantBase):
     ml_score_threshold: Mapped[float] = mapped_column(Float, default=0.7, server_default="0.7")
     ml_warmup_count: Mapped[int] = mapped_column(Integer, default=250, server_default="250")
     ml_algorithm: Mapped[str] = mapped_column(String(20), default="half_space_trees", server_default="half_space_trees")
+    # repetition only -- ignored by "single"/"ml_anomaly" rules. See this
+    # class's own docstring.
+    ml_sidecar_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

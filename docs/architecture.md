@@ -304,6 +304,18 @@ that split didn't earn its keep:
   open ticket of this policy's type, the event folds into that ticket
   instead (`service.combine_event_into_ticket` -- a comment noting the
   repeat + `is_problematic` turned on) rather than creating a new one.
+  `ml_sidecar_enabled` (on by default for a newly created repetition
+  policy) additionally runs the event through the same anomaly-scoring
+  path `ml_anomaly` uses below, against this same row's own
+  `ml_algorithm`/`group_by`/`window_minutes`/`ml_score_threshold`/
+  `ml_warmup_count` -- but a fire adds a comment to whichever ticket
+  this call already touched (see `rules._annotate_if_anomalous`)
+  instead of creating a second, separate one. Repetition and anomaly
+  detection aren't competing concerns the way the three tabs on the
+  policy form might suggest: repetition decides how an event's ticket
+  gets produced, ML is an orthogonal statistical layer that can just as
+  well watch the population repetition is already tracking (migration
+  0043).
 - `ml_anomaly`: scores every matching event (blank/`.*` pattern to mean
   "every event") against a per rule+group_key online model, trained on
   severity/message-length/hour-of-day -- deliberately small and numeric,
@@ -327,7 +339,12 @@ that split didn't earn its keep:
   `TicketRuleState.ml_feature_stats`, plain JSON) rides alongside the
   model so a firing event's description can name the single most-
   deviated feature and how many standard deviations off this group's
-  own history it was, instead of just a bare score.
+  own history it was, instead of just a bare score. The scoring/
+  statekeeping itself (`rules._score_for_anomaly`) is shared between
+  this standalone type and the repetition sidecar above -- same model,
+  same warm-up/threshold/cooldown gating either way; only what happens
+  on a fire (a new ticket here, a comment there) differs, which is each
+  caller's own job.
 
 Root cause assistance (`rain.modules.tickets.rootcause`) revisits a
 ticket -- on demand (an "Analyze root cause" button) or automatically,

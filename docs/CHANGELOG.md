@@ -8,6 +8,20 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-27
 
+- **Repetition policies also flag anomalies, by default**: a
+  "Repetition" Event Promotion Policy no longer needs a second,
+  separate "ML anomaly" policy (with a duplicated pattern) just to get
+  an anomaly signal on the same events -- an "Also flag statistically
+  unusual occurrences" checkbox, on by default, runs the same anomaly
+  scoring inline, at its standard settings, and notes an unusual
+  occurrence as a comment on whichever ticket repetition already
+  touched instead of spawning a second ticket. Repetition and anomaly
+  detection were never really competing concerns; they just looked
+  that way as two of three mutually-exclusive tabs on the policy form.
+  Only the algorithm choice is surfaced on Repetition's own tab; the
+  rest (group by, cooldown, threshold, warm-up) stays reachable from
+  the ML anomaly tab if it's ever worth changing from the default,
+  deliberately not duplicated onto Repetition's simpler tab.
 - **Root cause assistance for tickets**: an "Analyze root cause" button
   on any ticket (and an opt-in "run automatically when a ticket closes"
   toggle, off by default, under Admin > Ticket Statuses) posts a

@@ -106,7 +106,11 @@ async def apply_rule(db: AsyncSession, rule: TicketRule, event: SyslogEvent) -> 
     """Turns one matching event into a ticket -- "single" always creates
     a fresh one; "repetition" folds a repeat occurrence (same computed
     title, still-open ticket of this rule's ticket_type) into that ticket
-    instead (see service.combine_event_into_ticket)."""
+    instead (see service.combine_event_into_ticket). A "repetition" rule
+    with ml_sidecar_enabled also runs this event through the same
+    anomaly-scoring _evaluate_ml_one uses for a standalone ml_anomaly
+    rule, on whichever ticket this call ends up returning -- see
+    _annotate_if_anomalous."""
     asset_id = None
     if rule.asset_match_field:
         value = getattr(event, rule.asset_match_field, None)
@@ -117,25 +121,31 @@ async def apply_rule(db: AsyncSession, rule: TicketRule, event: SyslogEvent) -> 
 
     title = rule.title_template.format(message=event.message or "", host=event.host or "", program=event.program or "")
 
+    ticket: Ticket | None = None
     if rule.promotion_type == "repetition":
-        existing = await service.find_open_ticket_by_title(db, rule.ticket_type, title)
-        if existing is not None:
-            await service.combine_event_into_ticket(db, existing, event)
-            return existing
+        ticket = await service.find_open_ticket_by_title(db, rule.ticket_type, title)
+        if ticket is not None:
+            await service.combine_event_into_ticket(db, ticket, event)
 
-    return await service.create_ticket(
-        db,
-        ticket_type=rule.ticket_type,
-        title=title,
-        # The full event, not just message -- see build_event_description's
-        # own docstring (same reasoning applies to a policy-triggered
-        # promotion as a manual one).
-        description=service.build_event_description(event),
-        severity=rule.severity,
-        asset_id=asset_id,
-        source_event_id=event.id,
-        source_rule_id=rule.id,
-    )
+    if ticket is None:
+        ticket = await service.create_ticket(
+            db,
+            ticket_type=rule.ticket_type,
+            title=title,
+            # The full event, not just message -- see build_event_description's
+            # own docstring (same reasoning applies to a policy-triggered
+            # promotion as a manual one).
+            description=service.build_event_description(event),
+            severity=rule.severity,
+            asset_id=asset_id,
+            source_event_id=event.id,
+            source_rule_id=rule.id,
+        )
+
+    if rule.promotion_type == "repetition" and rule.ml_sidecar_enabled:
+        await _annotate_if_anomalous(db, rule, event, ticket)
+
+    return ticket
 
 
 async def evaluate_and_promote(db: AsyncSession, event: SyslogEvent) -> None:
@@ -155,7 +165,10 @@ async def evaluate_and_promote(db: AsyncSession, event: SyslogEvent) -> None:
       property CorrelationRule used to have as a wholly separate system;
       unifying the table/evaluation loop doesn't change that shape, it
       just means both kinds are configured and evaluated in one place
-      now instead of two.
+      now instead of two. A "repetition" rule with ml_sidecar_enabled
+      runs this same scoring too (see apply_rule), just inline as part
+      of its own turn rather than needing a second, standalone
+      ml_anomaly rule with a duplicated pattern.
 
     Never raises -- a broken rule must not take down event ingestion."""
     promoted = False
@@ -283,15 +296,33 @@ async def _get_or_create_ml_state(db: AsyncSession, rule_id: int, group_key: str
     return state
 
 
-async def _evaluate_ml_one(db: AsyncSession, rule: TicketRule, event: SyslogEvent) -> None:
+async def _score_for_anomaly(db: AsyncSession, rule: TicketRule, event: SyslogEvent) -> tuple[bool, float, str | None, str] | None:
+    """The scoring/statekeeping core shared by _evaluate_ml_one (a
+    standalone "ml_anomaly" rule, fires a new ticket) and
+    _annotate_if_anomalous (a "repetition" rule's ml_sidecar_enabled,
+    fires a comment on the ticket repetition already touched) -- same
+    model, same warm-up/threshold/cooldown gating either way, only what
+    happens on a fire differs, which is the caller's job, not this
+    function's.
+
+    None if this event doesn't reach this rule at all (match_field/
+    pattern, or no group_key to score against). Otherwise
+    (fired, score, deviation, group_key): `fired` is whether warm-up,
+    threshold, and cooldown all cleared just now -- on a fire,
+    state.last_triggered_at is updated but NOT committed here, since the
+    caller still has its own fire-action (create a ticket, or add a
+    comment to one) to perform on this same session first; both of
+    those already commit on their own, which is what actually persists
+    every mutation this function made. The non-fired paths commit
+    directly since there's nothing further for the caller to do."""
     if not field_matches(rule.match_field, rule.pattern, event):
-        return
+        return None
     if rule.group_by == "none":
         group_key = ""  # sentinel for "ungrouped" -- see TicketRuleState's docstring
     else:
         group_key = getattr(event, rule.group_by, None)
         if not group_key:
-            return  # can't form a group key for this event, so it can't contribute to a grouped rule
+            return None  # can't form a group key for this event, so it can't contribute to a grouped rule
 
     state = await _get_or_create_ml_state(db, rule.id, group_key)
     model = _load_ml_model(state.ml_model, rule.ml_algorithm)
@@ -313,20 +344,54 @@ async def _evaluate_ml_one(db: AsyncSession, rule: TicketRule, event: SyslogEven
     # every rule would flag its own cold start as one big anomaly.
     if state.ml_event_count < rule.ml_warmup_count:
         await db.commit()
-        return
+        return False, score, None, group_key
 
     if score < rule.ml_score_threshold:
         await db.commit()
-        return
+        return False, score, None, group_key
 
     now = dt.datetime.now(dt.timezone.utc)
     if state.last_triggered_at is not None and (now - state.last_triggered_at) < dt.timedelta(minutes=rule.window_minutes):
         await db.commit()  # still within the cooldown from the last trigger for this rule+group
-        return
+        return False, score, None, group_key
 
-    await _fire_ml(db, rule, group_key, event, score, _describe_deviation(zscores, x))
     state.last_triggered_at = now
-    await db.commit()
+    return True, score, _describe_deviation(zscores, x), group_key
+
+
+async def _evaluate_ml_one(db: AsyncSession, rule: TicketRule, event: SyslogEvent) -> None:
+    result = await _score_for_anomaly(db, rule, event)
+    if result is None:
+        return
+    fired, score, deviation, group_key = result
+    if fired:
+        await _fire_ml(db, rule, group_key, event, score, deviation)
+        await db.commit()
+
+
+async def _annotate_if_anomalous(db: AsyncSession, rule: TicketRule, event: SyslogEvent, ticket: Ticket) -> None:
+    """A "repetition" rule's ml_sidecar_enabled: same scoring as a
+    standalone ml_anomaly rule, against this rule's own ml_algorithm/
+    group_by/window_minutes/ml_score_threshold/ml_warmup_count -- but on
+    a fire, adds a comment to `ticket` (whichever one apply_rule's own
+    fold-or-create just touched) instead of creating a second, separate
+    ticket. Runs on every matching event, not just repeats, so the
+    model builds its baseline from the very first occurrence onward."""
+    result = await _score_for_anomaly(db, rule, event)
+    if result is None:
+        return
+    fired, score, deviation, group_key = result
+    if not fired:
+        return
+    algorithm_label = ML_ALGORITHMS.get(rule.ml_algorithm, ML_ALGORITHMS[DEFAULT_ML_ALGORITHM])[0]
+    lines = [
+        f"Statistically unusual occurrence (score {score:.3f}, threshold {rule.ml_score_threshold}, {algorithm_label} model)"
+        + (f", grouped by {rule.group_by} = {group_key}" if group_key else "")
+        + "."
+    ]
+    if deviation:
+        lines.append(deviation)
+    await service.add_comment(db, ticket.id, author_user_id=None, body="\n".join(lines))
 
 
 async def _fire_ml(

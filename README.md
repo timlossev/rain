@@ -103,13 +103,15 @@ Ticketing below.
   syslog event into an incident, vulnerability, or change ticket -- one
   event per ticket ("single"), or repeats of the same thing folded into
   one already-open ticket instead of a fresh one each time (marked
-  Problematic, "repetition"); an "ML anomaly" policy instead learns
-  normal traffic per rule (optionally grouped per host/program), on a
-  selectable `river.anomaly` algorithm (Half-Space Trees, Local Outlier
-  Factor, or One-Class SVM, each with a plain-language explanation of
-  what it's better at), and fires on a genuinely unusual event, running
-  alongside the other two rather than competing with them for the same
-  event
+  Problematic, "repetition" -- on by default, also flags statistically
+  unusual occurrences among those repeats as a comment, using a
+  selectable `river.anomaly` algorithm with no further tuning needed);
+  an "ML anomaly" policy instead learns normal traffic per rule
+  (optionally grouped per host/program) and fires its own ticket on a
+  genuinely unusual event, running alongside the other two rather than
+  competing with them for the same event -- useful for watching a
+  broad/unfiltered event stream that isn't otherwise being repetition-
+  tracked
 - **Root cause assistance**: an "Analyze root cause" button on any
   ticket (or automatically at closure, opt-in per tenant) posts a
   comment summarizing a repeat-occurrence pattern and similar past
