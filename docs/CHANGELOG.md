@@ -8,6 +8,9 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-27
 
+- Tickets list: "Mine" and "Unassigned" now un-toggle themselves on a
+  second click, same as "Problematic" already did, instead of needing
+  a separate "All" link (removed) to clear the assignee filter.
 - Moved the "Root cause assistance" auto-analyze-at-closure toggle from
   Admin > Ticket Statuses to Tickets > Platform Response Rules -- it
   reacts to a ticket event (closure), the same as every rule on that

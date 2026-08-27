@@ -80,9 +80,8 @@
     <div class="filter-bar-divider"></div>
 
     <div class="filter-bar-chips">
-      <a class="btn btn-sm {% if selected_assigned == 'me' %}active{% endif %}" href="/tickets?{{ qs(assigned='me') }}">Mine</a>
-      <a class="btn btn-sm {% if selected_assigned == 'unassigned' %}active{% endif %}" href="/tickets?{{ qs(assigned='unassigned') }}">Unassigned</a>
-      {% if selected_assigned %}<a class="btn btn-sm" href="/tickets?{{ qs(assigned='') }}">All</a>{% endif %}
+      <a class="btn btn-sm {% if selected_assigned == 'me' %}active{% endif %}" href="/tickets?{{ qs(assigned='' if selected_assigned == 'me' else 'me') }}">Mine</a>
+      <a class="btn btn-sm {% if selected_assigned == 'unassigned' %}active{% endif %}" href="/tickets?{{ qs(assigned='' if selected_assigned == 'unassigned' else 'unassigned') }}">Unassigned</a>
       <a class="btn btn-sm {% if selected_problematic %}active{% endif %}" href="/tickets?{{ qs(problematic='' if selected_problematic else '1') }}">Problematic</a>
     </div>
   </div>
