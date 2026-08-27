@@ -62,7 +62,12 @@ document.addEventListener("DOMContentLoaded", () => {
         a.textContent = entry.label;
         const path = document.createElement("span");
         path.className = "nav-search-path";
-        path.textContent = entry.path ? `Option in Quick Navigation (${entry.path})` : "Option in Quick Navigation";
+        // entry.path is the result's own immediate parent category label
+        // (e.g. "Tenant Administration" for a leaf nested two levels
+        // under "Admin" -- see the searchIndex map above) -- named after
+        // that category directly, not this search box's own name, which
+        // told the visitor nothing about where the result actually lives.
+        path.textContent = entry.path ? `Option in ${entry.path}` : "Option";
         a.appendChild(path);
         navSearchResults.appendChild(a);
       });

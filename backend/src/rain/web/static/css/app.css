@@ -412,6 +412,34 @@ p { margin: 0 0 1em; }
 .nav-item.open > .nav-children { display: block; }
 .nav-flyout-heading { display: none; }
 
+/* Top-level categories (Records Authority, Assets, Documents, Calendar,
+   Admin) get the tenant's own accent color instead of the flat sidebar
+   palette every nested item uses, so the sidebar reads as a handful of
+   sections rather than one long flat list. "nav > .nav-tree > .nav-item
+   >" is the same direct-child chain the collapsed-sidebar rule just
+   below reuses to mean "depth 0 only" -- a nested toggle (e.g. Platform
+   Administration under Admin) or leaf link lives inside a .nav-children
+   wrapper, breaking that chain, so this never reaches past the outermost
+   level. Higher specificity than .nav-link/.nav-toggle's own base color
+   rules above (four classes here vs. one or two there) is what lets this
+   override them without !important; the :hover pair right after restores
+   the plain hover-to-white feedback those same base rules already give
+   every other nav item, which this would otherwise also outrank. */
+nav > .nav-tree > .nav-item > .nav-link,
+nav > .nav-tree > .nav-item > .nav-toggle,
+nav > .nav-tree > .nav-item > .nav-link .nav-icon,
+nav > .nav-tree > .nav-item > .nav-toggle .nav-icon,
+nav > .nav-tree > .nav-item > .nav-toggle .nav-label {
+  color: var(--accent);
+}
+nav > .nav-tree > .nav-item > .nav-link:hover,
+nav > .nav-tree > .nav-item > .nav-toggle:hover,
+nav > .nav-tree > .nav-item > .nav-link:hover .nav-icon,
+nav > .nav-tree > .nav-item > .nav-toggle:hover .nav-icon,
+nav > .nav-tree > .nav-item > .nav-toggle:hover .nav-label {
+  color: #fff;
+}
+
 /* ---------- collapsed sidebar: icons only, children become flyouts ---------- */
 .sidebar.collapsed { width: 60px; }
 .sidebar.collapsed .brand-name,

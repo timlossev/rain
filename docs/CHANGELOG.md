@@ -8,6 +8,15 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-27
 
+- Sidebar top-level categories (Records Authority, Assets, Documents,
+  Calendar, Admin) now render in the tenant's own accent color instead
+  of the flat sidebar palette every nested item uses, so the sidebar
+  reads as a handful of sections rather than one long list. Nested
+  sub-groups (e.g. Platform Administration under Admin) and leaf links
+  are unaffected. Also fixed the sidebar search's result label, which
+  read "Option in Quick Navigation (Tenant Administration)" -- naming
+  its own search box instead of the category a result actually lives
+  in -- to just "Option in Tenant Administration."
 - **Repetition policies also flag anomalies, by default**: a
   "Repetition" Event Promotion Policy no longer needs a second,
   separate "ML anomaly" policy (with a duplicated pattern) just to get
