@@ -377,6 +377,48 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
+  // "Analyze root cause" (the ticket detail page's own button, and the
+  // tickets list row menu's same-named item) -- a POST to .../analyze/
+  // preview computes rain.modules.tickets.rootcause.analyze() without
+  // posting it anywhere, returned as a small fragment (findings text +
+  // Post as a comment/Copy to clipboard/Close), shared by both triggers
+  // instead of the list needing to precompute this for every row up
+  // front just in case one gets clicked.
+  const rootCauseModal = document.querySelector("#analyze-root-cause-modal");
+  const rootCauseBody = document.querySelector("#analyze-root-cause-body");
+  document.querySelectorAll("[data-analyze-root-cause]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!rootCauseModal) return;
+      // Closes the tickets-list row menu this button might be sitting
+      // inside, same as a tab switch inside a [data-menu-panel] already
+      // does above -- otherwise it's still open, behind the modal, once
+      // this closes.
+      const menuPanel = btn.closest("[data-menu-panel]");
+      if (menuPanel) {
+        menuPanel.hidden = true;
+        menuPanel.closest("[data-menu]")?.querySelector("[data-menu-toggle]")?.setAttribute("aria-expanded", "false");
+      }
+      rootCauseBody.innerHTML = "<p class=\"muted\">Analyzing...</p>";
+      rootCauseModal.hidden = false;
+      try {
+        const resp = await fetch(`/tickets/${btn.dataset.analyzeRootCause}/analyze/preview`, { method: "POST" });
+        rootCauseBody.innerHTML = resp.ok ? await resp.text() : "<p class=\"muted\">Couldn't run the analysis.</p>";
+        const copyBtn = rootCauseBody.querySelector("#root-cause-copy-btn");
+        const textEl = rootCauseBody.querySelector("#root-cause-preview-text");
+        if (copyBtn && textEl) {
+          copyBtn.addEventListener("click", () => {
+            navigator.clipboard.writeText(textEl.textContent).then(() => {
+              const original = copyBtn.textContent;
+              copyBtn.textContent = "Copied!";
+              setTimeout(() => { copyBtn.textContent = original; }, 1500);
+            });
+          });
+        }
+      } catch (err) {
+        rootCauseBody.innerHTML = "<p class=\"muted\">Couldn't run the analysis.</p>";
+      }
+    });
+  });
   // Client portal: ticket number click -> lightweight timeline modal
   // (rain.modules.portal.router.portal_ticket_timeline), same fetch-and-
   // inject shape as the doc-preview modal just above. The modal title

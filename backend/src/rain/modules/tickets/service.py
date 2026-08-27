@@ -330,6 +330,21 @@ async def is_watching(db: AsyncSession, ticket_id: int, user_id: int) -> bool:
     return result.scalar_one_or_none() is not None
 
 
+async def watching_ticket_ids(db: AsyncSession, ticket_ids: set[int], user_id: int) -> set[int]:
+    """Bulk is_watching -- the tickets list row menu needs "is the current
+    user watching this one" for every row on the page (to show Watch vs.
+    Stop watching, same as the detail page's own button), which would
+    otherwise be one is_watching() query per row."""
+    if not ticket_ids:
+        return set()
+    result = await db.execute(
+        select(TicketWatcher.ticket_id).where(
+            TicketWatcher.ticket_id.in_(ticket_ids), TicketWatcher.user_id == user_id
+        )
+    )
+    return set(result.scalars())
+
+
 async def add_watcher(db: AsyncSession, ticket_id: int, user_id: int) -> None:
     if await is_watching(db, ticket_id, user_id):
         return

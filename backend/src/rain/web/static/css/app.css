@@ -45,6 +45,13 @@
   --sidebar-bg: #161c1e;
   --sidebar-text: #ccd5d6;
   --sidebar-text-dim: #7c8788;
+  /* Shared by .brand (sidebar logo/instance-name row) and .topbar (the
+     breadcrumb/search/user-menu row) so the two sit flush against each
+     other at the same height -- one continuous band across the top of
+     the page, logo vertically centered against the breadcrumb next to
+     it, rather than each sizing to its own content and landing at a
+     slightly different height. */
+  --topbar-height: 60px;
   --radius: 3px;
   --radius-sm: 2px;
   --shadow: 0 1px 0 rgba(22, 28, 30, 0.1);
@@ -76,7 +83,11 @@ p { margin: 0 0 1em; }
   color: var(--sidebar-text);
   display: flex;
   flex-direction: column;
-  padding: 16px 0;
+  /* No top padding -- .brand below supplies its own height (matching
+     .topbar's, see --topbar-height) instead of sitting offset by an
+     ancestor's padding on top of that, which is what threw the two out
+     of alignment with each other. */
+  padding: 0 0 16px;
   position: relative;
   transition: width 0.15s ease;
 }
@@ -93,7 +104,17 @@ p { margin: 0 0 1em; }
 }
 .sidebar-resize-handle:hover, .sidebar-resize-handle.active { background: var(--accent); opacity: 0.5; }
 .sidebar.collapsed .sidebar-resize-handle { display: none; }
-.brand { display: flex; align-items: center; gap: 10px; padding: 4px 16px 20px; overflow: hidden; }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--topbar-height);
+  padding: 0 16px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.sidebar.collapsed .brand { justify-content: center; padding: 0; }
 /* 28px read as tiny outside the PDF header (which renders its own logo
    separately, rain.web.pdf's own _LOGO_HEIGHT=30 -- close to this old
    size, and looks right there because a PDF page is dense/printed; the
@@ -109,7 +130,9 @@ p { margin: 0 0 1em; }
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  padding: 12px 24px;
+  height: var(--topbar-height);
+  padding: 0 24px;
+  box-sizing: border-box;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
@@ -963,6 +986,12 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
 .modal-close:hover { color: var(--text); }
 .modal-body { padding: 18px; overflow-y: auto; }
 .modal-body pre.doc-preview-text { white-space: pre-wrap; font-family: "Cascadia Mono", "SF Mono", Consolas, monospace; font-size: 0.85rem; }
+/* A row of footer buttons inside a modal body (e.g. the "Analyze root
+   cause" modal's Post as a comment/Copy to clipboard/Close) -- relying
+   on inline-level buttons' own incidental whitespace for a gap is
+   fragile (collapses if the template's own whitespace between them
+   ever changes), so this is explicit instead. */
+.modal-actions { display: flex; gap: 8px; margin-top: 12px; }
 
 /* ---------- pagination ---------- */
 .pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }

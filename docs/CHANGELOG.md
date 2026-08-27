@@ -8,6 +8,21 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-27
 
+- **"Analyze root cause" now opens a preview window instead of posting
+  straight to the ticket**: findings show up in a small modal first,
+  with "Post as a comment" (submits it, same as the old direct-post
+  behavior), "Copy to clipboard", or "Close" to discard it. Also added
+  to the tickets list row menu, and made that whole menu correlate with
+  the ticket detail page's own top-right button row -- Watch/Stop
+  watching and Escalate joined it too, under the same conditions
+  (Escalate only once a tenant has an escalation webhook; Watch showing
+  the right state per row via one bulk query, not one per row).
+- Sidebar logo/instance-name row and the topbar (breadcrumb/search/user
+  menu) now share a height and vertical centering (`--topbar-height`),
+  so they read as one continuous band across the top of the page
+  instead of landing at two slightly different heights. The logo is
+  also properly centered in the collapsed (icons-only) sidebar now,
+  instead of hugging the left edge of that narrower column.
 - **Two new Platform Response Rule triggers**: "When an incident/
   vulnerability/change is closed" (any status flagged "closed") and
   "When a change is fully approved" (its last approval step clearing),

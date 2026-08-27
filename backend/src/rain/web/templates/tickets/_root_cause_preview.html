@@ -1,0 +1,17 @@
+{# Fetched by app.js's [data-analyze-root-cause] handler into base.html's
+   shared #analyze-root-cause-modal -- see rain.modules.tickets.router's
+   analyze_root_cause_preview. Never posted anywhere on its own; "Post as
+   a comment" below re-submits to the real analyze route, which
+   recomputes this fresh rather than trusting anything from here. #}
+{% if analysis %}
+<pre class="doc-preview-text" id="root-cause-preview-text">{{ analysis }}</pre>
+{% else %}
+<p class="muted" id="root-cause-preview-text">No root-cause signals found for this ticket yet - it hasn't accumulated more than one promoted syslog event, and no similar past closed tickets matched by title or description.</p>
+{% endif %}
+<div class="modal-actions">
+  <form method="post" action="/tickets/{{ ticket.id }}/analyze" class="inline">
+    <button type="submit" class="btn btn-sm btn-primary" {% if not analysis %}disabled{% endif %}>Post as a comment</button>
+  </form>
+  <button type="button" class="btn btn-sm" id="root-cause-copy-btn" {% if not analysis %}disabled{% endif %}>Copy to clipboard</button>
+  <button type="button" class="btn btn-sm" data-modal-close>Close</button>
+</div>

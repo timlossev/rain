@@ -120,6 +120,13 @@ async def list_tickets(
     status_colors = {s.key: s.color for s in statuses}
     user_names = await resolve_user_names({t.assignee_user_id for t in ticket_page.items})
     selected_asset = await asset_service.get_asset(tenant_db, asset_id) if asset_id else None
+    # The same two conditions the ticket detail page's own top-right
+    # button row uses for Escalate/Watch, computed here for the row
+    # menu's "Analyze root cause"/Escalate/Watch items so they stay
+    # available from exactly the same conditions either place -- see
+    # tickets/detail.html and this module's ticket_detail.
+    escalation_webhook_id = await get_tenant_config(tenant_db, "escalation_webhook_id", None)
+    watching_ids = await service.watching_ticket_ids(tenant_db, {t.id for t in ticket_page.items}, ctx.user.id)
     return templates.TemplateResponse(
         request,
         "tickets/list.html",
@@ -139,6 +146,8 @@ async def list_tickets(
             "selected_sort": sort if sort in service.SORTABLE_COLUMNS else "created_at",
             "selected_dir": dir,
             "user_names": user_names,
+            "can_escalate": escalation_webhook_id is not None,
+            "watching_ids": watching_ids,
         },
     )
 
@@ -636,6 +645,7 @@ async def change_status(
 async def toggle_watch(
     ticket_id: int,
     watching: str = Form(...),  # "1" | "0" -- current value the button already shows, so this is a set not a flip
+    next: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
@@ -646,6 +656,8 @@ async def toggle_watch(
             await service.add_watcher(tenant_db, ticket_id, ctx.user.id)
         else:
             await service.remove_watcher(tenant_db, ticket_id, ctx.user.id)
+    if next:
+        return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
     return RedirectResponse(
         f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER
     )
@@ -682,17 +694,41 @@ async def escalate_ticket(
     )
 
 
+@router.post("/{ticket_id:int}/analyze/preview", response_class=HTMLResponse)
+async def analyze_root_cause_preview(
+    request: Request,
+    ticket_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Computes rootcause.analyze() without posting it anywhere -- backs
+    the "Analyze root cause" modal (base.html's #analyze-root-cause-
+    modal, fetched by app.js's [data-analyze-root-cause] handler), opened
+    from either the ticket detail page's own button or the tickets list
+    row menu's same-named item. Posting the result as a comment is a
+    separate, deliberate step from inside that modal (see
+    analyze_root_cause below, unchanged)."""
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    analysis = await rootcause.analyze(tenant_db, ticket)
+    return templates.TemplateResponse(
+        request, "tickets/_root_cause_preview.html", {"ticket": ticket, "analysis": analysis}
+    )
+
+
 @router.post("/{ticket_id:int}/analyze")
 async def analyze_root_cause(
     ticket_id: int,
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
-    """On-demand version of the same rootcause.analyze the tenant can also
-    opt into running automatically at closure (Admin > Ticket Statuses,
-    rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY) -- always available regardless
-    of that setting, since a signed-in user asking for it right now is a
-    different thing from every closed ticket getting one unasked."""
+    """"Post as a comment" inside the analysis modal above -- always
+    available on demand regardless of whether the tenant also opted into
+    running this automatically at closure (Tickets > Platform Response
+    Rules, rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY). Recomputes the analysis
+    itself rather than trusting anything the client echoes back from the
+    preview above, so this always posts a fresh result."""
     ticket = await tenant_db.get(Ticket, ticket_id)
     if ticket is not None:
         analysis = await rootcause.analyze(tenant_db, ticket)

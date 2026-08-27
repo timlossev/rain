@@ -131,9 +131,13 @@ list with:
   Status, Created) to sort by it, click again to reverse direction.
   Assignee and Asset columns are shown but not sortable; Asset links to
   that asset's own page when the ticket has one.
-- A three-dot row menu on every ticket with: Mark closed, Mark/Unmark
-  problematic, Promote to Change (incidents and vulnerabilities only),
-  Mark cancelled (changes only), and Get a hard copy (PDF).
+- A three-dot row menu on every ticket, matching the ticket detail
+  page's own top-right button row under the same conditions -- Mark/
+  Unmark problematic, Watch/Stop watching, Promote to Change (incidents
+  and vulnerabilities only), Escalate (only once your tenant has an
+  escalation webhook configured), Analyze root cause -- plus two
+  quick actions specific to this list: Mark closed and Mark cancelled
+  (changes only), and Get a hard copy (PDF).
 
 A change ticket's title in this list carries a small icon showing
 whether it's been approved yet, and any ticket flagged problematic shows
@@ -180,12 +184,19 @@ button is for anyone else), "Escalate" (only shown once your tenant has
 an escalation webhook configured -- Admin > Branding -- fires it for
 this one ticket on demand, filling in that webhook's placeholders from
 this exact ticket -- see "Placeholders reference" under Webhooks below),
-"Analyze root cause" (posts a comment summarizing a repeat-occurrence
+"Analyze root cause" (opens a small window with a repeat-occurrence
 pattern, if this ticket accumulated more than one promoted syslog
 event, and similar past *closed* tickets by title/description match --
-statistical/historical signals, not a determined cause, and available
-regardless of the automatic-at-closure setting below), and "Export to
-PDF".
+statistical/historical signals, not a determined cause. From there,
+"Post as a comment" adds it to the ticket's activity feed, "Copy to
+clipboard" copies the text without posting anything, or "Close" just
+dismisses it. Available regardless of the automatic-at-closure setting
+below; also reachable from the same ticket's row on the tickets list,
+via its own [...] menu), and "Export to PDF". The tickets list row menu
+mirrors this whole button row -- Promote to Change, Mark/Unmark
+problematic, Watch/Stop watching, Escalate, and Analyze root cause are
+all there too, under the same conditions, alongside that menu's own
+list-only quick actions (Mark closed, Mark cancelled for a change).
 
 Below that is the main card:
 

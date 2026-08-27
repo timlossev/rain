@@ -347,18 +347,32 @@ that split didn't earn its keep:
   caller's own job.
 
 Root cause assistance (`rain.modules.tickets.rootcause`) revisits a
-ticket -- on demand (an "Analyze root cause" button) or automatically,
-once, the first time it's moved into an `is_closed` status, opt-in per
-tenant (`auto_root_cause_on_close` tenant_config, off by default) -- and
-posts a comment with two honest, non-causal signals: a repeat-occurrence
-pattern (host/program distribution and time span across every
-`SyslogEvent` promoted into the ticket via `promoted_ticket_id`) and
-similar past *closed* tickets (the same `websearch_to_tsquery`/`ts_rank`
-full-text search the global search bar uses, scoped to `is_closed`
-statuses). Deliberately not framed as "AI root cause analysis" -- nothing
-here, or in `river`, does causal reasoning; both signals are things a
-human would otherwise do by hand scrolling the timeline or searching
-past tickets, just automated.
+ticket -- on demand (an "Analyze root cause" button on the ticket detail
+page or its tickets-list row menu) or automatically, once, the first
+time it's moved into an `is_closed` status, opt-in per tenant
+(`auto_root_cause_on_close` tenant_config, off by default) -- computing
+two honest, non-causal signals: a repeat-occurrence pattern (host/
+program distribution and time span across every `SyslogEvent` promoted
+into the ticket via `promoted_ticket_id`) and similar past *closed*
+tickets (the same `websearch_to_tsquery`/`ts_rank` full-text search the
+global search bar uses, scoped to `is_closed` statuses). Deliberately
+not framed as "AI root cause analysis" -- nothing here, or in `river`,
+does causal reasoning; both signals are things a human would otherwise
+do by hand scrolling the timeline or searching past tickets, just
+automated.
+
+The on-demand path is a two-step, not a direct post: `POST /tickets/
+{id}/analyze/preview` computes the analysis and returns it as a fragment
+(`tickets/_root_cause_preview.html`) into a modal shared by both
+triggers (base.html's `#analyze-root-cause-modal`, populated by app.js's
+`[data-analyze-root-cause]` handler) -- nothing is persisted by this
+step. From there, "Post as a comment" submits to the unchanged `POST
+/tickets/{id}/analyze` (which recomputes the analysis itself rather than
+trusting anything echoed back from the preview, so what gets posted is
+always freshly computed), "Copy to clipboard" copies the shown text
+client-side, and "Close" just dismisses the modal. The automatic-at-
+closure path (`service.update_status`'s `newly_closed` hook) skips this
+preview step entirely and posts directly, same as before.
 
 `single`/`repetition` are evaluated first-match-wins (an event never
 spawns two tickets that way); `ml_anomaly` policies never "consume" the

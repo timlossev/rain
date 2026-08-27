@@ -38,9 +38,7 @@
       <button type="submit" class="btn btn-sm btn-danger">Escalate</button>
     </form>
     {% endif %}
-    <form method="post" action="/tickets/{{ ticket.id }}/analyze" class="inline">
-      <button type="submit" class="btn btn-sm" title="Looks for a repeat-occurrence pattern and similar past closed tickets, posted as a comment">Analyze root cause</button>
-    </form>
+    <button type="button" class="btn btn-sm" data-analyze-root-cause="{{ ticket.id }}" title="Looks for a repeat-occurrence pattern and similar past closed tickets">Analyze root cause</button>
     <a class="btn btn-sm" href="/tickets/{{ ticket.id }}/pdf">Export to PDF</a>
   </div>
 </div>

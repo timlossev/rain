@@ -113,10 +113,11 @@ Ticketing below.
   broad/unfiltered event stream that isn't otherwise being repetition-
   tracked
 - **Root cause assistance**: an "Analyze root cause" button on any
-  ticket (or automatically at closure, opt-in per tenant) posts a
-  comment summarizing a repeat-occurrence pattern and similar past
+  ticket (or in that ticket's row menu, or automatically at closure,
+  opt-in per tenant) shows a repeat-occurrence pattern and similar past
   closed tickets -- honest statistical/historical signals, not causal
-  reasoning
+  reasoning -- in a small window, with the choice to post it as a
+  comment, copy it, or just close it
 - **Platform Response Rules**: react to a ticket being created, closed,
   or (change tickets) fully approved by notifying Slack or email,
   calling a webhook, attaching a document or asset, marking the ticket

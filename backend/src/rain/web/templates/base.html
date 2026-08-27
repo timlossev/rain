@@ -173,6 +173,21 @@
     <div class="modal-body" id="doc-preview-body"><p class="muted">Loading...</p></div>
   </div>
 </div>
+{# Shared by the ticket detail page's own "Analyze root cause" button and
+   the tickets list row menu's same-named item (app.js's [data-analyze-
+   root-cause], fetching rain.modules.tickets.router.
+   analyze_root_cause_preview) -- lives here, not on either page alone,
+   so both triggers populate the same one instead of each needing its
+   own copy. #}
+<div class="modal-overlay" id="analyze-root-cause-modal" hidden data-modal>
+  <div class="modal-box">
+    <div class="modal-header">
+      <span>Root cause analysis</span>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="analyze-root-cause-body"><p class="muted">Analyzing...</p></div>
+  </div>
+</div>
 {% endif %}
 <script src="/static/js/app.js?v={{ asset_version }}"></script>
 {% block extra_scripts %}{% endblock %}

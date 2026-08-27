@@ -153,9 +153,28 @@
                 <input type="hidden" name="is_problematic" value="{{ '0' if t.is_problematic else '1' }}">
                 <button type="submit" class="row-menu-item">{{ "Unmark problematic" if t.is_problematic else "Mark problematic" }}</button>
               </form>
+              {# The rest of this menu, from here down (excluding the two
+                 list-only quick actions below, Mark cancelled/Get a hard
+                 copy), deliberately correlates 1:1 with the ticket detail
+                 page's own top-right button row (tickets/detail.html) --
+                 same items, same conditions (can_escalate, ticket_type),
+                 so whatever's reachable from one ticket's own page is
+                 also reachable without leaving the list. #}
+              <form method="post" action="/tickets/{{ t.id }}/watch/toggle">
+                <input type="hidden" name="next" value="/tickets?{{ qs() }}">
+                <input type="hidden" name="watching" value="{{ '0' if t.id in watching_ids else '1' }}">
+                <button type="submit" class="row-menu-item">{{ "Stop watching" if t.id in watching_ids else "Watch" }}</button>
+              </form>
               {% if t.ticket_type in ("incident", "vulnerability") %}
               <a class="row-menu-item" href="/tickets/new?ticket_type=change&amp;source_ticket_id={{ t.id }}">Promote to Change</a>
               {% endif %}
+              {% if can_escalate %}
+              <form method="post" action="/tickets/{{ t.id }}/escalate" data-confirm="Escalate {{ t.ticket_number }}?">
+                <input type="hidden" name="next" value="/tickets?{{ qs() }}">
+                <button type="submit" class="row-menu-item danger">Escalate</button>
+              </form>
+              {% endif %}
+              <button type="button" class="row-menu-item" data-analyze-root-cause="{{ t.id }}">Analyze root cause</button>
               {% if t.ticket_type == "change" %}
               <form method="post" action="/tickets/{{ t.id }}/mark-cancelled">
                 <input type="hidden" name="next" value="/tickets?{{ qs() }}">
