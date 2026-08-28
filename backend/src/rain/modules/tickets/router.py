@@ -1190,6 +1190,19 @@ class _NewRuleDefaults:
         self.window_minutes = 5
         self.ml_score_threshold = 0.7
         self.ml_warmup_count = 250
+        self.approval_flow_id = None
+
+
+async def _clamp_rule_approval_flow_id(tenant_db: AsyncSession, approval_flow_id: str) -> int | None:
+    """A rule's approval_flow_id (ticket_type == "change" only -- ignored
+    otherwise) falls back to None the same light-touch way group_by/
+    ml_algorithm/etc. do below rather than rejecting the whole save: a
+    blank selection, or one naming a flow that's since been deleted,
+    just means "file an unprotected change," not a validation error."""
+    if not approval_flow_id:
+        return None
+    flow_id = int(approval_flow_id)
+    return flow_id if await service.approval_flow_exists(tenant_db, flow_id) else None
 
 
 def _clamp_rule_ml_fields(
@@ -1237,6 +1250,7 @@ async def rules_list(
         if prefill_pattern
         else None
     )
+    approval_flows = await service.list_approval_flows(tenant_db)
     return templates.TemplateResponse(
         request,
         "tickets/rules.html",
@@ -1249,6 +1263,7 @@ async def rules_list(
             "match_fields": MATCH_FIELDS,
             "group_by_fields": GROUP_BY_FIELDS,
             "ml_algorithms": [(k, label, desc) for k, (label, desc, _) in ML_ALGORITHMS.items()],
+            "approval_flows": approval_flows,
             "prefill": prefill,
             "rule": _NewRuleDefaults(promotion_type="repetition" if prefill else "single"),
             "tested_rule": None,
@@ -1274,6 +1289,7 @@ async def rules_create(
     ml_warmup_count: int = Form(250),
     ml_algorithm: str = Form(DEFAULT_ML_ALGORITHM),
     ml_sidecar_enabled: bool = Form(False),
+    approval_flow_id: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
@@ -1300,6 +1316,9 @@ async def rules_create(
             sort_order=sort_order,
             created_by=ctx.user.id,
             ml_sidecar_enabled=ml_sidecar_enabled if promotion_type == "repetition" else False,
+            approval_flow_id=await _clamp_rule_approval_flow_id(tenant_db, approval_flow_id)
+            if ticket_type == "change"
+            else None,
             **ml_fields,
         )
     )
@@ -1319,6 +1338,7 @@ async def rules_edit_form(
     rule = await tenant_db.get(TicketRule, rule_id)
     if rule is None:
         return RedirectResponse("/tickets/rules/all", status_code=status.HTTP_303_SEE_OTHER)
+    approval_flows = await service.list_approval_flows(tenant_db)
     return templates.TemplateResponse(
         request,
         "tickets/rule_form.html",
@@ -1331,6 +1351,7 @@ async def rules_edit_form(
             "match_fields": MATCH_FIELDS,
             "group_by_fields": GROUP_BY_FIELDS,
             "ml_algorithms": [(k, label, desc) for k, (label, desc, _) in ML_ALGORITHMS.items()],
+            "approval_flows": approval_flows,
         },
     )
 
@@ -1353,6 +1374,7 @@ async def rules_edit(
     ml_warmup_count: int = Form(250),
     ml_algorithm: str = Form(DEFAULT_ML_ALGORITHM),
     ml_sidecar_enabled: bool = Form(False),
+    approval_flow_id: str = Form(""),
     is_active: bool = Form(False),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
@@ -1377,6 +1399,9 @@ async def rules_edit(
         rule.sort_order = sort_order
         rule.is_active = is_active
         rule.ml_sidecar_enabled = ml_sidecar_enabled if rule.promotion_type == "repetition" else False
+        rule.approval_flow_id = (
+            await _clamp_rule_approval_flow_id(tenant_db, approval_flow_id) if rule.ticket_type == "change" else None
+        )
         for key, value in ml_fields.items():
             setattr(rule, key, value)
         await tenant_db.commit()
@@ -1411,6 +1436,7 @@ async def rules_test(
     nav = await build_nav_context(ctx)
     stmt = select(TicketRule).order_by(TicketRule.sort_order)
     rule_page = await paginate(tenant_db, stmt, page=1)
+    approval_flows = await service.list_approval_flows(tenant_db)
     return templates.TemplateResponse(
         request,
         "tickets/rules.html",
@@ -1423,6 +1449,7 @@ async def rules_test(
             "match_fields": MATCH_FIELDS,
             "group_by_fields": GROUP_BY_FIELDS,
             "ml_algorithms": [(k, label, desc) for k, (label, desc, _) in ML_ALGORITHMS.items()],
+            "approval_flows": approval_flows,
             "prefill": None,
             "rule": _NewRuleDefaults(),
             "tested_rule": tested_rule,

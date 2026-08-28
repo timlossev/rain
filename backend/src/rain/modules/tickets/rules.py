@@ -102,6 +102,28 @@ async def find_matching_rule(db: AsyncSession, event: SyslogEvent) -> TicketRule
     return None
 
 
+def _default_change_window() -> tuple[dt.datetime, dt.datetime]:
+    """A rule-produced change ticket's implementation window, when the
+    rule doesn't ask for anything more specific than "file it now": start
+    now, 24h turnaround -- the same reasonable default a human would
+    otherwise have to type in by hand on the manual "New ticket" form."""
+    start = dt.datetime.now(dt.timezone.utc)
+    return start, start + dt.timedelta(hours=24)
+
+
+async def _maybe_attach_change_approval(db: AsyncSession, rule: TicketRule, ticket: Ticket) -> None:
+    """A rule producing a change ticket can name which approval flow to
+    attach (rule.approval_flow_id) -- the same ChangeApproval machinery
+    the manual "New ticket" form and Service Catalog use
+    (service.start_approval), just picked ahead of time on the rule
+    instead of asked for at submission. No-op for anything but a change,
+    or a rule with no flow configured (files an unprotected change, same
+    as leaving that field blank on the manual form)."""
+    if rule.ticket_type != "change" or rule.approval_flow_id is None:
+        return
+    await service.start_approval(db, ticket, rule.approval_flow_id)
+
+
 async def apply_rule(db: AsyncSession, rule: TicketRule, event: SyslogEvent) -> Ticket:
     """Turns one matching event into a ticket -- "single" always creates
     a fresh one; "repetition" folds a repeat occurrence (same computed
@@ -110,7 +132,10 @@ async def apply_rule(db: AsyncSession, rule: TicketRule, event: SyslogEvent) -> 
     with ml_sidecar_enabled also runs this event through the same
     anomaly-scoring _evaluate_ml_one uses for a standalone ml_anomaly
     rule, on whichever ticket this call ends up returning -- see
-    _annotate_if_anomalous."""
+    _annotate_if_anomalous. A newly created (never a folded-into) change
+    ticket also gets its implementation window defaulted and its
+    approval flow attached -- see _default_change_window/
+    _maybe_attach_change_approval."""
     asset_id = None
     if rule.asset_match_field:
         value = getattr(event, rule.asset_match_field, None)
@@ -128,6 +153,7 @@ async def apply_rule(db: AsyncSession, rule: TicketRule, event: SyslogEvent) -> 
             await service.combine_event_into_ticket(db, ticket, event)
 
     if ticket is None:
+        start_date, end_date = _default_change_window() if rule.ticket_type == "change" else (None, None)
         ticket = await service.create_ticket(
             db,
             ticket_type=rule.ticket_type,
@@ -140,7 +166,10 @@ async def apply_rule(db: AsyncSession, rule: TicketRule, event: SyslogEvent) -> 
             asset_id=asset_id,
             source_event_id=event.id,
             source_rule_id=rule.id,
+            start_date=start_date,
+            end_date=end_date,
         )
+        await _maybe_attach_change_approval(db, rule, ticket)
 
     if rule.promotion_type == "repetition" and rule.ml_sidecar_enabled:
         await _annotate_if_anomalous(db, rule, event, ticket)
@@ -427,6 +456,7 @@ async def _fire_ml(
         f"{event.host or '-'}  {event.program or '-'}  {(event.message or '')[:200]}",
     ]
 
+    start_date, end_date = _default_change_window() if rule.ticket_type == "change" else (None, None)
     ticket = await service.create_ticket(
         db,
         ticket_type=rule.ticket_type,
@@ -435,6 +465,9 @@ async def _fire_ml(
         severity=rule.severity,
         asset_id=asset_id,
         source_rule_id=rule.id,
+        start_date=start_date,
+        end_date=end_date,
     )
+    await _maybe_attach_change_approval(db, rule, ticket)
     if event.promoted_ticket_id is None:
         event.promoted_ticket_id = ticket.id

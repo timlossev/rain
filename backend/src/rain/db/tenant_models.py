@@ -233,7 +233,17 @@ class TicketRule(TenantBase):
       `pattern` becomes its own ticket of `ticket_type`. First
       single/repetition match for a given event wins (a message doesn't
       spawn two tickets); an "ml_anomaly" rule below never competes for
-      this, see evaluate_and_promote's own docstring.
+      this, see evaluate_and_promote's own docstring. A rule whose
+      `ticket_type` is "change" also defaults that new ticket's
+      `start_date`/`end_date` to "starts now, 24h turnaround" (see
+      rules._default_change_window) and, if `approval_flow_id` is set,
+      attaches that flow the same way the manual "New ticket" form and
+      Service Catalog do (`service.start_approval`) -- an unset
+      `approval_flow_id` still files the change, just unprotected, same
+      as leaving that field blank on the manual form. Only ever applies
+      to a *newly created* change ticket, never one "repetition" folds
+      an occurrence into (that ticket already made its own choice at
+      its own creation time).
     - "repetition": same match, but a computed title (`title_template`,
       via {message}/{host}/{program}) that equals an already-open
       ticket's folds the new occurrence into that ticket instead of
@@ -312,6 +322,12 @@ class TicketRule(TenantBase):
     # repetition only -- ignored by "single"/"ml_anomaly" rules. See this
     # class's own docstring.
     ml_sidecar_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # ticket_type == "change" only -- ignored otherwise. See this class's
+    # own docstring for the start_date/end_date default that comes with
+    # it regardless of whether this is set.
+    approval_flow_id: Mapped[int | None] = mapped_column(
+        ForeignKey("approval_flows.id", ondelete="SET NULL"), nullable=True
+    )
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

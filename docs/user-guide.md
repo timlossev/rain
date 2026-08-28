@@ -435,13 +435,20 @@ Fields every policy has, regardless of Promotion type:
 - Auto-link asset by (optional): don't auto-link, or match the event's
   host or program against an asset's External ID field to link the new
   ticket to that asset automatically.
+- Approval flow (change tickets only, ignored for incident/
+  vulnerability): which flow to attach automatically when this policy
+  produces a change, or "Don't attach a flow" to file an unprotected
+  one. A change this policy produces also defaults its implementation
+  window to starting the moment it's created, with a 24-hour
+  turnaround -- edit both on the ticket afterward the same as any
+  manually-created change.
 
-Each policy row has a small "Test" form: paste a sample log line in and
-it reports whether the policy's current pattern would match it, without
-creating anything. A policy also has an Active checkbox on its edit
-page to disable it without deleting it -- an inactive policy is skipped
-entirely, its events falling through to the next one (or just staying
-in Events, unpromoted).
+Each policy row has a "Test" button that opens a small window: paste a
+sample log line in and it reports whether the policy's current pattern
+would match it, without creating anything. A policy also has an Active
+checkbox on its edit page to disable it without deleting it -- an
+inactive policy is skipped entirely, its events falling through to the
+next one (or just staying in Events, unpromoted).
 
 Events' selection menu (see Events above) has a "New policy from
 selection" action that jumps here with a pattern pre-filled from the

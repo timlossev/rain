@@ -253,7 +253,9 @@ Documents above.
   policy instead learns normal traffic per rule (optionally grouped per
   host/program) and fires its own ticket on a genuinely unusual event,
   useful for watching a broad/unfiltered stream that isn't otherwise
-  being repetition-tracked
+  being repetition-tracked. A policy producing a change ticket can name
+  which approval flow to attach, and defaults that ticket's
+  implementation window to starting at creation with a 24h turnaround
 - **Platform Response Rules**: react to a ticket being created, closed,
   or (changes) fully approved by notifying Slack or email, calling a
   webhook, attaching a document or asset, marking the ticket problematic,

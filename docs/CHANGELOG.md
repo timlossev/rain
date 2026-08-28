@@ -8,6 +8,11 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-27
 
+- **Event Promotion Policies producing a change** can now name which
+  approval flow to attach automatically (instead of always filing an
+  unprotected change), and default that ticket's implementation window
+  to starting the moment it's created with a 24-hour turnaround --
+  editable afterward on the ticket, same as a manually-created one.
 - **"Analyze root cause" now opens a preview window instead of posting
   straight to the ticket**: findings show up in a small modal first,
   with "Post as a comment" (submits it, same as the old direct-post

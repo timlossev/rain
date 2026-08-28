@@ -67,6 +67,14 @@
           <div class="field-hint">Inactive policies are skipped entirely - fall through to the next policy.</div>
         </div>
       </div>
+      <div class="field">
+        <label for="approval_flow_id">Approval flow (change tickets only)</label>
+        <select id="approval_flow_id" name="approval_flow_id">
+          <option value="">Don't attach a flow (unprotected change)</option>
+          {% for f in approval_flows %}<option value="{{ f.id }}" {% if f.id == rule.approval_flow_id %}selected{% endif %}>{{ f.name }}</option>{% endfor %}
+        </select>
+        <div class="field-hint">Ignored unless Ticket type above is Change. The resulting ticket also defaults its implementation window to "starts now, 24h turnaround."</div>
+      </div>
     </div>
 
     <button class="btn btn-primary" type="submit">Save changes</button>

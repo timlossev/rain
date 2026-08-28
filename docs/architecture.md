@@ -299,7 +299,14 @@ code paths; see `TicketRule`'s own docstring and migration 0038 for why
 that split didn't earn its keep:
 
 - `single`: a match (regex on `message`/`host`/`program`) becomes its own
-  `Ticket` via `rain.modules.tickets.service.create_ticket`.
+  `Ticket` via `rain.modules.tickets.service.create_ticket`. A policy
+  whose `ticket_type` is `change` also defaults that new ticket's
+  `start_date`/`end_date` to "starts now, 24h turnaround"
+  (`rules._default_change_window`) and, if `approval_flow_id` is set,
+  attaches that flow (`service.start_approval`, the same machinery the
+  manual "New ticket" form and Service Catalog use) -- only for a
+  *newly created* change ticket, never one `repetition` folds an
+  occurrence into.
 - `repetition`: same match, but if the computed title equals an already-
   open ticket of this policy's type, the event folds into that ticket
   instead (`service.combine_event_into_ticket` -- a comment noting the
