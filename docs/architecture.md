@@ -351,7 +351,13 @@ that split didn't earn its keep:
   this standalone type and the repetition sidecar above -- same model,
   same warm-up/threshold/cooldown gating either way; only what happens
   on a fire (a new ticket here, a comment there) differs, which is each
-  caller's own job.
+  caller's own job. `rules.rule_training_status`/`bulk_rule_training_
+  summary` read `TicketRuleState.ml_event_count` back out against the
+  rule's own `ml_warmup_count` for display -- a compact per-rule badge
+  on the policy list ("Live", "115/250 training", or a mixed-group
+  summary), and a full per-group breakdown on the rule's own edit page
+  -- entirely a read of state `_score_for_anomaly` already maintains,
+  no new bookkeeping.
 
 Root cause assistance (`rain.modules.tickets.rootcause`) revisits a
 ticket -- on demand (an "Analyze root cause" button on the ticket detail

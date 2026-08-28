@@ -333,10 +333,12 @@ class TicketRule(TenantBase):
 
 
 class TicketRuleState(TenantBase):
-    """One row per (rule, group-key) an "ml_anomaly" TicketRule has
-    actually seen -- e.g. one row per host for a rule grouped by host.
-    "single"/"repetition" rules never touch this table; they have no
-    window/cooldown concept and no per-group model to persist.
+    """One row per (rule, group-key) that's actually been scored -- an
+    "ml_anomaly" rule, or a "repetition" rule with ml_sidecar_enabled
+    (see TicketRule's own docstring) -- e.g. one row per host for a rule
+    grouped by host. A plain "single" rule, or a "repetition" one with
+    the sidecar off, never touches this table; neither has any
+    window/cooldown concept or per-group model to persist.
 
     `ml_model` is a pickled river.anomaly detector (whichever the rule's
     own `ml_algorithm` names, see TicketRule's own docstring) and

@@ -306,6 +306,66 @@ def _describe_deviation(zscores: dict[str, float], features: dict[str, float]) -
     )
 
 
+async def rule_training_status(db: AsyncSession, rule_id: int) -> list[dict]:
+    """Per-group training progress for a rule that actually scores events
+    (an "ml_anomaly" rule, or a "repetition" rule with ml_sidecar_enabled)
+    -- one entry per TicketRuleState row that rule has accumulated, each
+    just its group_key and how many events it's seen so far. Whether
+    that counts as "still training" or "live" depends on the *rule's*
+    own ml_warmup_count, not anything stored on the state row itself, so
+    that comparison is the caller's job (rule_form.html, which already
+    has the rule in scope) rather than duplicated here. [] for a rule
+    that hasn't scored anything yet -- a brand new one, or one whose
+    sidecar was only just turned on -- not an error."""
+    result = await db.execute(
+        select(TicketRuleState).where(TicketRuleState.rule_id == rule_id).order_by(TicketRuleState.group_key)
+    )
+    return [{"group_key": row.group_key or None, "event_count": row.ml_event_count} for row in result.scalars()]
+
+
+async def bulk_rule_training_summary(db: AsyncSession, rules: list[TicketRule]) -> dict[int, str]:
+    """One short status string per rule that actually scores events (an
+    "ml_anomaly" rule, or a "repetition" rule with ml_sidecar_enabled) --
+    "Live", "115/250 training", or a mixed-group summary ("2 live, 1
+    training") -- for the policy list's compact per-row indicator, in
+    one query for every applicable rule on the page instead of one
+    per row (see rule_training_status for the fuller, per-group version
+    the rule's own edit page uses). A rule this doesn't apply to (plain
+    "single", or "repetition" with the sidecar off) is simply absent
+    from the result -- the template's own .get() treats that as
+    "nothing to show", not an error."""
+    applicable = [
+        r for r in rules if r.promotion_type == "ml_anomaly" or (r.promotion_type == "repetition" and r.ml_sidecar_enabled)
+    ]
+    if not applicable:
+        return {}
+    rule_ids = [r.id for r in applicable]
+    result = await db.execute(
+        select(TicketRuleState.rule_id, TicketRuleState.ml_event_count).where(TicketRuleState.rule_id.in_(rule_ids))
+    )
+    counts_by_rule: dict[int, list[int]] = {}
+    for rule_id, count in result.all():
+        counts_by_rule.setdefault(rule_id, []).append(count)
+
+    summaries: dict[int, str] = {}
+    for rule in applicable:
+        counts = counts_by_rule.get(rule.id)
+        if not counts:
+            summaries[rule.id] = "No events yet"
+            continue
+        live = sum(1 for c in counts if c >= rule.ml_warmup_count)
+        training = len(counts) - live
+        if len(counts) == 1:
+            summaries[rule.id] = "Live" if live else f"{counts[0]}/{rule.ml_warmup_count} training"
+        elif training == 0:
+            summaries[rule.id] = f"Live ({live} groups)"
+        elif live == 0:
+            summaries[rule.id] = f"Training ({training} groups)"
+        else:
+            summaries[rule.id] = f"{live} live, {training} training"
+    return summaries
+
+
 async def _get_or_create_ml_state(db: AsyncSession, rule_id: int, group_key: str) -> TicketRuleState:
     # FOR UPDATE: this row is read, mutated in Python (score + train the
     # model), and written back -- not a single atomic SQL statement --

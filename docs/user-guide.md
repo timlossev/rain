@@ -445,10 +445,21 @@ Fields every policy has, regardless of Promotion type:
 
 Each policy row has a "Test" button that opens a small window: paste a
 sample log line in and it reports whether the policy's current pattern
-would match it, without creating anything. A policy also has an Active
-checkbox on its edit page to disable it without deleting it -- an
-inactive policy is skipped entirely, its events falling through to the
-next one (or just staying in Events, unpromoted).
+would match it, without creating anything. A row also shows a compact
+training-status badge if it's an ML anomaly policy, or a Repetition one
+with "Also flag statistically unusual occurrences" on -- "No events
+yet", "115/250 training", "Live", or, for a policy grouped by host/
+program, a mixed summary like "2 live, 1 training". Its own edit page
+breaks this down further, one row per group, once it's scored at least
+one event: how many events that group has seen against the policy's own
+Warm-up events setting, and whether it's cleared that ("Live") or still
+building its baseline ("Training") -- it won't fire, or flag anything
+unusual, until it does.
+
+A policy also has an Active checkbox on its edit page to disable it
+without deleting it -- an inactive policy is skipped entirely, its
+events falling through to the next one (or just staying in Events,
+unpromoted).
 
 Events' selection menu (see Events above) has a "New policy from
 selection" action that jumps here with a pattern pre-filled from the

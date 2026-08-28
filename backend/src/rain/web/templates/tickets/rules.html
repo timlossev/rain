@@ -16,7 +16,10 @@
       <tr{% if not r.is_active %} class="muted"{% endif %}>
         <td class="muted">{{ r.sort_order }}</td>
         <td>{{ r.name }}{% if not r.is_active %} <span class="badge">inactive</span>{% endif %}</td>
-        <td class="muted">{{ {"single": "Single event", "repetition": "Repetition", "ml_anomaly": "ML anomaly"}[r.promotion_type] }}</td>
+        <td class="muted">
+          {{ {"single": "Single event", "repetition": "Repetition", "ml_anomaly": "ML anomaly"}[r.promotion_type] }}
+          {% if training_summaries.get(r.id) %}<br><span class="badge {% if 'training' not in training_summaries[r.id] and 'No events' not in training_summaries[r.id] %}badge-accent{% endif %}">{{ training_summaries[r.id] }}</span>{% endif %}
+        </td>
         <td><span class="badge">{{ r.ticket_type }}</span></td>
         <td class="muted">{{ r.match_field }}</td>
         <td><code>{{ r.pattern }}</code></td>

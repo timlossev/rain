@@ -46,6 +46,35 @@
 
     {% include "tickets/_promotion_type_fields.html" %}
 
+    {% if rule.promotion_type == 'ml_anomaly' or (rule.promotion_type == 'repetition' and rule.ml_sidecar_enabled) %}
+    <div class="form-section">
+      <div class="form-section-title">Training status</div>
+      {% if training_status %}
+      <table>
+        <thead><tr><th>Group</th><th>Events seen</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for entry in training_status %}
+          <tr>
+            <td class="muted">{{ entry.group_key or "(ungrouped)" }}</td>
+            <td>{{ entry.event_count }} / {{ rule.ml_warmup_count }}</td>
+            <td>
+              {% if entry.event_count >= rule.ml_warmup_count %}
+              <span class="badge badge-accent">Live</span>
+              {% else %}
+              <span class="badge">Training</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="muted">No events scored yet.</p>
+      {% endif %}
+      <div class="field-hint">"Training" means still building its baseline (fewer events seen than Warm-up events, above) - it won't fire, or flag anything unusual, until it clears that count. "Live" means it has, and is actively scoring.</div>
+    </div>
+    {% endif %}
+
     <div class="form-section">
       <div class="form-section-title">Output</div>
       <div class="field">

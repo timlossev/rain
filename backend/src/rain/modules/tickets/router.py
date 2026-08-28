@@ -37,7 +37,14 @@ from rain.modules.assets import service as asset_service
 from rain.modules.assets.schemas import coerce_field_value
 from rain.modules.documents import service as document_service
 from rain.modules.tickets import exporter, importer, platform_events, rootcause, service
-from rain.modules.tickets.rules import DEFAULT_ML_ALGORITHM, GROUP_BY_FIELDS, ML_ALGORITHMS, PROMOTION_TYPES
+from rain.modules.tickets.rules import (
+    DEFAULT_ML_ALGORITHM,
+    GROUP_BY_FIELDS,
+    ML_ALGORITHMS,
+    PROMOTION_TYPES,
+    bulk_rule_training_summary,
+    rule_training_status,
+)
 from rain.modules.tickets.schemas import MATCH_FIELDS, SEVERITIES, TICKET_TYPES
 from rain.modules.webhooks import service as webhook_service
 from rain.web.nav import build_nav_context
@@ -1251,6 +1258,7 @@ async def rules_list(
         else None
     )
     approval_flows = await service.list_approval_flows(tenant_db)
+    training_summaries = await bulk_rule_training_summary(tenant_db, rule_page.items)
     return templates.TemplateResponse(
         request,
         "tickets/rules.html",
@@ -1264,6 +1272,7 @@ async def rules_list(
             "group_by_fields": GROUP_BY_FIELDS,
             "ml_algorithms": [(k, label, desc) for k, (label, desc, _) in ML_ALGORITHMS.items()],
             "approval_flows": approval_flows,
+            "training_summaries": training_summaries,
             "prefill": prefill,
             "rule": _NewRuleDefaults(promotion_type="repetition" if prefill else "single"),
             "tested_rule": None,
@@ -1339,6 +1348,7 @@ async def rules_edit_form(
     if rule is None:
         return RedirectResponse("/tickets/rules/all", status_code=status.HTTP_303_SEE_OTHER)
     approval_flows = await service.list_approval_flows(tenant_db)
+    training_status = await rule_training_status(tenant_db, rule.id)
     return templates.TemplateResponse(
         request,
         "tickets/rule_form.html",
@@ -1352,6 +1362,7 @@ async def rules_edit_form(
             "group_by_fields": GROUP_BY_FIELDS,
             "ml_algorithms": [(k, label, desc) for k, (label, desc, _) in ML_ALGORITHMS.items()],
             "approval_flows": approval_flows,
+            "training_status": training_status,
         },
     )
 
@@ -1437,6 +1448,7 @@ async def rules_test(
     stmt = select(TicketRule).order_by(TicketRule.sort_order)
     rule_page = await paginate(tenant_db, stmt, page=1)
     approval_flows = await service.list_approval_flows(tenant_db)
+    training_summaries = await bulk_rule_training_summary(tenant_db, rule_page.items)
     return templates.TemplateResponse(
         request,
         "tickets/rules.html",
@@ -1450,6 +1462,7 @@ async def rules_test(
             "group_by_fields": GROUP_BY_FIELDS,
             "ml_algorithms": [(k, label, desc) for k, (label, desc, _) in ML_ALGORITHMS.items()],
             "approval_flows": approval_flows,
+            "training_summaries": training_summaries,
             "prefill": None,
             "rule": _NewRuleDefaults(),
             "tested_rule": tested_rule,

@@ -8,6 +8,13 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-27
 
+- **ML anomaly training status is now visible**: an ML anomaly policy
+  (or a Repetition one with "Also flag statistically unusual
+  occurrences" on) shows a compact badge on the policy list -- "No
+  events yet", "115/250 training", "Live", or a mixed summary for a
+  policy grouped by host/program -- and a full per-group breakdown on
+  its own edit page, comparing events seen so far against the policy's
+  Warm-up events setting.
 - **Event Promotion Policies producing a change** can now name which
   approval flow to attach automatically (instead of always filing an
   unprotected change), and default that ticket's implementation window
