@@ -71,123 +71,91 @@ Ticketing below.
 
 ## Capabilities
 
-**Asset Registry**
-- Ships with no pre-defined asset types -- a server tracking physical
-  attributes and configuration, a container tracking its build
-  lifecycle, an access credential tracking expiration and clearance, a
-  contact with associated contact methods, or anything else your
-  organization tracks, is just a type plus custom fields (text, number,
-  boolean, date, URL, email, select) you define yourself. No prescribed
-  methodology -- RAIN isn't Agile or ITIL out of the box, on purpose, so
-  the constructs and the workflow are yours to decide
-- CSV / JSON / Excel import and export, with reusable column/header/order
-  profiles
-- Tickets linked to an asset show on that asset's own page and PDF export
+### At a glance
 
-**Ticketing** -- the primary focus of the platform
+- Incident, vulnerability, and change tickets, one shared record shape
+- Built-in syslog listener, auto-parses plain text, CEF, JSON, key=value
+- Event Promotion Policies turn matching syslog events into tickets
+- Optional ML anomaly detection, no manual tuning required
+- Root cause assistance surfaces repeat patterns and similar past tickets
+- Platform Response Rules react to ticket lifecycle events automatically
+- No-code asset types and custom fields, define your own
+- Document repository with tags, webhook auto-population, and PDF export
+- Per-tenant calendar with recurring entries and a syslog bridge
+- Tenant-defined Service Catalog forms that produce tickets on submission
+- Public client portal for external incident reporting and requests
+- Shareable documents ("Trust Center") for public-facing compliance proof
+- Global full-text search across tickets, documents, and assets
+- CSV/JSON/Excel import and export wherever records live
+- Branded PDF export for tickets and documents
+- Local auth plus optional LDAP/Active Directory and SAML 2.0 SSO
+- Role-based access control across platform and per-tenant admin tiers
+- Runtime branding: instance name, accent color, logo, font
+- Schema-per-tenant multi-tenancy on one Postgres instance
+- Self-hosted, air-gapped-capable, no telemetry, no license server
+
+The rest of this section follows the sidebar, in order: Records
+Authority, Calendar, Assets, Documents, then Admin (where most rules,
+integrations, and tenant-wide settings actually live -- a lot of what
+reacts to tickets is configured there, not under Records Authority
+itself). Client Portal and Search sit outside the sidebar entirely, so
+they're covered last.
+
+### Records Authority
+
+Tickets, and everything about working one.
+
 - Three ticket types -- incident, vulnerability, and change -- sharing
   one record, one activity feed, and one export pipeline
-- Optional custom fields (same text/number/boolean/date/URL/email/select
-  types as the Asset Registry's, tenant-wide across all three ticket
-  types) -- a default tenant schema defines none, but any defined become
-  capturable on the ticket form/detail page and importable/exportable
-  right alongside the built-in columns
+- **Events**: a live feed off the built-in syslog listener (auto-detects
+  and parses CEF, JSON, and Splunk-style key=value message bodies
+  alongside plain syslog text, no per-source configuration needed), with
+  bulk-promote/correlate/discard straight from the feed and a real-time
+  listener status pill
+- Optional custom fields (text, number, boolean, date, URL, email,
+  select), tenant-wide across all three ticket types -- a default tenant
+  schema defines none, but any defined become capturable on the ticket
+  form/detail page and importable/exportable right alongside the
+  built-in columns
 - CSV / JSON / Excel import (create-only -- incident/vulnerability; a
   change needs an approval flow attached by hand) and export, with
-  reusable column/header/order profiles, mirroring the Asset Registry's
-- A built-in syslog listener turns any syslog-ng-fed event stream into a
-  live event feed -- auto-detects and parses CEF, JSON, and Splunk-style
-  key=value message bodies alongside plain syslog text, no per-source
-  configuration needed
-- **Event Promotion Policies**: regex rules that auto-promote a matching
-  syslog event into an incident, vulnerability, or change ticket -- one
-  event per ticket ("single"), or repeats of the same thing folded into
-  one already-open ticket instead of a fresh one each time (marked
-  Problematic, "repetition" -- on by default, also flags statistically
-  unusual occurrences among those repeats as a comment, using a
-  selectable `river.anomaly` algorithm with no further tuning needed);
-  an "ML anomaly" policy instead learns normal traffic per rule
-  (optionally grouped per host/program) and fires its own ticket on a
-  genuinely unusual event, running alongside the other two rather than
-  competing with them for the same event -- useful for watching a
-  broad/unfiltered event stream that isn't otherwise being repetition-
-  tracked
-- **Root cause assistance**: an "Analyze root cause" button on any
-  ticket (or in that ticket's row menu, or automatically at closure,
-  opt-in per tenant) shows a repeat-occurrence pattern and similar past
-  closed tickets -- honest statistical/historical signals, not causal
-  reasoning -- in a small window, with the choice to post it as a
-  comment, copy it, or just close it
-- **Platform Response Rules**: react to a ticket being created, closed,
-  or (change tickets) fully approved by notifying Slack or email,
-  calling a webhook, attaching a document or asset, marking the ticket
-  problematic, or adding a watcher (a system user or a bare email) --
-  every matching rule fires, and every firing is logged to the ticket
-- **Watchers**: opt in ("Watch" on the ticket detail page) or added
-  automatically (reporter, assignee, or a Platform Response Rule) to get
-  emailed on a ticket's new comments and status changes
-- **Escalate**: a one-click button on every ticket that calls a tenant's
-  configured escalation webhook on demand, logged to the ticket's
-  activity feed
-- **Webhooks**: centrally-configured outbound webhooks (Admin >
-  Webhooks) -- one definition (URL, headers, payload, timeout, success
-  codes) reused wherever a webhook call is needed, with an optional
-  syslog alert if a call fails or times out
-- **Live event triage**: bulk-promote, correlate, or discard selected
-  events straight from the live feed, with a real-time status pill for
-  the listener itself
+  reusable column/header/order profiles
+- **Root cause assistance**: "Analyze root cause" (on the ticket, or its
+  row menu) opens a preview -- a repeat-occurrence pattern and similar
+  past closed tickets, honest statistical/historical signals, not causal
+  reasoning -- with the choice to post it as a comment, copy it, or just
+  close it; optionally also automatic, once, at closure (opt-in, under
+  Admin)
+- **Escalate**: a one-click button that calls the tenant's configured
+  escalation webhook (Admin), logged to the ticket's activity feed
+- **Watchers**: opt in ("Watch" on the ticket) or added automatically
+  (reporter, assignee, or a Platform Response Rule) to get emailed on a
+  ticket's new comments and status changes
+- **Problematic flag** for recurring issues, toggleable inline, shown in
+  the list and on the ticket
 - **Change tickets**: promoted from an existing incident/vulnerability or
-  filed directly, with a required, tenant-defined approval flow and a
-  scheduled start/end window shown on the ticket and the tenant calendar
-- **Groups**: named sets of users an approval step can target as a whole
-- Title, priority, assignee, and affected asset are all editable after
-  creation, with every change logged to the ticket's activity feed
-- Tenant-customizable ticket statuses instead of a fixed open/closed enum
+  filed directly, with a required, tenant-defined approval flow (Admin)
+  and a scheduled start/end window shown on the ticket and the tenant
+  calendar
+- Tenant-customizable statuses (Admin) instead of a fixed open/closed
+  enum; title, priority, assignee, and affected asset are all editable
+  after creation, every change logged to the activity feed
 - A unified, chronological activity feed per ticket -- comments, field
   changes, assignment/asset changes, approval decisions, and rule
   firings, newest- or oldest-first
-- **Problematic flag** for recurring issues, shown in the list and on the
-  ticket
-- Quick-action menu and filter chips on every ticket list
+- Quick-action row menu and filter chips on the list -- correlates 1:1
+  with the ticket detail page's own top-right button row, so nothing
+  there needs a full page visit to reach
 - Branded PDF export of any ticket, including its full activity history
-- Email/Slack notification channels, reusable across any number of rules
+- **Service Catalog**: requestable, tenant-defined forms (defined under
+  Admin, reachable here or from the client portal) produce a ticket on
+  submission -- each one up to 10 questions (text, number, date, URL,
+  email, yes/no, or a dropdown), a change service optionally routed
+  through an approval flow, and a question's value can come from an
+  existing Document instead of free-form entry
 
-**Service Catalog**
-- Tenant-defined, requestable forms (Admin > Service Catalog, reachable
-  from Records Authority or the client portal below) -- each one up to
-  10 questions (text, number, date, URL, email, yes/no, or a dropdown)
-  that produce an incident, vulnerability, or change ticket on
-  submission, its description the answers serialized as JSON or
-  `key=value` lines
-- A change service is optionally routed through an approval flow, the
-  same machinery Change tickets use directly
-- A question's value can come from an existing Document instead of
-  free-form entry -- used as-is, or narrowed with a regex or a JSONPath,
-  with a live Preview while designing the form
+### Calendar
 
-**Client Portal**
-- A public per-tenant page (`/portal/<slug>`), no account needed --
-  "Request Something" (the Service Catalog above) and "Report Something"
-  (file an incident) are open to every visitor
-- Sign in for a search bar plus "Pending Actions" (tickets awaiting your
-  approval) and "Document Archive" tabs, and an Escalate button next to
-  your own reported tickets
-- "Today's events", pulled from the tenant calendar, shown to every
-  visitor regardless of sign-in status
-- Two settings gate the whole page (Admin > Branding): require sign-in
-  to file/request anything at all, and whether the page carries this
-  instance's own branding or stays neutral for sharing outside the
-  organization
-- An optional full-page background image (Admin > Branding), shown for
-  any tenant with that branding setting on; unset by default, same
-  plain background as ever
-- **Shareable documents**: a document flagged "Shareable in the client
-  portal" appears in a tab reachable by every visitor, including one
-  with no account at all, even on a tenant that requires sign-in for
-  the rest of the portal; the tab (renamable, e.g. "Trust Center", on
-  Admin > Branding) only shows up once a shareable document exists
-
-**Calendar**
 - Per-tenant calendar with a visual month-grid editor
 - Recurring-entry presets (daily, weekly, monthly, quarterly, every 6
   months, annually, one-time)
@@ -197,13 +165,29 @@ Ticketing below.
   occurrence, so the same rule engine that reacts to real syslog traffic
   can react to a recurring calendar entry too
 - **Related document**: tie an entry to a document (e.g. a quarterly
-  revision reminder), manageable either here or from that document's
-  own Calendar tab -- optionally also **auto-refreshing** it from its
+  revision reminder), manageable either here or from that document's own
+  Calendar tab -- optionally also **auto-refreshing** it from its
   configured webhook on each occurrence, the same way that document's
   own "Refresh from webhook" button would
 - Standard iCalendar (.ics) export/import
 
-**Document Repository**
+### Assets
+
+- Ships with no pre-defined asset types -- a server tracking physical
+  attributes and configuration, a container tracking its build
+  lifecycle, an access credential tracking expiration and clearance, a
+  contact with associated contact methods, or anything else your
+  organization tracks, is just a type plus custom fields (text, number,
+  boolean, date, URL, email, select) you define yourself (Admin). No
+  prescribed methodology -- RAIN isn't Agile or ITIL out of the box, on
+  purpose, so the constructs and the workflow are yours to decide
+- Browse all assets, or by type, with tenant-wide custom fields
+- CSV / JSON / Excel import and export, with reusable column/header/order
+  profiles
+- Tickets linked to an asset show on that asset's own page and PDF export
+
+### Documents
+
 - `DOC-xxxxxx` entries with description, optional freeform tags, file
   attachment, and links to any asset or ticket
 - Storage is local disk by default, or an S3 (or S3-compatible -- MinIO,
@@ -214,44 +198,111 @@ Ticketing below.
   webhook, with the new content diffed against what's stored and an
   optional syslog alert when it changes
 - A document's own Calendar tab: recurring or one-off reminders tied to
-  it (e.g. "due for revision every quarter"), independent of the
-  webhook auto-update above -- plain reminders unless one also opts
-  into auto-refreshing that document on the same schedule
+  it (e.g. "due for revision every quarter"), independent of the webhook
+  auto-update above -- plain reminders unless one also opts into
+  auto-refreshing that document on the same schedule
+- **Shareable documents**: a checkbox on the document's own page exposes
+  it through a tab in the client portal, reachable by every visitor
+  including one with no account at all, even on a tenant that requires
+  sign-in for the rest of the portal; the tab (renamable, e.g. "Trust
+  Center", under Admin) only appears once a shareable document exists
 - Branded PDF export, noting the source webhook and last-refresh date
   when a document is webhook-populated
 
-**Search**
-- A global search bar (every page) for keyword search across ticket and
-  document titles/descriptions/numbers (documents' tags included),
-  Postgres full-text ranked, with match highlighting
+### Admin
+
+Split into two tiers -- Platform Administration (instance-wide,
+`internal_admin` only) and Tenant Administration (the active tenant's
+own settings, reachable by `client_admin` too) -- which is also where
+most of what *reacts to* a ticket, asset, or document actually lives,
+even though its effect shows up under Records Authority/Assets/
+Documents above.
+
+**Platform Administration**
+- **Branding**: instance name, accent color, logo, font, and the client
+  portal's optional full-page background image
+- **Tenants**: create new tenants, switch which one is active
+- **Auth Providers**: LDAP/Active Directory sync, and SAML 2.0 SSO
+  (JIT-provisioned or matched by email, role re-derived from a
+  configurable attribute on every login)
+- **SMTP Relay**: outbound email settings, shared by every notification
+  channel and system email
+- **Syslog Listener**: real-time listener status, host/program-to-tenant
+  routing (or discard a noisy source outright), and how long an
+  un-promoted event sticks around before being discarded
+- **Users**: internal admin and client accounts
+- **API Documentation**: a generated Swagger UI reference for the same
+  server-rendered routes the UI itself calls (see Search below for why
+  this isn't a separate integration API)
+
+**Tenant Administration**
+- **Groups**: named sets of users an approval step can target as a whole
+- **Ticket Statuses**: the tenant's own status set, replacing a fixed
+  open/closed enum
+- **Notification Channels**: reusable Slack/email/webhook destinations,
+  shared across any number of rules
+- **Approval Flows**: ordered steps (a group or an individual), attached
+  to change tickets and change-producing Service Catalog items
+- **Event Promotion Policies**: regex rules that turn a matching syslog
+  event into an incident, vulnerability, or change ticket -- one event
+  per ticket ("single"), or repeats folded into one already-open ticket
+  instead of a fresh one each time (marked Problematic, "repetition" --
+  on by default, also flags statistically unusual occurrences among
+  those repeats as a comment, using a selectable `river.anomaly`
+  algorithm with no further tuning needed); a standalone "ML anomaly"
+  policy instead learns normal traffic per rule (optionally grouped per
+  host/program) and fires its own ticket on a genuinely unusual event,
+  useful for watching a broad/unfiltered stream that isn't otherwise
+  being repetition-tracked
+- **Platform Response Rules**: react to a ticket being created, closed,
+  or (changes) fully approved by notifying Slack or email, calling a
+  webhook, attaching a document or asset, marking the ticket problematic,
+  or adding a watcher -- every matching rule fires, and every firing is
+  logged to the ticket
+- **Webhooks**: one definition (URL, headers, payload, timeout, success
+  codes) reused wherever a webhook call is needed -- rules, document
+  auto-population -- with an optional syslog alert if a call fails or
+  times out
+- **Asset Types**: define the types and custom fields Assets above
+  tracks
+- **Service Catalog**: design the requestable forms Records Authority
+  and the client portal surface, with a live Preview while building one
+- **Import Ticket Field Pack**: bulk-define ticket custom fields from a
+  spreadsheet, with type-guessing from sample data
+- **Incident Portal**: the client portal's own per-tenant settings (see
+  Client Portal below)
+
+### Client Portal
+
+A public per-tenant page (`/portal/<slug>`), outside the sidebar
+entirely -- no account needed for the basics.
+
+- "Request Something" (the Service Catalog above) and "Report Something"
+  (file an incident) are open to every visitor
+- Sign in for a search bar plus "Pending Actions" (tickets awaiting your
+  approval) and "Document Archive" tabs, and an Escalate button next to
+  your own reported tickets
+- "Today's events", pulled from the tenant calendar, shown to every
+  visitor regardless of sign-in status
+- Shareable documents (see Documents above) in their own tab, reachable
+  even on a tenant that otherwise requires sign-in for the rest of the
+  page
+- Two settings gate the whole page (Admin > Branding): require sign-in
+  to file/request anything at all, and whether the page carries this
+  instance's own branding or stays neutral for sharing outside the
+  organization
+
+### Search
+
+Also outside the sidebar -- a bar on every signed-in page instead.
+
+- Keyword search across ticket and document titles/descriptions/numbers
+  (documents' tags included), Postgres full-text ranked, with match
+  highlighting
 - Typing a ticket, document, or asset number (`INC-000001`, `DOC-000004`,
   `CI-000001`) jumps straight to that record instead of a results page
 - Ticket and document detail pages live at that same human-readable
   number (`/tickets/INC-000001`, `/documents/DOC-000004`)
-
-**Platform**
-- Schema-per-tenant multi-tenancy on a single Postgres instance
-- Local email/password auth, plus optional LDAP/Active Directory and
-  SAML 2.0 SSO providers -- a SAML sign-in is JIT-provisioned (or
-  matched by email) with its role re-derived from a configurable
-  attribute on every login
-- Role-based access control: `internal_admin` (platform-wide), `client`
-  (one tenant, no admin functions), and `client_admin` (one tenant, full
-  admin rights over that tenant's own settings -- rules, flows, groups,
-  channels, webhooks -- but not platform-wide ones). The Admin console
-  itself splits the same way, into Platform Administration and Tenant
-  Administration
-- Runtime branding: instance name, accent color, logo, and font
-- A resizable, searchable, collapsible tree navigation sidebar, with live
-  count badges and an always-visible indicator of which tenant's data is
-  on screen
-- The user menu shows the current database schema build number
-- Contextual help on every page, and pagination on every list screen
-- A generated API spec (Swagger UI, grouped by area) at `/docs`, gated
-  behind `internal_admin` like every other platform-wide setting --
-  reference for the same server-rendered routes the UI itself calls,
-  not a separate integration API (use Webhooks and Platform Response
-  Rules for that)
 
 See [`docs/user-guide.md`](docs/user-guide.md) for a task-oriented guide
 to using RAIN day to day, [`docs/architecture.md`](docs/architecture.md)
