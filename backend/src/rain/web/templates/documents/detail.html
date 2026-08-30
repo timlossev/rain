@@ -85,6 +85,20 @@
     </div>
 
     <div class="field">
+      <label>Landing page</label>
+      <div>
+        <form method="post" action="/documents/{{ doc.id }}/landing-page" class="inline">
+          <label class="checkbox-row"><input type="checkbox" name="show_on_landing_page" onchange="this.form.submit()" {% if doc.show_on_landing_page %}checked{% endif %}> Show on landing page</label>
+        </form>
+        {% if body_kind %}
+        <div class="field-hint">Rendered {{ "as Markdown" if body_kind == "markdown" else "as plain text" }} on Home once checked{% if not doc.show_on_landing_page %} - not checked yet{% endif %}.</div>
+        {% else %}
+        <div class="field-hint">This document has no inline body (not a .txt/.md file) - checking this does nothing until it does.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="field">
       <label>Uploaded</label>
       <div class="muted">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</div>
     </div>

@@ -6,6 +6,19 @@ the honest anchor point. Each entry is a synthesis of that day's commits,
 not a 1:1 commit dump; see `git log` for the literal history this is
 drawn from. Updated alongside every push to `main`.
 
+## 2026-08-30
+
+- **New landing page** (`/home`, and what signing in now lands on
+  instead of Records Authority): a plain "Welcome to `<instance>`" by
+  default, or -- once at least one document is flagged "Show on
+  landing page" from its own Properties tab -- that document's own
+  content instead (rendered Markdown, or plain text), stacked in title
+  order if more than one is flagged. New top-level sidebar entry
+  ("Home"), ahead of Records Authority.
+- Client portal's "Today's events" now caps at 5, with a "+N more" link
+  to the full calendar when there are more -- previously showed every
+  due entry with no limit.
+
 ## 2026-08-27
 
 - **ML anomaly training status is now visible**: an ML anomaly policy

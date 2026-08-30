@@ -251,6 +251,21 @@ async def list_shareable_documents(db: AsyncSession) -> list[Document]:
     return list(result.scalars())
 
 
+async def update_landing_page_flag(db: AsyncSession, doc: Document, show_on_landing_page: bool) -> None:
+    doc.show_on_landing_page = show_on_landing_page
+    await db.commit()
+
+
+async def list_landing_page_documents(db: AsyncSession) -> list[Document]:
+    """Documents flagged "Show on the landing page" (rain.modules.home) --
+    ordered by title. [] until at least one is flagged; the landing page
+    falls back to its plain "Welcome to <instance>" default in that
+    case, same as the client portal's Shareable documents tab only
+    appearing once a document opts into that."""
+    result = await db.execute(select(Document).where(Document.show_on_landing_page.is_(True)).order_by(Document.title))
+    return list(result.scalars())
+
+
 async def update_webhook_config(
     db: AsyncSession,
     doc: Document,

@@ -609,6 +609,38 @@ has ever had) so an entry that already auto-refreshed a document shows
 up on that document's Calendar tab immediately, not just newly-created
 ones.
 
+## Home
+
+`rain.modules.home`, the smallest module in the app -- one route
+(`GET /home`), one template, no service.py. What `GET /` (`rain.main`'s
+own `index` route) redirects a signed-in user to instead of straight
+into Records Authority, and the default `next` every login flow falls
+back to (`Form("/")`, which itself now redirects to `/home`) -- a
+neutral first screen rather than assuming tickets are what everyone
+wants first. Registered in the sidebar as its own top-level `NavNode`
+(`order=5`, ahead of Records Authority's `10`) with no children, the
+first case in this app of a depth-0 nav node that's a plain link
+(`.nav-link`) rather than a toggle (`.nav-toggle`) -- both were already
+handled identically by `render_nav`, this just exercises the
+previously-unused branch for real.
+
+Content comes from `Document.show_on_landing_page` (migration 0045,
+same opt-in-per-document shape `is_shareable` already established for
+"Shareable documents," and independent of it -- a document can be
+either, both, or neither): every document with the flag set (from its
+own Properties tab) renders on Home, ordered by title, in place of the
+route's own plain "Welcome to `<instance>`" fallback text (which never
+renders at all once at least one document is flagged). Rendering reuses
+`rain.modules.documents.textbody` exactly the way `document_pdf`
+already does -- `body_kind()` picks Markdown vs. plain text vs. "no
+inline body at all" (silently skipped, not an error, since a flagged
+PDF/image has nothing to render), `render_markdown()` for Markdown
+(already `bleach`-sanitized, safe to inject via `|safe`), plain text
+left for Jinja's own autoescaping to handle safely on its own. No new
+rendering path, no new sanitization surface -- this is the third
+consumer of `textbody`'s existing functions (inline editor preview and
+PDF export being the other two), not a new one.
+
 ## Search
 
 Keyword search only -- no vector/semantic search, because there's no

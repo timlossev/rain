@@ -73,6 +73,7 @@ Ticketing below.
 
 ### At a glance
 
+- Landing page shows a welcome message, or a flagged document
 - Incident, vulnerability, and change tickets, one shared record shape
 - Built-in syslog listener, auto-parses plain text, CEF, JSON, key=value
 - Event Promotion Policies turn matching syslog events into tickets
@@ -94,12 +95,22 @@ Ticketing below.
 - Schema-per-tenant multi-tenancy on one Postgres instance
 - Self-hosted, air-gapped-capable, no telemetry, no license server
 
-The rest of this section follows the sidebar, in order: Records
+The rest of this section follows the sidebar, in order: Home, Records
 Authority, Calendar, Assets, Documents, then Admin (where most rules,
 integrations, and tenant-wide settings actually live -- a lot of what
 reacts to tickets is configured there, not under Records Authority
 itself). Client Portal and Search sit outside the sidebar entirely, so
 they're covered last.
+
+### Home
+
+The landing page (also what signing in lands you on). A plain "Welcome
+to `<instance name>`" by default -- or, if any document is flagged
+"Show on landing page" (from that document's own Properties tab, see
+Documents below), that document's own content instead, rendered as
+Markdown (or plain text for a non-Markdown text file) rather than
+linking out to it. More than one flagged document all show, stacked in
+title order.
 
 ### Records Authority
 
@@ -206,6 +217,9 @@ Tickets, and everything about working one.
   including one with no account at all, even on a tenant that requires
   sign-in for the rest of the portal; the tab (renamable, e.g. "Trust
   Center", under Admin) only appears once a shareable document exists
+- **Landing page content**: a separate checkbox shows a document's own
+  content (rendered Markdown, or plain text) on Home instead of just
+  linking to it -- see Home above
 - Branded PDF export, noting the source webhook and last-refresh date
   when a document is webhook-populated
 
@@ -456,7 +470,7 @@ backend/
     settings.py         -- the only place env vars are read
     db/                  -- models, engine/session, tenant provisioning
     core/                 -- security, RBAC, tenancy resolution, config store, nav registry
-    modules/{setup,auth,admin,assets,tickets,catalog,calendar,documents,portal,webhooks,search}/  -- one router+service per feature area
+    modules/{setup,auth,admin,assets,tickets,catalog,calendar,documents,home,portal,webhooks,search}/  -- one router+service per feature area
     web/                   -- Jinja2 templates, hand-written CSS/JS
   tests/
 ```

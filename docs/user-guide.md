@@ -98,6 +98,19 @@ admin list) is paginated the same way: a summary line ("Showing 1 to
 25 of 340") and Prev/Next controls at the bottom of the table. There is
 no configurable page size; it's fixed per list.
 
+## Home
+
+The first item in the sidebar, and where signing in (or clicking the
+logo) takes you. By default it's a plain "Welcome to `<instance
+name>`". To show something else instead, open a Markdown or plain-text
+document (Documents below) and check "Show on landing page" under its
+Properties tab -- its own content then renders here (Markdown as
+formatted text, plain text as-is) instead of the welcome message. More
+than one document can be checked at once; all of them show, one after
+another, in title order. A document with no inline body (an uploaded
+file that isn't a `.txt`/`.md`) can be checked too, but has nothing to
+show until it is one.
+
 ## Tickets
 
 In the sidebar this area is labeled "Records Authority", but everything
@@ -697,8 +710,11 @@ if none are set yet. Below that, a "Shareable in the client portal"
 checkbox: on, this document appears in the [Client Portal](#client-portal)'s
 Shareable documents tab for every visitor, including one with no
 account at all, regardless of that tenant's require-sign-in setting --
-off by default, so nothing is exposed until you opt it in here. Below
-that, the page is split into tabs:
+off by default, so nothing is exposed until you opt it in here. Next to
+it, a "Show on landing page" checkbox does the same for [Home](#home):
+on, this document's own content (rendered Markdown, or plain text)
+replaces the plain welcome message there instead of just being linked
+to. Below that, the page is split into tabs:
 
 - Description: a plain textarea, saved independently of the file
   itself.

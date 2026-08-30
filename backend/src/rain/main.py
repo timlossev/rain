@@ -131,6 +131,7 @@ def create_app() -> FastAPI:
     from rain.modules.assets import nav as _assets_nav  # noqa: F401
     from rain.modules.calendar import nav as _calendar_nav  # noqa: F401
     from rain.modules.documents import nav as _documents_nav  # noqa: F401
+    from rain.modules.home import nav as _home_nav  # noqa: F401
     from rain.modules.tickets import nav as _tickets_nav  # noqa: F401
 
     from rain.modules.admin.router import router as admin_router
@@ -139,6 +140,7 @@ def create_app() -> FastAPI:
     from rain.modules.calendar.router import router as calendar_router
     from rain.modules.catalog.router import router as catalog_router
     from rain.modules.documents.router import router as documents_router
+    from rain.modules.home.router import router as home_router
     from rain.modules.portal.router import router as portal_router
     from rain.modules.search.router import router as search_router
     from rain.modules.setup.router import router as setup_router
@@ -147,6 +149,7 @@ def create_app() -> FastAPI:
 
     app.include_router(setup_router)
     app.include_router(auth_router)
+    app.include_router(home_router)
     app.include_router(admin_router)
     app.include_router(assets_router)
     app.include_router(tickets_router)
@@ -180,7 +183,7 @@ def create_app() -> FastAPI:
     async def index(user: CurrentUser | None = Depends(get_current_user_optional)):
         if user is None:
             return RedirectResponse("/login")
-        return RedirectResponse("/tickets")
+        return RedirectResponse("/home")
 
     @app.middleware("http")
     async def enforce_setup_wizard(request: Request, call_next):

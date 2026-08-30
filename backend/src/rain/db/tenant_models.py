@@ -915,6 +915,15 @@ class Document(TenantBase):
     # renamable "Trust Center"-style tab is that it stays reachable
     # without logging in. Off by default; unrelated to tags/search_vector.
     is_shareable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Opt-in (see migration 0045): this document's contents (rendered
+    # Markdown, or plain text for a non-Markdown text file -- see
+    # rain.modules.documents.textbody.body_kind) show up on the landing
+    # page (rain.modules.home). More than one document can be flagged;
+    # the landing page renders every flagged one, falling back to a
+    # plain "Welcome to <instance>" only when none are. Off by default,
+    # and independent of is_shareable above -- a document can be one,
+    # the other, both, or neither.
+    show_on_landing_page: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # DB-generated (GENERATED ALWAYS AS ... STORED, see migrations 0023
     # and 0039) from doc_number/title/tags/description -- never written
     # from Python, only ever read (search_vector.op("@@")(...)), see

@@ -1408,6 +1408,7 @@ td.actions { text-align: right; white-space: nowrap; }
 .portal-today { margin-bottom: 16px; }
 .portal-today-list { margin: 0; padding-left: 20px; }
 .portal-today-list li { margin-bottom: 4px; }
+.portal-today-more { display: block; margin-top: 6px; font-size: 0.82rem; }
 .portal-section-title { font-size: 1rem; font-weight: 700; margin: 28px 0 12px; }
 .portal-signin-hint { margin-top: 10px; }
 .portal-search { margin-bottom: 20px; }
