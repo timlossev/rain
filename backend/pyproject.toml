@@ -20,6 +20,17 @@ dependencies = [
     # own <50 ceiling was the same "excludes the actual fix" mistake
     # again, caught by a second scan pass rather than by looking harder
     # the first time.
+    #
+    # 2026-08-30: the Aug 2026 OpenSSL advisory batch (CVE-2026-54874,
+    # 63072, 63075, 63076, 18798, 14457) doesn't need a ceiling change
+    # here -- cryptography's wheels vendor their own OpenSSL build rather
+    # than linking the image's system copy, and this range has no upper
+    # pin below whatever pyca's next release contains, so a build after
+    # that release ships the patched vendored copy automatically (no
+    # lockfile in this project pins an exact resolved version). The
+    # image's *system* OpenSSL -- what `ssl`/ldap3/asyncpg's TLS actually
+    # link against -- is handled separately, in the Dockerfile's `apk
+    # upgrade` step.
     "fastapi>=0.141,<0.142",
     "uvicorn>=0.52,<0.53",
     "wsproto>=1.3,<2",

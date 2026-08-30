@@ -18,6 +18,21 @@ drawn from. Updated alongside every push to `main`.
 - Client portal's "Today's events" now caps at 5, with a "+N more" link
   to the full calendar when there are more -- previously showed every
   due entry with no limit.
+- Home page: welcome message is now centered and bold in the middle of
+  the page instead of a small heading; the landing-page-document hint
+  moved from a visible paragraph to the page's `?` help text. Home's
+  sidebar entry now matches the bold weight of its sibling categories.
+- Docker build hardening: both build stages now run `apk upgrade
+  --no-cache` before installing anything, so the image's system OpenSSL
+  (and every other Alpine package) is pulled forward to whatever the
+  Alpine index has at build time regardless of how stale the floating
+  `python:3.12-alpine` tag's cached layers are -- closes the Aug 2026
+  OpenSSL advisory batch (CVE-2026-54874, 63072, 63075, 63076, 18798,
+  14457). Documented that the existing `pip>=26.1.2` floor already
+  covers CVE-2026-6357 and CVE-2026-13346 (both fixed at pip 26.1), and
+  that `cryptography`'s vendored OpenSSL self-updates on the next build
+  after pyca ships a release with the patched copy (no lockfile pins a
+  stale resolved version).
 
 ## 2026-08-27
 

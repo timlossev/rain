@@ -1,12 +1,25 @@
 # Multi-stage build: compiler toolchain never reaches the final image.
 FROM python:3.12-alpine AS builder
 
+# `apk upgrade` first: this stage's FROM tag is a floating `python:3.12-
+# alpine` (no digest pin -- see the final stage's own tag for why), so
+# its layers reflect whenever Docker Hub last rebuilt it, not today.
+# Upgrading before installing anything pulls every already-present Alpine
+# package -- openssl included -- forward to whatever the Alpine package
+# index actually has right now, closing system-library CVEs that may
+# predate that last rebuild regardless of how fresh the tag looks. Covers
+# the Aug 2026 OpenSSL batch (CVE-2026-54874, 63072, 63075, 63076, 18798,
+# 14457; fixed upstream in 3.0.22/3.4.7/3.5.8/3.6.4/4.0.2) at build time,
+# same "always take latest, not a stale pin" reasoning as the pip ADD
+# trick below.
+#
 # xmlsec1-dev (+ its own libxml2-dev/libxslt-dev) is only needed to build
 # the `xmlsec` Python package's C extension, which python3-saml uses for
 # XML-DSig signature verification on SAML responses -- hand-rolling that
 # instead of using an established toolkit isn't worth the risk for
 # something this security-sensitive.
-RUN apk add --no-cache build-base libffi-dev xmlsec-dev libxml2-dev libxslt-dev
+RUN apk upgrade --no-cache \
+ && apk add --no-cache build-base libffi-dev xmlsec-dev libxml2-dev libxslt-dev
 
 WORKDIR /build
 COPY pyproject.toml ./
@@ -31,10 +44,23 @@ RUN python -m venv /venv \
  # points outside the installation directory) was fixed there, and pip
  # itself ships inside /venv in the final image (copied wholesale below),
  # so an unpinned floor could silently regress under image layer caching.
+ # The same floor also already clears CVE-2026-6357 (insecure self-update
+ # deserialization) and CVE-2026-13346 (doubly-encoded index URLs could
+ # place files outside the install dir) -- both were fixed at 26.1, before
+ # this floor's 26.1.2, and the ADD-triggered rebuild above means we're
+ # never actually stuck on 26.1.2 itself: every build re-checks PyPI and
+ # takes whatever is newest, so later pip CVEs get picked up the same way
+ # without this floor needing to chase each one by number.
  && /venv/bin/pip install --no-cache-dir --upgrade "pip>=26.1.2" \
  && /venv/bin/pip install --no-cache-dir .
 
 FROM python:3.12-alpine
+
+# Same package-freshness reasoning as the builder stage's `apk upgrade`
+# above (this is a separate, later `FROM` of the same floating tag, so it
+# needs its own upgrade -- nothing carries over between stages except
+# what's explicitly COPY --from'd).
+RUN apk upgrade --no-cache
 
 # xmlsec (runtime shared libs only, no -dev/compiler) for the `xmlsec`
 # package built above -- see the builder stage's comment.
