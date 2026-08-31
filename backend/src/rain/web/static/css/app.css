@@ -819,6 +819,12 @@ form.inline { display: inline; }
 .sort-th:hover { text-decoration: none; color: var(--text); }
 .sort-arrow { color: var(--accent); font-size: 0.85em; }
 .muted { color: var(--text-muted); }
+/* The little "Last updated <timestamp>" line above a document's
+   rendered content (its own Contents tab, and each entry on Home) --
+   deliberately smaller than the surrounding text (a metadata aside,
+   not something competing with the content itself) and spaced off
+   from what follows it. */
+.doc-last-updated { font-size: 0.8em; margin-bottom: 8px; }
 
 /* ---------- calendar ---------- */
 table.calendar-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }

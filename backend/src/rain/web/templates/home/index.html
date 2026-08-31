@@ -6,6 +6,10 @@
 {% for entry in landing_docs %}
 <div class="card" style="margin-bottom:16px;">
   <div class="card-title">{{ entry.doc.title }}</div>
+  {% set last_updated = entry.doc.last_refreshed_at or entry.doc.updated_at or entry.doc.created_at %}
+  {% if last_updated %}
+  <div class="muted doc-last-updated">Last updated {{ last_updated.strftime("%Y-%m-%d %H:%M") }}</div>
+  {% endif %}
   {% if entry.html %}
   <div class="doc-md-preview">{{ entry.html | safe }}</div>
   {% else %}

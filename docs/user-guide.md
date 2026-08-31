@@ -109,7 +109,8 @@ formatted text, plain text as-is) instead of the welcome message. More
 than one document can be checked at once; all of them show, one after
 another, in title order. A document with no inline body (an uploaded
 file that isn't a `.txt`/`.md`) can be checked too, but has nothing to
-show until it is one.
+show until it is one. Each one shows a small "Last updated" label above
+its content.
 
 ## Tickets
 
@@ -728,10 +729,13 @@ the page is split into tabs:
 
 - Description: a plain textarea, saved independently of the file
   itself.
-- Contents (only shown for `.txt`/`.md` files): an inline editor. For
-  Markdown files, a further Write/Preview tab pair lets you render the
-  current text through the same Markdown renderer used by "Export to
-  PDF", so what you preview is what the PDF will actually look like.
+- Contents (only shown for `.txt`/`.md` files): a small "Last updated"
+  label at the top (the last successful webhook refresh if this
+  document's ever had one, otherwise when it was last saved), then an
+  inline editor. For Markdown files, a further Write/Preview tab pair
+  lets you render the current text through the same Markdown renderer
+  used by "Export to PDF", so what you preview is what the PDF will
+  actually look like.
   Saving diffs what you typed against what's actually stored -- opening
   the editor and saving with nothing really changed (including a save
   that only differs by a trailing blank line) doesn't count as a

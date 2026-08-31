@@ -606,6 +606,17 @@ timeout_seconds` allows, same trade-off the manual button already makes,
 just on every render instead of one click, and on Home potentially once
 per flagged document with this set.
 
+**Last-updated label.** Both render sites above (the document's own
+Contents tab, and each entry on Home) show a small "Last updated
+`<timestamp>`" line: `last_refreshed_at` if this document has ever had a
+successful webhook call (refresh-when-rendering included), else
+`updated_at`, else `created_at`. Not a precise "content last actually
+changed" signal -- `updated_at` moves on any saved field on the row, not
+just the body, and `last_refreshed_at` moves on a refresh whose response
+was identical to what's stored -- but the best one available without a
+dedicated column, and consistent with what "Last refreshed" already
+showed next to the manual button on the Auto-update tab.
+
 **Tags.** `Document.tags` (`text[]`, tenant migration 0039) -- optional,
 freeform, comma-separated on input (`rain.modules.documents.service.
 parse_tags`: trimmed, deduped case-insensitively keeping first spelling,

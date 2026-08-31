@@ -23,6 +23,10 @@ drawn from. Updated alongside every push to `main`.
   just its own page. Home falls back silently on a failed call (no
   banner there, unlike the document's own page) -- one stale response
   among possibly several documents shown isn't worth flagging.
+- A small "Last updated `<timestamp>`" label now shows wherever a
+  document's content actually renders (its own Contents tab, and each
+  entry on Home) -- the last successful webhook refresh if it's ever
+  had one, otherwise when it was last saved.
 
 ## 2026-08-30
 

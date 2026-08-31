@@ -36,6 +36,17 @@
 
   {% if body_kind %}
   <div class="tab-panel active" data-tab-panel="contents">
+    {# Best-known freshness signal for what's about to render below:
+       last_refreshed_at (set on every successful webhook call, "Refresh
+       when rendering" included) if this document has ever had one,
+       otherwise updated_at/created_at -- not a precise "content last
+       actually changed" (updated_at moves on any saved field, not just
+       the body; last_refreshed_at moves on a no-op refresh too), but a
+       reasonable "how current is this" at a glance. #}
+    {% set last_updated = doc.last_refreshed_at or doc.updated_at or doc.created_at %}
+    {% if last_updated %}
+    <div class="muted doc-last-updated">Last updated {{ last_updated.strftime("%Y-%m-%d %H:%M") }}</div>
+    {% endif %}
     <form method="post" action="/documents/{{ doc.id }}/body" data-md-editor>
       {% if body_kind == "markdown" %}
       <div class="tabs" data-tabs>
