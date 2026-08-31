@@ -44,6 +44,13 @@ drawn from. Updated alongside every push to `main`.
   filter bar itself moved into a shared partial (`tickets/
   _filter_bar.html`) so the table and board views can't drift apart on
   what filters mean.
+- Home's "Last updated" label is now a pill ("Version from
+  `<timestamp>`") next to each document's title, instead of a plain
+  line above its content. Ticket detail page: the accent tint moved
+  off the whole card and onto just the description box, which now
+  also gets a full border so it's clear where it ends and the
+  metadata table below it begins -- previously the whole card
+  (badges/title/metadata included) was tinted.
 
 ## 2026-08-30
 

@@ -725,13 +725,14 @@ form.inline { display: inline; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
 .card + .card { margin-top: 16px; }
 .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; }
-/* A ticket detail page's own card (badges/title/description/metadata) --
-   a light accent tint so it reads as the primary "this is the ticket"
-   card at a glance, distinct from the plain-surface Approval/Links/
-   Activity cards below it on the same page. Mixed against --surface
-   itself, not a flat white, so it stays correct in dark mode too --
-   same technique .calendar-day.today already uses for its own tint. */
-.ticket-body-card { background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+/* A card-title plus something else on the same line (Home's per-document
+   "Version from ..." pill today) -- baseline-aligned so the pill's own
+   text sits level with the title's rather than its box centering against
+   the title's full line-height, and the row itself (not .card-title)
+   carries the usual title/body gap since .card-title's own margin-bottom
+   would double up with this row's gap otherwise. */
+.card-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.card-title-row .card-title { margin-bottom: 0; }
 
 /* A handful of logically-separate cards (e.g. Admin > Branding's
    "Instance branding" and "Public incident portal") that used to stack
@@ -832,6 +833,11 @@ form.inline { display: inline; }
    not something competing with the content itself) and spaced off
    from what follows it. */
 .doc-last-updated { font-size: 0.8em; margin-bottom: 8px; }
+/* Home's per-document freshness pill (.card-title-row, above) -- .badge's
+   own uppercase/letter-spacing/bold suits a short status word ("HIGH",
+   "INCIDENT"), not a sentence-shaped "Version from <timestamp>", so this
+   overrides those three specifically rather than styling from scratch. */
+.doc-version-pill { text-transform: none; letter-spacing: normal; font-weight: 400; font-size: 0.75rem; flex-shrink: 0; }
 
 /* ---------- calendar ---------- */
 table.calendar-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -1304,11 +1310,14 @@ td.actions { text-align: right; white-space: nowrap; }
 .ticket-title-text { min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ticket-title-form { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; }
 .ticket-title-input { min-width: 0; flex: 1 1 auto; font-weight: 700; }
-/* The bottom margin/border that used to live on .ticket-description
-   itself now lives on its wrapper instead -- .ticket-description-toggle
-   ("Show more") sits between the text and that divider, which would
-   otherwise cut across right above the button instead of below it. */
-.ticket-description-wrap { margin: 0 0 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+/* A light accent-tinted, bordered box around the description (and its
+   own "Show more" toggle, .ticket-description-toggle below) -- makes it
+   obvious at a glance where the description ends and the metadata table
+   below it starts, without tinting the whole card the way an earlier
+   version of this did (badges/title/metadata aren't "the description").
+   Mixed against --surface itself, not a flat white, so it stays correct
+   in dark mode -- same technique .calendar-day.today already uses. */
+.ticket-description-wrap { margin: 0 0 20px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
 /* pre-wrap so a multi-line description (typed by hand, or -- see
    rain.modules.tickets.service.build_event_description -- built from a
    promoted syslog event's host/program/severity/raw/parsed_fields) keeps

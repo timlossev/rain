@@ -43,7 +43,7 @@
   </div>
 </div>
 
-<div class="card ticket-body-card">
+<div class="card">
   <div class="ticket-badges-row">
     <div class="ticket-badges-left">
       <span class="ticket-severity-edit" data-inline-edit>
@@ -85,7 +85,13 @@
      as a layout bug more than a feature. "Show more" only ever appears
      when the text actually overflows the clamp (app.js's [data-clamp]
      handler checks scrollHeight vs clientHeight) -- a short description
-     never gets a button with nothing to expand. #}
+     never gets a button with nothing to expand.
+
+     Tinted and framed (app.css) so it's obvious at a glance where the
+     description ends and the metadata table below it starts -- the tint
+     used to sit on the whole card instead; scoped down to just this box
+     since badges/title/metadata aren't "the description" and didn't need
+     it. #}
   <div class="ticket-description-wrap" data-clamp>
     <p class="ticket-description clamped" data-clamp-target>{{ ticket.description or "No description." }}</p>
     <button type="button" class="btn btn-sm ticket-description-toggle" data-clamp-toggle hidden>Show more</button>

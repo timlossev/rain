@@ -109,8 +109,8 @@ formatted text, plain text as-is) instead of the welcome message. More
 than one document can be checked at once; all of them show, one after
 another, in title order. A document with no inline body (an uploaded
 file that isn't a `.txt`/`.md`) can be checked too, but has nothing to
-show until it is one. Each one shows a small "Last updated" label above
-its content.
+show until it is one. Each one shows a small "Version from
+`<timestamp>`" pill next to its title.
 
 ## Tickets
 

@@ -655,16 +655,21 @@ timeout_seconds` allows, same trade-off the manual button already makes,
 just on every render instead of one click, and on Home potentially once
 per flagged document with this set.
 
-**Last-updated label.** Both render sites above (the document's own
-Contents tab, and each entry on Home) show a small "Last updated
-`<timestamp>`" line: `last_refreshed_at` if this document has ever had a
-successful webhook call (refresh-when-rendering included), else
-`updated_at`, else `created_at`. Not a precise "content last actually
-changed" signal -- `updated_at` moves on any saved field on the row, not
-just the body, and `last_refreshed_at` moves on a refresh whose response
-was identical to what's stored -- but the best one available without a
-dedicated column, and consistent with what "Last refreshed" already
-showed next to the manual button on the Auto-update tab.
+**Freshness display.** Both render sites above compute the same
+`last_updated = last_refreshed_at or updated_at or created_at` -- the
+first if this document's ever had a successful webhook call (refresh-
+when-rendering included), else the second, else the third. Not a precise
+"content last actually changed" signal -- `updated_at` moves on any saved
+field on the row, not just the body, and `last_refreshed_at` moves on a
+refresh whose response was identical to what's stored -- but the best one
+available without a dedicated column, and consistent with what "Last
+refreshed" already showed next to the manual button on the Auto-update
+tab. The document's own Contents tab shows it as a small "Last updated
+`<timestamp>`" line above the editor; Home shows it as a pill ("Version
+from `<timestamp>`", `.doc-version-pill`) next to that document's title,
+in a shared `.card-title-row` alongside `.card-title` (baseline-aligned,
+so the pill's text sits level with the title's own rather than centered
+against its full line-height).
 
 **Tags.** `Document.tags` (`text[]`, tenant migration 0039) -- optional,
 freeform, comma-separated on input (`rain.modules.documents.service.
