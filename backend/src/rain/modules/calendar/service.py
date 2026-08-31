@@ -62,14 +62,42 @@ async def mark_fired(db: AsyncSession, entry: CalendarEntry, on: dt.date) -> Non
 
 
 async def list_entries_due_today(db: AsyncSession) -> list[CalendarEntry]:
-    """Active entries with an occurrence landing on today -- backs the
-    client portal's "Today's events" listing. Reuses the same
-    occurrence math (rain.modules.calendar.recurrence.is_due_on) the
-    month-grid view computes each cell from, rather than a second
-    definition of what "due" means."""
+    """Active entries with an occurrence landing on today. Reuses the
+    same occurrence math (rain.modules.calendar.recurrence.is_due_on)
+    the month-grid view computes each cell from, rather than a second
+    definition of what "due" means. See list_due_today below for what
+    actually backs the client portal's "Today's events" listing --
+    CalendarEntry occurrences alone under-counted what the full
+    calendar page shows for the same day."""
     entries = await list_entries(db, active_only=True)
     today = dt.datetime.now(dt.timezone.utc).date()
     return [e for e in entries if is_due_on(e, today)]
+
+
+async def list_due_today(db: AsyncSession) -> list[CalendarEntry | Ticket]:
+    """Everything "for today" the way the full /calendar month grid
+    defines it -- CalendarEntry occurrences (list_entries_due_today)
+    *and* change tickets whose [start_date, end_date] window covers
+    today (list_changes_in_range), the same two sources rain.modules.
+    calendar.router's own grid-building combines into by_date/
+    changes_by_date. Backs the client portal's "Today's events" widget,
+    which used to call list_entries_due_today alone -- a tenant with,
+    say, one CalendarEntry and two changes scheduled for today would
+    see all three on the full calendar page but only the one
+    CalendarEntry here, which read as "only one item" despite having
+    multiple entries for the day.
+
+    Both `Ticket` and `CalendarEntry` have their own `.title`, so a
+    caller that only ever read that attribute works unchanged against
+    the merged list; portal/report.html additionally checks for
+    `.ticket_number` (Jinja's `is defined`, safe against the
+    AttributeError a CalendarEntry raises for that name) to prefix a
+    change's ticket number the same way the month grid's own chip
+    does."""
+    today = dt.datetime.now(dt.timezone.utc).date()
+    entries = await list_entries_due_today(db)
+    changes = await list_changes_in_range(db, today, today)
+    return [*entries, *changes]
 
 
 async def list_changes_in_range(db: AsyncSession, start: dt.date, end: dt.date) -> list[Ticket]:

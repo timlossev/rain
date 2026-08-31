@@ -8,6 +8,21 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-31
 
+- **Fixed**: client portal's "Pending Actions" tab no longer lists a
+  change whose approval was never explicitly decided but the ticket
+  itself is now closed/cancelled -- a change closed out from under a
+  pending approval (the status stepper, or "Mark cancelled") used to
+  stay listed there indefinitely, since nothing had touched
+  `ChangeApproval.overall_status`.
+- **Fixed**: client portal's "Today's events" was undercounting -- it
+  only ever queried `CalendarEntry` occurrences, missing change
+  tickets whose start/end window covers today even though the full
+  `/calendar` month grid already shows both together. A tenant with
+  one calendar entry and two changes due the same day saw all three
+  on the calendar page but only the one entry here. Now pulls both,
+  same as the grid does, with a change shown as
+  "CHG-000123: title" to match how the grid itself labels one.
+
 - **Custom JS injection**: Admin > Branding > "Tenant defaults" now has
   two more fields -- "Custom JS - main app" and "Custom JS - client
   portal" -- raw HTML/JS an admin pastes in for analytics, a chat

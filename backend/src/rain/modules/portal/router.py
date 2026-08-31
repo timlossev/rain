@@ -283,7 +283,7 @@ async def portal_form(
         # in anonymous_shared_only mode for the same reason as
         # catalog_items above: that mode renders nothing but the
         # Shareable documents tab.
-        todays_events = [] if anonymous_shared_only else await calendar_service.list_entries_due_today(tenant_db)
+        todays_events = [] if anonymous_shared_only else await calendar_service.list_due_today(tenant_db)
         # Same webhook the ticket detail page's own Escalate button uses
         # (Admin > Branding); only meaningful once signed in, since the
         # "Tickets reported by me" table it appears next to only renders

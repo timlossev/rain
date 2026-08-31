@@ -63,7 +63,7 @@
     <div class="portal-section-title" style="margin-top:0;">Today's events</div>
     {% if todays_events %}
     <ul class="portal-today-list">
-      {% for e in todays_events[:5] %}<li>{{ e.title }}</li>{% endfor %}
+      {% for e in todays_events[:5] %}<li>{% if e.ticket_number is defined %}{{ e.ticket_number }}: {% endif %}{{ e.title }}</li>{% endfor %}
     </ul>
     {% if todays_events | length > 5 %}
     <a class="muted portal-today-more" href="/calendar">+{{ todays_events | length - 5 }} more &rsaquo; View full calendar</a>

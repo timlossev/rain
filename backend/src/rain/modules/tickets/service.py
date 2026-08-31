@@ -988,8 +988,16 @@ async def list_tickets_pending_approval_for(db: AsyncSession, user_id: int) -> l
     (approver_user_id) or reachable via group membership
     (approver_group_id) -- backing the client portal's "Pending my
     approval" tab. Same eligibility rule as is_eligible_approver, just
-    evaluated as a set query instead of one step at a time."""
+    evaluated as a set query instead of one step at a time.
+
+    Also excludes a ticket sitting on an is_closed status -- a change can
+    be closed or cancelled (the status-stepper, or "Mark cancelled")
+    without its approval ever having been explicitly decided, which
+    leaves ChangeApproval.overall_status sitting at "pending" forever;
+    without this, that ticket would show up here indefinitely even
+    though there's nothing left to actually approve."""
     member_group_ids = select(GroupMembership.group_id).where(GroupMembership.user_id == user_id)
+    closed_keys = select(TicketStatus.key).where(TicketStatus.is_closed.is_(True))
     stmt = (
         select(Ticket)
         .join(ChangeApproval, ChangeApproval.ticket_id == Ticket.id)
@@ -1000,6 +1008,7 @@ async def list_tickets_pending_approval_for(db: AsyncSession, user_id: int) -> l
         )
         .where(
             ChangeApproval.overall_status == "pending",
+            Ticket.status.not_in(closed_keys),
             (ApprovalFlowStep.approver_user_id == user_id) | (ApprovalFlowStep.approver_group_id.in_(member_group_ids)),
         )
         .order_by(Ticket.created_at.desc())

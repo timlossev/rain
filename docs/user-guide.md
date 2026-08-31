@@ -832,9 +832,12 @@ incident always has.
 
 **Signed in** additionally gets a search bar and two more tabs:
 
-- **Pending Actions**: tickets currently waiting on your decision --
-  same list as clicking through to each one's own Approval card would
-  show.
+- **Pending Actions**: change tickets currently waiting on your
+  decision -- same list as clicking through to each one's own Approval
+  card would show. A change that gets closed or cancelled without ever
+  being explicitly approved or rejected drops off this list too, even
+  though its approval technically never got a decision -- there's
+  nothing left to act on once the ticket itself is closed.
 - **Document Archive**: every document in the tenant's repository,
   linking out to each one's own page.
 
@@ -851,9 +854,13 @@ ticket" button at the bottom opens the real, full ticket page
 (requires signing in, same as ever) for anyone who wants to comment,
 reassign, or change status.
 
-**Today's events**, above the tabs, lists anything due on the tenant
-calendar today (recurring or one-time), or "None" if nothing is. Shown
-to every visitor regardless of sign-in status.
+**Today's events**, above the tabs, lists anything due today -- calendar
+entries (recurring or one-time) and change tickets whose window covers
+today, the same two sources the full `/calendar` month grid shows
+together -- or "None" if nothing is. A change is listed as
+"CHG-000123: title"; a calendar entry just by its own title. Shown to
+every visitor regardless of sign-in status, capped at 5 with a "+N more"
+link to the full calendar if there's more.
 
 **Shareable documents** (only shown once at least one exists): a tab
 listing every document marked "Shareable in the client portal" from its

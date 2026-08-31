@@ -890,22 +890,37 @@ not -- gets the same `.portal-shell.portal-wide` layout: a tab bar
 (labels are visitor-facing copy, not the underlying concept -- "Request
 Something" is the catalog tab, "Report Something" the incident-report
 tab) plus "Today's events" above it, tenant-wide operational information
-shown regardless of sign-in status
-(`rain.modules.calendar.service.list_entries_due_today`, reusing the
-month-grid view's own occurrence math). Request Something and Report
-Something are both open with or without a session -- gated only by
-`portal_require_auth` below, same as ticket filing always was, since
-`rain.modules.catalog.service.submit_catalog_item`'s
+shown regardless of sign-in status. `rain.modules.calendar.service.
+list_due_today` is what actually backs it -- `list_entries_due_today`
+(CalendarEntry occurrences, reusing the month-grid view's own occurrence
+math) *plus* `list_changes_in_range(db, today, today)` (change tickets
+whose window covers today), the same two sources `rain.modules.calendar.
+router`'s own grid-building combines into `by_date`/`changes_by_date`.
+`list_entries_due_today` alone used to back this directly, which
+under-counted relative to the full calendar page for any day that also
+had a change scheduled on it. Both `Ticket` and `CalendarEntry` expose
+`.title`, so the merged list needs no per-type branching to render --
+`portal/report.html` additionally checks `e.ticket_number is defined`
+(Jinja's attribute-lookup-turned-`Undefined` mechanics, safe against the
+plain `AttributeError` a `CalendarEntry` raises for that name) to prefix
+a change's ticket number, matching how the month grid's own chip labels
+one (`calendar/month.html`'s `calendar-entry-chip-change`). Request
+Something and Report Something are both open with or without a session
+-- gated only by `portal_require_auth` below, same as ticket filing
+always was, since `rain.modules.catalog.service.submit_catalog_item`'s
 `reported_anonymously` flows straight through to
 `ticket_service.create_ticket` exactly like the plain incident form's
 already did. A signed-in visitor additionally gets a search bar and two
 more tabs -- Pending Actions (backed by `rain.modules.tickets.service.
 list_tickets_pending_approval_for`, the same eligibility rule
-`is_eligible_approver` uses, evaluated as a set query) and Document
-Archive -- both of which stay session-gated (`{% if user %}` around
-their tab button and panel alike, not just their content), since neither
-an approval decision nor the document repository was ever meant to be
-reachable anonymously. `.content-standalone` (base.html's `<main>` for
+`is_eligible_approver` uses, evaluated as a set query, and excluding a
+ticket sitting on an `is_closed` status -- a change closed or cancelled
+out from under a still-`"pending"` `ChangeApproval.overall_status`
+otherwise stayed listed here forever, since closing a ticket this way
+never touches the approval row itself) and Document Archive -- both of
+which stay session-gated (`{% if user %}` around their tab button and
+panel alike, not just their content), since neither an approval decision
+nor the document repository was ever meant to be reachable anonymously. `.content-standalone` (base.html's `<main>` for
 login/setup/portal alike) is a centered flexbox; overridden to normal
 top-down block flow specifically when a `.portal-shell` is present
 (`.content-standalone:has(.portal-shell)`, same `:has()` technique as
