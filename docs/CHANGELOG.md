@@ -8,6 +8,14 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-31
 
+- **Fixed**: "+ New ticket" sat visibly misaligned against the
+  All/Incidents/Vulnerabilities/Changes pills next to it (table view
+  and Kanban board both use the same filter bar). Same padding on
+  both, but `.type-pill` had no `line-height` of its own and inherited
+  the page's 1.5 instead of the button's explicit 1.3 -- about 2px
+  taller despite matching padding, enough for `.filter-bar`'s own
+  vertical centering to visibly misalign the two.
+
 - **Fixed**: the "Home" sidebar entry rendered at a visibly different
   font size than its sibling categories. Root cause: `.nav-toggle`'s
   `all: unset` (needed to strip a `<button>`'s own platform styling)
