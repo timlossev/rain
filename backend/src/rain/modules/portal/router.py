@@ -142,7 +142,9 @@ async def _resolve_portal_tenant_and_flags(
         return templates.TemplateResponse(request, "errors/403.html", {}, status_code=403)
 
     async with tenant_session(tenant.schema_name) as tenant_db:
-        flags = await get_tenant_configs(tenant_db, ["portal_require_auth", "portal_branded"])
+        flags = await get_tenant_configs(
+            tenant_db, ["portal_require_auth", "portal_branded", "portal_custom_js"]
+        )
 
     return tenant, flags
 
@@ -295,6 +297,7 @@ async def portal_form(
             "tenant": tenant,
             "user": user,
             "branded": flags["portal_branded"],
+            "portal_custom_js": flags["portal_custom_js"],
             "anonymous_shared_only": anonymous_shared_only,
             "interactions": PORTAL_INTERACTIONS,
             "severities": SEVERITIES,
@@ -384,6 +387,7 @@ async def portal_catalog_form(
             "tenant": tenant,
             "user": user,
             "branded": flags["portal_branded"],
+            "portal_custom_js": flags["portal_custom_js"],
             "item": item,
             "rendered_fields": rendered,
             "submitted": {},
@@ -427,6 +431,7 @@ async def portal_catalog_submit(
                     "tenant": tenant,
                     "user": user,
                     "branded": flags["portal_branded"],
+                    "portal_custom_js": flags["portal_custom_js"],
                     "item": item,
                     "rendered_fields": rendered,
                     "submitted": submitted,

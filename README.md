@@ -304,9 +304,12 @@ Documents above.
   spreadsheet, with type-guessing from sample data
 - **Incident Portal**: the client portal's own per-tenant settings (see
   Client Portal below)
-- **Tenant defaults** (Admin > Branding): currently just record list
-  page size (10/25/50/100/200), backing every tenant-scoped list --
-  Tickets, Assets, Documents, and this tenant's own admin config lists
+- **Tenant defaults** (Admin > Branding): record list page size
+  (10/25/50/100/200), backing every tenant-scoped list -- Tickets,
+  Assets, Documents, and this tenant's own admin config lists -- plus
+  two custom-JS fields (raw HTML/JS, e.g. analytics or a chat widget),
+  one for the main app's own signed-in pages and one for the client
+  portal, kept deliberately separate
 
 ### Client Portal
 

@@ -106,19 +106,19 @@ async def _portal_settings(ctx: RequestContext) -> dict:
 PAGE_SIZE_CHOICES = [10, 25, 50, 100, 200]
 
 
-async def _default_page_size(ctx: RequestContext) -> int:
-    """Same "mixed platform-wide + active-tenant" page shape
-    _portal_settings above uses -- falls back to the built-in default
-    (rain.core.pagination.DEFAULT_PAGE_SIZE) rather than requiring a
-    tenant picked first, since Branding has to stay reachable either
-    way. See TenantConfig.DEFAULTS's own "default_page_size" entry for
-    which record lists this actually governs (every tenant-scoped one;
-    a few platform-level admin lists deliberately opt out -- see their
-    own routes for why)."""
+async def _tenant_defaults(ctx: RequestContext) -> dict:
+    """Admin > Branding > "Tenant defaults" -- record list page size plus
+    the two custom-JS snippets (app_custom_js/portal_custom_js, see
+    TenantConfig.DEFAULTS's own comment on those). Same "mixed platform-
+    wide + active-tenant" page shape _portal_settings above uses -- falls
+    back to built-in defaults rather than requiring a tenant picked
+    first, since Branding has to stay reachable either way."""
     if ctx.active_tenant is None:
-        return DEFAULT_PAGE_SIZE
+        return {"default_page_size": DEFAULT_PAGE_SIZE, "app_custom_js": "", "portal_custom_js": ""}
     async with tenant_session(ctx.active_tenant.schema_name) as tenant_db:
-        return await get_tenant_config(tenant_db, "default_page_size")
+        return await get_tenant_configs(
+            tenant_db, ["default_page_size", "app_custom_js", "portal_custom_js"]
+        )
 
 
 @router.get("/branding", response_class=HTMLResponse)
@@ -137,7 +137,7 @@ async def branding_form(
             "error": None,
             "font_choices": FONT_CHOICES,
             "page_size_choices": PAGE_SIZE_CHOICES,
-            "default_page_size": await _default_page_size(ctx),
+            **await _tenant_defaults(ctx),
             **await _portal_settings(ctx),
         },
     )
@@ -165,7 +165,7 @@ async def branding_submit(
                 "error": str(exc),
                 "font_choices": FONT_CHOICES,
                 "page_size_choices": PAGE_SIZE_CHOICES,
-                "default_page_size": await _default_page_size(ctx),
+                **await _tenant_defaults(ctx),
                 **await _portal_settings(ctx),
             },
             status_code=400,
@@ -231,24 +231,40 @@ async def branding_portal_submit(
 @router.post("/branding/defaults")
 async def branding_defaults_submit(
     default_page_size: int = Form(DEFAULT_PAGE_SIZE),
+    app_custom_js: str = Form(""),
+    portal_custom_js: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     user: CurrentUser = Depends(require_admin),
 ):
-    """"Tenant defaults" card -- currently just default_page_size, the
-    fallback rain.core.pagination.paginate() uses for every tenant-scoped
-    record list (Tickets, Assets, Documents, and this tenant's own admin
-    config lists) that doesn't explicitly override it -- see that key's
-    own comment in TenantConfig.DEFAULTS for the platform-level lists
-    that deliberately never read it. Same no-op-without-a-tenant shape as
-    branding_portal_submit above. Silently clamped to the nearest allowed
-    PAGE_SIZE_CHOICES value rather than 400ing on a tampered form post --
-    consistent with how a stale/hand-edited value elsewhere in this app
-    (e.g. an invalid ticket status) degrades to "closest sane thing"
-    instead of hard-failing a save over one field."""
+    """"Tenant defaults" card: default_page_size (the fallback rain.core.
+    pagination.paginate() uses for every tenant-scoped record list --
+    Tickets, Assets, Documents, and this tenant's own admin config lists
+    -- that doesn't explicitly override it; see that key's own comment in
+    TenantConfig.DEFAULTS for the platform-level lists that deliberately
+    never read it) plus app_custom_js/portal_custom_js (raw HTML/JS
+    rendered with |safe on, respectively, every authenticated app page
+    and the client portal -- see those keys' own DEFAULTS comment for
+    the trust reasoning). Same no-op-without-a-tenant shape as
+    branding_portal_submit above. default_page_size is silently clamped
+    to the nearest allowed PAGE_SIZE_CHOICES value rather than 400ing on
+    a tampered form post -- consistent with how a stale/hand-edited
+    value elsewhere in this app (e.g. an invalid ticket status) degrades
+    to "closest sane thing" instead of hard-failing a save over one
+    field; the two JS fields are saved as typed, with no validation --
+    there's no "invalid" HTML/JS for this purpose, only ever an admin's
+    own to write and rewrite freely."""
     if ctx.active_tenant is not None:
         clamped = min(PAGE_SIZE_CHOICES, key=lambda choice: abs(choice - default_page_size))
         async with tenant_session(ctx.active_tenant.schema_name) as tenant_db:
-            await set_tenant_config(tenant_db, "default_page_size", clamped, updated_by=user.id)
+            await set_tenant_configs(
+                tenant_db,
+                {
+                    "default_page_size": clamped,
+                    "app_custom_js": app_custom_js,
+                    "portal_custom_js": portal_custom_js,
+                },
+                updated_by=user.id,
+            )
     return RedirectResponse("/admin/branding?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 

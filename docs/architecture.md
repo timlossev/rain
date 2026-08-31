@@ -1228,6 +1228,48 @@ persisted in `localStorage` the same way the sidebar's own collapsed state
 is. It changes how tightly the rows *already on the page* are drawn, not
 how many rows that page has -- that's what tenant page_size above governs.
 
+**Custom JS injection.** Two more `TenantConfig.DEFAULTS` keys,
+`app_custom_js` and `portal_custom_js` -- raw HTML/JS an admin pastes in
+(Admin > Branding > "Tenant defaults") for a third-party snippet
+(analytics, a chat widget) that needs to run as a real `<script>` tag,
+not something a sanitizer could preserve. Both are rendered with `|safe`
+in `base.html` -- a deliberate, explicit trust boundary (a tenant admin
+already has far more reach than this: webhooks that can target this
+app's own internal network, SSO configuration, every user's role), not
+an oversight in an otherwise-autoescaped app. Two keys, not one, because
+the blast radius differs: `app_custom_js` runs in the *authenticated*
+app, on every signed-in user's own session; `portal_custom_js` runs on
+the public, often-anonymous incident portal. Neither should imply the
+other is safe to reuse for, so a tenant opts into each independently.
+
+Getting each to the right surface *and only* that surface leans on how
+the two already differ structurally, rather than a new mechanism:
+
+- `app_custom_js`: fetched by `rain.web.nav._app_custom_js` and returned
+  as part of `build_nav_context(ctx)`'s own dict -- every authenticated
+  app route already calls this and spreads its result (`**nav`) into the
+  template context, so this needed no changes anywhere else. Rendered in
+  `base.html` right before `</body>`, guarded by `{% if app_custom_js is
+  defined and app_custom_js %}`.
+- `portal_custom_js`: fetched once in `rain.modules.portal.router._
+  resolve_portal_tenant_and_flags` (already batches `portal_require_auth`/
+  `portal_branded` the same way) and threaded explicitly into the three
+  portal routes that render a full page (`portal_form`, `portal_catalog_
+  form`, `portal_catalog_submit`'s error re-render) -- `portal_ticket_
+  timeline` doesn't need it, since that one returns a fragment injected
+  via `innerHTML` into an already-loaded portal page, not a fresh
+  `base.html` render. Rendered in `base.html`'s `{% else %}` branch (the
+  `content-standalone` shell login/setup/errors/portal all share), same
+  `is defined` guard.
+
+The `is defined` guard on both is what keeps this scoped correctly
+without an explicit "which surface is this?" flag: `build_nav_context`
+is never called by portal/login/setup routes, and those routes never
+pass `portal_custom_js` either, so each variable is only ever truthy on
+the one surface that's supposed to populate it -- a route that forgets
+to thread one through just gets no injected script there, never someone
+else's.
+
 ## Roadmap
 
 - **Semantic/vector search**: keyword search (Postgres full-text) is live

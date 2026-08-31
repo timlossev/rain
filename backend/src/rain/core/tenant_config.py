@@ -52,6 +52,26 @@ DEFAULTS: dict[str, Any] = {
     # than a tenant schema, since those aren't any one tenant's records
     # to have an opinion on the page size of.
     "default_page_size": DEFAULT_PAGE_SIZE,
+    # Raw HTML/JS an admin pastes in (Admin > Branding > "Tenant defaults")
+    # to embed a third-party snippet -- analytics (Google Analytics/GTM),
+    # a chat widget (Intercom, Drift, ...), anything that ships as a
+    # <script> tag. Rendered with |safe (rain.web.templating's Jinja
+    # environment autoescapes everything else) -- this is a deliberate,
+    # explicit trust boundary, not an oversight: a tenant admin is already
+    # trusted with far more (webhooks that can target this app's own
+    # internal network, SSO configuration, every user's role), and this
+    # only ever reaches that SAME tenant's own pages. See base.html for
+    # exactly where each renders.
+    #
+    # Two separate keys, not one, because the two surfaces have very
+    # different blast radii if misused: the portal is public and
+    # unauthenticated by default, but app_custom_js runs on every
+    # signed-in user's session in the *authenticated* app (tickets,
+    # documents, approvals) -- a chat widget is reasonable there, but it's
+    # a materially bigger trust grant than the portal one, worth its own
+    # explicit opt-in rather than one flag covering both.
+    "app_custom_js": "",
+    "portal_custom_js": "",
 }
 
 # Distinguishes "caller passed no default" from "caller explicitly passed

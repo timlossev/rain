@@ -8,6 +8,21 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-31
 
+- **Custom JS injection**: Admin > Branding > "Tenant defaults" now has
+  two more fields -- "Custom JS - main app" and "Custom JS - client
+  portal" -- raw HTML/JS an admin pastes in for analytics, a chat
+  widget, or anything else that ships as a `<script>` tag. The two are
+  deliberately separate: the main-app one runs on every signed-in page
+  for this tenant (before `</body>`), the portal one only on this
+  tenant's public incident portal -- a tenant can use either, both, or
+  neither. Both are rendered unsanitized by design (this is an
+  explicit trust boundary an admin opts into per snippet, not a
+  sanitization gap) and never reach the other surface, or login/setup
+  pages, at all.
+- Admin > Branding's three cards (Instance branding, Public incident
+  portal, Tenant defaults) now share one uniform grid instead of two
+  side-by-side cards with a mismatched full-width one below them.
+
 - Document detail page: on the Auto-update tab, "Save settings" now
   renders after "Refresh when rendering" (the last of that tab's
   fields) instead of between it and the webhook-picker fields above --

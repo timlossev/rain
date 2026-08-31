@@ -164,6 +164,13 @@
 <main class="content-standalone">
   {% block content_alone %}{% endblock %}
 </main>
+{# Admin > Branding > "Tenant defaults" (rain.modules.portal.router, one
+   of its three routes rendering a full page here rather than a fetched
+   fragment) -- only ever defined by those, never by login/setup/error
+   pages, which also land in this same content-standalone branch. #}
+{% if portal_custom_js is defined and portal_custom_js %}
+{{ portal_custom_js | safe }}
+{% endif %}
 {% endif %}
 {% if ctx %}
 <div class="modal-overlay" id="doc-preview-modal" hidden data-modal>
@@ -193,5 +200,14 @@
 {% endif %}
 <script src="/static/js/app.js?v={{ asset_version }}"></script>
 {% block extra_scripts %}{% endblock %}
+{# Admin > Branding > "Tenant defaults" -- rain.web.nav.build_nav_context
+   sets this for the active tenant on every page that reaches the {% if
+   ctx %} branch above (an authenticated app page); the client portal and
+   login/setup screens never call build_nav_context, so this is never
+   defined there -- see portal_custom_js above for that surface's own,
+   deliberately separate flag. #}
+{% if app_custom_js is defined and app_custom_js %}
+{{ app_custom_js | safe }}
+{% endif %}
 </body>
 </html>

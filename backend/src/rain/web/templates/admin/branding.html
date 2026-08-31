@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Branding - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Instance-wide look & feel, the public incident portal's per-tenant behavior, and tenant-wide defaults (currently just the record-list page size). Instance name/color/logo/font apply immediately across every tenant; the portal settings and tenant defaults apply only to whichever tenant is currently active.{% endblock %}
+{% block help_text %}Instance-wide look & feel, the public incident portal's per-tenant behavior, and tenant-wide defaults (record-list page size, and custom JS for the main app and/or the portal - e.g. analytics or a chat widget). Instance name/color/logo/font apply immediately across every tenant; the portal settings and tenant defaults apply only to whichever tenant is currently active.{% endblock %}
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
@@ -77,9 +77,8 @@
   </form>
   {% endif %}
 </div>
-</div>
 
-<div class="card" style="margin-top:16px;">
+<div class="card">
   <div class="card-title">Tenant defaults</div>
   {% if not portal_tenant %}
   <p class="muted">Select a tenant (Admin &gt; Tenants &gt; Switch to) to configure its defaults.</p>
@@ -95,8 +94,19 @@
       </select>
       <div class="field-hint">How many rows/cards a page shows on this tenant's own record lists - Tickets, Assets, Documents, and this tenant's admin config lists (Ticket Statuses, Webhooks, Groups, ...). Doesn't affect the platform-level Tenants or Users lists, which aren't this tenant's records.</div>
     </div>
+    <div class="field">
+      <label for="app_custom_js">Custom JS - main app</label>
+      <textarea id="app_custom_js" name="app_custom_js" rows="4" class="doc-body-editor" placeholder="<script>...</script>">{{ app_custom_js }}</textarea>
+      <div class="field-hint">Raw HTML/JS, added just before <code>&lt;/body&gt;</code> on every signed-in page of the main app for this tenant - analytics, a chat widget, anything that ships as a <code>&lt;script&gt;</code> tag. Runs with full access to the page, and to whatever a signed-in user does on it, for as long as they're using the app - only paste snippets from a source you'd trust as much as a new admin user. Leave blank for none.</div>
+    </div>
+    <div class="field">
+      <label for="portal_custom_js">Custom JS - client portal</label>
+      <textarea id="portal_custom_js" name="portal_custom_js" rows="4" class="doc-body-editor" placeholder="<script>...</script>">{{ portal_custom_js }}</textarea>
+      <div class="field-hint">Same idea, for this tenant's public incident portal (<code>/portal/{{ portal_tenant.slug }}</code>) instead - reachable by anyone with the link, signed in or not, separate from the main-app snippet above (a tenant may only want one of the two, or neither). Leave blank for none.</div>
+    </div>
     <button class="btn btn-primary" type="submit">Save</button>
   </form>
   {% endif %}
+</div>
 </div>
 {% endblock %}

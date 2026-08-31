@@ -904,6 +904,28 @@ Doesn't affect the platform-level Tenants or Users lists under
 Platform Administration, or Syslog Sources -- those aren't any one
 tenant's own records.
 
+Two more fields on the same card, both optional and blank by default:
+
+- **Custom JS - main app**: raw HTML/JS pasted in as-is, added just
+  before `</body>` on every signed-in page of the main app for this
+  tenant -- an analytics snippet (Google Analytics, GTM), a chat
+  widget (Intercom, Drift, ...), or anything else that ships as a
+  `<script>` tag. Runs with full access to the page, and to whatever a
+  signed-in user does on it, for as long as they're using the app --
+  only paste something from a source you'd trust as much as a new
+  admin user.
+- **Custom JS - client portal**: the same idea, added to this tenant's
+  public incident portal instead (`/portal/<tenant>`) -- reachable by
+  anyone with the link, signed in or not. Entirely separate from the
+  main-app field above; a tenant can use one, both, or neither.
+
+Neither field is sanitized or validated -- there's no "invalid" HTML/
+JS for this purpose, and this is a deliberate trust boundary rather
+than an oversight (an admin already has far more reach than this over
+their own tenant). Neither ever reaches the *other* surface (a portal
+snippet never runs in the main app and vice versa), or the shared
+login/setup screens, which don't belong to any one tenant.
+
 ## Roles and permissions
 
 RAIN has three roles, assigned per user under Admin > Users:
