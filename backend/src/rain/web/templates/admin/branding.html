@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Branding - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Instance-wide look & feel, and the public incident portal's per-tenant behavior. Instance name/color/logo/font apply immediately across every tenant; the portal settings below apply only to whichever tenant is currently active.{% endblock %}
+{% block help_text %}Instance-wide look & feel, the public incident portal's per-tenant behavior, and tenant-wide defaults (currently just the record-list page size). Instance name/color/logo/font apply immediately across every tenant; the portal settings and tenant defaults apply only to whichever tenant is currently active.{% endblock %}
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
@@ -77,5 +77,26 @@
   </form>
   {% endif %}
 </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="card-title">Tenant defaults</div>
+  {% if not portal_tenant %}
+  <p class="muted">Select a tenant (Admin &gt; Tenants &gt; Switch to) to configure its defaults.</p>
+  {% else %}
+  <p class="field-hint" style="margin-top:0;">For <strong>{{ portal_tenant.name }}</strong>.</p>
+  <form method="post" action="/admin/branding/defaults">
+    <div class="field field-w100">
+      <label for="default_page_size">Record list page size</label>
+      <select id="default_page_size" name="default_page_size">
+        {% for choice in page_size_choices %}
+        <option value="{{ choice }}" {% if default_page_size == choice %}selected{% endif %}>{{ choice }}</option>
+        {% endfor %}
+      </select>
+      <div class="field-hint">How many rows/cards a page shows on this tenant's own record lists - Tickets, Assets, Documents, and this tenant's admin config lists (Ticket Statuses, Webhooks, Groups, ...). Doesn't affect the platform-level Tenants or Users lists, which aren't this tenant's records.</div>
+    </div>
+    <button class="btn btn-primary" type="submit">Save</button>
+  </form>
+  {% endif %}
 </div>
 {% endblock %}

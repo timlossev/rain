@@ -191,8 +191,9 @@ async def portal_form(
     tenant, flags = resolved
 
     async with tenant_session(tenant.schema_name) as tenant_db:
+        page_size = await get_tenant_config(tenant_db, "default_page_size")
         shareable_documents = await paginate(
-            tenant_db, document_service.shareable_document_list_stmt(), page=shared_page or 1
+            tenant_db, document_service.shareable_document_list_stmt(), page=shared_page or 1, page_size=page_size
         )
         shareable_documents_label = await get_tenant_config(
             tenant_db, "portal_shareable_documents_label", "Shareable documents"
@@ -267,7 +268,7 @@ async def portal_form(
         # same as the signed-in-only tabs.
         pending_approval = await ticket_service.list_tickets_pending_approval_for(tenant_db, user.id) if user is not None else []
         documents = (
-            await paginate(tenant_db, document_service.document_list_stmt(), page=doc_page or 1)
+            await paginate(tenant_db, document_service.document_list_stmt(), page=doc_page or 1, page_size=page_size)
             if user is not None
             else []
         )

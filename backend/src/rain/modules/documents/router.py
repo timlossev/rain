@@ -13,6 +13,7 @@ from starlette.convertors import Convertor, register_url_convertor
 from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
+from rain.core.tenant_config import get_tenant_config
 from rain.modules.assets import service as asset_service
 from rain.modules.calendar import service as calendar_service
 from rain.modules.documents import service, storage, textbody
@@ -87,7 +88,8 @@ async def list_documents(
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
-    doc_page = await paginate(tenant_db, service.document_list_stmt(search=search), page=page)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    doc_page = await paginate(tenant_db, service.document_list_stmt(search=search), page=page, page_size=page_size)
     return templates.TemplateResponse(
         request, "documents/list.html", {**nav, "ctx": ctx, "page": doc_page, "search": search or ""}
     )

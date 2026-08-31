@@ -12,6 +12,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from rain.core.pagination import DEFAULT_PAGE_SIZE
 from rain.db.tenant_models import TenantConfig
 
 DEFAULTS: dict[str, Any] = {
@@ -42,6 +43,15 @@ DEFAULTS: dict[str, Any] = {
     # on-demand "Analyze root cause" button on a ticket works regardless
     # of this flag.
     "auto_root_cause_on_close": False,
+    # rain.core.pagination.paginate's own page_size, tenant-overridable
+    # (Admin > Branding > "Tenant defaults") for every tenant-scoped
+    # record list in the app (Tickets, Assets, Documents, and every
+    # admin config list under this tenant) -- NOT applied to the handful
+    # of platform-level lists (Admin > Tenants, platform Users, Syslog
+    # Sources) that read from `control` via control_session() rather
+    # than a tenant schema, since those aren't any one tenant's records
+    # to have an opinion on the page size of.
+    "default_page_size": DEFAULT_PAGE_SIZE,
 }
 
 # Distinguishes "caller passed no default" from "caller explicitly passed

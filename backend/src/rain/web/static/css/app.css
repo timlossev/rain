@@ -627,6 +627,20 @@ nav > .nav-tree > .nav-item > .nav-toggle:hover .nav-label {
 label { display: block; font-size: 0.83rem; font-weight: 600; margin-bottom: 4px; color: var(--text-muted); }
 .field { margin-bottom: 16px; }
 .field-hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+/* A .field whose label and value sit on one row instead of stacked --
+   label's own block display/margin-bottom (above) is what stacks every
+   other field by default, so this overrides just those two. Used where
+   the value is compact (a pill, e.g. a document's "Uploaded" timestamp)
+   rather than an input/textarea that needs its own full-width line. */
+.field-inline-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.field-inline-row label { margin-bottom: 0; }
+/* A document's tag editor (documents/detail.html): input + Save + Cancel
+   on one line. Unlike tickets/detail.html's own inline-edit forms
+   (.ticket-severity-form, .ticket-title-form), this one had no layout
+   rule of its own at all -- normal inline flow left it with no gap
+   between the ~320px-wide text input and the buttons right after it,
+   reading as the input overlapping them on a narrower viewport. */
+.doc-tags-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 input[type=text], input[type=email], input[type=password], input[type=number],
 input[type=date], input[type=time], input[type=datetime-local], input[type=url],
 input[type=color], input[type=file],
@@ -1077,6 +1091,24 @@ td.actions { text-align: right; white-space: nowrap; }
    them claiming more than they need) leaves the rest of the row to Title. */
 .tickets-table .col-narrow { width: 1%; white-space: nowrap; }
 .tickets-table .col-title { width: 45%; }
+/* Row-spacing switch (app.js's [data-density-toggle]) -- a small two-
+   button segmented control, same idea as a tab-button pair but compact
+   enough to sit in a header row without competing with it. */
+.density-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.density-toggle .btn { border: none; border-radius: 0; }
+.density-toggle .btn + .btn { border-left: 1px solid var(--border); }
+/* No dedicated .active override here -- .btn.active's own accent border/
+   text (above, already used by Mine/Unassigned/Problematic/Prioritized
+   and Watch/Escalate) applies unchanged, so this toggle's active state
+   matches every other toggle-style button in the app instead of
+   inventing a second "active" look just for this one control. */
+/* .density-condensed on .tickets-table itself (toggled by app.js) --
+   tighter padding and a smaller row font so noticeably more tickets fit
+   in the same vertical space, same "row spacing" a spreadsheet's own
+   compact-view toggle affects. Header cells (thead th) are deliberately
+   untouched -- Number/Title/etc. stay legible regardless of how tight
+   the data rows themselves are. */
+.tickets-table.density-condensed td { padding: 3px 10px; font-size: 0.82rem; }
 
 /* ---------- /tickets/kanban ---------- */
 /* Columns lay out side by side and scroll horizontally as a set (as many

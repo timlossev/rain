@@ -926,6 +926,30 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // /tickets row-spacing switch (Normal / Condensed) -- a pure display
+  // toggle on .tickets-table itself, persisted per browser the same way
+  // the sidebar's own collapsed state is. Doesn't touch how many tickets
+  // are fetched or shown per page -- see the tenant-level page-size
+  // setting for that; this only controls how tightly the rows already on
+  // the page are drawn.
+  const densityToggle = document.querySelector("[data-density-toggle]");
+  const densityTable = document.querySelector(".tickets-table");
+  if (densityToggle && densityTable) {
+    const DENSITY_KEY = "rain-tickets-density";
+    const buttons = Array.from(densityToggle.querySelectorAll("[data-density]"));
+    const apply = (density) => {
+      densityTable.classList.toggle("density-condensed", density === "condensed");
+      buttons.forEach((btn) => btn.classList.toggle("active", btn.dataset.density === density));
+    };
+    apply(localStorage.getItem(DENSITY_KEY) === "condensed" ? "condensed" : "normal");
+    buttons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        localStorage.setItem(DENSITY_KEY, btn.dataset.density);
+        apply(btn.dataset.density);
+      });
+    });
+  }
+
   // Kanban board (/tickets/kanban): HTML5 drag-and-drop between status
   // columns. Cards are draggable="true" (tickets/kanban.html); each
   // column body is a dropzone. A successful drop calls the same

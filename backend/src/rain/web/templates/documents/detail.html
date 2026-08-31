@@ -82,7 +82,7 @@
             <span class="nav-icon">{{ nav_icon("pencil") }}</span>
           </button>
         </span>
-        <form method="post" action="/documents/{{ doc.id }}/tags" data-inline-edit-form hidden>
+        <form method="post" action="/documents/{{ doc.id }}/tags" class="doc-tags-form" data-inline-edit-form hidden>
           <input type="text" name="tags" value="{{ doc.tags | join(', ') }}" placeholder="runbook, security, onboarding" style="min-width:320px;">
           <button type="submit" class="btn btn-sm">Save</button>
           <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
@@ -114,23 +114,9 @@
       </div>
     </div>
 
-    <div class="field">
-      <label>Refresh when rendering</label>
-      <div>
-        <form method="post" action="/documents/{{ doc.id }}/refresh-on-view" class="inline">
-          <label class="checkbox-row"><input type="checkbox" name="refresh_on_view" onchange="this.form.submit()" {% if doc.refresh_on_view %}checked{% endif %}> Refresh when rendering</label>
-        </form>
-        {% if doc.webhook_id %}
-        <div class="field-hint">Calls the webhook configured under Auto-update every time this document's content is actually displayed - opening this page, or (if also flagged "Show on landing page") every load of Home. A successful call shows the new content (and saves it, same as clicking "Refresh from webhook" there); a failed call quietly falls back to the last saved version - this page shows a small notice when that happens, Home shows nothing and just falls back silently.</div>
-        {% else %}
-        <div class="field-hint">No webhook configured yet - set one under the Auto-update tab first, or checking this does nothing.</div>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="field">
+    <div class="field field-inline-row">
       <label>Uploaded</label>
-      <div class="muted">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</div>
+      <span class="badge doc-version-pill">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</span>
     </div>
 
     <form method="post" action="/documents/{{ doc.id }}/description">
@@ -170,6 +156,20 @@
       </div>
       <button class="btn btn-sm" type="submit">Save settings</button>
     </form>
+
+    <div class="field">
+      <label>Refresh when rendering</label>
+      <div>
+        <form method="post" action="/documents/{{ doc.id }}/refresh-on-view" class="inline">
+          <label class="checkbox-row"><input type="checkbox" name="refresh_on_view" onchange="this.form.submit()" {% if doc.refresh_on_view %}checked{% endif %}> Refresh when rendering</label>
+        </form>
+        {% if doc.webhook_id %}
+        <div class="field-hint">Calls the webhook above every time this document's content is actually displayed - opening this page, or (if also flagged "Show on landing page" under Properties) every load of Home. A successful call shows the new content (and saves it, same as clicking "Refresh from webhook" below); a failed call quietly falls back to the last saved version - this page shows a small notice when that happens, Home shows nothing and just falls back silently.</div>
+        {% else %}
+        <div class="field-hint">No webhook configured yet - pick one above, or checking this does nothing.</div>
+        {% endif %}
+      </div>
+    </div>
 
     {% if doc.webhook_id %}
     {# A visually distinct section from the settings form above it (a

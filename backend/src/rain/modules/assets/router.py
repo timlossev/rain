@@ -15,6 +15,7 @@ from rain.core.export_columns import merge_profile_columns
 from rain.core.pagination import paginate
 from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
+from rain.core.tenant_config import get_tenant_config
 from rain.db.tenant_models import Asset, AssetType, CustomField
 from rain.modules.assets import exporter, importer, service
 from rain.modules.assets.schemas import coerce_field_value
@@ -66,10 +67,12 @@ async def list_assets(
 ):
     nav = await build_nav_context(ctx)
     q = q.strip()
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
     asset_page = await paginate(
         tenant_db,
         service.asset_list_stmt(asset_type_id=asset_type_id, q=q or None, sort=sort or None, dir=dir),
         page=page,
+        page_size=page_size,
     )
     asset_types = await service.list_asset_types(tenant_db)
     invalid_status_count = await service.count_invalid_statuses(tenant_db)
@@ -331,7 +334,8 @@ async def types_list(
 ):
     nav = await build_nav_context(ctx)
     stmt = select(AssetType).order_by(AssetType.sort_order, AssetType.name)
-    type_page = await paginate(tenant_db, stmt, page=page)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    type_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     field_counts: dict[int | None, int] = {}
     for f in await service.all_fields(tenant_db):
         field_counts[f.asset_type_id] = field_counts.get(f.asset_type_id, 0) + 1
@@ -420,7 +424,8 @@ async def fields_list(
         .options(selectinload(CustomField.asset_type))
         .order_by(CustomField.asset_type_id.is_(None), CustomField.sort_order, CustomField.label)
     )
-    field_page = await paginate(tenant_db, stmt, page=page)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    field_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     return templates.TemplateResponse(
         request,
         "assets/fields.html",

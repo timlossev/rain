@@ -24,7 +24,7 @@ from sqlalchemy.orm import selectinload
 from rain.core import ldap_client
 from rain.core.config_store import FONT_CHOICES, config_store
 from rain.core.crypto import decrypt_json, encrypt_json
-from rain.core.pagination import paginate
+from rain.core.pagination import DEFAULT_PAGE_SIZE, paginate
 from rain.core.rbac import require_admin, require_internal_admin, require_login
 from rain.core.security import hash_password
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
@@ -98,6 +98,29 @@ async def _portal_settings(ctx: RequestContext) -> dict:
         return {**flags, "portal_tenant": ctx.active_tenant, "webhooks": webhooks}
 
 
+# Offered choices for Admin > Branding > "Tenant defaults" -- deliberately
+# not a free-typed number: every paginate() caller passes this straight
+# through as a SQL LIMIT, so an admin fat-fingering something absurd
+# (a stray extra zero) would turn one page load into a real, self-
+# inflicted performance problem. A fixed list sidesteps that entirely.
+PAGE_SIZE_CHOICES = [10, 25, 50, 100, 200]
+
+
+async def _default_page_size(ctx: RequestContext) -> int:
+    """Same "mixed platform-wide + active-tenant" page shape
+    _portal_settings above uses -- falls back to the built-in default
+    (rain.core.pagination.DEFAULT_PAGE_SIZE) rather than requiring a
+    tenant picked first, since Branding has to stay reachable either
+    way. See TenantConfig.DEFAULTS's own "default_page_size" entry for
+    which record lists this actually governs (every tenant-scoped one;
+    a few platform-level admin lists deliberately opt out -- see their
+    own routes for why)."""
+    if ctx.active_tenant is None:
+        return DEFAULT_PAGE_SIZE
+    async with tenant_session(ctx.active_tenant.schema_name) as tenant_db:
+        return await get_tenant_config(tenant_db, "default_page_size")
+
+
 @router.get("/branding", response_class=HTMLResponse)
 async def branding_form(
     request: Request,
@@ -108,7 +131,15 @@ async def branding_form(
     return templates.TemplateResponse(
         request,
         "admin/branding.html",
-        {**nav, "ctx": ctx, "error": None, "font_choices": FONT_CHOICES, **await _portal_settings(ctx)},
+        {
+            **nav,
+            "ctx": ctx,
+            "error": None,
+            "font_choices": FONT_CHOICES,
+            "page_size_choices": PAGE_SIZE_CHOICES,
+            "default_page_size": await _default_page_size(ctx),
+            **await _portal_settings(ctx),
+        },
     )
 
 
@@ -128,7 +159,15 @@ async def branding_submit(
         return templates.TemplateResponse(
             request,
             "admin/branding.html",
-            {**nav, "ctx": ctx, "error": str(exc), "font_choices": FONT_CHOICES, **await _portal_settings(ctx)},
+            {
+                **nav,
+                "ctx": ctx,
+                "error": str(exc),
+                "font_choices": FONT_CHOICES,
+                "page_size_choices": PAGE_SIZE_CHOICES,
+                "default_page_size": await _default_page_size(ctx),
+                **await _portal_settings(ctx),
+            },
             status_code=400,
         )
 
@@ -189,6 +228,30 @@ async def branding_portal_submit(
     return RedirectResponse("/admin/branding?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.post("/branding/defaults")
+async def branding_defaults_submit(
+    default_page_size: int = Form(DEFAULT_PAGE_SIZE),
+    ctx: RequestContext = Depends(get_request_context),
+    user: CurrentUser = Depends(require_admin),
+):
+    """"Tenant defaults" card -- currently just default_page_size, the
+    fallback rain.core.pagination.paginate() uses for every tenant-scoped
+    record list (Tickets, Assets, Documents, and this tenant's own admin
+    config lists) that doesn't explicitly override it -- see that key's
+    own comment in TenantConfig.DEFAULTS for the platform-level lists
+    that deliberately never read it. Same no-op-without-a-tenant shape as
+    branding_portal_submit above. Silently clamped to the nearest allowed
+    PAGE_SIZE_CHOICES value rather than 400ing on a tampered form post --
+    consistent with how a stale/hand-edited value elsewhere in this app
+    (e.g. an invalid ticket status) degrades to "closest sane thing"
+    instead of hard-failing a save over one field."""
+    if ctx.active_tenant is not None:
+        clamped = min(PAGE_SIZE_CHOICES, key=lambda choice: abs(choice - default_page_size))
+        async with tenant_session(ctx.active_tenant.schema_name) as tenant_db:
+            await set_tenant_config(tenant_db, "default_page_size", clamped, updated_by=user.id)
+    return RedirectResponse("/admin/branding?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.get("/tenants", response_class=HTMLResponse)
 async def tenants_list(
     request: Request,
@@ -197,6 +260,10 @@ async def tenants_list(
     _: CurrentUser = Depends(require_internal_admin),
 ):
     nav = await build_nav_context(ctx)
+    # No tenant-configurable page_size here (contrast every tenant_db-
+    # scoped list elsewhere in this file) -- this is the platform's own
+    # list of every tenant, read via control_session(), not any one
+    # tenant's records to have a page-size opinion about.
     async with control_session() as session:
         stmt = select(Tenant).order_by(Tenant.name)
         tenant_page = await paginate(session, stmt, page=page)
@@ -248,6 +315,8 @@ async def users_list(
     _: CurrentUser = Depends(require_internal_admin),
 ):
     nav = await build_nav_context(ctx)
+    # Same reasoning as tenants_list above -- platform Users, control_
+    # session()-scoped, no single tenant's default_page_size applies.
     async with control_session() as session:
         stmt = select(User).options(selectinload(User.tenant)).order_by(User.email)
         user_page = await paginate(session, stmt, page=page)
@@ -469,6 +538,9 @@ async def syslog_sources_list(
 ):
     nav = await build_nav_context(ctx)
     listener_port = get_settings().syslog_port
+    # Same reasoning as tenants_list/users_list above -- SyslogSourceMap
+    # is a platform-level routing table (control_session()-scoped), not
+    # any one tenant's records.
     async with control_session() as session:
         stmt = (
             select(SyslogSourceMap)
@@ -778,7 +850,8 @@ async def ticket_statuses_list(
 ):
     nav = await build_nav_context(ctx)
     stmt = select(TicketStatus).order_by(TicketStatus.sort_order, TicketStatus.label)
-    status_page = await paginate(tenant_db, stmt, page=page)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    status_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     return templates.TemplateResponse(
         request,
         "admin/ticket_statuses.html",
@@ -857,7 +930,8 @@ async def notification_channels_list(
 ):
     nav = await build_nav_context(ctx)
     stmt = select(NotificationChannel).order_by(NotificationChannel.name)
-    channel_page = await paginate(tenant_db, stmt, page=page)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    channel_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     # Decrypted once here (not per-row in the template) so the Edit modal
     # can prefill recipients/webhook_url/webhook_config_id --
     # config_encrypted is otherwise opaque to Jinja.
@@ -954,7 +1028,8 @@ async def groups_list(
 ):
     nav = await build_nav_context(ctx)
     stmt = select(Group).order_by(Group.name)
-    group_page = await paginate(tenant_db, stmt, page=page)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    group_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     member_counts: dict[int, int] = {}
     if group_page.items:
         result = await tenant_db.execute(
@@ -1073,7 +1148,8 @@ async def approval_flows_list(
 ):
     nav = await build_nav_context(ctx)
     stmt = select(ApprovalFlow).options(selectinload(ApprovalFlow.steps)).order_by(ApprovalFlow.name)
-    flow_page = await paginate(tenant_db, stmt, page=page)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    flow_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     groups_result = await tenant_db.execute(select(Group).order_by(Group.name))
     group_names = {g.id: g.name for g in groups_result.scalars()}
     user_ids = {s.approver_user_id for f in flow_page.items for s in f.steps if s.approver_user_id}
@@ -1499,7 +1575,8 @@ async def webhooks_list(
 ):
     nav = await build_nav_context(ctx)
     stmt = select(WebhookConfig).order_by(WebhookConfig.name)
-    webhook_page = await paginate(tenant_db, stmt, page=page)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    webhook_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     return templates.TemplateResponse(
         request, "admin/webhooks.html", {**nav, "ctx": ctx, "page": webhook_page}
     )

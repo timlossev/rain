@@ -142,6 +142,11 @@ list with:
 - Quick-filter chips: "Mine" (tickets assigned to you), "Unassigned",
   "Problematic" (only tickets flagged problematic), and "Prioritized"
   (only the two highest severities -- "high" and "critical" today).
+- A Normal/Condensed row-spacing switch, remembered per browser --
+  Condensed tightens row padding so more tickets fit on screen without
+  scrolling. Display only; it doesn't change how many tickets are
+  fetched or how many fit on a page (see "Tenant defaults" under Admin
+  for that).
 - A sortable table: click any column header (Number, Title, Severity,
   Status, Created) to sort by it, click again to reverse direction.
   Assignee and Asset columns are shown but not sortable; Asset links to
@@ -740,17 +745,8 @@ off by default, so nothing is exposed until you opt it in here. Next to
 it, a "Show on landing page" checkbox does the same for [Home](#home):
 on, this document's own content (rendered Markdown, or plain text)
 replaces the plain welcome message there instead of just being linked
-to. Next, "Refresh when rendering" -- off by default, and only does
-anything once a webhook is picked on the Auto-update tab below: it
-re-runs that webhook, and updates the stored content on a successful
-response (same call/diff/save as the "Refresh from webhook" button),
-every time this document's content is actually displayed -- opening
-this page, or, if also flagged "Show on landing page", every load of
-Home. A failed call always falls back to the last saved version rather
-than an error; this page shows a small notice when that happens, Home
-shows nothing and just falls back quietly (a stale response on one of
-possibly several documents shown there isn't worth a banner). Below that,
-the page is split into tabs:
+to. Below that, an "Uploaded" row shows the upload date as a small
+pill. Below that, the page is split into tabs:
 
 - Description: a plain textarea, saved independently of the file
   itself.
@@ -773,10 +769,20 @@ the page is split into tabs:
   from a manual save on the Contents tab above; both go through the
   same diff. The event's detail includes a compact diff (added/removed
   lines) of exactly what changed, viewable in the live syslog viewer or
-  on whatever ticket it promotes to. A "Refresh from webhook" button
-  appears once a webhook is set, along with the timestamp of the last
-  refresh; each refresh diffs the new response against what's stored,
-  so nothing changes (or alerts) if the source hasn't.
+  on whatever ticket it promotes to. Next, "Refresh when rendering" --
+  off by default, and only does anything once a webhook is picked
+  above: it re-runs that webhook, and updates the stored content on a
+  successful response (same call/diff/save as "Refresh from webhook"
+  below), every time this document's content is actually displayed --
+  opening this page, or, if also flagged "Show on landing page" under
+  Properties, every load of Home. A failed call always falls back to
+  the last saved version rather than an error; this page shows a small
+  notice when that happens, Home shows nothing and just falls back
+  quietly (a stale response on one of possibly several documents shown
+  there isn't worth a banner). A "Refresh from webhook" button appears
+  once a webhook is set, along with the timestamp of the last refresh;
+  each refresh diffs the new response against what's stored, so
+  nothing changes (or alerts) if the source hasn't.
 - Links: every ticket or asset this document is linked to, each with
   an Unlink button, and an "Add link" control below the table. Pick
   Ticket or Asset with the pill selector, then either a ticket number
@@ -884,6 +890,19 @@ A signed-in visitor of a *different* tenant than the one in the URL is
 always turned away with a 403, regardless of the require-sign-in
 setting -- that setting controls whether an account is required at
 all, not whether an account for the wrong tenant is accepted.
+
+### Tenant defaults
+
+A third section on the same Admin > Branding page (also reachable by
+client_admin for their own tenant): **Record list page size**
+(10/25/50/100/200, default 25) -- how many rows or cards a page shows
+on this tenant's own record lists: Tickets (table and Kanban board),
+Assets, Documents, and this tenant's admin config lists (Ticket
+Statuses, Webhooks, Groups, Approval Flows, Notification Channels,
+Custom Fields, Event Promotion Policies, Platform Response Rules).
+Doesn't affect the platform-level Tenants or Users lists under
+Platform Administration, or Syslog Sources -- those aren't any one
+tenant's own records.
 
 ## Roles and permissions
 

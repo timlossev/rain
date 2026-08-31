@@ -57,6 +57,25 @@ drawn from. Updated alongside every push to `main`.
 - Kanban card: the ticket number is now its own pill/link, separate
   from the title -- previously folded into the title text ("INC-000123:
   Some title").
+- **Row-spacing switch** on the ticket list: a Normal/Condensed toggle
+  (persisted per browser) that tightens row padding so more tickets
+  fit on screen -- display only, doesn't change how many tickets are
+  fetched or paginated.
+- **Tenant-configurable page size**: a new "Record list page size"
+  setting under Admin > Branding > Tenant defaults (10/25/50/100/200,
+  default 25) now backs every tenant-scoped record list in the app --
+  Tickets, Assets, Documents, and this tenant's own admin config lists
+  (Ticket Statuses, Webhooks, Groups, Approval Flows, Notification
+  Channels, Custom Fields, Event Promotion Policies, Platform Response
+  Rules). Deliberately doesn't apply to the handful of platform-level
+  lists (Admin > Tenants, platform Users, Syslog Sources), which
+  aren't any one tenant's records to have a page-size opinion about.
+- Document Properties tab: "Refresh when rendering" moved to the
+  Auto-update tab, next to the webhook it actually governs (it never
+  belonged under Properties). "Uploaded" is now a pill on the right of
+  its row instead of a plain line below the label, matching Home's own
+  document pill. Fixed the tag editor's input overlapping its Save/
+  Cancel buttons (it had no layout rule of its own at all).
 
 ## 2026-08-30
 

@@ -155,9 +155,12 @@ Tickets, and everything about working one.
 - A unified, chronological activity feed per ticket -- comments, field
   changes, assignment/asset changes, approval decisions, and rule
   firings, newest- or oldest-first
-- Quick-action row menu and filter chips on the list -- correlates 1:1
-  with the ticket detail page's own top-right button row, so nothing
-  there needs a full page visit to reach
+- Quick-action row menu and filter chips (Mine, Unassigned, Problematic,
+  Prioritized) on the list -- correlates 1:1 with the ticket detail
+  page's own top-right button row, so nothing there needs a full page
+  visit to reach
+- Normal/Condensed row-spacing switch on the list, remembered per
+  browser
 - **Kanban board**: the same tickets and filters as the list, laid out
   as one draggable column per status instead of table rows -- drag a
   card to a different column to move it there, same as the status
@@ -301,6 +304,9 @@ Documents above.
   spreadsheet, with type-guessing from sample data
 - **Incident Portal**: the client portal's own per-tenant settings (see
   Client Portal below)
+- **Tenant defaults** (Admin > Branding): currently just record list
+  page size (10/25/50/100/200), backing every tenant-scoped list --
+  Tickets, Assets, Documents, and this tenant's own admin config lists
 
 ### Client Portal
 

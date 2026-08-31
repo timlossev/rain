@@ -124,7 +124,8 @@ async def list_tickets(
         sort=sort,
         direction=dir,
     )
-    ticket_page = await paginate(tenant_db, stmt, page=page)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    ticket_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     statuses = await service.list_statuses(tenant_db)
     status_colors = {s.key: s.color for s in statuses}
     user_names = await resolve_user_names({t.assignee_user_id for t in ticket_page.items})
@@ -972,7 +973,8 @@ async def fields_list(
         .where(CustomField.scope == "ticket")
         .order_by(CustomField.sort_order, CustomField.label)
     )
-    field_page = await paginate(tenant_db, stmt, page=page)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    field_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     return templates.TemplateResponse(
         request, "tickets/fields.html", {**nav, "ctx": ctx, "page": field_page, "error": None}
     )
@@ -1354,7 +1356,8 @@ async def rules_list(
 ):
     nav = await build_nav_context(ctx)
     stmt = select(TicketRule).order_by(TicketRule.sort_order)
-    rule_page = await paginate(tenant_db, stmt, page=page)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    rule_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     # "New policy from selection" (tickets/live's selection menu) lands
     # here with the New policy modal pre-filled from the selected
     # event(s) instead of asking the admin to retype a pattern they just
@@ -1560,7 +1563,8 @@ async def rules_test(
 
     nav = await build_nav_context(ctx)
     stmt = select(TicketRule).order_by(TicketRule.sort_order)
-    rule_page = await paginate(tenant_db, stmt, page=1)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    rule_page = await paginate(tenant_db, stmt, page=1, page_size=page_size)
     approval_flows = await service.list_approval_flows(tenant_db)
     training_summaries = await bulk_rule_training_summary(tenant_db, rule_page.items)
     return templates.TemplateResponse(
@@ -1602,7 +1606,8 @@ async def platform_events_list(
         .options(selectinload(PlatformEventRule.actions))
         .order_by(PlatformEventRule.sort_order)
     )
-    rule_page = await paginate(tenant_db, stmt, page=page)
+    page_size = await get_tenant_config(tenant_db, "default_page_size")
+    rule_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     auto_root_cause = await get_tenant_config(tenant_db, "auto_root_cause_on_close", False)
     return templates.TemplateResponse(
         request,

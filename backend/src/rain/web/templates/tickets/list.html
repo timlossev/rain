@@ -19,10 +19,21 @@
 </form>
 
 <div class="card">
-  {# Hidden until >=1 row is checked (app.js's [data-bulk-select]). #}
-  <div class="panel-row bulk-actions-bar" data-bulk-select-bar data-bulk-select-verb="closed" hidden style="justify-content:flex-end; gap:12px; margin-bottom:12px;">
-    <span class="muted" data-bulk-select-count>0 selected</span>
-    <button type="submit" form="tickets-bulk-close-form" class="btn btn-sm btn-primary">Mass close</button>
+  <div class="panel-row" style="justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
+    {# Row spacing, not record count -- purely a client-side CSS toggle
+       (app.js's [data-density-toggle], persisted in localStorage) on the
+       table below, same "remembered per browser" treatment the sidebar's
+       own collapse state already gets. Doesn't touch how many tickets are
+       fetched; see the per-page-size tenant setting for that. #}
+    <div class="density-toggle" data-density-toggle role="group" aria-label="Row spacing">
+      <button type="button" class="btn btn-sm" data-density="normal">Normal</button>
+      <button type="button" class="btn btn-sm" data-density="condensed">Condensed</button>
+    </div>
+    {# Hidden until >=1 row is checked (app.js's [data-bulk-select]). #}
+    <div class="bulk-actions-bar" data-bulk-select-bar data-bulk-select-verb="closed" hidden style="display:flex; align-items:center; gap:12px;">
+      <span class="muted" data-bulk-select-count>0 selected</span>
+      <button type="submit" form="tickets-bulk-close-form" class="btn btn-sm btn-primary">Mass close</button>
+    </div>
   </div>
   <table class="tickets-table" data-bulk-select>
     <thead>

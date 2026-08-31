@@ -1165,6 +1165,48 @@ restricted Postgres; no Caddy; single container):
   final single-container instructions now say so explicitly rather than
   leaving it to look like a broken feature.
 
+## Pagination & tenant defaults
+
+`rain.core.pagination.paginate(db, stmt, page=..., page_size=...)` is the
+one offset-pagination helper every list screen in the app uses (see its
+own module docstring); `page_size` defaults to `DEFAULT_PAGE_SIZE` (25)
+when a caller doesn't pass one. `TenantConfig.DEFAULTS["default_page_size"]`
+(`rain.core.tenant_config`, importing `DEFAULT_PAGE_SIZE` from
+`rain.core.pagination` -- no cycle, `pagination.py` itself only imports
+SQLAlchemy) makes that overridable per tenant: every router whose
+`paginate()` call reads from a `tenant_db` session now does `page_size =
+await get_tenant_config(tenant_db, "default_page_size")` first and passes
+it through -- Tickets (table, custom fields, Event Promotion Policies,
+Platform Response Rules), Assets (list, types, fields), Documents, and the
+client portal's own shareable-documents/documents tabs (`rain.modules.
+portal.router.portal_form`, which resolves a `tenant_session` for the
+tenant the URL names, same as any of these). Saved from Admin > Branding >
+"Tenant defaults" (`admin.router.branding_defaults_submit`), a fixed
+dropdown (`PAGE_SIZE_CHOICES = [10, 25, 50, 100, 200]`) rather than a free-
+typed number -- every caller passes this straight through as a SQL
+`LIMIT`, so an admin fat-fingering an extra zero would turn one page load
+into a real, self-inflicted performance problem; a submitted value is
+clamped to the nearest allowed choice rather than rejected outright,
+consistent with how a stale/tampered field elsewhere in this app degrades
+to "closest sane thing" instead of hard-failing a whole form save over it.
+
+Deliberately **not** applied to the handful of `paginate()` callers that
+read from `control_session()` instead of a tenant schema -- Admin >
+Tenants, platform Users, and Syslog Sources (`admin.router.tenants_list`/
+`tenants_create`/`users_list`/`syslog_sources_list`) -- each commented at
+its own call site. These are platform-level lists with no single tenant's
+config to read in the first place; `TenantConfig` itself only resolves
+against a tenant schema's own connection, so calling `get_tenant_config`
+against a `control_session()` connection wouldn't just be semantically
+wrong, it would fail outright (no `tenant_config` table in `public`).
+
+**Row density** (the ticket list's own Normal/Condensed toggle,
+`[data-density-toggle]` in `app.js`) is an unrelated, purely client-side
+concern -- a `.density-condensed` class toggled on `.tickets-table`,
+persisted in `localStorage` the same way the sidebar's own collapsed state
+is. It changes how tightly the rows *already on the page* are drawn, not
+how many rows that page has -- that's what tenant page_size above governs.
+
 ## Roadmap
 
 - **Semantic/vector search**: keyword search (Postgres full-text) is live
