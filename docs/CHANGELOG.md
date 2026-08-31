@@ -8,6 +8,18 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-31
 
+- **Fixed**: with "All" types selected, picking an asset (or changing
+  the status dropdown) on the ticket list or Kanban board emptied the
+  board/list entirely, and "Clear asset" couldn't recover it -- only
+  clicking "All" again did. Root cause: the filter bar's hidden
+  `ticket_type` field, carried along by every *other* filter control's
+  own form, rendered `value="None"` (Jinja stringifies Python `None`
+  in an attribute) whenever no type was selected, which then filtered
+  on the literal text "None" and matched nothing. Every other hidden
+  field in the same filter bar was already guarded against this;
+  `ticket_type` wasn't. Affects the table view too, just less often
+  hit there (usually a type's picked first).
+
 - Docker: the final image now removes the base `python:3.12-alpine`
   tag's own system-level pip/setuptools/wheel (outside the app's
   venv). The venv's own pip was already floored at >=26.1.2, clearing

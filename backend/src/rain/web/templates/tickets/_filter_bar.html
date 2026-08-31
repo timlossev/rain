@@ -59,7 +59,19 @@
     </div>
 
     <form method="get" action="{{ base_url }}" class="field" style="margin-bottom:0;">
-      <input type="hidden" name="ticket_type" value="{{ selected_type }}">
+      {# `or ''`, not a bare {{ selected_type }} -- Jinja stringifies
+         Python None to the literal text "None" in an attribute value,
+         and unlike every other hidden input here this one isn't gated
+         behind an `is not none`/truthy check first. With "All" selected
+         (selected_type is None) that used to submit ticket_type=None
+         (the four-character string) on picking an asset or changing
+         status here, which service.ticket_list_stmt's `if ticket_type:`
+         then filtered on literally -- matching nothing, since no real
+         ticket_type is ever the string "None". Confirmed live: emptied
+         the board, and "Clear asset" couldn't fix it either, since that
+         link falls back to this same poisoned selected_type too --
+         only the "All" pill's own explicit type='' ever bypassed it. #}
+      <input type="hidden" name="ticket_type" value="{{ selected_type or '' }}">
       {% if selected_asset_id %}<input type="hidden" name="asset_id" value="{{ selected_asset_id }}">{% endif %}
       {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
       {% if selected_problematic %}<input type="hidden" name="problematic" value="1">{% endif %}
@@ -76,7 +88,11 @@
     </form>
 
     <form method="get" action="{{ base_url }}" style="margin-bottom:0;">
-      <input type="hidden" name="ticket_type" value="{{ selected_type }}">
+      {# `or ''` -- same None-stringifies-to-"None" gotcha as the other
+         form's own ticket_type hidden input above; this is the field
+         picking an asset actually submits, so it was the one that
+         concretely emptied the board with "All" selected. #}
+      <input type="hidden" name="ticket_type" value="{{ selected_type or '' }}">
       {% if selected_status is not none %}<input type="hidden" name="ticket_status" value="{{ selected_status }}">{% endif %}
       {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
       {% if selected_problematic %}<input type="hidden" name="problematic" value="1">{% endif %}
