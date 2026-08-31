@@ -632,29 +632,50 @@ before/after is visible at a glance rather than just "something changed."
 approvals, below) reuses this exact same synthetic-event convention.
 
 **Refresh when rendering.** `Document.refresh_on_view` (tenant migration
-0046) is a third and fourth caller of `service.refresh_from_webhook`,
-alongside the manual "Refresh from webhook" button and the calendar
-sweep's `refresh_document` policy above -- both places a document's
-content is actually rendered for someone to read call it before reading
-the stored body, when the flag is set and `webhook_id` is configured:
-`rain.modules.documents.router.document_detail` (the document's own page)
-and `rain.modules.home.router.home` (Home, for a document also flagged
-`show_on_landing_page`). `refresh_from_webhook` never writes on a failed
-call (only a successful one reaches the diff/save step), so this falls out
-for free from the existing function rather than needing its own success/
-failure branching: a successful call has already overwritten storage by
-the time either route reads the body, and a failed one leaves it
-untouched. The two callers differ only in how (not whether) a failure
-surfaces: `document_detail` passes `outcome.error` through as
-`webhook_refresh_error` for the template to flash a small notice
-("showing the last saved version instead"); `home` ignores the outcome
-entirely and just falls back silently -- one document's stale webhook
-response isn't worth a banner on a page that may be showing several.
-Runs synchronously in the request path either way -- a slow or hung
-webhook delays the page load by however long `WebhookConfig.
-timeout_seconds` allows, same trade-off the manual button already makes,
-just on every render instead of one click, and on Home potentially once
-per flagged document with this set.
+0046) is a third and fourth caller of the refresh logic, alongside the
+manual "Refresh from webhook" button and the calendar sweep's
+`refresh_document` policy above -- both places a document's content is
+actually rendered for someone to read call it before reading the stored
+body, when the flag is set and `webhook_id` is configured:
+`rain.modules.documents.router.document_detail` (the document's own page,
+via `service.refresh_from_webhook`, one document) and `rain.modules.
+home.router.home` (Home, via `service.refresh_many_from_webhook`, since
+more than one document can be flagged `show_on_landing_page` +
+`refresh_on_view` on the same load -- see "Concurrent webhook refresh"
+below). Neither ever writes on a failed call (only a successful one
+reaches the diff/save step), so this falls out for free from the
+existing function rather than needing its own success/failure branching:
+a successful call has already overwritten storage by the time either
+route reads the body, and a failed one leaves it untouched. The two
+callers differ only in how (not whether) a failure surfaces:
+`document_detail` passes `outcome.error` through as `webhook_refresh_
+error` for the template to flash a small notice ("showing the last saved
+version instead"); `home` ignores the outcome entirely and just falls
+back silently -- one document's stale webhook response isn't worth a
+banner on a page that may be showing several.
+
+**Concurrent webhook refresh.** `service._apply_webhook_result` is the
+diff/save/commit/alert half of a refresh, factored out of `refresh_from_
+webhook` so `refresh_many_from_webhook` can reuse it per-document after
+gathering several `WebhookResult`s at once. The split matters because an
+`AsyncSession` isn't safe for concurrent use from multiple coroutines --
+the database half of a refresh has to stay sequential on whichever
+session the caller holds, but `webhook_service.call_webhook` itself
+touches nothing but network I/O and an already-fetched `WebhookConfig`
+(no shared session), so it doesn't have that constraint.
+`refresh_many_from_webhook` batches its `WebhookConfig` lookups into one
+query (`webhook_service.get_webhooks`, a `WHERE id IN (...)`, rather than
+one `get_webhook` round-trip per document), fires every eligible
+document's `call_webhook` concurrently via `asyncio.gather`, then applies
+each result through `_apply_webhook_result` in a plain sequential loop.
+On a Home load with several slow webhooks flagged, this turns what used
+to be N sequential waits (each up to that webhook's own
+`timeout_seconds`) into roughly one wait, all in flight together --
+`document_detail`'s single-document path is unaffected, still one
+`refresh_from_webhook` call, still synchronous in the request either
+way (a slow or hung webhook still delays that page load by up to
+`timeout_seconds`, same trade-off the manual button already makes, just
+now on every render instead of one click).
 
 **Freshness display.** Both render sites above compute the same
 `last_updated = last_refreshed_at or updated_at or created_at` -- the

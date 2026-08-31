@@ -130,6 +130,17 @@ async def get_webhook(db: AsyncSession, webhook_id: int) -> WebhookConfig | None
     return await db.get(WebhookConfig, webhook_id)
 
 
+async def get_webhooks(db: AsyncSession, webhook_ids: set[int]) -> dict[int, WebhookConfig]:
+    """Batched form of get_webhook -- one query for several ids at once
+    (rain.modules.documents.service.refresh_many_from_webhook), rather
+    than N sequential round-trips before the actual, concurrency-worthy
+    webhook calls even start."""
+    if not webhook_ids:
+        return {}
+    result = await db.execute(select(WebhookConfig).where(WebhookConfig.id.in_(webhook_ids)))
+    return {w.id: w for w in result.scalars()}
+
+
 async def list_webhooks(db: AsyncSession) -> list[WebhookConfig]:
     result = await db.execute(select(WebhookConfig).order_by(WebhookConfig.name))
     return list(result.scalars())

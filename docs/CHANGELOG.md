@@ -8,6 +8,16 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-31
 
+- **Performance**: Home's "Refresh when rendering" now calls every
+  flagged document's webhook concurrently instead of one at a time --
+  with several slow webhooks flagged, a page load used to wait out
+  each one's full timeout in sequence; now it waits out roughly the
+  slowest one, once. The database side of a refresh (diff/save/commit)
+  still happens sequentially per document, since it shares one
+  connection -- only the network round-trips run in parallel. The
+  single-document callers (the manual "Refresh from webhook" button,
+  the calendar sweep) are unchanged.
+
 - **Refresh from webhook on view**: a new checkbox in a document's
   Properties tab ("Refresh from webhook every time this page is
   viewed") re-runs the document's configured webhook every time its

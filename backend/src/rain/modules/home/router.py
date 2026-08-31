@@ -11,7 +11,11 @@ plain text as-is). Falls back to a plain "Welcome to <instance>" (the
 template's own default, not rendered here) when none are flagged. A
 flagged document with "Refresh when rendering" (Document.refresh_on_view)
 also set gets a fresh webhook call here, same as its own detail page --
-see that flag's own comment on the model."""
+see that flag's own comment on the model. Unlike the detail page (always
+exactly one document), Home can have several documents needing a refresh
+on the same load; document_service.refresh_many_from_webhook runs their
+webhook calls concurrently rather than one at a time -- see its own
+docstring for why."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
@@ -39,25 +43,31 @@ async def home(
     nav = await build_nav_context(ctx)
     flagged = await document_service.list_landing_page_documents(tenant_db)
 
+    # Same "Refresh when rendering" flag the document's own detail page
+    # acts on (rain.modules.documents.router.document_detail) -- this is
+    # the other place a document's content actually renders for someone
+    # to read, so it honors the same flag rather than needing a second,
+    # Home-specific opt-in. Batched (not one refresh_from_webhook call
+    # per document in the loop below): with several flagged documents
+    # each carrying their own slow webhook, awaiting them one at a time
+    # would serialize N timeouts into one page load -- refresh_many_from_
+    # webhook runs the actual HTTP calls concurrently instead. Silent on
+    # failure either way (no banner here, unlike the detail page): a
+    # failed call already falls through to whatever's stored, same as
+    # this never writing on failure, and a landing page showing a
+    # per-document error banner for something that isn't the page
+    # someone came here to fix would be more clutter than help -- the
+    # detail page (and the webhook's own alert_on_failure, if set) is
+    # where that gets surfaced instead.
+    refreshable = [d for d in flagged if d.refresh_on_view and d.webhook_id]
+    if refreshable:
+        await document_service.refresh_many_from_webhook(tenant_db, refreshable)
+
     landing_docs = []
     for doc in flagged:
         kind = textbody.body_kind(doc.filename)
         if kind is None:
             continue  # e.g. a PDF/image flagged with nothing inline to render -- silently skipped, not an error
-        # Same "Refresh when rendering" flag the document's own detail
-        # page acts on (rain.modules.documents.router.document_detail) --
-        # this is the other place a document's content actually renders
-        # for someone to read, so it honors the same flag rather than
-        # needing a second, Home-specific opt-in. Silent on failure (no
-        # banner here, unlike the detail page): a failed call already
-        # falls through to whatever's stored, same as refresh_from_webhook
-        # itself never writing on failure, and a landing page showing a
-        # per-document error banner for something that isn't the page
-        # someone came here to fix would be more clutter than help --
-        # the detail page (and the webhook's own alert_on_failure, if set)
-        # is where that gets surfaced instead.
-        if doc.refresh_on_view and doc.webhook_id:
-            await document_service.refresh_from_webhook(tenant_db, doc)
         try:
             text = textbody.decode_body(document_storage.get_storage().read(doc.storage_key))
         except FileNotFoundError:

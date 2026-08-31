@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import difflib
 import json
 import re
@@ -11,7 +12,7 @@ from sqlalchemy import Sequence, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from rain.db.tenant_models import Document, DocumentLink, SyslogEvent
+from rain.db.tenant_models import Document, DocumentLink, SyslogEvent, WebhookConfig
 from rain.modules.documents import storage, textbody
 from rain.modules.tickets import rules as ticket_rules
 from rain.modules.webhooks import service as webhook_service
@@ -299,23 +300,15 @@ class RefreshOutcome:
     json_note: str | None = None
 
 
-async def refresh_from_webhook(db: AsyncSession, doc: Document) -> RefreshOutcome:
-    """Call the document's configured webhook, diff the response against
-    what's currently stored, and overwrite on a real change -- the actual
-    "populate from webhook" logic, shared by the manual "Refresh from
-    webhook" button (documents.router) and a calendar entry's "refresh
-    this document on occurrence" policy (calendar.sweep), so there's
-    exactly one implementation of what a refresh means. Never raises; the
-    caller decides what to do with a failed/no-op outcome (a redirect +
-    flash for the button, a log line for the sweep)."""
-    if doc.webhook_id is None or textbody.body_kind(doc.filename) is None:
-        return RefreshOutcome(ok=False, error="document has no webhook configured")
-
-    webhook = await webhook_service.get_webhook(db, doc.webhook_id)
-    if webhook is None:
-        return RefreshOutcome(ok=False, error="configured webhook no longer exists")
-
-    result = await webhook_service.call_webhook(webhook)
+async def _apply_webhook_result(
+    db: AsyncSession, doc: Document, webhook: WebhookConfig, result: webhook_service.WebhookResult
+) -> RefreshOutcome:
+    """The diff/save/commit/alert half of a refresh, applied against a
+    single document once its WebhookResult is already known -- shared by
+    refresh_from_webhook and refresh_many_from_webhook below, both of
+    which need this same sequence run per-document against their (single,
+    shared) session, whether the WebhookResult came from a call made just
+    now or one gathered concurrently with several others."""
     if not result.success:
         if webhook.alert_on_failure:
             await webhook_service.alert_webhook_failure(
@@ -354,6 +347,77 @@ async def refresh_from_webhook(db: AsyncSession, doc: Document) -> RefreshOutcom
     doc.last_refreshed_at = datetime.now(timezone.utc)
     await db.commit()
     return RefreshOutcome(ok=True, changed=changed, json_note=json_note)
+
+
+async def refresh_from_webhook(db: AsyncSession, doc: Document) -> RefreshOutcome:
+    """Call the document's configured webhook, diff the response against
+    what's currently stored, and overwrite on a real change -- the actual
+    "populate from webhook" logic, shared by the manual "Refresh from
+    webhook" button (documents.router), a calendar entry's "refresh this
+    document on occurrence" policy (calendar.sweep), and a document's own
+    "Refresh when rendering" flag when only one document needs it (its
+    own detail page), so there's exactly one implementation of what a
+    refresh means. See refresh_many_from_webhook below for the same thing
+    batched across several documents at once. Never raises; the caller
+    decides what to do with a failed/no-op outcome (a redirect + flash
+    for the button, a log line for the sweep)."""
+    if doc.webhook_id is None or textbody.body_kind(doc.filename) is None:
+        return RefreshOutcome(ok=False, error="document has no webhook configured")
+
+    webhook = await webhook_service.get_webhook(db, doc.webhook_id)
+    if webhook is None:
+        return RefreshOutcome(ok=False, error="configured webhook no longer exists")
+
+    result = await webhook_service.call_webhook(webhook)
+    return await _apply_webhook_result(db, doc, webhook, result)
+
+
+async def refresh_many_from_webhook(db: AsyncSession, docs: list[Document]) -> dict[int, RefreshOutcome]:
+    """Same "populate from webhook" logic as refresh_from_webhook, batched
+    across several documents that all need a refresh on the same page
+    load (rain.modules.home.router.home, where more than one document can
+    be flagged "Show on landing page" + "Refresh when rendering" at once).
+
+    The slow part -- the actual webhook HTTP round-trip,
+    webhook_service.call_webhook -- runs concurrently for every eligible
+    document via asyncio.gather, since it touches nothing but network I/O
+    and the document's own (already-fetched) WebhookConfig, never the
+    database. Everything that *does* touch the database (_apply_webhook_
+    result's diff/save/commit) still runs sequentially afterward, one
+    document at a time against this same shared session -- AsyncSession
+    isn't safe for concurrent use from multiple coroutines, so that half
+    can't parallelize the same way the network calls can. On a page with
+    N slow webhooks, this turns "N x timeout" of sequential waiting into
+    roughly one timeout's worth, all in flight at once.
+
+    Returns an outcome only for documents actually eligible for a refresh
+    (a real webhook_id and an inline body) -- a doc with neither simply
+    isn't in the returned dict; the caller (Home) doesn't currently need
+    to distinguish that from "eligible but nothing changed," but keeping
+    RefreshOutcome for every doc it passed in is one dict lookup away if
+    that ever changes."""
+    eligible = [d for d in docs if d.webhook_id is not None and textbody.body_kind(d.filename) is not None]
+    if not eligible:
+        return {}
+
+    webhooks = await webhook_service.get_webhooks(db, {d.webhook_id for d in eligible})
+
+    ready: list[tuple[Document, WebhookConfig]] = []
+    outcomes: dict[int, RefreshOutcome] = {}
+    for doc in eligible:
+        webhook = webhooks.get(doc.webhook_id)
+        if webhook is None:
+            outcomes[doc.id] = RefreshOutcome(ok=False, error="configured webhook no longer exists")
+        else:
+            ready.append((doc, webhook))
+
+    results = await asyncio.gather(*(webhook_service.call_webhook(webhook) for _, webhook in ready))
+
+    # Sequential on purpose -- see the docstring above for why the
+    # database half of this can't join the concurrency above.
+    for (doc, webhook), result in zip(ready, results):
+        outcomes[doc.id] = await _apply_webhook_result(db, doc, webhook, result)
+    return outcomes
 
 
 async def update_body(db: AsyncSession, doc: Document, new_text: str) -> bool:
