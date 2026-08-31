@@ -841,12 +841,13 @@ form.inline { display: inline; }
 .sort-th:hover { text-decoration: none; color: var(--text); }
 .sort-arrow { color: var(--accent); font-size: 0.85em; }
 .muted { color: var(--text-muted); }
-/* The little "Last updated <timestamp>" line above a document's
-   rendered content (its own Contents tab, and each entry on Home) --
-   deliberately smaller than the surrounding text (a metadata aside,
-   not something competing with the content itself) and spaced off
-   from what follows it. */
-.doc-last-updated { font-size: 0.8em; margin-bottom: 8px; }
+/* The "Last updated <timestamp>" pill above a document's own Contents
+   tab -- right-aligned (a metadata aside, not something competing with
+   the editor below it) and spaced off from what follows. .doc-version-
+   pill (below) is the same pill Home's per-document freshness label
+   already uses, for the same "when was this actually last current"
+   information in the other place a document's content renders. */
+.doc-last-updated { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 /* Home's per-document freshness pill (.card-title-row, above) -- .badge's
    own uppercase/letter-spacing/bold suits a short status word ("HIGH",
    "INCIDENT"), not a sentence-shaped "Version from <timestamp>", so this

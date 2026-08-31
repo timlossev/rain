@@ -45,7 +45,7 @@
        reasonable "how current is this" at a glance. #}
     {% set last_updated = doc.last_refreshed_at or doc.updated_at or doc.created_at %}
     {% if last_updated %}
-    <div class="muted doc-last-updated">Last updated {{ last_updated.strftime("%Y-%m-%d %H:%M") }}</div>
+    <div class="doc-last-updated"><span class="badge doc-version-pill">Last updated {{ last_updated.strftime("%Y-%m-%d %H:%M") }}</span></div>
     {% endif %}
     <form method="post" action="/documents/{{ doc.id }}/body" data-md-editor>
       {% if body_kind == "markdown" %}
@@ -133,7 +133,13 @@
     {% if request.query_params.get('refreshed') == '1' %}<div class="flash flash-ok">Refreshed - content changed.</div>{% endif %}
     {% if request.query_params.get('refreshed') == '0' %}<div class="flash flash-ok">Refreshed - no change from webhook response.</div>{% endif %}
     {% if request.query_params.get('json_note') %}<div class="flash flash-ok">{{ request.query_params.get('json_note') }}</div>{% endif %}
-    <form method="post" action="/documents/{{ doc.id }}/webhook-config">
+    {# id + the button's own form="..." attribute (below, after Refresh
+       when rendering) instead of nesting the button here -- "Save
+       settings" only ever covers these four fields (Refresh when
+       rendering is its own always-saved, self-submitting checkbox), but
+       rendering the button here put it visually in the middle of this
+       tab's settings instead of after the last of them. #}
+    <form method="post" action="/documents/{{ doc.id }}/webhook-config" id="doc-webhook-config-form">
       <div class="field">
         <label for="webhook_id">Webhook</label>
         <select id="webhook_id" name="webhook_id">
@@ -154,7 +160,6 @@
         <input type="text" id="webhook_json_path" name="webhook_json_path" value="{{ doc.webhook_json_path or '' }}" placeholder="$.data.body (optional)">
         <div class="field-hint">Only applies when "Interpret response as JSON" is on. Pulls one value out of the parsed object to save as the document's content; left blank, the whole object is saved, pretty-printed.</div>
       </div>
-      <button class="btn btn-sm" type="submit">Save settings</button>
     </form>
 
     <div class="field">
@@ -170,6 +175,8 @@
         {% endif %}
       </div>
     </div>
+
+    <button class="btn btn-sm" type="submit" form="doc-webhook-config-form">Save settings</button>
 
     {% if doc.webhook_id %}
     {# A visually distinct section from the settings form above it (a

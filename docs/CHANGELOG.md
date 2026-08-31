@@ -8,6 +8,13 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-31
 
+- Document detail page: on the Auto-update tab, "Save settings" now
+  renders after "Refresh when rendering" (the last of that tab's
+  fields) instead of between it and the webhook-picker fields above --
+  same form, just submitted via a `form=` attribute so it can render
+  where it visually belongs. The Contents tab's "Last updated" label
+  is now a right-aligned pill, matching the one already on Home.
+
 - **Performance**: Home's "Refresh when rendering" now calls every
   flagged document's webhook concurrently instead of one at a time --
   with several slow webhooks flagged, a page load used to wait out
