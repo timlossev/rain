@@ -33,6 +33,17 @@ drawn from. Updated alongside every push to `main`.
   metadata) now has a light accent-tinted background, distinguishing
   it from the plain Approval/Links/Activity cards below it. The title
   line also truncates later (~30 more characters) before ellipsis-ing.
+- **Kanban board**: a new "Kanban" entry under Records Authority
+  (`/tickets/kanban`) shows the same tickets and filters as the ticket
+  list, grouped into one draggable column per status instead of table
+  rows. Drag a card to a different column to move it there -- the same
+  change the ticket's own status-stepper buttons make, reverted back
+  to its original column if the move doesn't go through. Each card
+  carries the same three-dot row menu as the table view. Capped at the
+  first 500 matching tickets (with a banner if that's hit); the
+  filter bar itself moved into a shared partial (`tickets/
+  _filter_bar.html`) so the table and board views can't drift apart on
+  what filters mean.
 
 ## 2026-08-30
 

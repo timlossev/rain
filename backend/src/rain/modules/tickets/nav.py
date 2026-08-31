@@ -69,6 +69,14 @@ nav_registry.register(
                 order=4,
                 count_provider=partial(_active_ticket_count, ticket_type="change"),
             ),
+            # Same tickets, same filters, as the table view above -- just
+            # grouped into draggable status columns instead of rows (see
+            # rain.modules.tickets.router.kanban_board). No count_provider:
+            # unlike Incidents/Vulnerabilities/Changes this isn't a subset
+            # of tickets, it's a whole different way of looking at all of
+            # them, so a badge count here would just repeat -- or fight
+            # with -- whichever of those three is currently active.
+            NavNode(key="tickets-kanban", label="Kanban", href="/tickets/kanban", order=5),
             # rain.modules.catalog: a self-service form that produces a
             # ticket on submission -- lives under Records Authority rather
             # than standing alone, same reason Export does, since it's
@@ -77,12 +85,12 @@ nav_registry.register(
                 key="tickets-catalog",
                 label="Service Catalog",
                 href="/catalog",
-                order=5,
+                order=6,
                 count_provider=_active_catalog_item_count,
             ),
-            NavNode(key="tickets-fields", label="Custom Fields", href="/tickets/fields", order=6),
-            NavNode(key="tickets-export", label="Export", href="/tickets/export/run", order=7),
-            NavNode(key="tickets-import", label="Import", href="/tickets/import", order=8),
+            NavNode(key="tickets-fields", label="Custom Fields", href="/tickets/fields", order=7),
+            NavNode(key="tickets-export", label="Export", href="/tickets/export/run", order=8),
+            NavNode(key="tickets-import", label="Import", href="/tickets/import", order=9),
         ],
     )
 )

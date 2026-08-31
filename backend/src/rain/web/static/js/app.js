@@ -925,4 +925,120 @@ document.addEventListener("DOMContentLoaded", () => {
       if (evt.target.matches("[data-bulk-select-row]")) update();
     });
   });
+
+  // Kanban board (/tickets/kanban): HTML5 drag-and-drop between status
+  // columns. Cards are draggable="true" (tickets/kanban.html); each
+  // column body is a dropzone. A successful drop calls the same
+  // service.update_status the ticket detail page's own status-stepper
+  // buttons call, just via a small JSON endpoint (rain.modules.tickets.
+  // router.kanban_update_status) instead of a full-page redirect -- the
+  // card moves in the DOM right away (optimistic), and only reverts back
+  // to its original column if that call comes back not-ok or fails
+  // outright (a stale status key, two people dragging the same card at
+  // once, a dropped connection), so the board never shows a move the
+  // server never actually recorded.
+  const kanbanBoard = document.querySelector("[data-kanban-board]");
+  if (kanbanBoard) {
+    let dragged = null; // the card element currently being dragged
+    let dragOrigin = null; // its dropzone at dragstart, for a revert
+
+    const updateColumnCount = (dropzone) => {
+      const countEl = dropzone.closest("[data-kanban-column]")?.querySelector("[data-kanban-count]");
+      if (countEl) countEl.textContent = dropzone.querySelectorAll("[data-kanban-card]").length;
+    };
+    // A column's own "No tickets." placeholder (kanban.html's {% else %}
+    // on an empty column) has to be maintained by hand here -- there's no
+    // template re-render on a client-side move, just a DOM node relocated
+    // from one dropzone to another.
+    const updateEmptyState = (dropzone) => {
+      const hasCards = dropzone.querySelector("[data-kanban-card]") !== null;
+      const placeholder = dropzone.querySelector("[data-kanban-empty]");
+      if (!hasCards && !placeholder) {
+        const el = document.createElement("div");
+        el.className = "kanban-empty muted";
+        el.setAttribute("data-kanban-empty", "");
+        el.textContent = "No tickets.";
+        dropzone.appendChild(el);
+      } else if (hasCards && placeholder) {
+        placeholder.remove();
+      }
+    };
+    const flashBoardError = (message) => {
+      const flash = document.createElement("div");
+      flash.className = "flash flash-error";
+      flash.textContent = message;
+      kanbanBoard.parentNode.insertBefore(flash, kanbanBoard);
+      setTimeout(() => flash.remove(), 4000);
+    };
+    const revert = (card, origin, dropzone) => {
+      origin.appendChild(card);
+      updateColumnCount(origin);
+      updateColumnCount(dropzone);
+      updateEmptyState(origin);
+      updateEmptyState(dropzone);
+    };
+
+    kanbanBoard.querySelectorAll("[data-kanban-card]").forEach((card) => {
+      card.addEventListener("dragstart", (evt) => {
+        dragged = card;
+        dragOrigin = card.closest("[data-kanban-dropzone]");
+        card.classList.add("kanban-dragging");
+        evt.dataTransfer.effectAllowed = "move";
+        // Not actually read back on drop (dragged/dragOrigin above cover
+        // that) -- some browsers refuse to start a drag at all unless
+        // dragstart sets *some* data, so this is just satisfying that.
+        evt.dataTransfer.setData("text/plain", card.dataset.ticketId || "");
+      });
+      card.addEventListener("dragend", () => {
+        card.classList.remove("kanban-dragging");
+        dragged = null;
+        dragOrigin = null;
+      });
+    });
+
+    kanbanBoard.querySelectorAll("[data-kanban-dropzone]").forEach((dropzone) => {
+      dropzone.addEventListener("dragover", (evt) => {
+        evt.preventDefault(); // required, or "drop" never fires
+        evt.dataTransfer.dropEffect = "move";
+        dropzone.classList.add("kanban-drag-over");
+      });
+      dropzone.addEventListener("dragleave", (evt) => {
+        // dragleave also fires when the pointer moves from the dropzone
+        // onto one of its own child cards -- only clear the highlight
+        // once it's genuinely left the dropzone's bounds.
+        if (!dropzone.contains(evt.relatedTarget)) dropzone.classList.remove("kanban-drag-over");
+      });
+      dropzone.addEventListener("drop", async (evt) => {
+        evt.preventDefault();
+        dropzone.classList.remove("kanban-drag-over");
+        if (!dragged) return;
+        const card = dragged;
+        const origin = dragOrigin;
+        const newStatus = dropzone.dataset.statusKey;
+        if (origin === dropzone) return; // dropped back into its own column
+
+        dropzone.appendChild(card); // optimistic move -- same node, listeners intact
+        updateColumnCount(origin);
+        updateColumnCount(dropzone);
+        updateEmptyState(origin);
+        updateEmptyState(dropzone);
+
+        try {
+          const resp = await fetch(`/tickets/${card.dataset.ticketId}/kanban-status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `new_status=${encodeURIComponent(newStatus)}`,
+          });
+          const data = resp.ok ? await resp.json() : null;
+          if (!data || !data.ok) {
+            revert(card, origin, dropzone);
+            flashBoardError((data && data.error) || "Couldn't move that ticket -- try again.");
+          }
+        } catch (err) {
+          revert(card, origin, dropzone);
+          flashBoardError("Couldn't move that ticket -- try again.");
+        }
+      });
+    });
+  }
 });

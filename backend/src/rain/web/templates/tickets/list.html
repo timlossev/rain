@@ -1,95 +1,21 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg with context %}
-{% import "_search_picker.html" as picker %}
+{% import "tickets/_filter_bar.html" as filters with context %}
 {% block title %}Tickets - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Browse and filter tickets (incidents, vulnerabilities, and changes) by type, status, or affected asset. Defaults to active tickets (everything not closed) - pick "All statuses" or "Closed" to see closed ones. Click a column header to sort by it. Check rows to mass-close several at once. Click a ticket to view its full detail and activity.{% endblock %}
+{% block help_text %}Browse and filter tickets (incidents, vulnerabilities, and changes) by type, status, or affected asset. Defaults to active tickets (everything not closed) - pick "All statuses" or "Closed" to see closed ones. Click a column header to sort by it. Check rows to mass-close several at once. Click a ticket to view its full detail and activity. A "Kanban" view of the same tickets and filters, grouped into draggable status columns, is also under Records Authority.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 
-{# Builds a /tickets query string, keeping every filter/sort dimension at
-   its current value except the one(s) passed in -- None means "keep
-   current", "" means "explicitly clear". Used by every link in this page
-   so clicking one filter/sort control never silently drops another.
-   status is handled separately from the rest: `is not none` (not a bare
-   truthiness check) so an explicit "" (the "All statuses" pick) survives
-   being carried through a link that isn't itself about status -- a plain
-   falsy check couldn't tell that apart from "no filter set at all", which
-   would silently revert every other link back to the "active" default. #}
-{% macro qs(type=none, status=none, asset_id=none, assigned=none, problematic=none, sort=none, dir=none) %}
-{%- set parts = [] -%}
-{%- set t = type if type is not none else selected_type -%}
-{%- set s = status if status is not none else selected_status -%}
-{%- set aid = asset_id if asset_id is not none else selected_asset_id -%}
-{%- set a = assigned if assigned is not none else selected_assigned -%}
-{%- set c = problematic if problematic is not none else ("1" if selected_problematic else "") -%}
-{%- set so = sort if sort is not none else selected_sort -%}
-{%- set d = dir if dir is not none else selected_dir -%}
-{%- if t %}{% set _ = parts.append("ticket_type=" ~ t) %}{% endif -%}
-{%- if s is not none %}{% set _ = parts.append("ticket_status=" ~ s) %}{% endif -%}
-{%- if aid %}{% set _ = parts.append("asset_id=" ~ aid) %}{% endif -%}
-{%- if a %}{% set _ = parts.append("assigned=" ~ a) %}{% endif -%}
-{%- if c %}{% set _ = parts.append("problematic=" ~ c) %}{% endif -%}
-{%- if so and so != "created_at" %}{% set _ = parts.append("sort=" ~ so) %}{% endif -%}
-{%- if d and d != "desc" %}{% set _ = parts.append("dir=" ~ d) %}{% endif -%}
-{{- parts | join("&") -}}
-{% endmacro %}
-
 {% macro sort_link(key, label) %}
 {%- set next_dir = "asc" if selected_sort == key and selected_dir == "desc" else "desc" -%}
-<a class="sort-th" href="/tickets?{{ qs(sort=key, dir=next_dir) }}">{{ label }}{% if selected_sort == key %}<span class="sort-arrow" aria-hidden="true">{{ "&uarr;" | safe if selected_dir == "asc" else "&darr;" | safe }}</span>{% endif %}</a>
+<a class="sort-th" href="/tickets?{{ filters.qs("/tickets", sort=key, dir=next_dir) }}">{{ label }}{% if selected_sort == key %}<span class="sort-arrow" aria-hidden="true">{{ "&uarr;" | safe if selected_dir == "asc" else "&darr;" | safe }}</span>{% endif %}</a>
 {% endmacro %}
 
-<div class="panel-row" style="margin-bottom: 0;">
-  <div class="filter-bar">
-    <a class="btn btn-primary" href="/tickets/new{{ '?ticket_type=' ~ selected_type if selected_type else '' }}" style="flex-shrink:0;">+ New ticket</a>
-
-    <div class="filter-bar-types">
-      <a class="type-pill {% if not selected_type %}active{% endif %}" href="/tickets?{{ qs(type='') }}">All</a>
-      <a class="type-pill type-pill-incident {% if selected_type == 'incident' %}active{% endif %}" href="/tickets?{{ qs(type='incident') }}">Incidents</a>
-      <a class="type-pill type-pill-vulnerability {% if selected_type == 'vulnerability' %}active{% endif %}" href="/tickets?{{ qs(type='vulnerability') }}">Vulnerabilities</a>
-      <a class="type-pill type-pill-change {% if selected_type == 'change' %}active{% endif %}" href="/tickets?{{ qs(type='change') }}">Changes</a>
-    </div>
-
-    <form method="get" action="/tickets" class="field" style="margin-bottom:0;">
-      <input type="hidden" name="ticket_type" value="{{ selected_type }}">
-      {% if selected_asset_id %}<input type="hidden" name="asset_id" value="{{ selected_asset_id }}">{% endif %}
-      {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
-      {% if selected_problematic %}<input type="hidden" name="problematic" value="1">{% endif %}
-      {% if selected_sort and selected_sort != "created_at" %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
-      {% if selected_dir != "desc" %}<input type="hidden" name="dir" value="{{ selected_dir }}">{% endif %}
-      <select id="ticket_status" name="ticket_status" onchange="this.form.submit()" aria-label="Status" title="Filter by status">
-        <option value="active" {% if selected_status is none or selected_status == "active" %}selected{% endif %}>All active</option>
-        <option value="" {% if selected_status == "" %}selected{% endif %}>All statuses</option>
-        {% for s in statuses %}
-        <option value="{{ s.key }}" {% if selected_status == s.key %}selected{% endif %}>{{ s.label }}</option>
-        {% endfor %}
-      </select>
-    </form>
-
-    <form method="get" action="/tickets" style="margin-bottom:0;">
-      <input type="hidden" name="ticket_type" value="{{ selected_type }}">
-      {% if selected_status is not none %}<input type="hidden" name="ticket_status" value="{{ selected_status }}">{% endif %}
-      {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
-      {% if selected_problematic %}<input type="hidden" name="problematic" value="1">{% endif %}
-      {% if selected_sort and selected_sort != "created_at" %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
-      {% if selected_dir != "desc" %}<input type="hidden" name="dir" value="{{ selected_dir }}">{% endif %}
-      {{ picker.search_picker("asset_id", "/tickets/assets/search", initial_value=selected_asset_id, initial_label=selected_asset_name, placeholder="Filter by asset...", auto_submit=True) }}
-    </form>
-    {% if selected_asset_id %}<a class="btn btn-sm" href="/tickets?{{ qs(asset_id='') }}">Clear asset</a>{% endif %}
-
-    <div class="filter-bar-divider"></div>
-
-    <div class="filter-bar-chips">
-      <a class="btn btn-sm {% if selected_assigned == 'me' %}active{% endif %}" href="/tickets?{{ qs(assigned='' if selected_assigned == 'me' else 'me') }}">Mine</a>
-      <a class="btn btn-sm {% if selected_assigned == 'unassigned' %}active{% endif %}" href="/tickets?{{ qs(assigned='' if selected_assigned == 'unassigned' else 'unassigned') }}">Unassigned</a>
-      <a class="btn btn-sm {% if selected_problematic %}active{% endif %}" href="/tickets?{{ qs(problematic='' if selected_problematic else '1') }}">Problematic</a>
-    </div>
-  </div>
-</div>
+{{ filters.render_filter_bar("/tickets", statuses) }}
 
 <form id="tickets-bulk-close-form" method="post" action="/tickets/bulk-close" data-confirm="">
   <input type="hidden" name="ticket_ids" data-bulk-select-ids>
-  <input type="hidden" name="next" value="/tickets?{{ qs() }}">
+  <input type="hidden" name="next" value="/tickets?{{ filters.qs('/tickets') }}">
 </form>
 
 <div class="card">
@@ -145,11 +71,11 @@
             </button>
             <div class="dropdown-menu-panel row-menu-panel" data-menu-panel hidden>
               <form method="post" action="/tickets/{{ t.id }}/mark-closed">
-                <input type="hidden" name="next" value="/tickets?{{ qs() }}">
+                <input type="hidden" name="next" value="/tickets?{{ filters.qs('/tickets') }}">
                 <button type="submit" class="row-menu-item">Mark closed</button>
               </form>
               <form method="post" action="/tickets/{{ t.id }}/problematic/toggle">
-                <input type="hidden" name="next" value="/tickets?{{ qs() }}">
+                <input type="hidden" name="next" value="/tickets?{{ filters.qs('/tickets') }}">
                 <input type="hidden" name="is_problematic" value="{{ '0' if t.is_problematic else '1' }}">
                 <button type="submit" class="row-menu-item">{{ "Unmark problematic" if t.is_problematic else "Mark problematic" }}</button>
               </form>
@@ -161,7 +87,7 @@
                  so whatever's reachable from one ticket's own page is
                  also reachable without leaving the list. #}
               <form method="post" action="/tickets/{{ t.id }}/watch/toggle">
-                <input type="hidden" name="next" value="/tickets?{{ qs() }}">
+                <input type="hidden" name="next" value="/tickets?{{ filters.qs('/tickets') }}">
                 <input type="hidden" name="watching" value="{{ '0' if t.id in watching_ids else '1' }}">
                 <button type="submit" class="row-menu-item">{{ "Stop watching" if t.id in watching_ids else "Watch" }}</button>
               </form>
@@ -170,14 +96,14 @@
               {% endif %}
               {% if can_escalate %}
               <form method="post" action="/tickets/{{ t.id }}/escalate" data-confirm="Escalate {{ t.ticket_number }}?">
-                <input type="hidden" name="next" value="/tickets?{{ qs() }}">
+                <input type="hidden" name="next" value="/tickets?{{ filters.qs('/tickets') }}">
                 <button type="submit" class="row-menu-item danger">Escalate</button>
               </form>
               {% endif %}
               <button type="button" class="row-menu-item" data-analyze-root-cause="{{ t.id }}">Analyze root cause</button>
               {% if t.ticket_type == "change" %}
               <form method="post" action="/tickets/{{ t.id }}/mark-cancelled">
-                <input type="hidden" name="next" value="/tickets?{{ qs() }}">
+                <input type="hidden" name="next" value="/tickets?{{ filters.qs('/tickets') }}">
                 <button type="submit" class="row-menu-item danger">Mark cancelled</button>
               </form>
               {% endif %}
@@ -188,7 +114,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="9" class="muted">{% if selected_status == "active" or selected_status is none %}No active tickets. <a href="/tickets?{{ qs(status='') }}">Show all statuses</a>, or <a href="/tickets/new">create one</a>.{% else %}No tickets yet. <a href="/tickets/new">Create one</a> or watch <a href="/tickets/live">Events</a>.{% endif %}</td></tr>
+      <tr><td colspan="9" class="muted">{% if selected_status == "active" or selected_status is none %}No active tickets. <a href="/tickets?{{ filters.qs('/tickets', status='') }}">Show all statuses</a>, or <a href="/tickets/new">create one</a>.{% else %}No tickets yet. <a href="/tickets/new">Create one</a> or watch <a href="/tickets/live">Events</a>.{% endif %}</td></tr>
       {% endfor %}
     </tbody>
   </table>

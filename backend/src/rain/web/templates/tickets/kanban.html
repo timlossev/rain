@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% import "tickets/_filter_bar.html" as filters with context %}
+{% block title %}Kanban - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}The same tickets and filters as the table view, grouped into columns by status instead of rows. Drag a card to a different column to change its status - the same move "Mark closed" or the ticket's own status buttons make. Each card's "..." menu matches the table view's row menu, which matches the ticket detail page's own top-right buttons.{% endblock %}
+{% block content_class %}content-full{% endblock %}
+{% block content %}
+
+{# Same card markup and row-menu items as tickets/list.html's table rows
+   (deliberately 1:1, including the fallback "next" redirect target so a
+   menu action lands back on this board with its current filters, not the
+   table view) -- draggable="true" plus data-ticket-id/data-kanban-card
+   is the only addition, picked up by app.js's Kanban drag-and-drop block. #}
+{% macro kanban_card(t) %}
+<div class="kanban-card" draggable="true" data-kanban-card data-ticket-id="{{ t.id }}">
+  <div class="kanban-card-top">
+    <div class="kanban-card-badges">
+      {% if t.is_problematic %}<span class="problematic-icon" title="Problematic: recurring issue">{{ nav_icon("repeat") }}</span>{% endif %}
+      {% if t.ticket_type == "change" %}
+        {% if t.approval and t.approval.overall_status == "approved" %}
+        <span class="approval-icon approval-icon-approved" title="Approved">{{ nav_icon("check-circle") }}</span>
+        {% else %}
+        <span class="approval-icon approval-icon-unapproved" title="{{ 'Rejected' if t.approval and t.approval.overall_status == 'rejected' else 'Not yet approved' }}">{{ nav_icon("x-circle") }}</span>
+        {% endif %}
+      {% endif %}
+      <span class="badge severity-{{ t.severity }}">{{ t.severity }}</span>
+    </div>
+    <div class="dropdown-menu" data-menu>
+      <button type="button" class="dropdown-menu-btn row-menu-btn" data-menu-toggle aria-haspopup="true" aria-expanded="false" title="Actions">
+        <span class="nav-icon">{{ nav_icon("dots-vertical") }}</span>
+      </button>
+      <div class="dropdown-menu-panel row-menu-panel" data-menu-panel hidden>
+        <form method="post" action="/tickets/{{ t.id }}/mark-closed">
+          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}">
+          <button type="submit" class="row-menu-item">Mark closed</button>
+        </form>
+        <form method="post" action="/tickets/{{ t.id }}/problematic/toggle">
+          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}">
+          <input type="hidden" name="is_problematic" value="{{ '0' if t.is_problematic else '1' }}">
+          <button type="submit" class="row-menu-item">{{ "Unmark problematic" if t.is_problematic else "Mark problematic" }}</button>
+        </form>
+        <form method="post" action="/tickets/{{ t.id }}/watch/toggle">
+          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}">
+          <input type="hidden" name="watching" value="{{ '0' if t.id in watching_ids else '1' }}">
+          <button type="submit" class="row-menu-item">{{ "Stop watching" if t.id in watching_ids else "Watch" }}</button>
+        </form>
+        {% if t.ticket_type in ("incident", "vulnerability") %}
+        <a class="row-menu-item" href="/tickets/new?ticket_type=change&amp;source_ticket_id={{ t.id }}">Promote to Change</a>
+        {% endif %}
+        {% if can_escalate %}
+        <form method="post" action="/tickets/{{ t.id }}/escalate" data-confirm="Escalate {{ t.ticket_number }}?">
+          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}">
+          <button type="submit" class="row-menu-item danger">Escalate</button>
+        </form>
+        {% endif %}
+        <button type="button" class="row-menu-item" data-analyze-root-cause="{{ t.id }}">Analyze root cause</button>
+        {% if t.ticket_type == "change" %}
+        <form method="post" action="/tickets/{{ t.id }}/mark-cancelled">
+          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}">
+          <button type="submit" class="row-menu-item danger">Mark cancelled</button>
+        </form>
+        {% endif %}
+        <div class="dropdown-menu-divider"></div>
+        <a class="row-menu-item" href="/tickets/{{ t.id }}/pdf">Get a hard copy (PDF)</a>
+      </div>
+    </div>
+  </div>
+  <a class="kanban-card-title" href="/tickets/{{ t.ticket_number }}">{{ t.ticket_number }}: {{ t.title }}</a>
+  <div class="kanban-card-meta muted">
+    {{ user_names.get(t.assignee_user_id, "Unassigned") }}
+    {% if t.asset %} &middot; {{ t.asset.name }}{% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+{{ filters.render_filter_bar("/tickets/kanban", statuses, include_sort=false) }}
+
+{% set shown_count = columns.values() | map("length") | sum %}
+{% if truncated %}
+<div class="flash flash-error">Showing the first {{ shown_count }} matching tickets - narrow your filters (or use the table view) to see the rest.</div>
+{% endif %}
+
+<div class="kanban-board" data-kanban-board>
+  {% for s in statuses %}
+  <div class="kanban-column" data-kanban-column>
+    <div class="kanban-column-header" style="--column-color: {{ s.color }};">
+      <span class="kanban-column-dot" aria-hidden="true"></span>
+      <span class="kanban-column-title">{{ s.label }}</span>
+      <span class="kanban-column-count" data-kanban-count>{{ columns.get(s.key, []) | length }}</span>
+    </div>
+    <div class="kanban-column-body" data-kanban-dropzone data-status-key="{{ s.key }}">
+      {% for t in columns.get(s.key, []) %}
+      {{ kanban_card(t) }}
+      {% else %}
+      <div class="kanban-empty muted" data-kanban-empty>No tickets.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% for key in extra_status_keys %}
+  {# A status key still on some ticket(s) but no longer configured under
+     Admin > Ticket Statuses -- see kanban_board's own docstring. Shown so
+     nothing silently vanishes from the board, styled the same as every
+     other column just without a real TicketStatus.color to draw from. #}
+  <div class="kanban-column" data-kanban-column>
+    <div class="kanban-column-header" style="--column-color: #6b7280;">
+      <span class="kanban-column-dot" aria-hidden="true"></span>
+      <span class="kanban-column-title">{{ key }} <span class="muted" style="font-weight:400;">(removed status)</span></span>
+      <span class="kanban-column-count" data-kanban-count>{{ columns.get(key, []) | length }}</span>
+    </div>
+    <div class="kanban-column-body" data-kanban-dropzone data-status-key="{{ key }}">
+      {% for t in columns.get(key, []) %}
+      {{ kanban_card(t) }}
+      {% else %}
+      <div class="kanban-empty muted" data-kanban-empty>No tickets.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

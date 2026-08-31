@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -157,6 +157,114 @@ async def list_tickets(
             "watching_ids": watching_ids,
         },
     )
+
+
+# Hard cap on how many tickets a Kanban board renders at once. Unlike the
+# table view, this has no pagination -- the whole point of a board is
+# seeing everything matching the current filters in one place, not
+# paging through it column by column. 500 is generous for what a board
+# can usefully show anyway (a column holding hundreds of cards stops
+# being a board); truncated=True tells the template to say so rather
+# than silently showing a partial picture.
+_KANBAN_TICKET_CAP = 500
+
+
+@router.get("/kanban", response_class=HTMLResponse)
+async def kanban_board(
+    request: Request,
+    ticket_type: str | None = None,
+    ticket_status: str | None = None,
+    asset_id: int | None = None,
+    assigned: str | None = None,  # "me" | "unassigned" | None
+    problematic: str | None = None,  # "1" | None
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Same filters, same service.ticket_list_stmt, as list_tickets above
+    -- just grouped into per-status columns instead of table rows, so the
+    two views can never disagree about which tickets match a given
+    filter set. No sort control here (column position already conveys
+    status; each column is created_at desc, ticket_list_stmt's own
+    default) and no pagination -- see _KANBAN_TICKET_CAP."""
+    nav = await build_nav_context(ctx)
+    effective_status = "active" if ticket_status is None else ticket_status
+    stmt = service.ticket_list_stmt(
+        ticket_type=ticket_type,
+        status=effective_status,
+        asset_id=asset_id,
+        assigned_to=ctx.user.id if assigned == "me" else None,
+        unassigned=assigned == "unassigned",
+        problematic_only=bool(problematic),
+    ).limit(_KANBAN_TICKET_CAP + 1)
+    result = await tenant_db.execute(stmt)
+    tickets = list(result.scalars())
+    truncated = len(tickets) > _KANBAN_TICKET_CAP
+    tickets = tickets[:_KANBAN_TICKET_CAP]
+
+    statuses = await service.list_statuses(tenant_db)
+    columns: dict[str, list[Ticket]] = {s.key: [] for s in statuses}
+    # A ticket can sit on a status key the tenant has since deleted (see
+    # TicketStatus's own docstring on why Ticket.status is a plain string,
+    # not a real FK) -- still shown, in its own extra column, rather than
+    # silently dropped off the board.
+    for t in tickets:
+        columns.setdefault(t.status, []).append(t)
+    known_keys = {s.key for s in statuses}
+    extra_status_keys = sorted(k for k in columns if k not in known_keys)
+
+    selected_asset = await asset_service.get_asset(tenant_db, asset_id) if asset_id else None
+    escalation_webhook_id = await get_tenant_config(tenant_db, "escalation_webhook_id", None)
+    user_names = await resolve_user_names({t.assignee_user_id for t in tickets})
+    watching_ids = await service.watching_ticket_ids(tenant_db, {t.id for t in tickets}, ctx.user.id)
+
+    return templates.TemplateResponse(
+        request,
+        "tickets/kanban.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "ticket_types": TICKET_TYPES,
+            "statuses": statuses,
+            "extra_status_keys": extra_status_keys,
+            "columns": columns,
+            "truncated": truncated,
+            "selected_type": ticket_type,
+            "selected_status": ticket_status,
+            "selected_asset_id": asset_id,
+            "selected_asset_name": selected_asset.name if selected_asset else "",
+            "selected_assigned": assigned,
+            "selected_problematic": bool(problematic),
+            "user_names": user_names,
+            "can_escalate": escalation_webhook_id is not None,
+            "watching_ids": watching_ids,
+        },
+    )
+
+
+@router.post("/{ticket_id:int}/kanban-status")
+async def kanban_update_status(
+    ticket_id: int,
+    new_status: str = Form(...),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """The Kanban board's drag-and-drop move: same service.update_status
+    call the status-stepper's /status route makes (below), but returns
+    JSON instead of redirecting -- the board moves the card in the DOM
+    itself rather than reloading the whole page after every drag. No
+    approval-reset confirm to replicate here: unlike the severity/title/
+    assignee/asset edit forms (tickets/detail.html's approval_will_reset),
+    a plain status change never nullifies a change's collected approvals,
+    on this route or /status -- see service.update_status."""
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is None:
+        return JSONResponse({"ok": False, "error": "Ticket not found."}, status_code=404)
+    ok = await service.update_status(tenant_db, ticket, new_status, changed_by_user_id=ctx.user.id)
+    if not ok:
+        return JSONResponse({"ok": False, "error": "Not a valid status."}, status_code=400)
+    return {"ok": True, "status": ticket.status}
 
 
 @router.get("/new", response_class=HTMLResponse)

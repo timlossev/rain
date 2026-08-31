@@ -472,6 +472,55 @@ than silently created without one).
 **Document linking** (the ticketing spec's "link to a document repository
 as a knowledge base") is live -- see Document Repository below.
 
+**Kanban board.** `GET /tickets/kanban` (`router.kanban_board`) is a second
+view over the exact same tickets `GET /tickets` shows -- same
+`service.ticket_list_stmt`, same filter parameters (`ticket_type`,
+`ticket_status`, `asset_id`, `assigned`, `problematic`), just grouped by
+`Ticket.status` into columns instead of paginated into table rows. The
+filter bar itself (type pills, status dropdown, asset picker, quick-filter
+chips, and the `qs()` query-string builder both views' links use) was
+pulled out of `tickets/list.html` into `tickets/_filter_bar.html` -- a
+Jinja macro file imported `with context` by both templates -- specifically
+so the two views' filters can't drift apart from each other; `qs()` takes
+a `base` URL (`/tickets` vs `/tickets/kanban`) and an `include_sort` flag
+(Kanban has no column-header sort, list.html does) as its only two
+divergence points. No pagination: a board's point is seeing everything
+that matches at once, not paging through it, so the query is capped
+in-process at `_KANBAN_TICKET_CAP` (500) instead, with a banner telling
+the tenant to narrow their filters (or use the table view, which still
+paginates) if that cap was hit. Each card carries the identical row-menu
+markup `tickets/list.html`'s own rows do (same actions, same conditions --
+literally copy-pasted into a `kanban_card()` macro at the top of
+`kanban.html`, since the two live in different templates and there's no
+per-row Jinja include cheap enough to be worth it over a in-file macro
+here); a ticket sitting on a status key no tenant-configured `TicketStatus`
+row has any more (deleted out from under it) still gets a column, appended
+after the configured ones and labeled "(removed status)", rather than
+silently vanishing from the board.
+
+Dragging a card is HTML5 drag-and-drop (`app.js`, no library) against a
+small dedicated endpoint, `POST /tickets/{id}/kanban-status` -- everywhere
+else a status change happens (the ticket detail page's status-stepper
+buttons) is a traditional form POST + 303 redirect, which is the wrong
+shape for a drag gesture that shouldn't reload the whole page on every
+drop. This route calls the exact same `service.update_status()` the
+stepper's own `/tickets/{id}/status` does, just returns `{"ok": bool,
+"status"/"error": ...}` as JSON instead of redirecting. The drop handler
+moves the card's actual DOM node into the new column immediately
+(optimistic -- and a real node move, not a re-render, so the moved card's
+own row-menu listeners are still attached afterward), then reverts it back
+to its original column and shows a dismissing `.flash-error` if the
+request comes back not-`ok` or fails outright. No approval-reset confirm
+to replicate from the detail page's severity/title/assignee/asset edit
+forms: a plain status change has never nullified a change ticket's
+collected approvals on any of these routes, only editing those other
+fields does, so a card move needs no `confirm()` before it fires. Columns
+intentionally don't get their own vertical scroll container (the whole
+page scrolls instead, same as every other view) -- `overflow-y` on a
+column would clip a card's `.dropdown-menu-panel` (absolutely positioned,
+CSS computes `overflow-x` right along with an explicit `overflow-y`) the
+moment it tried to pop out past that column's own bottom edge.
+
 ### A routing bug worth knowing about
 
 While wiring `/tickets/live` in next to `/tickets/{ticket_id}`, a

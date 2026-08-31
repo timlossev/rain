@@ -75,6 +75,7 @@ Ticketing below.
 
 - Landing page shows a welcome message, or a flagged document
 - Incident, vulnerability, and change tickets, one shared record shape
+- Drag-and-drop Kanban board, same tickets and filters as the list
 - Built-in syslog listener, auto-parses plain text, CEF, JSON, key=value
 - Event Promotion Policies turn matching syslog events into tickets
 - Optional ML anomaly detection, no manual tuning required
@@ -157,6 +158,11 @@ Tickets, and everything about working one.
 - Quick-action row menu and filter chips on the list -- correlates 1:1
   with the ticket detail page's own top-right button row, so nothing
   there needs a full page visit to reach
+- **Kanban board**: the same tickets and filters as the list, laid out
+  as one draggable column per status instead of table rows -- drag a
+  card to a different column to move it there, same as the status
+  stepper on its own page would; each card carries the same row menu
+  as the list
 - Branded PDF export of any ticket, including its full activity history
 - **Service Catalog**: requestable, tenant-defined forms (defined under
   Admin, reachable here or from the client portal) produce a ticket on
