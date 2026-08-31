@@ -725,6 +725,13 @@ form.inline { display: inline; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
 .card + .card { margin-top: 16px; }
 .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; }
+/* A ticket detail page's own card (badges/title/description/metadata) --
+   a light accent tint so it reads as the primary "this is the ticket"
+   card at a glance, distinct from the plain-surface Approval/Links/
+   Activity cards below it on the same page. Mixed against --surface
+   itself, not a flat white, so it stays correct in dark mode too --
+   same technique .calendar-day.today already uses for its own tint. */
+.ticket-body-card { background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
 
 /* A handful of logically-separate cards (e.g. Admin > Branding's
    "Instance branding" and "Public incident portal") that used to stack
@@ -1253,7 +1260,11 @@ td.actions { text-align: right; white-space: nowrap; }
 .ticket-severity-form { display: inline-flex; align-items: center; gap: 6px; }
 .ticket-severity-select { width: auto; }
 
-.ticket-title-edit { display: flex; min-width: 0; flex: 1 1 260px; max-width: 480px; margin-left: auto; justify-content: flex-end; }
+/* max-width bounds .ticket-title-text's ellipsis truncation below --
+   720px is roughly 480px (the old width) plus ~30 more characters at
+   this bold text's average glyph width (~8px), not an exact character
+   count (that's not something CSS width can guarantee across fonts). */
+.ticket-title-edit { display: flex; min-width: 0; flex: 1 1 260px; max-width: 720px; margin-left: auto; justify-content: flex-end; }
 .ticket-title-display { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ticket-title-text { min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ticket-title-form { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; }

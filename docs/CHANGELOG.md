@@ -29,6 +29,10 @@ drawn from. Updated alongside every push to `main`.
   had one, otherwise when it was last saved.
 - A ticket's clamped description preview ("Show more") now shows 20
   lines before truncating, up from 15.
+- Ticket detail page: the main card (badges, title, description,
+  metadata) now has a light accent-tinted background, distinguishing
+  it from the plain Approval/Links/Activity cards below it. The title
+  line also truncates later (~30 more characters) before ellipsis-ing.
 
 ## 2026-08-30
 
