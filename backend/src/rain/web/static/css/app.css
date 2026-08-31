@@ -430,6 +430,19 @@ p { margin: 0 0 1em; }
 }
 .nav-link:hover .nav-icon, .nav-toggle:hover .nav-icon { color: #fff; }
 .nav-toggle {
+  /* `all: unset` resets a <button>'s UA-stylesheet appearance (border,
+     background, the platform's own control font -- buttons don't
+     inherit the page's font the way an <a> does, absent this reset),
+     but it also wipes the font-size .nav-link, .nav-toggle set together
+     above -- an inherited property, so `unset` falls back to whatever
+     this button's own ancestor chain resolves to instead of the 0.92rem
+     both were actually supposed to share. Confirmed live: Home (the
+     app's only depth-0 .nav-link, every sibling category being a
+     .nav-toggle) rendered visibly smaller/larger than its siblings
+     until this was re-declared here, the same way display/gap/width/
+     padding/border-radius already are below -- all wiped by the same
+     `all: unset` and all already being re-specified for exactly this
+     reason. */
   all: unset;
   display: flex;
   align-items: center;
@@ -439,6 +452,7 @@ p { margin: 0 0 1em; }
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   box-sizing: border-box;
+  font-size: 0.92rem;
 }
 .nav-caret {
   display: inline-flex;

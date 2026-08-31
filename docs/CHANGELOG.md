@@ -8,6 +8,17 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-31
 
+- **Fixed**: the "Home" sidebar entry rendered at a visibly different
+  font size than its sibling categories. Root cause: `.nav-toggle`'s
+  `all: unset` (needed to strip a `<button>`'s own platform styling)
+  also wipes the `font-size` it was supposed to share with `.nav-link`
+  -- an inherited property, so `unset` falls back to the button's
+  ancestor chain instead. Every other top-level category is a
+  `.nav-toggle`; Home is the app's only depth-0 `.nav-link` (no
+  children), so it was the only one actually showing the intended
+  size. Re-declared `font-size` alongside the other properties that
+  block already re-specifies post-reset (display, gap, width, ...).
+
 - **Fixed**: client portal's "Pending Actions" tab no longer lists a
   change whose approval was never explicitly decided but the ticket
   itself is now closed/cancelled -- a change closed out from under a
