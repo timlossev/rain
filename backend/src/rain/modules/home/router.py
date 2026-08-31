@@ -8,7 +8,10 @@ show_on_landing_page, set from the document's own page -- see
 rain.modules.documents.router), rendered the same way its own Contents
 tab/PDF export would (Markdown through the same sanitizing renderer,
 plain text as-is). Falls back to a plain "Welcome to <instance>" (the
-template's own default, not rendered here) when none are flagged."""
+template's own default, not rendered here) when none are flagged. A
+flagged document with "Refresh when rendering" (Document.refresh_on_view)
+also set gets a fresh webhook call here, same as its own detail page --
+see that flag's own comment on the model."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
@@ -41,6 +44,20 @@ async def home(
         kind = textbody.body_kind(doc.filename)
         if kind is None:
             continue  # e.g. a PDF/image flagged with nothing inline to render -- silently skipped, not an error
+        # Same "Refresh when rendering" flag the document's own detail
+        # page acts on (rain.modules.documents.router.document_detail) --
+        # this is the other place a document's content actually renders
+        # for someone to read, so it honors the same flag rather than
+        # needing a second, Home-specific opt-in. Silent on failure (no
+        # banner here, unlike the detail page): a failed call already
+        # falls through to whatever's stored, same as refresh_from_webhook
+        # itself never writing on failure, and a landing page showing a
+        # per-document error banner for something that isn't the page
+        # someone came here to fix would be more clutter than help --
+        # the detail page (and the webhook's own alert_on_failure, if set)
+        # is where that gets surfaced instead.
+        if doc.refresh_on_view and doc.webhook_id:
+            await document_service.refresh_from_webhook(tenant_db, doc)
         try:
             text = textbody.decode_body(document_storage.get_storage().read(doc.storage_key))
         except FileNotFoundError:

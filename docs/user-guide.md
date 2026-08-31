@@ -714,12 +714,16 @@ off by default, so nothing is exposed until you opt it in here. Next to
 it, a "Show on landing page" checkbox does the same for [Home](#home):
 on, this document's own content (rendered Markdown, or plain text)
 replaces the plain welcome message there instead of just being linked
-to. Next, "Refresh from webhook every time this page is viewed" -- off
-by default, and only does anything once a webhook is picked on the
-Auto-update tab below: a successful call updates the stored content
-before the page renders it (same call/diff/save as the "Refresh from
-webhook" button), while a failed call shows a small notice and falls
-back to the last saved version rather than an error page. Below that,
+to. Next, "Refresh when rendering" -- off by default, and only does
+anything once a webhook is picked on the Auto-update tab below: it
+re-runs that webhook, and updates the stored content on a successful
+response (same call/diff/save as the "Refresh from webhook" button),
+every time this document's content is actually displayed -- opening
+this page, or, if also flagged "Show on landing page", every load of
+Home. A failed call always falls back to the last saved version rather
+than an error; this page shows a small notice when that happens, Home
+shows nothing and just falls back quietly (a stale response on one of
+possibly several documents shown there isn't worth a banner). Below that,
 the page is split into tabs:
 
 - Description: a plain textarea, saved independently of the file

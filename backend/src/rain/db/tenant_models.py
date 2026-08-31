@@ -899,10 +899,13 @@ class Document(TenantBase):
     webhook_response_is_json: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     webhook_json_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Opt-in (see migration 0046): calls the configured webhook again
-    # every time this document's detail page is rendered, not just on the
-    # manual "Refresh from webhook" button -- same refresh_from_webhook
-    # call either way (rain.modules.documents.router.document_detail), so
-    # a successful call shows the freshly-fetched copy and a failed one
+    # every time this document's content is actually rendered for
+    # someone to read, not just on the manual "Refresh from webhook"
+    # button -- both of the places that happen (the document's own
+    # detail page, rain.modules.documents.router.document_detail; and
+    # Home, rain.modules.home.router.home, if this document is also
+    # show_on_landing_page) call the same refresh_from_webhook, so a
+    # successful call shows the freshly-fetched copy and a failed one
     # silently falls back to whatever's already stored (refresh_from_
     # webhook never writes on failure). Only does anything once webhook_id
     # above is actually set.

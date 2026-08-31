@@ -17,6 +17,12 @@ drawn from. Updated alongside every push to `main`.
   version instead of an error page. Also fixed: the document detail
   page never actually rendered the failure message the manual refresh
   button's redirect already carried in its `?error=` query param.
+- That checkbox is now labeled "Refresh when rendering" and also covers
+  Home: a document flagged both "Refresh when rendering" and "Show on
+  landing page" gets a fresh webhook call on every Home load too, not
+  just its own page. Home falls back silently on a failed call (no
+  banner there, unlike the document's own page) -- one stale response
+  among possibly several documents shown isn't worth flagging.
 
 ## 2026-08-30
 

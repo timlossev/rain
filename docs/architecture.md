@@ -581,22 +581,30 @@ before/after is visible at a glance rather than just "something changed."
 `rain.modules.tickets.service._emit_syslog_on_full_approval` (Change
 approvals, below) reuses this exact same synthetic-event convention.
 
-**Refresh on view.** `Document.refresh_on_view` (tenant migration 0046) is a
-third caller of `service.refresh_from_webhook`, alongside the manual
-"Refresh from webhook" button and the calendar sweep's `refresh_document`
-policy above -- `rain.modules.documents.router.document_detail` calls it
-before reading the stored body, when the flag is set and `webhook_id` is
-configured. `refresh_from_webhook` never writes on a failed call (only a
-successful one reaches the diff/save step), so this falls out for free
-from the existing function rather than needing its own success/failure
-branching: a successful call has already overwritten storage by the time
-the route reads `body_text`, and a failed one leaves it untouched, with
-`outcome.error` passed through as `webhook_refresh_error` for the template
-to flash a small notice ("showing the last saved version instead") without
-failing the page itself. Runs synchronously in the request path -- a slow
-or hung webhook delays the page load by however long `WebhookConfig.
+**Refresh when rendering.** `Document.refresh_on_view` (tenant migration
+0046) is a third and fourth caller of `service.refresh_from_webhook`,
+alongside the manual "Refresh from webhook" button and the calendar
+sweep's `refresh_document` policy above -- both places a document's
+content is actually rendered for someone to read call it before reading
+the stored body, when the flag is set and `webhook_id` is configured:
+`rain.modules.documents.router.document_detail` (the document's own page)
+and `rain.modules.home.router.home` (Home, for a document also flagged
+`show_on_landing_page`). `refresh_from_webhook` never writes on a failed
+call (only a successful one reaches the diff/save step), so this falls out
+for free from the existing function rather than needing its own success/
+failure branching: a successful call has already overwritten storage by
+the time either route reads the body, and a failed one leaves it
+untouched. The two callers differ only in how (not whether) a failure
+surfaces: `document_detail` passes `outcome.error` through as
+`webhook_refresh_error` for the template to flash a small notice
+("showing the last saved version instead"); `home` ignores the outcome
+entirely and just falls back silently -- one document's stale webhook
+response isn't worth a banner on a page that may be showing several.
+Runs synchronously in the request path either way -- a slow or hung
+webhook delays the page load by however long `WebhookConfig.
 timeout_seconds` allows, same trade-off the manual button already makes,
-just on every view instead of one click.
+just on every render instead of one click, and on Home potentially once
+per flagged document with this set.
 
 **Tags.** `Document.tags` (`text[]`, tenant migration 0039) -- optional,
 freeform, comma-separated on input (`rain.modules.documents.service.

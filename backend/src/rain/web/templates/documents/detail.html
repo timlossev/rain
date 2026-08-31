@@ -104,13 +104,13 @@
     </div>
 
     <div class="field">
-      <label>Refresh on view</label>
+      <label>Refresh when rendering</label>
       <div>
         <form method="post" action="/documents/{{ doc.id }}/refresh-on-view" class="inline">
-          <label class="checkbox-row"><input type="checkbox" name="refresh_on_view" onchange="this.form.submit()" {% if doc.refresh_on_view %}checked{% endif %}> Refresh from webhook every time this page is viewed</label>
+          <label class="checkbox-row"><input type="checkbox" name="refresh_on_view" onchange="this.form.submit()" {% if doc.refresh_on_view %}checked{% endif %}> Refresh when rendering</label>
         </form>
         {% if doc.webhook_id %}
-        <div class="field-hint">Calls the webhook configured under Auto-update on every view of this page. A successful call shows the new content (and saves it, same as clicking "Refresh from webhook" there); a failed call quietly shows the last saved version instead - never an error page.</div>
+        <div class="field-hint">Calls the webhook configured under Auto-update every time this document's content is actually displayed - opening this page, or (if also flagged "Show on landing page") every load of Home. A successful call shows the new content (and saves it, same as clicking "Refresh from webhook" there); a failed call quietly falls back to the last saved version - this page shows a small notice when that happens, Home shows nothing and just falls back silently.</div>
         {% else %}
         <div class="field-hint">No webhook configured yet - set one under the Auto-update tab first, or checking this does nothing.</div>
         {% endif %}
