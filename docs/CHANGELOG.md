@@ -6,6 +6,18 @@ the honest anchor point. Each entry is a synthesis of that day's commits,
 not a 1:1 commit dump; see `git log` for the literal history this is
 drawn from. Updated alongside every push to `main`.
 
+## 2026-08-31
+
+- **Refresh from webhook on view**: a new checkbox in a document's
+  Properties tab ("Refresh from webhook every time this page is
+  viewed") re-runs the document's configured webhook every time its
+  page is opened, not just on the manual "Refresh from webhook"
+  button. A successful call shows (and saves) the fresh content; a
+  failed one shows a small notice and falls back to the last saved
+  version instead of an error page. Also fixed: the document detail
+  page never actually rendered the failure message the manual refresh
+  button's redirect already carried in its `?error=` query param.
+
 ## 2026-08-30
 
 - **New landing page** (`/home`, and what signing in now lands on

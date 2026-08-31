@@ -256,6 +256,11 @@ async def update_landing_page_flag(db: AsyncSession, doc: Document, show_on_land
     await db.commit()
 
 
+async def update_refresh_on_view_flag(db: AsyncSession, doc: Document, refresh_on_view: bool) -> None:
+    doc.refresh_on_view = refresh_on_view
+    await db.commit()
+
+
 async def list_landing_page_documents(db: AsyncSession) -> list[Document]:
     """Documents flagged "Show on the landing page" (rain.modules.home) --
     ordered by title. [] until at least one is flagged; the landing page

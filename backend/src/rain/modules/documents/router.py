@@ -191,6 +191,21 @@ async def document_detail(
     doc = await service.get_document_by_ref(tenant_db, doc_ref)
     if doc is None:
         return RedirectResponse("/documents", status_code=status.HTTP_303_SEE_OTHER)
+
+    # "Refresh from webhook on view": re-runs the same call/diff/save
+    # refresh_from_webhook does for the manual button, but before this GET
+    # even reads the stored body -- a successful call has already
+    # overwritten storage by the time body_text is read below, so the
+    # freshly-fetched copy is what renders; a failed call never touches
+    # storage at all, so body_text below reads whatever was already
+    # there. webhook_refresh_error is only set to flash that failure --
+    # it's not a reason to fail the page itself.
+    webhook_refresh_error = None
+    if doc.refresh_on_view and doc.webhook_id and textbody.body_kind(doc.filename) is not None:
+        outcome = await service.refresh_from_webhook(tenant_db, doc)
+        if not outcome.ok:
+            webhook_refresh_error = outcome.error
+
     body_kind = textbody.body_kind(doc.filename)
     body_text = None
     if body_kind is not None:
@@ -222,6 +237,7 @@ async def document_detail(
             "ticket_numbers": ticket_numbers,
             "asset_numbers": asset_numbers,
             "calendar_entries": calendar_entries,
+            "webhook_refresh_error": webhook_refresh_error,
         },
     )
 
@@ -294,6 +310,19 @@ async def update_document_landing_page(
     doc = await service.get_document(tenant_db, document_id)
     if doc is not None:
         await service.update_landing_page_flag(tenant_db, doc, show_on_landing_page)
+    return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{document_id:int}/refresh-on-view")
+async def update_document_refresh_on_view(
+    document_id: int,
+    refresh_on_view: bool = Form(False),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is not None:
+        await service.update_refresh_on_view_flag(tenant_db, doc, refresh_on_view)
     return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 

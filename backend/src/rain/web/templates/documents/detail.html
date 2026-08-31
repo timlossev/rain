@@ -16,6 +16,11 @@
   </div>
 </div>
 
+{% if request.query_params.get('error') %}<div class="flash flash-error">{{ request.query_params.get('error') }}</div>{% endif %}
+{% if webhook_refresh_error %}
+<div class="flash flash-error">Couldn't refresh from webhook just now ({{ webhook_refresh_error }}) - showing the last saved version instead.</div>
+{% endif %}
+
 <div class="card" data-tabs>
   <div class="tab-buttons">
     {% if body_kind %}
@@ -94,6 +99,20 @@
         <div class="field-hint">Rendered {{ "as Markdown" if body_kind == "markdown" else "as plain text" }} on Home once checked{% if not doc.show_on_landing_page %} - not checked yet{% endif %}.</div>
         {% else %}
         <div class="field-hint">This document has no inline body (not a .txt/.md file) - checking this does nothing until it does.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Refresh on view</label>
+      <div>
+        <form method="post" action="/documents/{{ doc.id }}/refresh-on-view" class="inline">
+          <label class="checkbox-row"><input type="checkbox" name="refresh_on_view" onchange="this.form.submit()" {% if doc.refresh_on_view %}checked{% endif %}> Refresh from webhook every time this page is viewed</label>
+        </form>
+        {% if doc.webhook_id %}
+        <div class="field-hint">Calls the webhook configured under Auto-update on every view of this page. A successful call shows the new content (and saves it, same as clicking "Refresh from webhook" there); a failed call quietly shows the last saved version instead - never an error page.</div>
+        {% else %}
+        <div class="field-hint">No webhook configured yet - set one under the Auto-update tab first, or checking this does nothing.</div>
         {% endif %}
       </div>
     </div>

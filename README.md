@@ -208,6 +208,10 @@ Tickets, and everything about working one.
 - A document's contents can be populated by calling a configured
   webhook, with the new content diffed against what's stored and an
   optional syslog alert when it changes
+- **Refresh on view**: a checkbox re-runs that same webhook call every
+  time the document's page is opened, not just on the manual button --
+  a successful call shows (and saves) the fresh content, a failed one
+  quietly falls back to the last saved version instead of erroring
 - A document's own Calendar tab: recurring or one-off reminders tied to
   it (e.g. "due for revision every quarter"), independent of the webhook
   auto-update above -- plain reminders unless one also opts into

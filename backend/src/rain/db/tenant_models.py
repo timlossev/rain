@@ -898,6 +898,15 @@ class Document(TenantBase):
     # response verbatim, same as webhook_response_is_json being off.
     webhook_response_is_json: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     webhook_json_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Opt-in (see migration 0046): calls the configured webhook again
+    # every time this document's detail page is rendered, not just on the
+    # manual "Refresh from webhook" button -- same refresh_from_webhook
+    # call either way (rain.modules.documents.router.document_detail), so
+    # a successful call shows the freshly-fetched copy and a failed one
+    # silently falls back to whatever's already stored (refresh_from_
+    # webhook never writes on failure). Only does anything once webhook_id
+    # above is actually set.
+    refresh_on_view: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Optional, freeform -- a plain array rather than a normalized tags
     # table (see migration 0039's own docstring for why: nothing here
     # needs a tenant-wide tag registry or tag-scoped browsing, just
