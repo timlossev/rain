@@ -1109,6 +1109,12 @@ td.actions { text-align: right; white-space: nowrap; }
 .kanban-card.kanban-dragging { opacity: 0.4; }
 .kanban-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
 .kanban-card-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* The ticket number: a badge/link rather than folded into the title text
+   below (which used to read "INC-000123: Some title") -- .badge-accent's
+   own pill already reads as "an identifier", same visual role the table
+   view's own Number column plays; just needed :hover feedback since
+   .badge is never normally a link. */
+.kanban-card-number:hover { text-decoration: underline; }
 .kanban-card-title { display: block; font-weight: 600; color: var(--text); margin-bottom: 4px; }
 .kanban-card-title:hover { text-decoration: underline; }
 .kanban-card-meta { font-size: 0.8rem; }

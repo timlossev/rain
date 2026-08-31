@@ -14,6 +14,7 @@
 <div class="kanban-card" draggable="true" data-kanban-card data-ticket-id="{{ t.id }}">
   <div class="kanban-card-top">
     <div class="kanban-card-badges">
+      <a class="badge badge-accent kanban-card-number" href="/tickets/{{ t.ticket_number }}">{{ t.ticket_number }}</a>
       {% if t.is_problematic %}<span class="problematic-icon" title="Problematic: recurring issue">{{ nav_icon("repeat") }}</span>{% endif %}
       {% if t.ticket_type == "change" %}
         {% if t.approval and t.approval.overall_status == "approved" %}
@@ -64,7 +65,7 @@
       </div>
     </div>
   </div>
-  <a class="kanban-card-title" href="/tickets/{{ t.ticket_number }}">{{ t.ticket_number }}: {{ t.title }}</a>
+  <a class="kanban-card-title" href="/tickets/{{ t.ticket_number }}">{{ t.title }}</a>
   <div class="kanban-card-meta muted">
     {{ user_names.get(t.assignee_user_id, "Unassigned") }}
     {% if t.asset %} &middot; {{ t.asset.name }}{% endif %}

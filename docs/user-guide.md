@@ -139,9 +139,9 @@ list with:
 - Type pills (All, Incidents, Vulnerabilities, Changes) to switch which
   type you're looking at.
 - A status dropdown that filters to one tenant-defined status.
-- Two quick-filter chips, "Mine" (tickets assigned to you) and
-  "Unassigned", plus a "Problematic" chip that shows only tickets
-  flagged problematic.
+- Quick-filter chips: "Mine" (tickets assigned to you), "Unassigned",
+  "Problematic" (only tickets flagged problematic), and "Prioritized"
+  (only the two highest severities -- "high" and "critical" today).
 - A sortable table: click any column header (Number, Title, Severity,
   Status, Created) to sort by it, click again to reverse direction.
   Assignee and Asset columns are shown but not sortable; Asset links to
@@ -161,18 +161,22 @@ a recurring-arrow icon next to its title.
 ### Kanban board
 
 The same tickets, and the same filter bar (type pills, status dropdown,
-asset picker, Mine/Unassigned/Problematic), as the ticket list -- laid
-out as one column per tenant-defined status instead of table rows.
-Drag a card into a different column to move it there, the same change
-the status stepper on that ticket's own detail page would make; the
-column's count updates immediately, and the card reverts back to its
-original column if the move didn't actually go through (a connectivity
-hiccup, or the status a card was dropped on having been deleted out
-from under the board by someone else in the meantime). Each card
-carries the same three-dot row menu as the ticket list, matching the
-ticket detail page's own top-right button row under the same
-conditions -- see "Ticket list" above for the full list of what's in
-it. Board columns have no per-column vertical scrolling; the whole
+asset picker, Mine/Unassigned/Problematic/Prioritized), as the ticket
+list -- laid out as one column per tenant-defined status instead of
+table rows. Drag a card into a different column to move it there, the
+same change the status stepper on that ticket's own detail page would
+make; the column's count updates immediately, and the card reverts
+back to its original column if the move didn't actually go through (a
+connectivity hiccup, or the status a card was dropped on having been
+deleted out from under the board by someone else in the meantime).
+Each card shows the ticket number as its own pill (links to the
+ticket, same as the title below it does), then any problematic/
+approval icons and the severity badge, then the title, then assignee
+and asset. Each card also carries the same three-dot row menu as the
+ticket list, matching the ticket detail page's own top-right button
+row under the same conditions -- see "Ticket list" above for the full
+list of what's in it. Board columns have no per-column vertical
+scrolling; the whole
 page scrolls if a column runs long, same as everywhere else in the
 app. A board is capped at the first 500 matching tickets, with a
 banner saying so if a filter set turns up more -- narrow the filters

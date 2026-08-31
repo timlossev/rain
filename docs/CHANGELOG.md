@@ -51,6 +51,12 @@ drawn from. Updated alongside every push to `main`.
   also gets a full border so it's clear where it ends and the
   metadata table below it begins -- previously the whole card
   (badges/title/metadata included) was tinted.
+- New "Prioritized" filter chip (table view and Kanban board), next to
+  Mine/Unassigned/Problematic -- shows only the two highest severities
+  (currently "high" and "critical").
+- Kanban card: the ticket number is now its own pill/link, separate
+  from the title -- previously folded into the title text ("INC-000123:
+  Some title").
 
 ## 2026-08-30
 

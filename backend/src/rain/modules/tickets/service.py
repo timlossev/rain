@@ -216,6 +216,7 @@ def ticket_list_stmt(
     assigned_to: int | None = None,
     unassigned: bool = False,
     problematic_only: bool = False,
+    prioritized_only: bool = False,
     sort: str | None = None,
     direction: str = "desc",
 ):
@@ -223,6 +224,10 @@ def ticket_list_stmt(
     for exports/etc) and the Tickets screen's paginated query.
     `assigned_to` (a user id, for "My Incidents") and `unassigned` (for
     "Unassigned Incidents") are mutually exclusive; callers pick one.
+    `prioritized_only` matches the top two entries of SEVERITIES ("high"
+    and "critical" today) -- computed off that list's own top two rather
+    than a hardcoded pair, so it can't quietly drift out of sync if
+    SEVERITIES itself is ever reordered or extended.
     `sort` falls back to created_at (the pre-sorting default) for None or
     anything not in SORTABLE_COLUMNS, rather than erroring on a stale or
     hand-edited query string.
@@ -264,6 +269,8 @@ def ticket_list_stmt(
         stmt = stmt.where(Ticket.assignee_user_id == assigned_to)
     if problematic_only:
         stmt = stmt.where(Ticket.is_problematic.is_(True))
+    if prioritized_only:
+        stmt = stmt.where(Ticket.severity.in_(SEVERITIES[-2:]))
     return stmt
 
 

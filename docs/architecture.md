@@ -475,7 +475,8 @@ as a knowledge base") is live -- see Document Repository below.
 **Kanban board.** `GET /tickets/kanban` (`router.kanban_board`) is a second
 view over the exact same tickets `GET /tickets` shows -- same
 `service.ticket_list_stmt`, same filter parameters (`ticket_type`,
-`ticket_status`, `asset_id`, `assigned`, `problematic`), just grouped by
+`ticket_status`, `asset_id`, `assigned`, `problematic`, `prioritized`),
+just grouped by
 `Ticket.status` into columns instead of paginated into table rows. The
 filter bar itself (type pills, status dropdown, asset picker, quick-filter
 chips, and the `qs()` query-string builder both views' links use) was

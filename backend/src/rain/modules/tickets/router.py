@@ -95,6 +95,7 @@ async def list_tickets(
     asset_id: int | None = None,
     assigned: str | None = None,  # "me" | "unassigned" | None
     problematic: str | None = None,  # "1" | None
+    prioritized: str | None = None,  # "1" | None
     sort: str | None = None,
     dir: str = "desc",
     page: int = 1,
@@ -119,6 +120,7 @@ async def list_tickets(
         assigned_to=ctx.user.id if assigned == "me" else None,
         unassigned=assigned == "unassigned",
         problematic_only=bool(problematic),
+        prioritized_only=bool(prioritized),
         sort=sort,
         direction=dir,
     )
@@ -150,6 +152,7 @@ async def list_tickets(
             "selected_asset_name": selected_asset.name if selected_asset else "",
             "selected_assigned": assigned,
             "selected_problematic": bool(problematic),
+            "selected_prioritized": bool(prioritized),
             "selected_sort": sort if sort in service.SORTABLE_COLUMNS else "created_at",
             "selected_dir": dir,
             "user_names": user_names,
@@ -177,6 +180,7 @@ async def kanban_board(
     asset_id: int | None = None,
     assigned: str | None = None,  # "me" | "unassigned" | None
     problematic: str | None = None,  # "1" | None
+    prioritized: str | None = None,  # "1" | None
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
@@ -196,6 +200,7 @@ async def kanban_board(
         assigned_to=ctx.user.id if assigned == "me" else None,
         unassigned=assigned == "unassigned",
         problematic_only=bool(problematic),
+        prioritized_only=bool(prioritized),
     ).limit(_KANBAN_TICKET_CAP + 1)
     result = await tenant_db.execute(stmt)
     tickets = list(result.scalars())
@@ -235,6 +240,7 @@ async def kanban_board(
             "selected_asset_name": selected_asset.name if selected_asset else "",
             "selected_assigned": assigned,
             "selected_problematic": bool(problematic),
+            "selected_prioritized": bool(prioritized),
             "user_names": user_names,
             "can_escalate": escalation_webhook_id is not None,
             "watching_ids": watching_ids,

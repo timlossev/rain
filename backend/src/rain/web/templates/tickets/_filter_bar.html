@@ -1,11 +1,12 @@
 {# Shared /tickets filter bar (New ticket + type pills + status dropdown +
-   asset picker + Mine/Unassigned/Problematic chips) and its qs() query-
-   string builder -- used by both the table view (tickets/list.html) and
-   the Kanban board (tickets/kanban.html) so the two filter sets can't
-   drift apart from each other. Expects the same selected_* context
-   variables both routes already pass (tickets/router.py's list_tickets
-   and kanban_board): selected_type, selected_status, selected_asset_id,
-   selected_asset_name, selected_assigned, selected_problematic, plus
+   asset picker + Mine/Unassigned/Problematic/Prioritized chips) and its
+   qs() query-string builder -- used by both the table view (tickets/
+   list.html) and the Kanban board (tickets/kanban.html) so the two
+   filter sets can't drift apart from each other. Expects the same
+   selected_* context variables both routes already pass (tickets/
+   router.py's list_tickets and kanban_board): selected_type,
+   selected_status, selected_asset_id, selected_asset_name,
+   selected_assigned, selected_problematic, selected_prioritized, plus
    selected_sort/selected_dir *if* include_sort is used (list.html only
    -- see qs() below). #}
 {% import "_search_picker.html" as picker %}
@@ -22,18 +23,20 @@
    Kanban has no equivalent, so it never reads/writes those two);
    selected_sort/selected_dir are read via `default(none)` rather than
    assumed present, since kanban.html's context never defines them. #}
-{% macro qs(base, type=none, status=none, asset_id=none, assigned=none, problematic=none, sort=none, dir=none, include_sort=true) %}
+{% macro qs(base, type=none, status=none, asset_id=none, assigned=none, problematic=none, prioritized=none, sort=none, dir=none, include_sort=true) %}
 {%- set parts = [] -%}
 {%- set t = type if type is not none else selected_type -%}
 {%- set s = status if status is not none else selected_status -%}
 {%- set aid = asset_id if asset_id is not none else selected_asset_id -%}
 {%- set a = assigned if assigned is not none else selected_assigned -%}
 {%- set c = problematic if problematic is not none else ("1" if selected_problematic else "") -%}
+{%- set pr = prioritized if prioritized is not none else ("1" if selected_prioritized else "") -%}
 {%- if t %}{% set _ = parts.append("ticket_type=" ~ t) %}{% endif -%}
 {%- if s is not none %}{% set _ = parts.append("ticket_status=" ~ s) %}{% endif -%}
 {%- if aid %}{% set _ = parts.append("asset_id=" ~ aid) %}{% endif -%}
 {%- if a %}{% set _ = parts.append("assigned=" ~ a) %}{% endif -%}
 {%- if c %}{% set _ = parts.append("problematic=" ~ c) %}{% endif -%}
+{%- if pr %}{% set _ = parts.append("prioritized=" ~ pr) %}{% endif -%}
 {%- if include_sort -%}
 {%- set so = sort if sort is not none else (selected_sort | default(none)) -%}
 {%- set d = dir if dir is not none else (selected_dir | default(none)) -%}
@@ -60,6 +63,7 @@
       {% if selected_asset_id %}<input type="hidden" name="asset_id" value="{{ selected_asset_id }}">{% endif %}
       {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
       {% if selected_problematic %}<input type="hidden" name="problematic" value="1">{% endif %}
+      {% if selected_prioritized %}<input type="hidden" name="prioritized" value="1">{% endif %}
       {% if include_sort and selected_sort | default(none) and selected_sort != "created_at" %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
       {% if include_sort and selected_dir | default(none) and selected_dir != "desc" %}<input type="hidden" name="dir" value="{{ selected_dir }}">{% endif %}
       <select id="ticket_status" name="ticket_status" onchange="this.form.submit()" aria-label="Status" title="Filter by status">
@@ -76,6 +80,7 @@
       {% if selected_status is not none %}<input type="hidden" name="ticket_status" value="{{ selected_status }}">{% endif %}
       {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
       {% if selected_problematic %}<input type="hidden" name="problematic" value="1">{% endif %}
+      {% if selected_prioritized %}<input type="hidden" name="prioritized" value="1">{% endif %}
       {{ picker.search_picker("asset_id", "/tickets/assets/search", initial_value=selected_asset_id, initial_label=selected_asset_name, placeholder="Filter by asset...", auto_submit=True) }}
     </form>
     {% if selected_asset_id %}<a class="btn btn-sm" href="{{ base_url }}?{{ qs(base_url, asset_id='', include_sort=include_sort) }}">Clear asset</a>{% endif %}
@@ -86,6 +91,7 @@
       <a class="btn btn-sm {% if selected_assigned == 'me' %}active{% endif %}" href="{{ base_url }}?{{ qs(base_url, assigned='' if selected_assigned == 'me' else 'me', include_sort=include_sort) }}">Mine</a>
       <a class="btn btn-sm {% if selected_assigned == 'unassigned' %}active{% endif %}" href="{{ base_url }}?{{ qs(base_url, assigned='' if selected_assigned == 'unassigned' else 'unassigned', include_sort=include_sort) }}">Unassigned</a>
       <a class="btn btn-sm {% if selected_problematic %}active{% endif %}" href="{{ base_url }}?{{ qs(base_url, problematic='' if selected_problematic else '1', include_sort=include_sort) }}">Problematic</a>
+      <a class="btn btn-sm {% if selected_prioritized %}active{% endif %}" href="{{ base_url }}?{{ qs(base_url, prioritized='' if selected_prioritized else '1', include_sort=include_sort) }}" title="The two highest severities">Prioritized</a>
     </div>
   </div>
 </div>
