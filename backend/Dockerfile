@@ -66,6 +66,23 @@ RUN apk upgrade --no-cache
 # package built above -- see the builder stage's comment.
 RUN apk add --no-cache xmlsec
 
+# The base image's own system-level pip (ensurepip, baked into this
+# tag's system Python outside our venv) is never actually used here --
+# PATH below always resolves pip/python to /venv/bin first, and the
+# builder stage's own upgrade only ever touched *that* venv's pip, not
+# this stage's separate system one. Left in place, an image scanner
+# still walks the filesystem and flags whatever (likely older) pip
+# version this tag happened to ship, on a copy nothing ever calls --
+# the likeliest explanation for a pip CVE (e.g. CVE-2026-6357) still
+# showing up in a scan despite the venv's own pip already being
+# >=26.1.2. Removing it outright, rather than upgrading a copy that's
+# dead weight either way, closes that finding and trims the image at
+# the same time. No network access needed (unlike the venv's own
+# PyPI-triggered upgrade above), so this holds even in an air-gapped
+# build. setuptools/wheel come along for the same reason -- the same
+# unused-system-copy story applies to their own CVEs.
+RUN python3 -m pip uninstall -y pip setuptools wheel 2>/dev/null || true
+
 RUN addgroup -S rain \
  && adduser -S rain -G rain \
  && mkdir -p /data/uploads \

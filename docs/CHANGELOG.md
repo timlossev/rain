@@ -8,6 +8,16 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-08-31
 
+- Docker: the final image now removes the base `python:3.12-alpine`
+  tag's own system-level pip/setuptools/wheel (outside the app's
+  venv). The venv's own pip was already floored at >=26.1.2, clearing
+  CVE-2026-6357/13346/8643, but that upgrade never touched this
+  separate system copy, which the app never actually uses (`PATH`
+  always resolves to `/venv/bin` first) -- left in place, an image
+  scanner still finds and flags whatever older pip version that base
+  layer happened to ship. Removing it outright, rather than upgrading
+  a copy nothing calls, closes that finding and trims the image.
+
 - **Fixed**: "+ New ticket" sat visibly misaligned against the
   All/Incidents/Vulnerabilities/Changes pills next to it (table view
   and Kanban board both use the same filter bar). Same padding on
