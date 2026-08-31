@@ -27,6 +27,8 @@ drawn from. Updated alongside every push to `main`.
   document's content actually renders (its own Contents tab, and each
   entry on Home) -- the last successful webhook refresh if it's ever
   had one, otherwise when it was last saved.
+- A ticket's clamped description preview ("Show more") now shows 20
+  lines before truncating, up from 15.
 
 ## 2026-08-30
 

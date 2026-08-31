@@ -1281,7 +1281,7 @@ td.actions { text-align: right; white-space: nowrap; }
 .ticket-description.clamped {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 15;
+  -webkit-line-clamp: 20;
   overflow: hidden;
 }
 .ticket-description-toggle { margin-top: 8px; }
