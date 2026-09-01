@@ -270,7 +270,7 @@ async def kanban_board(
             "statuses": statuses,
             "extra_status_keys": extra_status_keys,
             "columns": columns,
-            "group_by": group_by,
+            "selected_group_by": group_by,
             "assignee_users": assignee_users,
             "assignee_columns": assignee_columns,
             "extra_assignee_ids": extra_assignee_ids,

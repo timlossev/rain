@@ -573,11 +573,17 @@ moment it tried to pop out past that column's own bottom edge.
 
 **Group by: status vs. assignee.** A `group_by` query param (`"status"`,
 the default, or `"assignee"`) picks what the board's columns actually
-are, independent of every filter above -- a small `<select>` above the
-board, auto-submitting on change (same pattern the filter bar's own
-status dropdown uses), that carries the current filters as hidden
-inputs so switching modes never resets what's shown. `"assignee"`
-columns come from `rain.core.user_names.list_assignable_users` (the
+are, independent of every filter above -- a second, self-labeling
+`<select>` (no separate `<label>`, same as the filter bar's own status
+dropdown) living inside that same `<form>` in `tickets/_filter_bar.html`,
+so either select's `onchange="this.form.submit()"` submits both
+current values together. `qs()`, the filter bar's shared query-string
+builder, reads an optional `selected_group_by` context variable the
+same `default(none)`-guarded way it already reads `selected_sort`/
+`selected_dir` -- present (and threaded onto every link/hidden-input it
+builds) only for `kanban_board`'s own context; `list_tickets`'s table
+view never defines it, so it never appears on a table-view link.
+`"assignee"` columns come from `rain.core.user_names.list_assignable_users` (the
 same tenant-scoped-users-plus-internal_admins candidate set the
 assignee picker's own `search_assignable_users` predicate offers, just
 the full list instead of a typed-in, capped-at-8 search) plus a

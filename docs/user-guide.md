@@ -171,8 +171,9 @@ a recurring-arrow icon next to its title.
 
 The same tickets, and the same filter bar (type pills, status dropdown,
 asset picker, Mine/Unassigned/Problematic/Prioritized), as the ticket
-list -- laid out in columns instead of table rows. A "Group by" switch
-above the board picks what the columns actually are:
+list -- laid out in columns instead of table rows. A second dropdown
+next to the status filter, reading "Group by status" or "Group by
+assignee (workload)," picks what the columns actually are:
 
 - **Status** (default): one column per tenant-defined status. Drag a
   card into a different column to move it there, the same change the
@@ -192,9 +193,9 @@ Either way, the column's count updates immediately, and the card
 reverts back to its original column if the move didn't actually go
 through (a connectivity hiccup, or the target having been deleted or
 deactivated out from under the board by someone else in the
-meantime). Switching "Group by" keeps every filter currently applied;
-it only changes how the matching tickets are grouped, not which ones
-are shown.
+meantime). Switching the Group by dropdown keeps every filter
+currently applied; it only changes how the matching tickets are
+grouped, not which ones are shown.
 
 Each card shows the ticket number as its own pill (links to the
 ticket, same as the title below it does), then any problematic/

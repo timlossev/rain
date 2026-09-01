@@ -8,7 +8,10 @@
    selected_status, selected_asset_id, selected_asset_name,
    selected_assigned, selected_problematic, selected_prioritized, plus
    selected_sort/selected_dir *if* include_sort is used (list.html only
-   -- see qs() below). #}
+   -- see qs() below), and selected_group_by *if the caller defines it*
+   (kanban_board only -- list.html has nothing to group, so its absence
+   from context, not a flag, is what hides the Group by control and
+   keeps qs() from ever adding a group_by= param to a table-view link). #}
 {% import "_search_picker.html" as picker %}
 
 {# Builds a `base`-rooted query string, keeping every filter dimension at
@@ -23,7 +26,7 @@
    Kanban has no equivalent, so it never reads/writes those two);
    selected_sort/selected_dir are read via `default(none)` rather than
    assumed present, since kanban.html's context never defines them. #}
-{% macro qs(base, type=none, status=none, asset_id=none, assigned=none, problematic=none, prioritized=none, sort=none, dir=none, include_sort=true) %}
+{% macro qs(base, type=none, status=none, asset_id=none, assigned=none, problematic=none, prioritized=none, sort=none, dir=none, group_by=none, include_sort=true) %}
 {%- set parts = [] -%}
 {%- set t = type if type is not none else selected_type -%}
 {%- set s = status if status is not none else selected_status -%}
@@ -31,12 +34,18 @@
 {%- set a = assigned if assigned is not none else selected_assigned -%}
 {%- set c = problematic if problematic is not none else ("1" if selected_problematic else "") -%}
 {%- set pr = prioritized if prioritized is not none else ("1" if selected_prioritized else "") -%}
+{# selected_group_by only exists in kanban.html's own context (list.html,
+   the table view, has no equivalent of it) -- default(none) reads it
+   without raising when it's plain absent, same as selected_sort/
+   selected_dir below being list.html-only in the other direction. #}
+{%- set gb = group_by if group_by is not none else (selected_group_by | default(none)) -%}
 {%- if t %}{% set _ = parts.append("ticket_type=" ~ t) %}{% endif -%}
 {%- if s is not none %}{% set _ = parts.append("ticket_status=" ~ s) %}{% endif -%}
 {%- if aid %}{% set _ = parts.append("asset_id=" ~ aid) %}{% endif -%}
 {%- if a %}{% set _ = parts.append("assigned=" ~ a) %}{% endif -%}
 {%- if c %}{% set _ = parts.append("problematic=" ~ c) %}{% endif -%}
 {%- if pr %}{% set _ = parts.append("prioritized=" ~ pr) %}{% endif -%}
+{%- if gb and gb != "status" %}{% set _ = parts.append("group_by=" ~ gb) %}{% endif -%}
 {%- if include_sort -%}
 {%- set so = sort if sort is not none else (selected_sort | default(none)) -%}
 {%- set d = dir if dir is not none else (selected_dir | default(none)) -%}
@@ -85,6 +94,17 @@
         <option value="{{ s.key }}" {% if selected_status == s.key %}selected{% endif %}>{{ s.label }}</option>
         {% endfor %}
       </select>
+      {# selected_group_by only ever exists in kanban.html's context (the
+         table view has nothing to switch) -- same self-labeling,
+         no-separate-<label> shape as the Status select just above, sharing
+         this same form so either one's onchange submits both current
+         values together. #}
+      {% if selected_group_by is defined %}
+      <select name="group_by" onchange="this.form.submit()" aria-label="Group board by" title="Group the board by status or by assignee workload">
+        <option value="status" {% if selected_group_by == "status" %}selected{% endif %}>Group by status</option>
+        <option value="assignee" {% if selected_group_by == "assignee" %}selected{% endif %}>Group by assignee (workload)</option>
+      </select>
+      {% endif %}
     </form>
 
     <form method="get" action="{{ base_url }}" style="margin-bottom:0;">
@@ -97,6 +117,7 @@
       {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
       {% if selected_problematic %}<input type="hidden" name="problematic" value="1">{% endif %}
       {% if selected_prioritized %}<input type="hidden" name="prioritized" value="1">{% endif %}
+      {% if selected_group_by | default(none) and selected_group_by != "status" %}<input type="hidden" name="group_by" value="{{ selected_group_by }}">{% endif %}
       {{ picker.search_picker("asset_id", "/tickets/assets/search", initial_value=selected_asset_id, initial_label=selected_asset_name, placeholder="Filter by asset...", auto_submit=True) }}
     </form>
     {% if selected_asset_id %}<a class="btn btn-sm" href="{{ base_url }}?{{ qs(base_url, asset_id='', include_sort=include_sort) }}">Clear asset</a>{% endif %}
