@@ -43,6 +43,24 @@ async def is_assignable_user(user_id: int, tenant_id: int) -> bool:
         return result.scalar_one_or_none() is not None
 
 
+async def list_assignable_users(tenant_id: int) -> list[User]:
+    """Every user is_assignable_user above would accept for `tenant_id` --
+    this tenant's own active users plus every active internal_admin
+    (platform-wide, not tenant-scoped) -- ordered by display name. Backs
+    Kanban's "group by assignee" view (rain.modules.tickets.router.
+    kanban_board), which needs the full candidate list up front, unlike
+    rain.modules.tickets.router.search_assignable_users' typed-a-few-
+    characters, capped-at-8 predictive search."""
+    async with control_session() as session:
+        stmt = (
+            select(User)
+            .where(User.is_active.is_(True), (User.tenant_id == tenant_id) | (User.role_key == "internal_admin"))
+            .order_by(User.display_name)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars())
+
+
 async def resolve_user_emails(user_ids: set[int | None]) -> dict[int, str]:
     """Same batched lookup as resolve_user_names, but for email addresses --
     backs notification-trigger code (approval-pending emails, ticket

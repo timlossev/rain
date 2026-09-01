@@ -571,6 +571,42 @@ column would clip a card's `.dropdown-menu-panel` (absolutely positioned,
 CSS computes `overflow-x` right along with an explicit `overflow-y`) the
 moment it tried to pop out past that column's own bottom edge.
 
+**Group by: status vs. assignee.** A `group_by` query param (`"status"`,
+the default, or `"assignee"`) picks what the board's columns actually
+are, independent of every filter above -- a small `<select>` above the
+board, auto-submitting on change (same pattern the filter bar's own
+status dropdown uses), that carries the current filters as hidden
+inputs so switching modes never resets what's shown. `"assignee"`
+columns come from `rain.core.user_names.list_assignable_users` (the
+same tenant-scoped-users-plus-internal_admins candidate set the
+assignee picker's own `search_assignable_users` predicate offers, just
+the full list instead of a typed-in, capped-at-8 search) plus a
+leading "Unassigned" column; a ticket assigned to someone no longer in
+that set gets its own extra column, same "shown, not silently
+dropped" treatment `extra_status_keys` already gives an orphaned
+status, except deliberately not a drop target (no
+`data-kanban-dropzone` on it) -- there's no sane "reassign to someone
+this tenant can't assign to" action for a drop there to mean.
+
+Dragging a card in assignee mode hits a second small endpoint, `POST
+/tickets/{id}/kanban-assignee`, mirroring `kanban-status` exactly:
+`service.update_assignee()`, JSON response, optimistic DOM move,
+revert-and-flash on failure. It re-checks `is_assignable_user()`
+server-side before accepting a drop the same way the ticket detail
+page's own `/assign` route already has to -- the board only ever
+*offers* this tenant's assignable users as columns, but nothing stops
+a crafted POST naming an arbitrary id, and `data-assignee-id` is exactly
+that kind of client-supplied value. `app.js`'s single Kanban drop
+handler branches on `dropzone.dataset.assigneeId !== undefined` (a
+presence check, not a truthiness one -- `data-assignee-id=""`, the
+Unassigned column, is a real assignee-mode dropzone, not a missing
+attribute) to decide which endpoint/body shape to send, and, on a
+successful assignee-mode drop, updates the moved card's own visible
+assignee name (`kanban_card()`'s meta line, given its own `<span
+data-kanban-assignee>` for exactly this) -- the one piece of card
+content a move actually changes in this mode, unlike status mode where
+nothing on the card's own face reflects its column.
+
 ### A routing bug worth knowing about
 
 While wiring `/tickets/live` in next to `/tickets/{ticket_id}`, a

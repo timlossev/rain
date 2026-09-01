@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "tickets/_filter_bar.html" as filters with context %}
 {% block title %}Kanban - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}The same tickets and filters as the table view, grouped into columns by status instead of rows. Drag a card to a different column to change its status - the same move "Mark closed" or the ticket's own status buttons make. Each card's "..." menu matches the table view's row menu, which matches the ticket detail page's own top-right buttons.{% endblock %}
+{% block help_text %}The same tickets and filters as the table view, grouped into columns instead of rows. "Group by" switches what the columns are: Status (default) - drag a card to a different column to change its status, the same move "Mark closed" or the ticket's own status buttons make; or Assignee - a workload view, one column per user plus "Unassigned", where dragging a card into a column assigns it to that person (or clears the assignee, dropped into "Unassigned"). Each card's "..." menu matches the table view's row menu, which matches the ticket detail page's own top-right buttons.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 
@@ -31,16 +31,16 @@
       </button>
       <div class="dropdown-menu-panel row-menu-panel" data-menu-panel hidden>
         <form method="post" action="/tickets/{{ t.id }}/mark-closed">
-          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}">
+          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}{{ '&group_by=assignee' if group_by == 'assignee' else '' }}">
           <button type="submit" class="row-menu-item">Mark closed</button>
         </form>
         <form method="post" action="/tickets/{{ t.id }}/problematic/toggle">
-          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}">
+          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}{{ '&group_by=assignee' if group_by == 'assignee' else '' }}">
           <input type="hidden" name="is_problematic" value="{{ '0' if t.is_problematic else '1' }}">
           <button type="submit" class="row-menu-item">{{ "Unmark problematic" if t.is_problematic else "Mark problematic" }}</button>
         </form>
         <form method="post" action="/tickets/{{ t.id }}/watch/toggle">
-          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}">
+          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}{{ '&group_by=assignee' if group_by == 'assignee' else '' }}">
           <input type="hidden" name="watching" value="{{ '0' if t.id in watching_ids else '1' }}">
           <button type="submit" class="row-menu-item">{{ "Stop watching" if t.id in watching_ids else "Watch" }}</button>
         </form>
@@ -49,14 +49,14 @@
         {% endif %}
         {% if can_escalate %}
         <form method="post" action="/tickets/{{ t.id }}/escalate" data-escalate-form data-confirm-text="{{ escalate_label }} {{ t.ticket_number }}?">
-          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}">
+          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}{{ '&group_by=assignee' if group_by == 'assignee' else '' }}">
           <button type="submit" class="row-menu-item danger">{{ escalate_label }}</button>
         </form>
         {% endif %}
         <button type="button" class="row-menu-item" data-analyze-root-cause="{{ t.id }}">Analyze root cause</button>
         {% if t.ticket_type == "change" %}
         <form method="post" action="/tickets/{{ t.id }}/mark-cancelled">
-          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}">
+          <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}{{ '&group_by=assignee' if group_by == 'assignee' else '' }}">
           <button type="submit" class="row-menu-item danger">Mark cancelled</button>
         </form>
         {% endif %}
@@ -67,7 +67,10 @@
   </div>
   <a class="kanban-card-title" href="/tickets/{{ t.ticket_number }}">{{ t.title }}</a>
   <div class="kanban-card-meta muted">
-    {{ user_names.get(t.assignee_user_id, "Unassigned") }}
+    {# Its own span, not just bare text, so an assignee-mode drop
+       (app.js's Kanban block) can update just this piece after a
+       successful drag without having to re-render the asset half too. #}
+    <span data-kanban-assignee>{{ user_names.get(t.assignee_user_id, "Unassigned") }}</span>
     {% if t.asset %} &middot; {{ t.asset.name }}{% endif %}
   </div>
 </div>
@@ -75,11 +78,92 @@
 
 {{ filters.render_filter_bar("/tickets/kanban", statuses, include_sort=false) }}
 
-{% set shown_count = columns.values() | map("length") | sum %}
+{# Board's own view switch, deliberately outside _filter_bar.html's shared
+   qs()/render_filter_bar (list.html, the table view, has no equivalent of
+   this - group_by only ever means something as a column layout). Carries
+   every current filter as a hidden input, same auto-submit-on-change
+   pattern as the filter bar's own status <select>, so switching modes
+   never resets what's actually shown, just how it's grouped. #}
+<div class="panel-row" style="margin-top:8px; margin-bottom:0;">
+  <form method="get" action="/tickets/kanban" style="display:flex; flex-direction:row; align-items:center; gap:8px; margin-bottom:0;">
+    <input type="hidden" name="ticket_type" value="{{ selected_type or '' }}">
+    {% if selected_status is not none %}<input type="hidden" name="ticket_status" value="{{ selected_status }}">{% endif %}
+    {% if selected_asset_id %}<input type="hidden" name="asset_id" value="{{ selected_asset_id }}">{% endif %}
+    {% if selected_assigned %}<input type="hidden" name="assigned" value="{{ selected_assigned }}">{% endif %}
+    {% if selected_problematic %}<input type="hidden" name="problematic" value="1">{% endif %}
+    {% if selected_prioritized %}<input type="hidden" name="prioritized" value="1">{% endif %}
+    <label for="group_by" class="muted" style="font-size:0.85rem; margin-bottom:0;">Group by</label>
+    <select id="group_by" name="group_by" onchange="this.form.submit()" aria-label="Group board by" title="Group the board by status or by assignee workload">
+      <option value="status" {% if group_by == "status" %}selected{% endif %}>Status</option>
+      <option value="assignee" {% if group_by == "assignee" %}selected{% endif %}>Assignee (workload)</option>
+    </select>
+  </form>
+</div>
+
+{% set shown_count = columns.values() | map("length") | sum if group_by == "status" else (assignee_columns.values() | map("length") | sum) %}
 {% if truncated %}
 <div class="flash flash-error">Showing the first {{ shown_count }} matching tickets - narrow your filters (or use the table view) to see the rest.</div>
 {% endif %}
 
+{% if group_by == "assignee" %}
+<div class="kanban-board" data-kanban-board>
+  <div class="kanban-column" data-kanban-column>
+    <div class="kanban-column-header" style="--column-color: #6b7280;">
+      <span class="kanban-column-dot" aria-hidden="true"></span>
+      <span class="kanban-column-title">Unassigned</span>
+      <span class="kanban-column-count" data-kanban-count>{{ assignee_columns.get("unassigned", []) | length }}</span>
+    </div>
+    {# data-assignee-id="" (empty, not absent) is what app.js's Kanban
+       block checks for to tell an assignee-mode dropzone apart from a
+       status-mode one - dropping here clears the assignee. #}
+    <div class="kanban-column-body" data-kanban-dropzone data-assignee-id="">
+      {% for t in assignee_columns.get("unassigned", []) %}
+      {{ kanban_card(t) }}
+      {% else %}
+      <div class="kanban-empty muted" data-kanban-empty>No tickets.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% for u in assignee_users %}
+  <div class="kanban-column" data-kanban-column>
+    <div class="kanban-column-header" style="--column-color: var(--accent);">
+      <span class="kanban-column-dot" aria-hidden="true"></span>
+      <span class="kanban-column-title">{{ u.display_name }}</span>
+      <span class="kanban-column-count" data-kanban-count>{{ assignee_columns.get(u.id | string, []) | length }}</span>
+    </div>
+    <div class="kanban-column-body" data-kanban-dropzone data-assignee-id="{{ u.id }}">
+      {% for t in assignee_columns.get(u.id | string, []) %}
+      {{ kanban_card(t) }}
+      {% else %}
+      <div class="kanban-empty muted" data-kanban-empty>No tickets.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% for uid in extra_assignee_ids %}
+  {# Assigned to someone no longer assignable to this tenant (deactivated,
+     or moved off it) - shown, same "extra column rather than silently
+     dropped" treatment the status view's own extra_status_keys gets, but
+     deliberately no data-kanban-dropzone: this isn't a real reassignment
+     target, just where an otherwise-orphaned ticket's card still needs
+     to live. A card can still be dragged *out* of it into a real column. #}
+  <div class="kanban-column" data-kanban-column>
+    <div class="kanban-column-header" style="--column-color: #6b7280;">
+      <span class="kanban-column-dot" aria-hidden="true"></span>
+      <span class="kanban-column-title">{{ user_names.get(uid, "Former user #" ~ uid) }} <span class="muted" style="font-weight:400;">(not assignable here)</span></span>
+      <span class="kanban-column-count" data-kanban-count>{{ assignee_columns.get(uid | string, []) | length }}</span>
+    </div>
+    <div class="kanban-column-body">
+      {% for t in assignee_columns.get(uid | string, []) %}
+      {{ kanban_card(t) }}
+      {% else %}
+      <div class="kanban-empty muted" data-kanban-empty>No tickets.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
 <div class="kanban-board" data-kanban-board>
   {% for s in statuses %}
   <div class="kanban-column" data-kanban-column>
@@ -118,4 +202,5 @@
   </div>
   {% endfor %}
 </div>
+{% endif %}
 {% endblock %}

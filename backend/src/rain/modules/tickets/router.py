@@ -19,7 +19,7 @@ from rain.core.pagination import paginate
 from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.tenant_config import get_tenant_config, get_tenant_configs, set_tenant_config
-from rain.core.user_names import is_assignable_user, resolve_user_names
+from rain.core.user_names import is_assignable_user, list_assignable_users, resolve_user_names
 from rain.db.base import control_session
 from rain.db.control_models import User
 from rain.db.tenant_models import (
@@ -183,17 +183,29 @@ async def kanban_board(
     assigned: str | None = None,  # "me" | "unassigned" | None
     problematic: str | None = None,  # "1" | None
     prioritized: str | None = None,  # "1" | None
+    group_by: str = "status",  # "status" | "assignee"
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     """Same filters, same service.ticket_list_stmt, as list_tickets above
-    -- just grouped into per-status columns instead of table rows, so the
-    two views can never disagree about which tickets match a given
-    filter set. No sort control here (column position already conveys
-    status; each column is created_at desc, ticket_list_stmt's own
-    default) and no pagination -- see _KANBAN_TICKET_CAP."""
+    -- just grouped into columns instead of table rows, so the two views
+    can never disagree about which tickets match a given filter set. No
+    sort control here (column position already conveys grouping; each
+    column is created_at desc, ticket_list_stmt's own default) and no
+    pagination -- see _KANBAN_TICKET_CAP.
+
+    group_by picks what the columns *are*, independent of every filter
+    above: "status" (default) groups by this tenant's own TicketStatus
+    set, same as always; "assignee" groups by who's carrying each ticket
+    instead, for a workload-at-a-glance view -- one column per this
+    tenant's assignable users (rain.core.user_names.list_assignable_users,
+    the same candidate set the assignee picker itself offers) plus a
+    leading "Unassigned" column. Dragging a card between assignee columns
+    reassigns it (POST .../kanban-assignee below) the same optimistic way
+    dragging between status columns changes its status."""
     nav = await build_nav_context(ctx)
+    group_by = group_by if group_by in ("status", "assignee") else "status"
     effective_status = "active" if ticket_status is None else ticket_status
     stmt = service.ticket_list_stmt(
         ticket_type=ticket_type,
@@ -220,9 +232,32 @@ async def kanban_board(
     known_keys = {s.key for s in statuses}
     extra_status_keys = sorted(k for k in columns if k not in known_keys)
 
+    assignee_users: list[User] = []
+    assignee_columns: dict[str, list[Ticket]] = {}
+    extra_assignee_ids: list[int] = []
+    if group_by == "assignee":
+        assignee_users = await list_assignable_users(ctx.active_tenant.id)
+        known_user_ids = {u.id for u in assignee_users}
+        assignee_columns = {"unassigned": []}
+        for u in assignee_users:
+            assignee_columns[str(u.id)] = []
+        for t in tickets:
+            if t.assignee_user_id is None:
+                assignee_columns["unassigned"].append(t)
+            elif t.assignee_user_id in known_user_ids:
+                assignee_columns[str(t.assignee_user_id)].append(t)
+            else:
+                # Assigned to someone no longer assignable to this tenant
+                # (deactivated, or moved off it since) -- same "extra
+                # column rather than silently dropped" treatment
+                # extra_status_keys gives an orphaned status above.
+                assignee_columns.setdefault(str(t.assignee_user_id), []).append(t)
+                if t.assignee_user_id not in extra_assignee_ids:
+                    extra_assignee_ids.append(t.assignee_user_id)
+
     selected_asset = await asset_service.get_asset(tenant_db, asset_id) if asset_id else None
     escalation_settings = await get_tenant_configs(tenant_db, ["escalation_webhook_id", "escalate_button_label"])
-    user_names = await resolve_user_names({t.assignee_user_id for t in tickets})
+    user_names = await resolve_user_names({t.assignee_user_id for t in tickets} | set(extra_assignee_ids))
     watching_ids = await service.watching_ticket_ids(tenant_db, {t.id for t in tickets}, ctx.user.id)
 
     return templates.TemplateResponse(
@@ -235,6 +270,10 @@ async def kanban_board(
             "statuses": statuses,
             "extra_status_keys": extra_status_keys,
             "columns": columns,
+            "group_by": group_by,
+            "assignee_users": assignee_users,
+            "assignee_columns": assignee_columns,
+            "extra_assignee_ids": extra_assignee_ids,
             "truncated": truncated,
             "selected_type": ticket_type,
             "selected_status": ticket_status,
@@ -274,6 +313,34 @@ async def kanban_update_status(
     if not ok:
         return JSONResponse({"ok": False, "error": "Not a valid status."}, status_code=400)
     return {"ok": True, "status": ticket.status}
+
+
+@router.post("/{ticket_id:int}/kanban-assignee")
+async def kanban_update_assignee(
+    ticket_id: int,
+    new_assignee_user_id: str = Form(""),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Kanban's "group by assignee" view (kanban_board above): dragging a
+    card into a different assignee column, or into "Unassigned", reassigns
+    it -- same service.update_assignee call the ticket detail page's own
+    /assign route makes (and the same is_assignable_user re-check that
+    route's own comment explains: the board only ever offers this
+    tenant's own assignable users as columns to begin with, but a crafted
+    POST could still name an arbitrary id, so this is what actually
+    enforces it), just returning JSON instead of redirecting -- the board
+    moves the card in the DOM itself, mirroring kanban_update_status."""
+    ticket = await tenant_db.get(Ticket, ticket_id)
+    if ticket is None:
+        return JSONResponse({"ok": False, "error": "Ticket not found."}, status_code=404)
+    new_id = int(new_assignee_user_id) if new_assignee_user_id else None
+    if new_id is not None and not await is_assignable_user(new_id, ctx.active_tenant.id):
+        return JSONResponse({"ok": False, "error": "Not assignable to this tenant."}, status_code=400)
+    await service.update_assignee(tenant_db, ticket, new_id, changed_by_user_id=ctx.user.id)
+    names = await resolve_user_names({new_id}) if new_id is not None else {}
+    return {"ok": True, "assignee_user_id": new_id, "assignee_name": names.get(new_id, "Unassigned")}
 
 
 @router.get("/new", response_class=HTMLResponse)

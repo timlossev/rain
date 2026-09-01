@@ -1031,17 +1031,22 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Kanban board (/tickets/kanban): HTML5 drag-and-drop between status
-  // columns. Cards are draggable="true" (tickets/kanban.html); each
-  // column body is a dropzone. A successful drop calls the same
-  // service.update_status the ticket detail page's own status-stepper
-  // buttons call, just via a small JSON endpoint (rain.modules.tickets.
-  // router.kanban_update_status) instead of a full-page redirect -- the
-  // card moves in the DOM right away (optimistic), and only reverts back
-  // to its original column if that call comes back not-ok or fails
-  // outright (a stale status key, two people dragging the same card at
-  // once, a dropped connection), so the board never shows a move the
-  // server never actually recorded.
+  // Kanban board (/tickets/kanban): HTML5 drag-and-drop between columns.
+  // Cards are draggable="true" (tickets/kanban.html); each column body is
+  // a dropzone, either status-mode (data-status-key) or, with "Group by"
+  // switched to Assignee, assignee-mode (data-assignee-id, "" meaning
+  // Unassigned -- see dropzone.dataset.assigneeId !== undefined below for
+  // why that has to be a presence check, not a truthiness one). A
+  // successful drop calls the same service.update_status/update_assignee
+  // the ticket detail page's own status-stepper/assignee picker call,
+  // just via a small JSON endpoint (rain.modules.tickets.router.
+  // kanban_update_status/kanban_update_assignee) instead of a full-page
+  // redirect -- the card moves in the DOM right away (optimistic), and
+  // only reverts back to its original column if that call comes back
+  // not-ok or fails outright (a stale status key, someone no longer
+  // assignable, two people dragging the same card at once, a dropped
+  // connection), so the board never shows a move the server never
+  // actually recorded.
   const kanbanBoard = document.querySelector("[data-kanban-board]");
   if (kanbanBoard) {
     let dragged = null; // the card element currently being dragged
@@ -1119,8 +1124,19 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!dragged) return;
         const card = dragged;
         const origin = dragOrigin;
-        const newStatus = dropzone.dataset.statusKey;
         if (origin === dropzone) return; // dropped back into its own column
+
+        // Presence check, not truthiness -- data-assignee-id="" (the
+        // Unassigned column) is a real, valid assignee-mode dropzone, not
+        // a missing attribute the way a status-mode dropzone's dataset
+        // lacks this key entirely.
+        const isAssigneeMode = dropzone.dataset.assigneeId !== undefined;
+        const url = isAssigneeMode
+          ? `/tickets/${card.dataset.ticketId}/kanban-assignee`
+          : `/tickets/${card.dataset.ticketId}/kanban-status`;
+        const body = isAssigneeMode
+          ? `new_assignee_user_id=${encodeURIComponent(dropzone.dataset.assigneeId)}`
+          : `new_status=${encodeURIComponent(dropzone.dataset.statusKey)}`;
 
         dropzone.appendChild(card); // optimistic move -- same node, listeners intact
         updateColumnCount(origin);
@@ -1129,15 +1145,23 @@ document.addEventListener("DOMContentLoaded", () => {
         updateEmptyState(dropzone);
 
         try {
-          const resp = await fetch(`/tickets/${card.dataset.ticketId}/kanban-status`, {
+          const resp = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: `new_status=${encodeURIComponent(newStatus)}`,
+            body,
           });
           const data = resp.ok ? await resp.json() : null;
           if (!data || !data.ok) {
             revert(card, origin, dropzone);
             flashBoardError((data && data.error) || "Couldn't move that ticket -- try again.");
+          } else if (isAssigneeMode) {
+            // Status-mode needs no client-side text update -- the card's
+            // own status isn't shown as text on it. Assignee-mode's
+            // workload view does show it (kanban.html's kanban_card
+            // macro), so the just-moved card's own meta line has to
+            // reflect the new assignee without a full page reload.
+            const nameEl = card.querySelector("[data-kanban-assignee]");
+            if (nameEl) nameEl.textContent = data.assignee_name;
           }
         } catch (err) {
           revert(card, origin, dropzone);

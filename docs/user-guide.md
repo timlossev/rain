@@ -171,13 +171,31 @@ a recurring-arrow icon next to its title.
 
 The same tickets, and the same filter bar (type pills, status dropdown,
 asset picker, Mine/Unassigned/Problematic/Prioritized), as the ticket
-list -- laid out as one column per tenant-defined status instead of
-table rows. Drag a card into a different column to move it there, the
-same change the status stepper on that ticket's own detail page would
-make; the column's count updates immediately, and the card reverts
-back to its original column if the move didn't actually go through (a
-connectivity hiccup, or the status a card was dropped on having been
-deleted out from under the board by someone else in the meantime).
+list -- laid out in columns instead of table rows. A "Group by" switch
+above the board picks what the columns actually are:
+
+- **Status** (default): one column per tenant-defined status. Drag a
+  card into a different column to move it there, the same change the
+  status stepper on that ticket's own detail page would make.
+- **Assignee (workload)**: one column per this tenant's assignable
+  users (the same candidate list the assignee picker itself offers,
+  plus every internal admin) with an "Unassigned" column first. Drag a
+  card into someone's column to assign it to them, or into
+  "Unassigned" to clear the assignee -- the same change the ticket
+  detail page's own assignee picker would make. A ticket assigned to
+  someone no longer assignable to this tenant (deactivated, or moved
+  off it) still shows in its own column, labeled "not assignable
+  here," but isn't a drop target -- a card can be dragged out of it,
+  just not back in.
+
+Either way, the column's count updates immediately, and the card
+reverts back to its original column if the move didn't actually go
+through (a connectivity hiccup, or the target having been deleted or
+deactivated out from under the board by someone else in the
+meantime). Switching "Group by" keeps every filter currently applied;
+it only changes how the matching tickets are grouped, not which ones
+are shown.
+
 Each card shows the ticket number as its own pill (links to the
 ticket, same as the title below it does), then any problematic/
 approval icons and the severity badge, then the title, then assignee

@@ -657,3 +657,50 @@ async def test_platform_config_bundle_redacts_secrets_by_default():
     full = await config_bundle.build_platform_bundle(include_secrets=True)
     assert full["ldap"]["bind_password"] == "hunter2"
     assert "password_redacted" not in full["ldap"]
+
+
+async def test_list_assignable_users_scopes_by_tenant_and_active():
+    """rain.core.user_names.list_assignable_users backs Kanban's "group by
+    assignee" columns (rain.modules.tickets.router.kanban_board) -- it has
+    to return exactly the same candidate set is_assignable_user would
+    accept a write for, or a column could exist for someone a drag-drop
+    assignment then rejects. Covers the three ways that set is scoped:
+    this tenant's own active users, every active internal_admin
+    regardless of tenant, and NOT another tenant's users or a deactivated
+    one of this tenant's own."""
+    from rain.core.security import hash_password
+    from rain.core.user_names import is_assignable_user, list_assignable_users
+    from rain.db.control_models import User
+    from rain.db.provisioning import provision_tenant
+
+    tenant_a = await provision_tenant(slug="pi", name="Pi Corp")
+    tenant_b = await provision_tenant(slug="rho", name="Rho Corp")
+
+    async with control_session() as session:
+        own_active = User(
+            tenant_id=tenant_a.id, email="agent@pi.example", password_hash=hash_password("x"),
+            role_key="client", display_name="Pi Agent", auth_source="local", is_active=True,
+        )
+        own_inactive = User(
+            tenant_id=tenant_a.id, email="gone@pi.example", password_hash=hash_password("x"),
+            role_key="client", display_name="Pi Former Agent", auth_source="local", is_active=False,
+        )
+        other_tenant = User(
+            tenant_id=tenant_b.id, email="agent@rho.example", password_hash=hash_password("x"),
+            role_key="client", display_name="Rho Agent", auth_source="local", is_active=True,
+        )
+        admin = User(
+            tenant_id=None, email="root@instance.example", password_hash=hash_password("x"),
+            role_key="internal_admin", display_name="Root Admin", auth_source="local", is_active=True,
+        )
+        session.add_all([own_active, own_inactive, other_tenant, admin])
+        await session.commit()
+
+        candidates = await list_assignable_users(tenant_a.id)
+        names = {u.display_name for u in candidates}
+        assert names == {"Pi Agent", "Root Admin"}
+
+        assert await is_assignable_user(own_active.id, tenant_a.id) is True
+        assert await is_assignable_user(admin.id, tenant_a.id) is True
+        assert await is_assignable_user(own_inactive.id, tenant_a.id) is False
+        assert await is_assignable_user(other_tenant.id, tenant_a.id) is False
