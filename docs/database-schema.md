@@ -10,9 +10,12 @@ should always agree with both:
   (the tenant schema, applied once per tenant). Every table's own
   docstring there explains the *why*; this doc is the *what*, for
   looking a table up without reading the whole file.
-- **Migrations**: `backend/migrations/control/versions/` (10, as of
-  this writing) and `backend/migrations/tenant/versions/` (47) --
-  Alembic, one linear chain per schema kind. A tenant schema migrates
+- **Migrations**: `backend/migrations/control/versions/` (9, as of
+  this writing) and `backend/migrations/tenant/versions/` (46) --
+  Alembic, one linear chain per schema kind, numbered sequentially
+  (`0001`, `0002`, ...) rather than Alembic's default random hex
+  revision ids, so the chain doubles as a build-number history -- see
+  "Migration history by number" below. A tenant schema migrates
   independently of `control`, and every tenant schema migrates
   independently of every other one (see `docs/architecture.md`'s own
   "Migrations" section for how that's kept in sync at startup).
@@ -143,6 +146,81 @@ out per-column below as "cross-schema" wherever it appears.
 | Table | Purpose |
 |---|---|
 | `audit_log` | Per-tenant change history for asset registry entities (a *different* table from `control.audit_log`, which is platform-level). |
+
+---
+
+## Migration history by number
+
+Every table/column above traces back to one of these -- `alembic -n
+tenant history` (or `-n control`) from `backend/` shows the same chain
+straight from the DB. Numbers are per schema kind: tenant `0046` and
+control `0009` are unrelated migrations that happen to share no
+numbering, run independently, and land in different schemas.
+
+### Tenant schema (`backend/migrations/tenant/versions/`)
+
+| # | Change |
+|---|---|
+| 0001 | Initial schema: Asset Registry (`asset_types`, `custom_fields`, `assets`, `asset_field_values`, `export_profiles`). |
+| 0002 | Ticketing: `syslog_events`, `ticket_rules`, `tickets`, `ticket_comments`, `notification_channels`. |
+| 0003 | Document repository: `documents`, `document_links`. |
+| 0004 | Platform Response Rules: `platform_event_rules`/`platform_event_actions`/`platform_event_triggers`. |
+| 0005 | `ticket_statuses` -- per-tenant customizable statuses, seeded with the previous hardcoded open/in_progress/resolved/closed. |
+| 0006 | Drop `notification_channels.notify_on_incident`/`notify_on_vulnerability`. |
+| 0007 | `ticket_status_changes` audit trail. |
+| 0008 | `calendar_entries` -- per-tenant calendar with recurring-entry presets. |
+| 0009 | `documents.updated_at` (documents became editable in-place). |
+| 0010 | `correlation_rules`/`correlation_rule_states` -- multi-event ("N matching events") rules; unified into `ticket_rules` at 0038. |
+| 0011 | `ticket_assignment_changes` audit trail. |
+| 0012 | `ticket_asset_changes` audit trail. |
+| 0013 | Groups & approvals: `groups`, `approval_flows`, `approval_flow_steps`, `change_approvals`, `change_approval_decisions`. |
+| 0014 | `chg_number_seq` -- ticket-number sequence for the "change" ticket type. |
+| 0015 | `groups.source`/`ldap_dn` -- distinguishes an LDAP-synced group from a local one. |
+| 0016 | `tickets.is_chronic` -- manually-set repeat-incident flag; renamed at 0027. |
+| 0017 | `ticket_field_changes` -- generic audit trail for simple field edits. |
+| 0018 | `export_profiles.scope` -- distinguishes an asset export profile from a ticket one. |
+| 0019 | `tickets.start_date`/`end_date`: `DATE` -> `TIMESTAMPTZ`. |
+| 0020 | `webhook_configs` -- centrally-configured outbound webhooks. |
+| 0021 | `webhook_configs.alert_on_failure`. |
+| 0022 | Drop the cloud-sync scaffolding (`sync_connections`, `sync_runs`). |
+| 0023 | Search: `search_vector` generated `tsvector` columns + GIN indexes on `tickets`/`documents`. |
+| 0024 | `notification_channels.message_template`/`subject_template`. |
+| 0025 | `assets.ci_number` -- human-readable identifier (`CI-000123`). |
+| 0026 | `tickets.reported_anonymously`. |
+| 0027 | `tickets.is_chronic` -> `is_problematic` (rename). |
+| 0028 | `ticket_watchers`. |
+| 0029 | `correlation_rules` gains a second `rule_type`, `ml_anomaly`. |
+| 0030 | `ticket_watchers.email` -- a watcher with no system account. |
+| 0031 | `syslog_events.event_format` (`plain`\|`cef`\|`json`\|`kv`). |
+| 0032 | Service Catalog: `service_catalog_items`, `service_catalog_fields`. |
+| 0033 | `approval_flows.notify_syslog_on_approval`. |
+| 0034 | `tickets.title`: widen `VARCHAR(255)` -> `VARCHAR(500)`. |
+| 0035 | `ticket_rules.combine_by_title`. |
+| 0036 | `documents.webhook_response_is_json`/`webhook_json_path`. |
+| 0037 | `custom_fields.scope` + `ticket_field_values` -- custom fields on tickets, not just assets. |
+| 0038 | Unify Event Promotion Policies and Correlation Rules into one `ticket_rules` table. |
+| 0039 | `documents.tags`. |
+| 0040 | `calendar_entries.document_id`. |
+| 0041 | `ticket_rules.ml_algorithm` + per-rule-state feature stats. |
+| 0042 | `documents.is_shareable`. |
+| 0043 | `ticket_rules.ml_sidecar_enabled` -- ML scoring alongside a `repetition` rule. |
+| 0044 | `ticket_rules.approval_flow_id`. |
+| 0045 | `documents.show_on_landing_page`. |
+| 0046 | `documents.refresh_on_view`. |
+
+### `control` schema (`backend/migrations/control/versions/`)
+
+| # | Change |
+|---|---|
+| 0001 | Initial schema: `tenants`, `roles`, `users`, `sessions`, `global_config`, `auth_providers`, `syslog_source_map`, `audit_log`. |
+| 0002 | `syslog_source_map` -- source-to-tenant routing table. |
+| 0003 | LDAP auth provider: encrypted connection config + last-sync bookkeeping. |
+| 0004 | `syslog_source_map.action` (`route`\|`discard`). |
+| 0005 | Remove the seeded `oidc` `auth_providers` row -- SAML replaced it as the real SSO option. |
+| 0006 | Enable the `pgvector` extension. |
+| 0007 | `client_admin` role, pinned to one tenant like `client`. |
+| 0008 | `password_reset_tokens` -- self-service "Forgot password?" for local auth. |
+| 0009 | `branding_assets` -- durable backup of the branding logo. |
 
 ---
 
