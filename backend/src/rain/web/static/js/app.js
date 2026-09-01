@@ -419,6 +419,82 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
+
+  // "Escalate" (the ticket detail page's own button, the tickets list row
+  // menu, and the Kanban card menu) -- unlike "Analyze root cause" above,
+  // this is a single real action, not a preview: the POST this fires
+  // (rain.modules.tickets.router.escalate_ticket) actually calls the
+  // webhook and posts its result to the ticket before ever returning, so
+  // there's nothing left to confirm-and-post from inside the modal --
+  // it's shown purely to report what already happened. Still confirmed
+  // first (data-confirm-text, read directly here rather than relying on
+  // the generic form[data-confirm] handler above, which listens for its
+  // own submit event on the SAME element this reuses -- two independent
+  // listeners on one submit would either double-prompt or, worse, let
+  // this one's fetch through even after the other's confirm() was
+  // cancelled, since preventDefault() from one listener doesn't stop a
+  // later listener from still running).
+  const escalateModal = document.querySelector("#escalate-modal");
+  const escalateBody = document.querySelector("#escalate-modal-body");
+  document.querySelectorAll("[data-escalate-form]").forEach((form) => {
+    form.addEventListener("submit", async (evt) => {
+      evt.preventDefault();
+      if (!escalateModal || !window.confirm(form.dataset.confirmText || "Escalate this ticket?")) return;
+      const menuPanel = form.closest("[data-menu-panel]");
+      if (menuPanel) {
+        menuPanel.hidden = true;
+        menuPanel.closest("[data-menu]")?.querySelector("[data-menu-toggle]")?.setAttribute("aria-expanded", "false");
+      }
+      escalateBody.innerHTML = "<p class=\"muted\">Escalating...</p>";
+      escalateModal.hidden = false;
+      try {
+        const resp = await fetch(form.action, { method: "POST" });
+        escalateBody.innerHTML = resp.ok ? await resp.text() : "<p class=\"muted\">Couldn't escalate this ticket.</p>";
+        const copyBtn = escalateBody.querySelector("#escalate-copy-btn");
+        const textEl = escalateBody.querySelector("#escalate-result-text");
+        if (copyBtn && textEl) {
+          copyBtn.addEventListener("click", () => {
+            navigator.clipboard.writeText(textEl.textContent).then(() => {
+              const original = copyBtn.textContent;
+              copyBtn.textContent = "Copied!";
+              setTimeout(() => { copyBtn.textContent = original; }, 1500);
+            });
+          });
+        }
+      } catch (err) {
+        escalateBody.innerHTML = "<p class=\"muted\">Couldn't escalate this ticket.</p>";
+      }
+    });
+  });
+
+  // A ticket's own "Source event" field -- opens the exact same full-
+  // event modal the Events tab's own row click/"View full message" menu
+  // item does (#live-message-modal, now shared in base.html; see
+  // rain.modules.tickets.live.live_event_full). live.js drives the
+  // Events tab's own triggers directly against these same element ids,
+  // so this only needs to handle the one trigger that page doesn't have.
+  const sourceEventModal = document.querySelector("#live-message-modal");
+  const sourceEventTitle = document.querySelector("#live-message-title");
+  const sourceEventBody = document.querySelector("#live-message-body");
+  document.querySelectorAll("[data-source-event]").forEach((el) => {
+    el.addEventListener("click", async (evt) => {
+      evt.preventDefault();
+      if (!sourceEventModal) return;
+      sourceEventTitle.textContent = `Event #${el.dataset.sourceEvent}`;
+      sourceEventBody.innerHTML = "<p class=\"muted\">Loading...</p>";
+      sourceEventModal.hidden = false;
+      try {
+        // Same route the Events tab's own modal calls -- both success
+        // and 404 already return ready-to-show HTML, no need to branch
+        // on resp.ok here.
+        const resp = await fetch(`/tickets/live/${el.dataset.sourceEvent}/full`);
+        sourceEventBody.innerHTML = await resp.text();
+      } catch (err) {
+        sourceEventBody.innerHTML = "<p class=\"muted\">Couldn't load this event.</p>";
+      }
+    });
+  });
+
   // Client portal: ticket number click -> lightweight timeline modal
   // (rain.modules.portal.router.portal_ticket_timeline), same fetch-and-
   // inject shape as the doc-preview modal just above. The modal title
@@ -926,19 +1002,23 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // /tickets row-spacing switch (Normal / Condensed) -- a pure display
-  // toggle on .tickets-table itself, persisted per browser the same way
-  // the sidebar's own collapsed state is. Doesn't touch how many tickets
-  // are fetched or shown per page -- see the tenant-level page-size
-  // setting for that; this only controls how tightly the rows already on
-  // the page are drawn.
+  // Row-spacing switch (Normal / Condensed) -- a pure display toggle,
+  // persisted per browser the same way the sidebar's own collapsed state
+  // is. One shared preference (one localStorage key) across every page
+  // that offers it, not a separate one per page -- someone who likes a
+  // tight view generally wants it everywhere, not re-chosen per screen.
+  // The toggle itself doesn't know or care what it's condensing; it just
+  // flips .density-condensed on whichever single element on this page
+  // opts in via [data-density-target] -- .tickets-table on /tickets,
+  // .live-feed on /tickets/live -- each with its own CSS for what
+  // "condensed" actually tightens (row padding, mostly).
   const densityToggle = document.querySelector("[data-density-toggle]");
-  const densityTable = document.querySelector(".tickets-table");
-  if (densityToggle && densityTable) {
-    const DENSITY_KEY = "rain-tickets-density";
+  const densityTarget = document.querySelector("[data-density-target]");
+  if (densityToggle && densityTarget) {
+    const DENSITY_KEY = "rain-density";
     const buttons = Array.from(densityToggle.querySelectorAll("[data-density]"));
     const apply = (density) => {
-      densityTable.classList.toggle("density-condensed", density === "condensed");
+      densityTarget.classList.toggle("density-condensed", density === "condensed");
       buttons.forEach((btn) => btn.classList.toggle("active", btn.dataset.density === density));
     };
     apply(localStorage.getItem(DENSITY_KEY) === "condensed" ? "condensed" : "normal");

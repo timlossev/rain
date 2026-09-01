@@ -34,8 +34,8 @@
       <button type="submit" class="btn btn-sm{% if is_watching %} active{% endif %}">{{ "Stop watching" if is_watching else "Watch" }}</button>
     </form>
     {% if can_escalate %}
-    <form method="post" action="/tickets/{{ ticket.id }}/escalate" class="inline" data-confirm="Escalate {{ ticket.ticket_number }}?">
-      <button type="submit" class="btn btn-sm btn-danger">Escalate</button>
+    <form method="post" action="/tickets/{{ ticket.id }}/escalate" class="inline" data-escalate-form data-confirm-text="{{ escalate_label }} {{ ticket.ticket_number }}?">
+      <button type="submit" class="btn btn-sm btn-danger">{{ escalate_label }}</button>
     </form>
     {% endif %}
     <button type="button" class="btn btn-sm" data-analyze-root-cause="{{ ticket.id }}" title="Looks for a repeat-occurrence pattern and similar past closed tickets">Analyze root cause</button>
@@ -63,6 +63,7 @@
       </span>
       {% if ticket.is_problematic %}<span class="badge problematic-badge">{{ nav_icon("repeat") }} Problematic</span>{% endif %}
       <span class="badge badge-accent">{{ nav_icon("alert-triangle" if ticket.ticket_type == "incident" else ("shield" if ticket.ticket_type == "vulnerability" else "swap")) }} {{ ticket.ticket_type | capitalize }}</span>
+      {% if ticket.created_at %}<span class="badge timestamp-pill">Created {{ ticket.created_at.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
     </div>
     <div class="ticket-title-edit" data-inline-edit>
       <div class="ticket-title-display" data-inline-edit-display>
@@ -116,7 +117,7 @@
         {%- elif ticket.source_rule %}Event Promotion Policy: {{ ticket.source_rule.name }}
         {%- else %}-{% endif %}
       </td></tr>
-      <tr><th>Source event</th><td class="muted">{% if ticket.source_event_id %}#{{ ticket.source_event_id }}{% else %}manually created{% endif %}</td></tr>
+      <tr><th>Source event</th><td class="muted">{% if ticket.source_event_id %}<a href="#" data-source-event="{{ ticket.source_event_id }}" title="Preview the full event">#{{ ticket.source_event_id }}</a>{% else %}manually created{% endif %}</td></tr>
       {% if ticket.source_rule %}
       <tr><th>Event Promotion Policy</th><td class="muted"><a href="/tickets/rules/{{ ticket.source_rule.id }}/edit">{{ ticket.source_rule.name }}</a></td></tr>
       {% endif %}
@@ -129,7 +130,6 @@
       {% if ticket.ticket_type == "change" %}
       <tr><th>Change window</th><td class="muted">{{ ticket.start_date.strftime("%Y-%m-%d %H:%M") if ticket.start_date else "?" }} &rarr; {{ ticket.end_date.strftime("%Y-%m-%d %H:%M") if ticket.end_date else "?" }}</td></tr>
       {% endif %}
-      <tr><th>Created</th><td class="muted">{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td></tr>
     </tbody>
   </table>
 

@@ -9,7 +9,7 @@
     <div class="card-title">{{ entry.doc.title }}</div>
     {% set last_updated = entry.doc.last_refreshed_at or entry.doc.updated_at or entry.doc.created_at %}
     {% if last_updated %}
-    <span class="badge doc-version-pill">Version from {{ last_updated.strftime("%Y-%m-%d %H:%M") }}</span>
+    <span class="badge timestamp-pill">Version from {{ last_updated.strftime("%Y-%m-%d %H:%M") }}</span>
     {% endif %}
   </div>
   {% if entry.html %}

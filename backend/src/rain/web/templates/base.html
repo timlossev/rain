@@ -197,6 +197,39 @@
     <div class="modal-body" id="analyze-root-cause-body"><p class="muted">Analyzing...</p></div>
   </div>
 </div>
+{# Shared by the ticket detail page's own "Escalate" button, the tickets
+   list row menu, and the Kanban card menu (app.js's [data-escalate-
+   ticket], fetching rain.modules.tickets.router.escalate_ticket) -- the
+   webhook has already fired and its result already posted to the ticket
+   by the time this shows anything, unlike the root-cause modal above
+   (which only posts once someone chooses to, from inside it). #}
+<div class="modal-overlay" id="escalate-modal" hidden data-modal>
+  <div class="modal-box">
+    <div class="modal-header">
+      <span>Escalation result</span>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="escalate-modal-body"><p class="muted">Escalating...</p></div>
+  </div>
+</div>
+{# Full syslog event detail -- the Events tab (rain.modules.tickets.
+   live.py's live_event_full route, live.js's own openFullMessage,
+   reachable by clicking a row or "View full message" in its [...]
+   menu) and a ticket's own "Source event" field (app.js's [data-
+   source-event]) both fetch-and-inject into this one modal, so the
+   same window ("here's the full message/parsed fields/raw body for
+   this event") looks and behaves identically from either place. Lives
+   here, not on either page alone, for the same reason the root-cause
+   and escalate modals above do. #}
+<div class="modal-overlay" id="live-message-modal" hidden data-modal>
+  <div class="modal-box modal-box-wide">
+    <div class="modal-header">
+      <span id="live-message-title"></span>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="live-message-body"><p class="muted">Loading...</p></div>
+  </div>
+</div>
 {% endif %}
 <script src="/static/js/app.js?v={{ asset_version }}"></script>
 {% block extra_scripts %}{% endblock %}

@@ -142,7 +142,8 @@ list with:
 - Quick-filter chips: "Mine" (tickets assigned to you), "Unassigned",
   "Problematic" (only tickets flagged problematic), and "Prioritized"
   (only the two highest severities -- "high" and "critical" today).
-- A Normal/Condensed row-spacing switch, remembered per browser --
+- A Normal/Condensed row-spacing switch, remembered per browser (the
+  same preference the Events tab's own switch reads and writes) --
   Condensed tightens row padding so more tickets fit on screen without
   scrolling. Display only; it doesn't change how many tickets are
   fetched or how many fit on a page (see "Tenant defaults" under Admin
@@ -224,23 +225,29 @@ quick actions: "Promote to Change" (incidents/vulnerabilities only),
 "Mark problematic" / "Unmark problematic", "Watch" / "Stop watching"
 (get emailed on this ticket's new comments and status changes -- you're
 watching automatically if you reported it or it's assigned to you, this
-button is for anyone else), "Escalate" (only shown once your tenant has
-an escalation webhook configured -- Admin > Branding -- fires it for
-this one ticket on demand, filling in that webhook's placeholders from
-this exact ticket -- see "Placeholders reference" under Webhooks below),
-"Analyze root cause" (opens a small window with a repeat-occurrence
-pattern, if this ticket accumulated more than one promoted syslog
-event, and similar past *closed* tickets by title/description match --
-statistical/historical signals, not a determined cause. From there,
-"Post as a comment" adds it to the ticket's activity feed, "Copy to
-clipboard" copies the text without posting anything, or "Close" just
-dismisses it. Available regardless of the automatic-at-closure setting
-below; also reachable from the same ticket's row on the tickets list,
-via its own [...] menu), and "Export to PDF". The tickets list row menu
-mirrors this whole button row -- Promote to Change, Mark/Unmark
-problematic, Watch/Stop watching, Escalate, and Analyze root cause are
-all there too, under the same conditions, alongside that menu's own
-list-only quick actions (Mark closed, Mark cancelled for a change).
+button is for anyone else), the escalate button -- labeled "Escalate"
+by default, but renamable tenant-wide under Admin > Branding -- Public
+incident portal (only shown once your tenant has an escalation webhook
+configured there too): fires that webhook for this one ticket on
+demand, filling in its placeholders from this exact ticket (see
+"Placeholders reference" under Webhooks below), then shows the
+webhook's actual response in a small window and posts it to the
+ticket's activity feed as a comment -- not just a note that it fired,
+what the receiving system actually said. "Analyze root cause" (opens a
+small window with a repeat-occurrence pattern, if this ticket
+accumulated more than one promoted syslog event, and similar past
+*closed* tickets by title/description match -- statistical/historical
+signals, not a determined cause. From there, "Post as a comment" adds
+it to the ticket's activity feed, "Copy to clipboard" copies the text
+without posting anything, or "Close" just dismisses it. Available
+regardless of the automatic-at-closure setting below; also reachable
+from the same ticket's row on the tickets list, via its own [...]
+menu), and "Export to PDF". The tickets list row menu and the Kanban
+board's own card menu both mirror this whole button row -- Promote to
+Change, Mark/Unmark problematic, Watch/Stop watching, Escalate, and
+Analyze root cause are all there too, under the same conditions,
+alongside that menu's own list-only quick actions (Mark closed, Mark
+cancelled for a change).
 
 Below that is the main card:
 
@@ -248,6 +255,7 @@ Below that is the main card:
   pick a new severity from the dropdown that appears, Save or Cancel.
 - A problematic badge if the ticket is flagged problematic.
 - A type badge (Incident/Vulnerability/Change).
+- A "Created" pill with the ticket's creation timestamp.
 - The title, also editable inline the same way as severity.
 - The description, shown as plain read-only text (edit it via the
   Activity feed's comment box instead, or from wherever the ticket was
@@ -255,11 +263,13 @@ Below that is the main card:
 - A metadata table: Assignee and Asset (both editable inline via the
   same type-to-search picker used on the New ticket form, each with
   its own Save button), Reported by (shows the user who filed it, or
-  which Event Promotion Policy auto-created it), Source event (the
-  originating syslog event ID, or "manually created"), Promoted from
-  (if this ticket was promoted from another one, a link back to it),
-  Change window (start and end date/time, on change tickets only), and
-  Created (timestamp).
+  which Event Promotion Policy auto-created it), Source event (a link,
+  if this ticket was promoted from one -- opens the same full-event
+  preview window the Events tab itself uses: host, program, severity,
+  the full message, parsed fields, and raw body; just "manually
+  created" if there isn't one), Promoted from (if this ticket was
+  promoted from another one, a link back to it), and Change window
+  (start and end date/time, on change tickets only).
 - The document links list for this ticket (see Documents below for how
   linking works) with an inline "Add link" control.
 - If your tenant has defined any ticket custom fields, a "Custom
@@ -294,10 +304,13 @@ this ticket, each entry naming who or what caused it and when.
 The live view of the syslog listener's incoming stream, at Records
 Authority > Events. A status pill in the corner shows whether the feed
 is connected, and a Pause button freezes it in place so you can read
-without new events pushing the list around. Two filters narrow what's
-shown: a free-text filter matched against host, program, and message,
-and a minimum-severity dropdown (All / Info and up / Warning and up /
-Error and up / Alert and up, using syslog severity levels).
+without new events pushing the list around. A Normal/Condensed
+row-spacing switch (same as the ticket list's own, and the same
+remembered browser preference) tightens row height for fitting more
+on screen. Two filters narrow what's shown: a free-text filter matched
+against host, program, and message, and a minimum-severity dropdown
+(All / Info and up / Warning and up / Error and up / Alert and up,
+using syslog severity levels).
 
 A source doesn't have to send plain syslog text -- CEF, JSON, and
 Splunk-style key=value message bodies are all recognized and parsed
@@ -305,6 +318,11 @@ automatically, no configuration needed. When one is, a small badge
 (CEF / JSON / KV) appears next to the message, which is itself a
 readable one-line summary pulled from whatever that format's own
 "this is what happened" field was, rather than the raw structured text.
+Click a row (or "View full message" from the selection menu below) to
+open the full event in a window: host, program, severity, the
+complete message, parsed fields, and the raw body as received -- the
+same window a ticket's own "Source event" link opens, if it was
+promoted from one of these.
 
 Check the boxes next to one or more events to reveal a selection menu
 with four bulk actions: "Turn these into incidents", "Turn these into
@@ -887,9 +905,13 @@ tenant; internal_admin needs to switch to a tenant first):
   unaccented page showing only the tenant's own name -- for a portal
   shared outside your own organization.
 - **Escalation webhook**: which of this tenant's configured webhooks
-  (Admin > Webhooks) the Escalate button calls, on the ticket detail
-  page and here. Leave unset and no Escalate button shows anywhere for
-  this tenant.
+  (Admin > Webhooks) the escalate button calls -- the ticket detail
+  page, the tickets list and Kanban board's own row menus, and here.
+  Leave unset and no escalate button shows anywhere for this tenant.
+- **Escalation button label**: what that button/menu item is actually
+  called, everywhere it appears; defaults to "Escalate." Rename it to
+  match what the webhook above actually does, e.g. "Page On-Call" or
+  "Notify Ops."
 - **Shareable documents tab name**: what the tab above is labeled;
   defaults to "Shareable documents."
 

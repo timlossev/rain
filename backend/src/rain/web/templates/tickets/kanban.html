@@ -48,9 +48,9 @@
         <a class="row-menu-item" href="/tickets/new?ticket_type=change&amp;source_ticket_id={{ t.id }}">Promote to Change</a>
         {% endif %}
         {% if can_escalate %}
-        <form method="post" action="/tickets/{{ t.id }}/escalate" data-confirm="Escalate {{ t.ticket_number }}?">
+        <form method="post" action="/tickets/{{ t.id }}/escalate" data-escalate-form data-confirm-text="{{ escalate_label }} {{ t.ticket_number }}?">
           <input type="hidden" name="next" value="/tickets/kanban?{{ filters.qs('/tickets/kanban', include_sort=false) }}">
-          <button type="submit" class="row-menu-item danger">Escalate</button>
+          <button type="submit" class="row-menu-item danger">{{ escalate_label }}</button>
         </form>
         {% endif %}
         <button type="button" class="row-menu-item" data-analyze-root-cause="{{ t.id }}">Analyze root cause</button>

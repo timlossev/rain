@@ -63,10 +63,15 @@
     <div class="field">
       <label for="escalation_webhook_id">Escalation webhook</label>
       <select id="escalation_webhook_id" name="escalation_webhook_id">
-        <option value="">Don't show an Escalate button</option>
+        <option value="">Don't show an "{{ escalate_button_label }}" button</option>
         {% for w in webhooks %}<option value="{{ w.id }}" {% if escalation_webhook_id == w.id %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
       </select>
-      <div class="field-hint">Called by the "Escalate" button on this tenant's tickets - on the ticket detail page, and next to a signed-in visitor's own tickets in the portal. {% if not webhooks %}No webhooks yet - create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.{% endif %}</div>
+      <div class="field-hint">Called by the "{{ escalate_button_label }}" button on this tenant's tickets - on the ticket detail page, the tickets list and Kanban board's own row menus, and next to a signed-in visitor's own tickets in the portal. {% if not webhooks %}No webhooks yet - create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.{% endif %}</div>
+    </div>
+    <div class="field">
+      <label for="escalate_button_label">Escalation button label</label>
+      <input type="text" id="escalate_button_label" name="escalate_button_label" value="{{ escalate_button_label }}" placeholder="Escalate">
+      <div class="field-hint">What that button/menu item is actually labeled, wherever it appears - rename it to whatever fits what the webhook above actually does, e.g. "Page On-Call" or "Notify Ops".</div>
     </div>
     <div class="field">
       <label for="portal_shareable_documents_label">Shareable documents tab name</label>

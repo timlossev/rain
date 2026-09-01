@@ -1,0 +1,27 @@
+{# Fetched by app.js's [data-escalate-ticket] handler into base.html's
+   shared #escalate-modal -- see rain.modules.tickets.router's
+   escalate_ticket. Unlike the root-cause preview modal, the webhook has
+   already fired and the result already posted (a field-change entry plus
+   a comment, service.escalate_ticket) by the time this renders -- there's
+   no separate "confirm"/"post" step here, this is purely "here's what
+   just happened". #}
+{% if error %}
+<p class="muted">{{ error }}</p>
+{% else %}
+<div class="flash {{ 'flash-ok' if outcome.success else 'flash-error' }}">
+  {% if outcome.success %}
+  Escalated via {{ outcome.webhook_name }} (HTTP {{ outcome.status_code }}). Posted to the ticket as a comment.
+  {% else %}
+  Escalation via {{ outcome.webhook_name }} failed: {{ outcome.error or ("HTTP " ~ outcome.status_code) }}. Logged to the ticket's activity feed.
+  {% endif %}
+</div>
+{% if outcome.body.strip() %}
+<pre class="doc-preview-text" id="escalate-result-text">{{ outcome.body }}</pre>
+{% endif %}
+{% endif %}
+<div class="modal-actions">
+  {% if outcome and outcome.body.strip() %}
+  <button type="button" class="btn btn-sm" id="escalate-copy-btn">Copy to clipboard</button>
+  {% endif %}
+  <button type="button" class="btn btn-sm" data-modal-close>Close</button>
+</div>

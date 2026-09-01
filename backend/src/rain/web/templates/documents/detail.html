@@ -45,7 +45,7 @@
        reasonable "how current is this" at a glance. #}
     {% set last_updated = doc.last_refreshed_at or doc.updated_at or doc.created_at %}
     {% if last_updated %}
-    <div class="doc-last-updated"><span class="badge doc-version-pill">Last updated {{ last_updated.strftime("%Y-%m-%d %H:%M") }}</span></div>
+    <div class="doc-last-updated"><span class="badge timestamp-pill">Last updated {{ last_updated.strftime("%Y-%m-%d %H:%M") }}</span></div>
     {% endif %}
     <form method="post" action="/documents/{{ doc.id }}/body" data-md-editor>
       {% if body_kind == "markdown" %}
@@ -116,7 +116,7 @@
 
     <div class="field field-inline-row">
       <label>Uploaded</label>
-      <span class="badge doc-version-pill">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</span>
+      <span class="badge timestamp-pill">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</span>
     </div>
 
     <form method="post" action="/documents/{{ doc.id }}/description">

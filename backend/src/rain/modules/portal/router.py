@@ -284,11 +284,15 @@ async def portal_form(
         # catalog_items above: that mode renders nothing but the
         # Shareable documents tab.
         todays_events = [] if anonymous_shared_only else await calendar_service.list_due_today(tenant_db)
-        # Same webhook the ticket detail page's own Escalate button uses
-        # (Admin > Branding); only meaningful once signed in, since the
-        # "Tickets reported by me" table it appears next to only renders
-        # for one.
-        escalation_webhook_id = await get_tenant_config(tenant_db, "escalation_webhook_id", None) if user is not None else None
+        # Same webhook (and its rename-able label) the ticket detail
+        # page's own Escalate button uses (Admin > Branding); only
+        # meaningful once signed in, since the "Tickets reported by me"
+        # table it appears next to only renders for one.
+        escalation_settings = (
+            await get_tenant_configs(tenant_db, ["escalation_webhook_id", "escalate_button_label"])
+            if user is not None
+            else {"escalation_webhook_id": None, "escalate_button_label": "Escalate"}
+        )
 
     return templates.TemplateResponse(
         request,
@@ -311,7 +315,8 @@ async def portal_form(
             "shareable_documents_label": shareable_documents_label,
             "catalog_items": catalog_items,
             "todays_events": todays_events,
-            "can_escalate": escalation_webhook_id is not None,
+            "can_escalate": escalation_settings["escalation_webhook_id"] is not None,
+            "escalate_label": escalation_settings["escalate_button_label"],
             "created": created_ticket.ticket_number if created_ticket is not None else "",
             "error": _PORTAL_ERRORS.get(error, ""),
         },

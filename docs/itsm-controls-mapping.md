@@ -348,8 +348,8 @@ The Essential Eight is a prioritized set of eight mitigation strategies. While r
 
 | Essential Eight Strategy | ITSM Dependency |
 |---|---|
-| Patch applications (ML1–ML3) | Requires tracked, time-bound patch remediation -- operationalized through change/remediation tickets with SLA enforcement |
-| Restrict administrative privileges (ML1–ML3) | Requires documented justification and approval for privileged accounts -- operationalized through access request tickets |
+| Patch applications (ML1-ML3) | Requires tracked, time-bound patch remediation -- operationalized through change/remediation tickets with SLA enforcement |
+| Restrict administrative privileges (ML1-ML3) | Requires documented justification and approval for privileged accounts -- operationalized through access request tickets |
 | Application control | Changes to approved application lists must be formally managed -- operationalized through change tickets |
 
 ISM (Information Security Manual) -- the full Australian government security framework, mandatory for government agencies and used by the IRAP (Infosec Registered Assessors Program) assessment process. The ISM contains over 800 controls across change management (ISM-1406, ISM-1219), incident management (ISM-0140, ISM-0576), asset management (ISM-1401), and access control (ISM-0430, ISM-0441) that parallel the FedRAMP controls in this document almost exactly. IRAP assessors require documentary evidence of each control, not policy references.

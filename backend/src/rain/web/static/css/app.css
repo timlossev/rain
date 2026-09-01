@@ -864,16 +864,19 @@ form.inline { display: inline; }
 .muted { color: var(--text-muted); }
 /* The "Last updated <timestamp>" pill above a document's own Contents
    tab -- right-aligned (a metadata aside, not something competing with
-   the editor below it) and spaced off from what follows. .doc-version-
-   pill (below) is the same pill Home's per-document freshness label
-   already uses, for the same "when was this actually last current"
-   information in the other place a document's content renders. */
+   the editor below it) and spaced off from what follows. .timestamp-pill
+   (below) is the same generic pill Home's per-document freshness label,
+   a document's own "Uploaded" pill, and a ticket's "Created" pill all
+   share. */
 .doc-last-updated { display: flex; justify-content: flex-end; margin-bottom: 8px; }
-/* Home's per-document freshness pill (.card-title-row, above) -- .badge's
-   own uppercase/letter-spacing/bold suits a short status word ("HIGH",
-   "INCIDENT"), not a sentence-shaped "Version from <timestamp>", so this
-   overrides those three specifically rather than styling from scratch. */
-.doc-version-pill { text-transform: none; letter-spacing: normal; font-weight: 400; font-size: 0.75rem; flex-shrink: 0; }
+/* A pill showing a sentence-shaped date/time ("Version from ...",
+   "Created ..."), not a short status word -- .badge's own uppercase/
+   letter-spacing/bold suits "HIGH"/"INCIDENT", not that, so this
+   overrides those three specifically rather than styling from scratch.
+   Started as documents-only (hence a name that once said "doc"), now
+   reused wherever a timestamp needs the same treatment (tickets/
+   detail.html's own "Created" pill included). */
+.timestamp-pill { text-transform: none; letter-spacing: normal; font-weight: 400; font-size: 0.75rem; flex-shrink: 0; }
 
 /* ---------- calendar ---------- */
 table.calendar-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -1453,6 +1456,12 @@ td.actions { text-align: right; white-space: nowrap; }
 }
 .live-row:hover { background: var(--surface); }
 .live-row:last-child { border-bottom: none; }
+/* Normal/Condensed row-spacing switch (same [data-density-target]
+   mechanism the ticket list's own .tickets-table.density-condensed
+   uses) -- .live-row's normal padding (6px 10px) is already tighter
+   than a table row's own (9px 10px), so condensed just about halves it
+   again rather than matching the table's exact condensed value. */
+.live-feed.density-condensed .live-row { padding: 2px 10px; }
 .live-select { cursor: pointer; }
 .live-time { color: var(--text-muted); }
 .live-host, .live-program { overflow: hidden; text-overflow: ellipsis; }

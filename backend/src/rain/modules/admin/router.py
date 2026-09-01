@@ -86,13 +86,20 @@ async def _portal_settings(ctx: RequestContext) -> dict:
             "portal_branded": True,
             "escalation_webhook_id": None,
             "portal_shareable_documents_label": "Shareable documents",
+            "escalate_button_label": "Escalate",
             "portal_tenant": None,
             "webhooks": [],
         }
     async with tenant_session(ctx.active_tenant.schema_name) as tenant_db:
         flags = await get_tenant_configs(
             tenant_db,
-            ["portal_require_auth", "portal_branded", "escalation_webhook_id", "portal_shareable_documents_label"],
+            [
+                "portal_require_auth",
+                "portal_branded",
+                "escalation_webhook_id",
+                "portal_shareable_documents_label",
+                "escalate_button_label",
+            ],
         )
         webhooks = list((await tenant_db.execute(select(WebhookConfig).order_by(WebhookConfig.name))).scalars())
         return {**flags, "portal_tenant": ctx.active_tenant, "webhooks": webhooks}
@@ -204,15 +211,16 @@ async def branding_portal_submit(
     portal_branded: bool = Form(False),
     escalation_webhook_id: str = Form(""),
     portal_shareable_documents_label: str = Form("Shareable documents"),
+    escalate_button_label: str = Form("Escalate"),
     ctx: RequestContext = Depends(get_request_context),
     user: CurrentUser = Depends(require_admin),
 ):
     """Saves rain.modules.portal's per-tenant flags, plus the escalation
-    webhook, for whichever tenant is currently active. A no-op (not an
-    error) with no active tenant -- there's nothing to save into --
-    since the page that posts here already hides this form in that case
-    rather than blocking the whole Branding screen on picking one
-    first."""
+    webhook and its own button/menu-item label, for whichever tenant is
+    currently active. A no-op (not an error) with no active tenant --
+    there's nothing to save into -- since the page that posts here
+    already hides this form in that case rather than blocking the whole
+    Branding screen on picking one first."""
     if ctx.active_tenant is not None:
         async with tenant_session(ctx.active_tenant.schema_name) as tenant_db:
             await set_tenant_configs(
@@ -222,6 +230,7 @@ async def branding_portal_submit(
                     "portal_branded": portal_branded,
                     "escalation_webhook_id": int(escalation_webhook_id) if escalation_webhook_id else None,
                     "portal_shareable_documents_label": portal_shareable_documents_label.strip() or "Shareable documents",
+                    "escalate_button_label": escalate_button_label.strip() or "Escalate",
                 },
                 updated_by=user.id,
             )

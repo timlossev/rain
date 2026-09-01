@@ -2,7 +2,17 @@
 {% block title %}Events - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}A live feed of incoming syslog events. Filter by text or minimum severity. Matching events get promoted to tickets by Event Promotion Policies.{% endblock %}
 {% block content %}
-<div class="panel-row" style="justify-content:flex-end;">
+<div class="panel-row" style="justify-content:flex-end; align-items:center;">
+  {# Same Normal/Condensed row-spacing switch as the ticket list
+     (app.js's [data-density-toggle], one shared localStorage
+     preference) -- .live-feed opts in via [data-density-target] below,
+     same as .tickets-table does there. margin-right:auto keeps this at
+     the row's own far left while .live-controls/#live-selection-menu
+     stay clustered together at the right, same as before this existed. #}
+  <div class="density-toggle" data-density-toggle role="group" aria-label="Row spacing" style="margin-right:auto;">
+    <button type="button" class="btn btn-sm" data-density="normal">Normal</button>
+    <button type="button" class="btn btn-sm" data-density="condensed">Condensed</button>
+  </div>
   <div class="live-controls">
     <span id="live-status" class="badge">connecting&hellip;</span>
     <button type="button" class="btn btn-sm" id="live-pause">Pause</button>
@@ -27,21 +37,6 @@
   </div>
 </div>
 
-{# Click a row (or "View full message" in the [...] menu above -- either
-   way, the WebSocket feed only ever carries a message truncated to 500
-   chars, never raw/parsed_fields, so this always goes back to the server
-   for the full row; see live.py's own docstring on this route. Same
-   fetch-and-inject-into-a-modal shape as the ticket-timeline/doc-preview
-   modals elsewhere in the app. #}
-<div class="modal-overlay" id="live-message-modal" hidden data-modal>
-  <div class="modal-box modal-box-wide">
-    <div class="modal-header">
-      <span id="live-message-title"></span>
-      <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
-    </div>
-    <div class="modal-body" id="live-message-body"><p class="muted">Loading...</p></div>
-  </div>
-</div>
 
 <form id="live-bulk-promote-form" method="post" action="/tickets/live/bulk-promote" hidden>
   <input type="hidden" name="event_ids">
@@ -68,7 +63,7 @@
       </select>
     </div>
   </div>
-  <div id="live-feed" class="live-feed" aria-live="polite"></div>
+  <div id="live-feed" class="live-feed" aria-live="polite" data-density-target></div>
 </div>
 {% endblock %}
 {% block extra_scripts %}<script src="/static/js/live.js?v={{ asset_version }}"></script>{% endblock %}

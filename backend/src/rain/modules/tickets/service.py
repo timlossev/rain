@@ -4,6 +4,7 @@ import datetime as dt
 import json
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import Sequence, func, select
@@ -784,9 +785,27 @@ async def update_asset(
     await db.commit()
 
 
+# Escalation responses are pasted into a comment verbatim (see
+# escalate_ticket below) -- capped so a receiving system's own error page
+# (an HTML 500, a stack trace) can't dump an unreasonably large blob into
+# the ticket's activity feed. Same spirit as documents.service's
+# _DIFF_MAX_LINES, just a character cap instead of a line cap since this
+# is arbitrary response text, not a diff.
+_ESCALATION_BODY_MAX_CHARS = 4000
+
+
+@dataclass
+class EscalationOutcome:
+    webhook_name: str
+    success: bool
+    status_code: int | None
+    body: str
+    error: str | None
+
+
 async def escalate_ticket(
     db: AsyncSession, ticket: Ticket, webhook: WebhookConfig, *, actor_user_id: int | None = None
-) -> str:
+) -> EscalationOutcome:
     """Fires the tenant's one configured escalation webhook (Admin >
     Branding > Public incident portal -- reused there since it's already
     the "portal & ticket-adjacent tenant settings" page) for this single
@@ -794,10 +813,18 @@ async def escalate_ticket(
     webhook" action, this isn't pattern-matched or automatic -- it's the
     "Escalate" button on the ticket detail page (and, for an
     authenticated portal visitor, next to their own tickets), fired by a
-    human who decided this one needs attention now. Logs the outcome to
-    the ticket's activity feed the same way a platform-rule firing does,
-    and to the webhook's own alert_on_failure path on a failed call.
-    Returns a short outcome string for the caller to flash back."""
+    human who decided this one needs attention now.
+
+    Two things get logged, not one: a terse field-change entry ("escalated
+    this ticket: <webhook> -> HTTP 200"), same as before, for a quick scan
+    of the activity timeline; and, new, a real comment attributed to
+    whoever clicked Escalate, carrying the webhook's actual response body
+    (capped at _ESCALATION_BODY_MAX_CHARS) -- what the receiving system
+    actually said, not just whether the call succeeded. Also logs to the
+    webhook's own alert_on_failure path on a failed call, same as always.
+    Returns the full outcome (not just the terse string the field-change
+    entry gets) for the caller to show in its own "here's what happened"
+    modal."""
     # Imported locally to avoid a module-load-time cycle: webhooks.service
     # imports tickets.rules, which imports this module -- same reason
     # create_ticket's platform_events import is local instead of top-level.
@@ -816,10 +843,32 @@ async def escalate_ticket(
         await webhook_service.alert_webhook_failure(
             db, webhook, result, context=f"Escalation of {ticket.ticket_number}"
         )
-    outcome = f"{webhook.name} -> {result.error}" if result.error else f"{webhook.name} -> HTTP {result.status_code}"
-    await log_field_change(db, ticket.id, "escalated", None, outcome, changed_by_user_id=actor_user_id, commit=False)
-    await db.commit()
-    return outcome
+    outcome_line = (
+        f"{webhook.name} -> {result.error}" if result.error else f"{webhook.name} -> HTTP {result.status_code}"
+    )
+    await log_field_change(
+        db, ticket.id, "escalated", None, outcome_line, changed_by_user_id=actor_user_id, commit=False
+    )
+
+    comment = f"Escalated via {webhook.name}." if result.success else f"Escalation via {webhook.name} failed."
+    comment += f" ({outcome_line.split(' -> ', 1)[1]})"
+    body = result.body.strip()
+    if body:
+        truncated = len(body) > _ESCALATION_BODY_MAX_CHARS
+        if truncated:
+            body = body[:_ESCALATION_BODY_MAX_CHARS]
+        comment += f"\n\nResponse:\n{body}"
+        if truncated:
+            comment += "\n... (truncated)"
+    await add_comment(db, ticket.id, author_user_id=actor_user_id, body=comment)
+
+    return EscalationOutcome(
+        webhook_name=webhook.name,
+        success=result.success,
+        status_code=result.status_code,
+        body=result.body,
+        error=result.error,
+    )
 
 
 async def list_approval_flows(db: AsyncSession) -> list[ApprovalFlow]:

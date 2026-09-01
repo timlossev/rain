@@ -214,9 +214,9 @@
               <td class="muted mobile-hide">{{ row.last_update_at.strftime("%Y-%m-%d %H:%M") if row.last_update_at else "-" }}</td>
               <td>
                 {% if can_escalate %}
-                <form method="post" action="/tickets/{{ row.ticket.id }}/escalate" class="inline" data-confirm="Escalate {{ row.ticket.ticket_number }}?">
+                <form method="post" action="/tickets/{{ row.ticket.id }}/escalate" class="inline" data-confirm="{{ escalate_label }} {{ row.ticket.ticket_number }}?">
                   <input type="hidden" name="next" value="/portal/{{ tenant.slug }}">
-                  <button type="submit" class="btn btn-sm btn-danger">Escalate</button>
+                  <button type="submit" class="btn btn-sm btn-danger">{{ escalate_label }}</button>
                 </form>
                 {% endif %}
               </td>

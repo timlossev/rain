@@ -288,6 +288,21 @@ FastAPI only special-cases an exact `Request`/`WebSocket` match even
 though both are Starlette `HTTPConnection` subclasses with the same
 `.cookies`.
 
+The WebSocket payload itself only ever carries `message[:500]`, never
+`raw`/`parsed_fields` (`live.py`'s `_event_payload`) -- too much to push
+per event on a busy stream. `GET /tickets/live/{event_id}/full`
+(`live.live_event_full`) is the fetch-and-inject fragment
+(`tickets/_live_event_full.html`) that goes back to the DB for the
+complete row, shown in `#live-message-modal` -- which lives in
+`base.html`, not `live.html`, specifically so a ticket's own "Source
+event" field (`[data-source-event]` in `app.js`, wherever `ticket.
+source_event_id` is set) can open the identical window without a second
+implementation: same route, same modal, same fragment, just a
+different trigger reading a different id (a ticket's `source_event_id`
+instead of a feed row's own `data-id`). 404s past the retention window
+or a deleted event render inline in the modal rather than erroring the
+page underneath it.
+
 **Event Promotion Policies (rule engine).** Each persisted event is
 checked against that tenant's active `ticket_rules`
 (`rain.modules.tickets.rules.evaluate_and_promote`) in `sort_order`.
@@ -450,13 +465,44 @@ fact the rule matched.
 
 **Escalation.** A per-tenant "escalation webhook" (one `WebhookConfig`,
 picked on Admin > Branding next to the portal's own settings, stored as
-`tenant_config["escalation_webhook_id"]`) backs a manual "Escalate"
-button shown on every ticket detail page -- and next to a signed-in
-portal visitor's own tickets -- whenever a tenant has one configured,
-absent otherwise. Unlike a Platform Response Rule's webhook action,
-this isn't pattern-matched or automatic: `rain.modules.tickets.service.
-escalate_ticket` fires it for one ticket, on demand, logged to that
-ticket's activity feed the same way a rule firing is.
+`tenant_config["escalation_webhook_id"]`) backs a manual escalate
+button/menu item shown on every ticket detail page, the tickets list
+and Kanban board's own row menus, and next to a signed-in portal
+visitor's own tickets -- whenever a tenant has one configured, absent
+otherwise. Its own label is a second tenant_config key,
+`escalate_button_label` (default `"Escalate"`), rendered wherever the
+button appears instead of a hardcoded string -- same idea as
+`portal_shareable_documents_label`. Unlike a Platform Response Rule's
+webhook action, this isn't pattern-matched or automatic: `rain.modules.
+tickets.service.escalate_ticket` fires it for one ticket, on demand.
+
+Two things get logged, not one: a terse field-change entry ("escalated
+this ticket: `<webhook>` -> HTTP 200"), same as before, for a quick
+scan of the activity timeline; and a real comment, attributed to
+whoever clicked it, carrying the webhook's actual response body
+(`_ESCALATION_BODY_MAX_CHARS`, 4000, caps it -- same "don't let a
+receiving system's own error page dump an unbounded blob into the
+ticket" reasoning as `documents.service`'s own diff cap). `escalate_
+ticket` returns an `EscalationOutcome` (webhook name, success,
+status_code, body, error) rather than the old bare outcome string, so
+a caller can show more than "it worked" -- the ticket detail page, list
+row menu, and Kanban card menu all do, via `app.js`'s `[data-escalate-
+form]` handler and a shared `#escalate-modal` (base.html, alongside the
+root-cause one). That handler intercepts the same `<form>` markup the
+old redirect-based flow used (now `data-escalate-form` +
+`data-confirm-text` instead of the generic `form[data-confirm]`
+selector -- deliberately its own listener, not stacked onto that
+generic one, since `preventDefault()` from one submit listener doesn't
+stop a *later* listener on the same event from still running, so a
+cancelled confirm() in the generic handler wouldn't have stopped this
+one's fetch), then fetches `POST /tickets/{id}/escalate` with no
+`next` field and renders the returned fragment (`tickets/_escalate_
+result.html`) into the modal. `next`'s presence is what the route
+branches on: sent (only the portal's own form still sends it, since it
+has no modal to show a result in) means fire, then redirect there as
+before; absent means fire, then return the fragment instead. Not
+content negotiation (an `Accept` header) -- just the one field the
+route already had a reason to read.
 
 **Export.** `GET/POST /tickets/export/run` -- CSV/JSON/Excel with the
 same configurable-column picker the Asset Registry exporter uses: a fixed
@@ -1236,12 +1282,19 @@ against a tenant schema's own connection, so calling `get_tenant_config`
 against a `control_session()` connection wouldn't just be semantically
 wrong, it would fail outright (no `tenant_config` table in `public`).
 
-**Row density** (the ticket list's own Normal/Condensed toggle,
-`[data-density-toggle]` in `app.js`) is an unrelated, purely client-side
-concern -- a `.density-condensed` class toggled on `.tickets-table`,
-persisted in `localStorage` the same way the sidebar's own collapsed state
-is. It changes how tightly the rows *already on the page* are drawn, not
-how many rows that page has -- that's what tenant page_size above governs.
+**Row density** (the Normal/Condensed toggle, `[data-density-toggle]` in
+`app.js`) is an unrelated, purely client-side concern -- a
+`.density-condensed` class toggled on whichever single element opts in
+via `[data-density-target]`, persisted in `localStorage` (one shared
+key, `rain-density`, across every page that offers it -- originally
+tickets-scoped, generalized once the Events tab got its own toggle) the
+same way the sidebar's own collapsed state is. It changes how tightly
+the rows *already on the page* are drawn, not how many rows that page
+has -- that's what tenant page_size above governs. The toggle logic
+itself doesn't know or care what it's condensing; `.tickets-table`
+(list.html) and `.live-feed` (live.html) each carry their own CSS for
+what "condensed" tightens on that specific layout (a table's own
+`td` padding vs. a `.live-row`'s already-tighter grid padding).
 
 **Custom JS injection.** Two more `TenantConfig.DEFAULTS` keys,
 `app_custom_js` and `portal_custom_js` -- raw HTML/JS an admin pastes in

@@ -6,6 +6,36 @@ the honest anchor point. Each entry is a synthesis of that day's commits,
 not a 1:1 commit dump; see `git log` for the literal history this is
 drawn from. Updated alongside every push to `main`.
 
+## 2026-09-01
+
+- **Renamable Escalate button**: Admin > Branding > Public incident
+  portal has a new "Escalation button label" field -- renames the
+  "Escalate" button/menu item everywhere it appears (ticket detail
+  page, tickets list and Kanban board row menus, and the client
+  portal's own per-ticket button) to whatever fits what the configured
+  webhook actually does, e.g. "Page On-Call".
+- **Escalation output capture**: escalating a ticket (from its own
+  page, the tickets list, or the Kanban board) now shows the webhook's
+  actual response in a modal, and posts it to the ticket as a comment
+  (attributed to whoever escalated it), not just a terse "escalated"
+  activity-feed line. The client portal's own Escalate button still
+  redirects back to the portal as before, but the response it fires
+  now gets the same rich comment too.
+- Ticket detail page: "Created" is now a pill next to the
+  priority/type badges instead of a row in the metadata table.
+- Ticket detail page: clicking "Source event" opens the exact same
+  full-event-preview modal the Events tab's own row click/"View full
+  message" menu item uses -- host/program/severity, the full message,
+  parsed fields, and raw body. That modal now lives in base.html
+  (shared), not live.html alone.
+- The Events tab now has the same Normal/Condensed row-spacing switch
+  as the ticket list -- one shared browser preference between the two,
+  not a separate choice per page.
+- README trimmed substantially (roughly 70%) -- kept the bite-sized
+  capabilities list and the essentials of getting started, moved the
+  detailed per-module walkthrough to `docs/user-guide.md` (already
+  covering it in more depth) rather than duplicating it here.
+
 ## 2026-08-31
 
 - **Fixed**: with "All" types selected, picking an asset (or changing

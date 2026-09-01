@@ -18,7 +18,7 @@ from rain.core.field_pack import sniff_columns
 from rain.core.pagination import paginate
 from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
-from rain.core.tenant_config import get_tenant_config, set_tenant_config
+from rain.core.tenant_config import get_tenant_config, get_tenant_configs, set_tenant_config
 from rain.core.user_names import is_assignable_user, resolve_user_names
 from rain.db.base import control_session
 from rain.db.control_models import User
@@ -135,7 +135,7 @@ async def list_tickets(
     # menu's "Analyze root cause"/Escalate/Watch items so they stay
     # available from exactly the same conditions either place -- see
     # tickets/detail.html and this module's ticket_detail.
-    escalation_webhook_id = await get_tenant_config(tenant_db, "escalation_webhook_id", None)
+    escalation_settings = await get_tenant_configs(tenant_db, ["escalation_webhook_id", "escalate_button_label"])
     watching_ids = await service.watching_ticket_ids(tenant_db, {t.id for t in ticket_page.items}, ctx.user.id)
     return templates.TemplateResponse(
         request,
@@ -157,7 +157,8 @@ async def list_tickets(
             "selected_sort": sort if sort in service.SORTABLE_COLUMNS else "created_at",
             "selected_dir": dir,
             "user_names": user_names,
-            "can_escalate": escalation_webhook_id is not None,
+            "can_escalate": escalation_settings["escalation_webhook_id"] is not None,
+            "escalate_label": escalation_settings["escalate_button_label"],
             "watching_ids": watching_ids,
         },
     )
@@ -220,7 +221,7 @@ async def kanban_board(
     extra_status_keys = sorted(k for k in columns if k not in known_keys)
 
     selected_asset = await asset_service.get_asset(tenant_db, asset_id) if asset_id else None
-    escalation_webhook_id = await get_tenant_config(tenant_db, "escalation_webhook_id", None)
+    escalation_settings = await get_tenant_configs(tenant_db, ["escalation_webhook_id", "escalate_button_label"])
     user_names = await resolve_user_names({t.assignee_user_id for t in tickets})
     watching_ids = await service.watching_ticket_ids(tenant_db, {t.id for t in tickets}, ctx.user.id)
 
@@ -243,7 +244,8 @@ async def kanban_board(
             "selected_problematic": bool(problematic),
             "selected_prioritized": bool(prioritized),
             "user_names": user_names,
-            "can_escalate": escalation_webhook_id is not None,
+            "can_escalate": escalation_settings["escalation_webhook_id"] is not None,
+            "escalate_label": escalation_settings["escalate_button_label"],
             "watching_ids": watching_ids,
         },
     )
@@ -632,7 +634,7 @@ async def ticket_detail(
         flows = await service.list_approval_flows(tenant_db)
 
     is_watching = await service.is_watching(tenant_db, ticket.id, ctx.user.id)
-    escalation_webhook_id = await get_tenant_config(tenant_db, "escalation_webhook_id", None)
+    escalation_settings = await get_tenant_configs(tenant_db, ["escalation_webhook_id", "escalate_button_label"])
 
     fields = await service.ticket_fields(tenant_db)
     field_values = {fv.field_id: fv.value for fv in ticket.field_values}
@@ -656,7 +658,8 @@ async def ticket_detail(
             "flows": flows,
             "group_names": group_names,
             "is_watching": is_watching,
-            "can_escalate": escalation_webhook_id is not None,
+            "can_escalate": escalation_settings["escalation_webhook_id"] is not None,
+            "escalate_label": escalation_settings["escalate_button_label"],
             "fields": fields,
             "field_values": field_values,
         },
@@ -787,6 +790,7 @@ async def toggle_watch(
 
 @router.post("/{ticket_id:int}/escalate")
 async def escalate_ticket(
+    request: Request,
     ticket_id: int,
     next: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
@@ -797,22 +801,38 @@ async def escalate_ticket(
     unlike Mark closed/problematic (list quick-actions, require_login the
     same as this), there's no separate permission tier for "this is
     urgent," and the button is only ever rendered at all when the tenant
-    has an escalation webhook configured (Admin > Branding). `next`
-    lets the portal's per-row Escalate button (which has nowhere else
-    useful to send someone with no session-based nav) return to the
-    portal page instead of a ticket detail page it might not even be
+    has an escalation webhook configured (Admin > Branding).
+
+    Two response shapes, chosen by whether `next` was sent, not by
+    content negotiation: the portal's own per-row Escalate button (which
+    has nowhere else useful to send someone with no session-based nav,
+    and no modal to show a result in) always sends `next` and gets the
+    original redirect-back-to-`next` behavior -- `next` lets it return to
+    the portal page instead of a ticket detail page it might not even be
     allowed to open (portal_require_auth off doesn't imply this visitor
-    can view /tickets/<n> -- that's still require_login)."""
+    can view /tickets/<n> -- that's still require_login). Every other
+    caller (the ticket detail page's own button, the tickets list row
+    menu, the Kanban card menu) is a plain JS-driven button, not a real
+    form submission -- data-escalate-ticket in app.js -- so it never
+    sends `next` at all, and gets the fragment (tickets/
+    _escalate_result.html) that populates their shared modal instead."""
     ticket = await tenant_db.get(Ticket, ticket_id)
-    if ticket is not None:
+    outcome = None
+    error = None
+    if ticket is None:
+        error = "Ticket not found."
+    else:
         webhook_id = await get_tenant_config(tenant_db, "escalation_webhook_id", None)
         webhook = await tenant_db.get(WebhookConfig, webhook_id) if webhook_id else None
-        if webhook is not None:
-            await service.escalate_ticket(tenant_db, ticket, webhook, actor_user_id=ctx.user.id)
+        if webhook is None:
+            error = "No escalation webhook is configured for this tenant."
+        else:
+            outcome = await service.escalate_ticket(tenant_db, ticket, webhook, actor_user_id=ctx.user.id)
+
     if next:
         return RedirectResponse(safe_relative_path(next, default="/tickets"), status_code=status.HTTP_303_SEE_OTHER)
-    return RedirectResponse(
-        f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER
+    return templates.TemplateResponse(
+        request, "tickets/_escalate_result.html", {"ticket": ticket, "outcome": outcome, "error": error}
     )
 
 

@@ -35,7 +35,7 @@
       <button type="submit" form="tickets-bulk-close-form" class="btn btn-sm btn-primary">Mass close</button>
     </div>
   </div>
-  <table class="tickets-table" data-bulk-select>
+  <table class="tickets-table" data-bulk-select data-density-target>
     <thead>
       <tr>
         <th class="col-narrow"><input type="checkbox" data-bulk-select-all aria-label="Select all"></th>
@@ -106,9 +106,9 @@
               <a class="row-menu-item" href="/tickets/new?ticket_type=change&amp;source_ticket_id={{ t.id }}">Promote to Change</a>
               {% endif %}
               {% if can_escalate %}
-              <form method="post" action="/tickets/{{ t.id }}/escalate" data-confirm="Escalate {{ t.ticket_number }}?">
+              <form method="post" action="/tickets/{{ t.id }}/escalate" data-escalate-form data-confirm-text="{{ escalate_label }} {{ t.ticket_number }}?">
                 <input type="hidden" name="next" value="/tickets?{{ filters.qs('/tickets') }}">
-                <button type="submit" class="row-menu-item danger">Escalate</button>
+                <button type="submit" class="row-menu-item danger">{{ escalate_label }}</button>
               </form>
               {% endif %}
               <button type="button" class="row-menu-item" data-analyze-root-cause="{{ t.id }}">Analyze root cause</button>

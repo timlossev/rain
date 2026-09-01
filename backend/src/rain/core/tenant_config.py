@@ -35,6 +35,15 @@ DEFAULTS: dict[str, Any] = {
     # Branding; the tab itself only appears once a shareable document
     # exists, so there's no separate on/off flag to go with this one.
     "portal_shareable_documents_label": "Shareable documents",
+    # The "Escalate" button/menu-item's own text -- same tenant-renamable
+    # idea as portal_shareable_documents_label above, e.g. "Page On-Call"
+    # or "Notify Ops" for a tenant whose escalation webhook does
+    # something more specific than a generic escalation. Shown wherever
+    # that button appears (ticket detail page, tickets list row menu,
+    # Kanban card menu, and the portal's own per-ticket button) -- never
+    # the escalation webhook's own name, which is a separate, admin-only
+    # concept (Admin > Webhooks) a visitor never sees.
+    "escalate_button_label": "Escalate",
     # rain.modules.tickets.rootcause.analyze: off by default -- a comment
     # on every single closed ticket is noise for a tenant that never asked
     # for it. An admin opts in under Tickets > Platform Response Rules
