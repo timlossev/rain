@@ -66,8 +66,11 @@ at RAIN is enough to get started.
 
 See [`docs/user-guide.md`](docs/user-guide.md) for how each of these
 actually works day to day, organized by the same sidebar you'll see in
-the app, and [`docs/architecture.md`](docs/architecture.md) for the
-technical design, deployment lessons, and current roadmap.
+the app; [`docs/architecture.md`](docs/architecture.md) for the
+technical design and deployment lessons; [`docs/database-schema.md`](docs/database-schema.md)
+for every table and how it relates to the rest; and
+[`docs/code-layout.md`](docs/code-layout.md) for where things live in
+the codebase and how to add to it.
 
 ## Quickstart
 
@@ -117,9 +120,9 @@ the same deployment shapes as the two Compose files.
 | Document storage | Local volume, or S3/S3-compatible | Swappable behind one small abstraction |
 | Exports | CSV, JSON, Excel, PDF, iCalendar | All pure-Python, no extra system dependencies in the image |
 
-See [`docs/architecture.md`](docs/architecture.md) for the repository
-layout, module boundaries, and the reasoning behind each of these
-choices.
+See [`docs/code-layout.md`](docs/code-layout.md) for the repository
+layout and module boundaries, and [`docs/architecture.md`](docs/architecture.md)
+for the reasoning behind each of these choices.
 
 ## Development
 

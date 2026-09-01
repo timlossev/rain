@@ -2,7 +2,10 @@
 
 This is the living design doc for RAIN, kept in-repo so future work extends
 the same foundation rather than re-deriving it. See the repo root
-[`README.md`](../README.md) for the quickstart.
+[`README.md`](../README.md) for the quickstart,
+[`database-schema.md`](database-schema.md) for every table, and
+[`code-layout.md`](code-layout.md) for where things live in the
+codebase and how to add to it.
 
 ## Containers
 

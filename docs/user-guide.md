@@ -2,7 +2,10 @@
 
 This guide walks through RAIN screen by screen: what each page is for,
 what you can do on it, and every option it offers. For how the system
-is built underneath, see [`architecture.md`](architecture.md).
+is built underneath, see [`architecture.md`](architecture.md); for
+every database table, [`database-schema.md`](database-schema.md); and
+for where things live in the codebase and how to add to it,
+[`code-layout.md`](code-layout.md).
 
 ## Signing in
 

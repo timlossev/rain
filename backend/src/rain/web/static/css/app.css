@@ -1538,7 +1538,14 @@ td.actions { text-align: right; white-space: nowrap; }
 .portal-shell.portal-unbranded { --accent: #52525b; }
 .portal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
 .portal-header .brand { padding: 0; }
-.portal-header .brand-name { color: var(--text); font-size: 1.1rem; }
+/* text-shadow in all 4 diagonals, not box-shadow/border -- this sits
+   directly on .portal-backdrop (an admin-uploaded, arbitrary background
+   image, optional), not a card with its own opaque surface, so
+   var(--text) (dark in light mode) can go unreadable against a dark
+   image with nothing else on the page to fix that for it. A thin white
+   outline keeps the name legible regardless of what's behind it,
+   without needing to know the image's own colors up front. */
+.portal-header .brand-name { color: var(--text); font-size: 1.1rem; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; }
 .portal-header .brand-logo { width: 44px; height: 44px; }
 .portal-tenant-pill {
   margin-left: auto;
