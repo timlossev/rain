@@ -8,6 +8,12 @@ drawn from. Updated alongside every push to `main`.
 
 ## 2026-09-01
 
+- Removed the Roadmap section from `docs/architecture.md` and README
+  (semantic/vector search, multiple LDAP/SAML sources) -- neither is
+  planned. Reworded the Search section's own description of the
+  unpopulated `embedding` columns/pgvector extension to a neutral
+  "here's what's there and unused" rather than "reserved for later."
+
 - **Renamable Escalate button**: Admin > Branding > Public incident
   portal has a new "Escalation button label" field -- renames the
   "Escalate" button/menu item everywhere it appears (ticket detail

@@ -110,7 +110,7 @@ the same deployment shapes as the two Compose files.
 |---|---|---|
 | Frontend edge | Caddy (alpine) | Automatic HTTPS, reverse proxy, nothing else to configure |
 | App | FastAPI + Jinja2, server-rendered | No Node/SPA build, no third-party JS framework to track for CVEs |
-| DB | Postgres, optionally with pgvector | Full-text search live now; pgvector reserved for semantic search once an embedding source exists |
+| DB | Postgres, optionally with pgvector | Full-text search (tsvector/GIN); pgvector is enabled by default but unused -- no vector/semantic search is planned |
 | Multi-tenancy | Schema-per-tenant | One Postgres instance, isolated per tenant |
 | Auth | Local email/password + optional LDAP + SAML 2.0 | `python3-saml` for SAML, not hand-rolled |
 | Ticketing bus | Built-in syslog listener (TCP+UDP) | No third-party syslog library; foldable into the app container for a single-container deployment |
@@ -147,14 +147,3 @@ security-relevant fixes are available. Reach out for details on support
 tiers, SLAs, and delivery for air-gapped and controlled environments.
 
 Contact: [inquiries@curated.systems](mailto:inquiries@curated.systems)
-
-## Roadmap
-
-Per [`docs/architecture.md`](docs/architecture.md#roadmap):
-
-- Semantic/vector search (pgvector is enabled and each searchable table
-  already carries a reserved `embedding` column; keyword search is live
-  today -- this needs an embedding source, local or API-based, to
-  actually populate and query those columns from).
-- Multiple independent LDAP or SAML sources (currently one of each,
-  syncing/signing into exactly one target tenant, instance-wide).

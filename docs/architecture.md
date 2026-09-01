@@ -853,14 +853,16 @@ part of `search()` -- no `search_vector` column -- but a typed-in CI
 number is still an exact, unambiguous lookup the same way a ticket/
 document number is.
 
-**Reserved for later.** `control` enables the `vector` extension once,
-database-wide (`CREATE EXTENSION IF NOT EXISTS vector`, control migration
-0006 -- extensions are per-database, not per-schema, so this doesn't
-repeat per tenant); `tickets.embedding`/`documents.embedding`
-(`pgvector.sqlalchemy.Vector(1536)`, tenant migration 0023) are nullable
-and completely unpopulated today. The dimension (1536) matches common
-embedding APIs' output size as a reasonable placeholder, not a
-commitment to a specific provider -- see the Roadmap entry below.
+**Unpopulated pgvector columns.** `control` enables the `vector`
+extension once, database-wide (`CREATE EXTENSION IF NOT EXISTS vector`,
+control migration 0006 -- extensions are per-database, not per-schema,
+so this doesn't repeat per tenant); `tickets.embedding`/`documents.
+embedding` (`pgvector.sqlalchemy.Vector(1536)`, tenant migration 0023)
+are nullable and completely unpopulated -- nothing in this app writes or
+reads them. There's no plan to wire up an embedding source; the columns
+are a leftover from an earlier design pass, kept only because dropping
+them is its own migration for no functional gain over just leaving two
+always-null columns in place.
 
 **`Settings.enable_pgvector`** (`ENABLE_PGVECTOR` in `.env`, on by
 default) makes all of the above skippable: some managed Postgres
@@ -868,8 +870,8 @@ instances either refuse `CREATE EXTENSION` to the app's own role
 (confirmed live: `asyncpg.exceptions.InsufficientPrivilegeError` against
 a standard, non-superuser RDS role) or don't offer `vector` at all
 (standard RDS in AWS GovCloud) -- since nothing reads or writes these
-columns yet, failing the whole migration chain over an extension that's
-purely reserved for later isn't worth it. Off, control migration 0006's
+unpopulated columns, failing the whole migration chain over an
+extension nothing depends on isn't worth it. Off, control migration 0006's
 `CREATE EXTENSION` and tenant migration 0023's two `add_column` calls
 are no-ops (0023's `search_vector`/GIN part is unaffected -- it needs
 nothing beyond stock Postgres); `rain.db.tenant_models` reads the exact
@@ -1337,13 +1339,3 @@ pass `portal_custom_js` either, so each variable is only ever truthy on
 the one surface that's supposed to populate it -- a route that forgets
 to thread one through just gets no injected script there, never someone
 else's.
-
-## Roadmap
-
-- **Semantic/vector search**: keyword search (Postgres full-text) is live
-  today -- see the Search section above. `tickets.embedding`/`documents.
-  embedding` (pgvector, enabled) are reserved but unpopulated; this needs
-  a concrete embedding model/API chosen and a backfill + a `SearchProvider`
-  interface, not a schema change.
-- **Multiple LDAP/SAML sources**: currently one of each, syncing/signing
-  into exactly one target tenant, instance-wide.
