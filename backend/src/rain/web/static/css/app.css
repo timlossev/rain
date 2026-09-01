@@ -1,5 +1,5 @@
 /* RAIN design system -- hand-written, no build step.
-   A small bespoke stylesheet was chosen over Tailwind for Milestone 1: it
+   A small bespoke stylesheet was chosen over Tailwind: it
    keeps the image free of any CSS/JS toolchain or CDN dependency (nothing
    to download at build time, nothing to patch for supply-chain CVEs)
    while still giving a modern, consistent look. --accent is overridden

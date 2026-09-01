@@ -1,5 +1,6 @@
-// RAIN client-side glue -- deliberately dependency-free (no htmx/Alpine),
-// this is the entire JS footprint of the app in Milestone 1.
+// RAIN client-side glue -- deliberately dependency-free (no htmx/Alpine).
+// live.js (the live syslog feed's WebSocket client) is the one exception,
+// kept in its own file rather than folded in here -- see architecture.md.
 
 document.addEventListener("DOMContentLoaded", () => {
   // Expand/collapse nav tree branches, persisted per-branch across visits.

@@ -96,7 +96,7 @@ the Admin console.
 
 To feed the ticketing side, point a syslog-ng destination at this host
 on `SYSLOG_PORT` (default `5514`, TCP or UDP) -- see
-[`docs/architecture.md`](docs/architecture.md#ticketing-milestone-2-full-scope)
+[`docs/architecture.md`](docs/architecture.md#ticketing)
 for the destination snippet.
 
 For an external/managed Postgres, S3 document storage, a single

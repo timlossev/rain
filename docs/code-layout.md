@@ -139,36 +139,51 @@ that recur enough to know before you add to them:
 
 ## Testing: what's there and what isn't
 
-`backend/tests/` is a real but narrow suite -- worth an honest read
-before assuming it catches something:
+`backend/tests/` is a real but still-not-exhaustive suite -- worth an
+honest read before assuming it catches something:
 
-- **~100 fast, DB-free tests** (`pytest`, no setup needed) covering
-  mostly pure functions: syslog/CEF/JSON/kv parsing, tag/CSV/field-pack
-  parsing, a handful of security-regression cases (CSV formula
-  injection, markdown sanitization, SSRF URL checks, PDF `link_callback`
-  path guards), and Service Catalog payload rendering.
-- **8 integration tests** (`test_integration.py`, skipped unless
+- **~150 fast, DB-free tests** (`pytest`, no setup needed) covering
+  pure functions: syslog/CEF/JSON/kv parsing, tag/CSV/field-pack
+  parsing, calendar recurrence's occurrence math (including the Jan
+  31 quarterly -> Apr 30 -> Jul 31 clamp-and-recover case), Platform
+  Response Rules' regex matching, document tag/diff/webhook-JSON
+  helpers, root-cause's span formatter, a handful of security-
+  regression cases (CSV formula injection, markdown sanitization, SSRF
+  URL checks, PDF `link_callback` path guards, search snippet
+  escaping), and Service Catalog payload rendering.
+- **11 integration tests** (`test_integration.py`, skipped unless
   `TEST_DATABASE_URL` is set) against a real Postgres -- tenant
   provisioning, asset CRUD, ticket numbering + rule promotion, syslog
-  routing, document numbering/linking, custom fields, tags/search.
-  Broad strokes, not deep: each is one scenario, not a sweep of edge
-  cases.
+  routing, document numbering/linking, custom fields, tags/search, a
+  Platform Response Rule firing its actions end to end (and an
+  inactive/non-matching one correctly not firing), escalation posting
+  its webhook response as both a field-change line and a comment
+  (with the response-body truncation cap), and root-cause's auto
+  comment plus a close-triggered Platform Response Rule both firing
+  once on a status transition into `closed`, never again on a later
+  closed -> closed move. Broad strokes, not deep: each is one
+  scenario, not a sweep of edge cases -- and, since this checkout has
+  no Postgres available, the three most recently added ones were
+  written and code-reviewed against the exact service-layer functions
+  they exercise but not run live; run them for real before leaning on
+  them for a release.
 - **No HTTP-level tests at all** -- nothing in this suite drives a
   route through FastAPI's `TestClient`. A routing/template bug (a
   filter silently matching nothing, a redirect going to the wrong
   place) has to be caught by hand today.
-- **Whole modules with zero coverage**: `admin` (every screen),
-  `platform_events.py` (Platform Response Rules), `rootcause.py`,
-  `calendar.recurrence`'s occurrence math, `documents.service`'s
-  webhook-refresh logic, `portal`, `home`, `auth`'s LDAP/SAML flows,
-  `search`'s query/highlighting path, and most of `tickets.service`
-  (the single biggest file in the codebase) beyond what the 8
-  integration tests happen to touch in passing.
+- **Whole modules still with zero coverage**: `admin` (every screen),
+  `portal`, `home`, `auth`'s LDAP/SAML flows, and most of
+  `tickets.service` (the single biggest file in the codebase) beyond
+  what the integration tests happen to touch in passing.
+  `documents.service`'s webhook-refresh *orchestration*
+  (`refresh_from_webhook`/`refresh_many_from_webhook`, as opposed to
+  the pure helpers they call) is also untested.
 
 None of that is a reason to avoid changing those areas -- it's a
 reason to add a test alongside a change there rather than assuming one
 already exists. `test_pure_functions.py`/`test_rules.py`/
-`test_event_formats.py` are good templates for a plain function; for
+`test_recurrence.py`/`test_platform_events_matching.py`/
+`test_documents_pure.py` are good templates for a plain function; for
 something that needs a DB, add a case to `test_integration.py` rather
 than standing up a second integration-test file.
 

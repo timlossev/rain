@@ -13,6 +13,7 @@ import pytest
 from rain.core.url_safety import _is_unsafe_ip, check_outbound_url
 from rain.core.xlsx_export import neutralize_formula
 from rain.modules.documents.textbody import render_markdown
+from rain.modules.search.service import _headline_to_html
 from rain.web.uploads import import_stash_path
 
 
@@ -100,3 +101,24 @@ def test_is_unsafe_ip_still_blocks_loopback_and_link_local(addr):
     # target in any deployment, air-gapped or not -- unlike a private
     # RFC1918 address, these stay blocked.
     assert _is_unsafe_ip(ipaddress.ip_address(addr)) is True
+
+
+def test_headline_to_html_escapes_html_in_the_matched_source_text():
+    """Regression for search.service's own stated invariant: a ts_headline
+    result is escaped *before* the \\x01/\\x02 sentinels are swapped for
+    <mark>/</mark>, so a ticket/document title containing real HTML (never
+    sanitized on the way in) can never smuggle a tag through a search
+    result's highlighted snippet."""
+    raw = "\x01<script>alert(1)</script>\x02 still here"
+    rendered = str(_headline_to_html(raw))
+    assert rendered == "<mark>&lt;script&gt;alert(1)&lt;/script&gt;</mark> still here"
+    assert "<script>" not in rendered
+
+
+def test_headline_to_html_none_and_empty_input():
+    assert _headline_to_html(None) is None
+    assert _headline_to_html("") is None
+
+
+def test_headline_to_html_plain_text_with_no_match_markers():
+    assert str(_headline_to_html("no highlight here")) == "no highlight here"

@@ -1,7 +1,7 @@
-"""Local-volume file storage for user uploads (branding assets now --
-the logo, and the client portal's optional background image; document
-repository attachments in Milestone 3 will reuse this same volume behind
-a small storage abstraction).
+"""Local-volume file storage for user uploads: branding assets (the logo,
+and the client portal's optional background image). Document attachments
+use this same volume behind a small storage abstraction of their own --
+see rain.modules.documents.storage.
 
 A branding asset is still always served from local disk (the static
 mount at /media/branding, see rain.main) -- that part is unchanged. What

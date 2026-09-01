@@ -201,20 +201,20 @@ first tenant and admin account.
 ## Why no Tailwind/htmx/Alpine
 
 The plan called for a server-rendered UI with HTMX/Alpine + Tailwind. In
-practice the surface Milestone 1 needed -- nav expand/collapse, reloading a
+practice the UI's actual surface -- nav expand/collapse, reloading a
 custom-fields fragment when the asset type changes, confirm-before-delete
 -- is about 70 lines of vanilla JS, and the visual design is one hand-written
 CSS file using custom properties for the accent color. Dropping the three
 libraries removes an entire JS supply chain (nothing to download at image
 build time, nothing to patch for CVEs, no version pinning to maintain) at
-no real cost to the UI. If a future milestone's interactions outgrow plain
+no real cost to the UI. If a later feature's interactions outgrow plain
 `fetch()` calls, htmx is a single `<script>` tag away and nothing here
-would need to change to adopt it. Milestone 2's one addition,
-`static/js/live.js`, follows the same rule: a plain `WebSocket` client with
+would need to change to adopt it. The one addition since, `static/js/live.js`,
+follows the same rule: a plain `WebSocket` client with
 no library, kept in its own file (loaded only on the live-viewer page via
 `{% block extra_scripts %}`) rather than bloating the shared `app.js`.
 
-## Asset Registry (Milestone 1, full scope)
+## Asset Registry
 
 - `asset_types` / `custom_fields` (EAV field definitions, `asset_type_id`
   nullable = applies to every type; `scope="asset"` here, `scope="ticket"`
@@ -227,7 +227,7 @@ no library, kept in its own file (loaded only on the live-viewer page via
 - CSV/JSON export: ad-hoc or saved `export_profiles` -- pick columns,
   headers, and order (`rain.modules.assets.exporter`).
 
-## Ticketing (Milestone 2, full scope)
+## Ticketing
 
 **Ingestion.** `worker` runs a hand-written RFC 3164 / RFC 5424 syslog
 parser (`rain.modules.tickets.syslog_parser` -- no third-party syslog
@@ -574,7 +574,7 @@ moment it tried to pop out past that column's own bottom edge.
 ### A routing bug worth knowing about
 
 While wiring `/tickets/live` in next to `/tickets/{ticket_id}`, a
-pre-existing bug from Milestone 1 surfaced: FastAPI/Starlette match routes
+pre-existing routing bug surfaced: FastAPI/Starlette match routes
 by trying each registered pattern in order, and a bare `{param}` segment
 (default `str` converter) matches *any* single path segment -- including
 ones meant for a different, later-registered literal route. `POST
@@ -589,9 +589,9 @@ digits, so Starlette correctly skips it for non-numeric segments regardless
 of registration order. `backend/.stub_check` (not committed) had a small
 script that instantiates the app and asserts no literal path incorrectly
 matches a dynamic sibling pattern -- worth re-running by hand after adding
-routes in future milestones.
+new routes.
 
-## Document Repository (Milestone 3, full scope)
+## Document Repository
 
 **Storage.** `rain.modules.documents.storage` is a small `StorageBackend`
 protocol (`save`/`read`/`delete` on an opaque string key) with two
@@ -632,9 +632,9 @@ uploads volume" is actually about.
 
 **Access control.** Documents are *never* served through the static file
 mount. `/media` was previously mounted over the whole `uploads_dir` --
-harmless while it only held branding logos, but Milestone 3 also uses that
-volume for tenant documents and the CSV/JSON import stash, both of which
-must stay tenant-scoped and authenticated. Fixed by mounting only
+harmless while it only held branding logos, but the document repository
+also uses that volume for tenant documents and the CSV/JSON import stash,
+both of which must stay tenant-scoped and authenticated. Fixed by mounting only
 `/media/branding` (the one thing that legitimately needs to be
 fetchable pre-auth, for the login/setup page); documents are downloaded
 exclusively through `GET /documents/{id}/download`, which goes through the
@@ -1142,7 +1142,7 @@ requester hits it.
 
 ## Lessons from the first real Docker run
 
-Everything above was verified through Milestone 3 by static checks only
+Everything above was verified by static checks only
 (`py_compile`, importing the app from the source tree, rendering templates
 against mock context) -- no Docker was available until partway through
 hardening. Running the real stack surfaced four bugs no amount of that

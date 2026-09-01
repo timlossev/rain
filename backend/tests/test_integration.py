@@ -328,3 +328,174 @@ async def test_document_tags_search_and_calendar_link():
         await document_service.delete_document(session, doc)
         remaining = await session.get(CalendarEntry, entry.id)
         assert remaining is None
+
+
+async def test_platform_event_rule_fires_matching_actions_only():
+    """rain.modules.tickets.platform_events end to end: create_ticket's own
+    hook into evaluate_ticket_created, an active rule's actions actually
+    running (mark_problematic, add_watcher by email), the firing logged
+    both to platform_event_triggers and the ticket's own activity feed --
+    and, just as importantly, that a non-matching and an inactive rule
+    both correctly do *not* fire."""
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import PlatformEventAction, PlatformEventRule, PlatformEventTrigger, TicketFieldChange, TicketWatcher
+    from rain.modules.tickets import service
+
+    tenant = await provision_tenant(slug="lambda", name="Lambda LLC")
+
+    async with tenant_session(tenant.schema_name) as session:
+        matching_rule = PlatformEventRule(name="Major outage", trigger_event="incident_created", match_field="title", pattern="outage")
+        matching_rule.actions.append(PlatformEventAction(action_type="mark_problematic", config={}))
+        matching_rule.actions.append(PlatformEventAction(action_type="add_watcher", config={"email": "oncall@example.com"}))
+        session.add(matching_rule)
+
+        non_matching_rule = PlatformEventRule(name="Disk full", trigger_event="incident_created", match_field="title", pattern="disk full")
+        non_matching_rule.actions.append(PlatformEventAction(action_type="mark_problematic", config={}))
+        session.add(non_matching_rule)
+
+        inactive_rule = PlatformEventRule(
+            name="Inactive outage rule", trigger_event="incident_created", match_field="title", pattern="outage", is_active=False
+        )
+        inactive_rule.actions.append(PlatformEventAction(action_type="add_watcher", config={"email": "should-not-be-added@example.com"}))
+        session.add(inactive_rule)
+        await session.commit()
+
+        ticket = await service.create_ticket(session, ticket_type="incident", title="major outage in us-east", description=None)
+
+        reloaded = await service.get_ticket(session, ticket.id)
+        assert reloaded is not None
+        assert reloaded.is_problematic is True
+
+        watchers = (await session.execute(select(TicketWatcher).where(TicketWatcher.ticket_id == ticket.id))).scalars().all()
+        assert [w.email for w in watchers] == ["oncall@example.com"]
+
+        triggers = (
+            await session.execute(select(PlatformEventTrigger).where(PlatformEventTrigger.ticket_id == ticket.id))
+        ).scalars().all()
+        assert [t.rule_name for t in triggers] == ["Major outage"]
+        assert "Mark problematic" in triggers[0].summary
+        assert "oncall@example.com" in triggers[0].summary
+
+        field_changes = (
+            await session.execute(select(TicketFieldChange).where(TicketFieldChange.ticket_id == ticket.id, TicketFieldChange.field_name == "platform_rule"))
+        ).scalars().all()
+        assert len(field_changes) == 1
+
+
+async def test_escalate_ticket_captures_webhook_response_as_comment(monkeypatch):
+    """rain.modules.tickets.service.escalate_ticket: both log lines it's
+    documented to produce (the terse field-change entry, unchanged from
+    before this session's rebuild, and the new rich comment carrying the
+    webhook's actual response body), plus the _ESCALATION_BODY_MAX_CHARS
+    truncation on an oversized response. webhook_service.call_webhook is
+    monkeypatched rather than actually dispatched -- this is exercising
+    escalate_ticket's own logging/comment logic, not the HTTP client."""
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import TicketComment, TicketFieldChange, WebhookConfig
+    from rain.modules.tickets import service
+    from rain.modules.webhooks import service as webhook_service
+
+    tenant = await provision_tenant(slug="mu", name="Mu Inc")
+
+    async with tenant_session(tenant.schema_name) as session:
+        webhook = WebhookConfig(name="PagerDuty", url="https://example.com/hook")
+        session.add(webhook)
+        ticket = await service.create_ticket(session, ticket_type="incident", title="db down", description=None)
+        await session.commit()
+        await session.refresh(webhook)
+
+        async def fake_call_webhook(config, placeholders=None):
+            return webhook_service.WebhookResult(status_code=200, success=True, body="ack: paged on-call")
+
+        monkeypatch.setattr(webhook_service, "call_webhook", fake_call_webhook)
+        outcome = await service.escalate_ticket(session, ticket, webhook, actor_user_id=None)
+
+        assert outcome.success is True
+        assert outcome.status_code == 200
+        assert outcome.body == "ack: paged on-call"
+
+        field_changes = (
+            await session.execute(select(TicketFieldChange).where(TicketFieldChange.ticket_id == ticket.id, TicketFieldChange.field_name == "escalated"))
+        ).scalars().all()
+        assert len(field_changes) == 1
+        assert "PagerDuty" in field_changes[0].to_value
+        assert "HTTP 200" in field_changes[0].to_value
+
+        comments = (await session.execute(select(TicketComment).where(TicketComment.ticket_id == ticket.id))).scalars().all()
+        assert len(comments) == 1
+        assert "ack: paged on-call" in comments[0].body
+
+        # A response body over the cap gets truncated, not dropped or left
+        # to blow up the comment/activity feed.
+        async def fake_call_webhook_oversized(config, placeholders=None):
+            return webhook_service.WebhookResult(status_code=200, success=True, body="x" * (service._ESCALATION_BODY_MAX_CHARS + 500))
+
+        monkeypatch.setattr(webhook_service, "call_webhook", fake_call_webhook_oversized)
+        await service.escalate_ticket(session, ticket, webhook, actor_user_id=None)
+
+        comments = (await session.execute(select(TicketComment).where(TicketComment.ticket_id == ticket.id))).scalars().all()
+        assert len(comments) == 2
+        newest = comments[-1]
+        assert "(truncated)" in newest.body
+        assert len(newest.body) < service._ESCALATION_BODY_MAX_CHARS + 500
+
+
+async def test_rootcause_auto_analyze_and_platform_rule_on_close():
+    """Two independent close-time reactions covered together, both wired
+    through rain.modules.tickets.service.update_status's single
+    newly_closed branch: rootcause.analyze's opt-in auto-comment (gated
+    by the auto_root_cause_on_close tenant config) summarizing the
+    ticket's repeat promoted syslog events, and an active "incident is
+    closed" Platform Response Rule's own action firing alongside it."""
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import PlatformEventAction, PlatformEventRule, SyslogEvent, TicketComment
+    from rain.core.tenant_config import set_tenant_config
+    from rain.modules.tickets import rootcause, service
+
+    tenant = await provision_tenant(slug="nu", name="Nu Corp")
+
+    async with tenant_session(tenant.schema_name) as session:
+        await set_tenant_config(session, rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY, True)
+
+        closed_rule = PlatformEventRule(name="Outage closed", trigger_event="incident_closed", match_field="title", pattern="outage")
+        closed_rule.actions.append(PlatformEventAction(action_type="mark_problematic", config={}))
+        session.add(closed_rule)
+
+        ticket = await service.create_ticket(session, ticket_type="incident", title="recurring outage", description=None)
+
+        # Two promoted syslog events -- summarize_chronic only produces a
+        # summary once there's more than one (see that function's own
+        # docstring), which is also the exact condition this covers.
+        event1 = SyslogEvent(host="web-01", program="nginx", facility=1, severity=3, message="502", raw="raw1", promoted_ticket_id=ticket.id)
+        event2 = SyslogEvent(host="web-01", program="nginx", facility=1, severity=3, message="502", raw="raw2", promoted_ticket_id=ticket.id)
+        session.add_all([event1, event2])
+        await session.commit()
+        await session.refresh(event1)
+        await session.refresh(event2)
+
+        ok = await service.update_status(session, ticket, "closed")
+        assert ok is True
+
+        reloaded = await service.get_ticket(session, ticket.id)
+        assert reloaded is not None
+        assert reloaded.status == "closed"
+        assert reloaded.is_problematic is True  # the "incident_closed" platform rule's own action
+
+        comments = (await session.execute(select(TicketComment).where(TicketComment.ticket_id == ticket.id))).scalars().all()
+        assert len(comments) == 1
+        assert "Root cause assistance" in comments[0].body
+        assert "Repetition pattern" in comments[0].body
+        assert "web-01" in comments[0].body
+
+        # A later closed -> closed move (e.g. Closed -> Cancelled, if this
+        # tenant had one) must not fire either reaction again -- covered
+        # here by re-closing into the same status, which update_status's
+        # own new_status == ticket.status guard short-circuits before the
+        # newly_closed check is even reached.
+        again = await service.update_status(session, ticket, "closed")
+        assert again is True
+        comments_after = (await session.execute(select(TicketComment).where(TicketComment.ticket_id == ticket.id))).scalars().all()
+        assert len(comments_after) == 1
