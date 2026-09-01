@@ -177,8 +177,11 @@ honest read before assuming it catches something:
   filter silently matching nothing, a redirect going to the wrong
   place) has to be caught by hand today.
 - **Whole modules still with zero coverage**: `admin` (every screen
-  except the config bundle round trip above), `portal`, `home`,
-  `auth`'s LDAP/SAML flows, and most of `tickets.service` (the single
+  and route, including the five new Config Bundle ones -- the
+  integration tests above exercise `config_bundle.py`'s build/apply
+  functions directly, not the admin router or templates in front of
+  them), `portal`, `home`, `auth`'s LDAP/SAML flows, and most of
+  `tickets.service` (the single
   biggest file in the codebase) beyond what the integration tests
   happen to touch in passing.
   `documents.service`'s webhook-refresh *orchestration*
