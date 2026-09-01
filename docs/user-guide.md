@@ -1067,6 +1067,23 @@ since this documents the same server-rendered routes the UI already
 calls rather than a distinct integration API. To react to RAIN's events
 from outside the app, use Webhooks and Platform Response Rules instead.
 
+**Config Bundles.** Export or import instance-wide configuration --
+never ticket/asset/document data -- as one downloadable JSON file:
+instance name, accent color, font, logo, the client portal's
+background image, the SMTP relay, LDAP and SAML provider config, and
+syslog source routing rules. An "Include secrets" checkbox (off by
+default) decides whether the SMTP/LDAP passwords come out in cleartext
+or redacted with a marker to re-enter after import; either way the
+file stays complete and readable. Importing upserts by name/type
+rather than duplicating, so re-importing the same or an edited file
+updates the matching settings instead of piling up copies. A syslog
+routing rule or LDAP/SAML config that targets a tenant slug not
+present on this instance is skipped, or imported disabled, noted in
+the result. This page also has a Tenant configuration bundle card --
+see Config Bundles under Tenant Administration below; the two are
+independent, and neither requires the other to have been imported
+first.
+
 ### Tenant Administration
 
 Reachable by both Internal Admin (for whichever tenant is currently
@@ -1218,3 +1235,26 @@ it's worth knowing which is which:
 
 **Asset Types.** Covered under Assets above; reached from here since
 defining the asset schema is treated as an admin task.
+
+**Config Bundles.** The same page Platform Administration's own Config
+Bundles entry points at (above), reachable by client_admin too, but
+only showing this tenant's own card here: asset types, custom fields,
+ticket statuses, groups, local users, notification channels, webhooks,
+approval flows, Event Promotion Policies, Platform Response Rules, and
+Service Catalog items, as one downloadable JSON file for the currently
+active tenant. Every reference inside the file (a rule's notification
+channel, an approval step's group, a Service Catalog item's approval
+flow, ...) is written and re-read by name, not an internal id, so it
+still resolves correctly when imported into a *different* tenant. An
+action or field that points at a specific document or asset (an
+"attach a document" action, a Service Catalog field sourced from one
+document) has no portable equivalent and is skipped, noted in the
+result -- along with anything else this instance couldn't resolve, like
+a group or approval step that no longer matches anyone. "Include
+secrets" (off by default) decides whether notification channel/webhook
+config and local users' password hashes are carried across; without
+it, an account with a matching email already on the target tenant is
+still recognized and left alone, but a new one has no password to be
+created with. Importing upserts by name/key, same as the platform
+bundle -- a re-import updates matching rows rather than duplicating
+them, except a local user, which is never overwritten once it exists.

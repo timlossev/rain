@@ -13,10 +13,13 @@ rain.modules.tickets.router instead, alongside the rest of Tickets)."""
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
+import io
+import json
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -44,6 +47,7 @@ from rain.db.tenant_models import (
     TicketStatus,
     WebhookConfig,
 )
+from rain.modules.admin import config_bundle
 from rain.modules.auth import saml_config
 from rain.modules.auth.ldap_config import get_provider_row, get_raw_config, save_ldap_config
 from rain.modules.auth.ldap_sync import run_ldap_sync
@@ -1720,3 +1724,103 @@ async def webhooks_delete(
     if webhook is not None:
         await webhook_service.delete_webhook(tenant_db, webhook)
     return RedirectResponse("/admin/webhooks", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/config-bundle", response_class=HTMLResponse)
+async def config_bundle_form(
+    request: Request,
+    ctx: RequestContext = Depends(get_request_context),
+    _: CurrentUser = Depends(require_admin),
+):
+    """Two independent cards, same "mixed platform-wide + active-tenant"
+    page shape Branding already uses -- the platform card (require_admin
+    at the route, but the template itself hides it from anyone but
+    ctx.user.is_internal_admin) and the tenant card (either role, for
+    whichever tenant is active) neither require the other."""
+    nav = await build_nav_context(ctx)
+    return templates.TemplateResponse(
+        request,
+        "admin/config_bundle.html",
+        {**nav, "ctx": ctx, "error": None, "platform_result": None, "tenant_result": None},
+    )
+
+
+def _bundle_filename(prefix: str, suffix: str = "") -> str:
+    stamp = dt.date.today().isoformat()
+    return f"{prefix}{suffix}-{stamp}.json"
+
+
+@router.post("/config-bundle/platform/export")
+async def config_bundle_platform_export(
+    include_secrets: bool = Form(False),
+    _: CurrentUser = Depends(require_internal_admin),
+):
+    data = await config_bundle.build_platform_bundle(include_secrets=include_secrets)
+    body = json.dumps(data, indent=2, default=str).encode("utf-8")
+    return StreamingResponse(
+        io.BytesIO(body),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{_bundle_filename("rain-platform-config")}"'},
+    )
+
+
+@router.post("/config-bundle/platform/import", response_class=HTMLResponse)
+async def config_bundle_platform_import(
+    request: Request,
+    bundle_file: UploadFile,
+    ctx: RequestContext = Depends(get_request_context),
+    user: CurrentUser = Depends(require_internal_admin),
+):
+    nav = await build_nav_context(ctx)
+    error = None
+    platform_result = None
+    try:
+        data = json.loads(await bundle_file.read())
+        platform_result = await config_bundle.apply_platform_bundle(data, updated_by=user.id)
+    except Exception as exc:
+        error = f"Could not import platform configuration bundle: {exc}"
+    return templates.TemplateResponse(
+        request,
+        "admin/config_bundle.html",
+        {**nav, "ctx": ctx, "error": error, "platform_result": platform_result, "tenant_result": None},
+        status_code=status.HTTP_400_BAD_REQUEST if error else status.HTTP_200_OK,
+    )
+
+
+@router.post("/config-bundle/tenant/export")
+async def config_bundle_tenant_export(
+    include_secrets: bool = Form(False),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    data = await config_bundle.build_tenant_bundle(tenant_db, ctx.active_tenant, include_secrets=include_secrets)
+    body = json.dumps(data, indent=2, default=str).encode("utf-8")
+    filename = _bundle_filename("rain-tenant-config", f"-{ctx.active_tenant.slug}")
+    return StreamingResponse(
+        io.BytesIO(body), media_type="application/json", headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@router.post("/config-bundle/tenant/import", response_class=HTMLResponse)
+async def config_bundle_tenant_import(
+    request: Request,
+    bundle_file: UploadFile,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    user: CurrentUser = Depends(require_admin),
+):
+    nav = await build_nav_context(ctx)
+    error = None
+    tenant_result = None
+    try:
+        data = json.loads(await bundle_file.read())
+        tenant_result = await config_bundle.apply_tenant_bundle(tenant_db, ctx.active_tenant, data, updated_by=user.id)
+    except Exception as exc:
+        error = f"Could not import tenant configuration bundle: {exc}"
+    return templates.TemplateResponse(
+        request,
+        "admin/config_bundle.html",
+        {**nav, "ctx": ctx, "error": error, "platform_result": None, "tenant_result": tenant_result},
+        status_code=status.HTTP_400_BAD_REQUEST if error else status.HTTP_200_OK,
+    )

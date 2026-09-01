@@ -53,11 +53,24 @@ nav_registry.register(
                     # (people/accounts vs. groups of them being far apart
                     # in a flat list was confusing).
                     NavNode(key="admin-users", label="Users", href="/admin/users", order=6, roles=("internal_admin",)),
+                    # rain.modules.admin.config_bundle -- export/import for
+                    # everything on this submenu that's genuinely instance-
+                    # wide (branding, SMTP, LDAP/SAML, syslog routing).
+                    # The tenant half of the same page is reached via
+                    # admin-tenant-config-bundle below instead, same split
+                    # Branding itself already uses.
+                    NavNode(
+                        key="admin-config-bundle",
+                        label="Config Bundles",
+                        href="/admin/config-bundle",
+                        order=7,
+                        roles=("internal_admin",),
+                    ),
                     # The Swagger UI at /docs -- gated the same way as
                     # every other platform-wide setting (require_internal_
                     # admin, see rain.main's route for it), not FastAPI's
                     # own public default.
-                    NavNode(key="admin-api-docs", label="API Documentation", href="/docs", order=7, roles=("internal_admin",)),
+                    NavNode(key="admin-api-docs", label="API Documentation", href="/docs", order=8, roles=("internal_admin",)),
                 ],
             ),
             # Tenant-scoped settings -- reachable by internal_admin (for
@@ -168,6 +181,17 @@ nav_registry.register(
                         label="Incident Portal",
                         href="/admin/branding",
                         order=11,
+                        roles=("client_admin",),
+                    ),
+                    # Same /admin/config-bundle page admin-config-bundle
+                    # above points at (it shows the platform card only to
+                    # internal_admin) -- client_admin only here, same
+                    # "duplicate link" avoidance as admin-incident-portal.
+                    NavNode(
+                        key="admin-tenant-config-bundle",
+                        label="Config Bundle",
+                        href="/admin/config-bundle",
+                        order=12,
                         roles=("client_admin",),
                     ),
                 ],

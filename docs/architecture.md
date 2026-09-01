@@ -1140,6 +1140,66 @@ and-inject-a-fragment shape as the Markdown body editor's own Preview
 tab), so a mistake is visible before it's saved rather than only once a
 requester hits it.
 
+## Configuration bundles
+
+`rain.modules.admin.config_bundle` backs Admin > Config Bundles: export
+and import configuration -- never ticket/asset/document data -- as one
+JSON file, for cloning a setup onto a different instance (or a fresh
+tenant on the same one). Two independent bundle kinds, each importable
+on its own with no dependency on the other:
+
+- **Platform bundle** (`rain_platform_config`): everything genuinely
+  instance-wide in this schema -- branding (instance name, accent
+  color, font, logo, and the client portal's background image; all of
+  these live in `control.global_config`, one set for the whole
+  install, not per tenant -- see "Branding & runtime config" above),
+  the SMTP relay, the LDAP and SAML provider configs (each a single
+  row for the whole instance, pointed at one target tenant -- see
+  `rain.modules.auth.ldap_config`'s own docstring for why RAIN doesn't
+  support one directory per tenant), and syslog source routing rules.
+- **Tenant bundle** (`rain_tenant_config`): one tenant's own asset
+  types, custom fields, ticket statuses, groups and local users,
+  notification channels, webhooks, approval flows, Event Promotion
+  Policies, Platform Response Rules, and Service Catalog items.
+
+Every cross-reference inside a bundle (a Platform Response Rule
+action's notification channel, an approval step's group, a Service
+Catalog item's approval flow, ...) is resolved by *name* at export
+time and re-resolved by name again on import -- never a raw database
+id, which means nothing on a different instance. Every entity is
+upserted by its natural key (name/key/email) on import too, not
+always-inserted, so re-importing the same (or an edited) bundle
+updates the matching rows instead of duplicating them -- the one
+exception is a local user, left untouched if an account with that
+email already exists, so a re-import can never silently overwrite a
+password/role an admin has since changed by hand.
+
+Two things a bundle can't make portable, and doesn't try to: a
+reference to actual data (a Platform Response Rule's "attach a
+document" action, a Service Catalog field sourced from a specific
+document) has no sane equivalent on a different tenant with no data
+yet, so it's dropped at export time with a note in the bundle's own
+`warnings` list explaining why, rather than either failing the whole
+export or silently producing a rule that points at nothing. The ML
+rule sidecar's trained runtime state (`TicketRuleState`) is excluded
+outright -- it's a statistical model fit to this tenant's own observed
+traffic, not configuration, and has no meaning transplanted elsewhere.
+
+Secrets (the LDAP bind password, the SMTP password, a Slack/email
+notification channel's config, a webhook's headers) are decrypted into
+the bundle only when the exporting admin explicitly opts in
+(`include_secrets`) -- off by default, the same "locked down unless
+explicitly opted into" posture `portal_require_auth`/`portal_branded`
+already use. Without it, the bundle stays structurally complete (every
+other field present, plus a `"_redacted": true` marker) rather than
+silently dropping those keys. This also sidesteps a real portability
+problem on its own: `rain.core.crypto`'s Fernet key is derived from
+`APP_SECRET_KEY`, a random secret generated fresh per install, so a
+raw copy of another instance's ciphertext would be undecryptable
+garbage regardless -- `include_secrets` decrypts on export and
+re-encrypts with the *target* instance's own key on import, rather
+than ever moving ciphertext across the boundary.
+
 ## Lessons from the first real Docker run
 
 Everything above was verified by static checks only

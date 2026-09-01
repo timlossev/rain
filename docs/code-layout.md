@@ -57,7 +57,7 @@ Module by module:
 |---|---|
 | `setup` | First-run wizard (instance name, first tenant, first admin). |
 | `auth` | Local/LDAP/SAML login, logout, password reset, LDAP sync, SAML SSO flow. |
-| `admin` | Branding, Tenants, Users, Auth Providers, SMTP Relay, Syslog Listener (Platform Administration); Groups, Ticket Statuses, Notification Channels, Approval Flows, Webhooks, Asset Types, Field Pack import, Tenant defaults (Tenant Administration). One large `router.py` -- see its own section headers. |
+| `admin` | Branding, Tenants, Users, Auth Providers, SMTP Relay, Syslog Listener, Config Bundles (Platform Administration); Groups, Ticket Statuses, Notification Channels, Approval Flows, Webhooks, Asset Types, Field Pack import, Tenant defaults, Config Bundles (Tenant Administration). One large `router.py` -- see its own section headers. `config_bundle.py` holds the export/import logic for both bundle kinds, kept separate from the router for the same reason every other module's `service.py` is. |
 | `assets` | Asset Registry: types, custom fields, CRUD, import/export. |
 | `tickets` | The biggest module by far -- ticket CRUD, the table/Kanban/board views, Event Promotion Policies (`rules.py`), Platform Response Rules (`platform_events.py`), root cause assistance (`rootcause.py`), the live syslog viewer (`live.py`, `live_bus.py`), syslog parsing/format detection (`syslog_parser.py`, `event_formats.py`), tenant-to-event routing (`routing.py`), notifications, import/export. |
 | `catalog` | Service Catalog: requestable forms that produce a ticket on submission. |
@@ -151,19 +151,24 @@ honest read before assuming it catches something:
   regression cases (CSV formula injection, markdown sanitization, SSRF
   URL checks, PDF `link_callback` path guards, search snippet
   escaping), and Service Catalog payload rendering.
-- **11 integration tests** (`test_integration.py`, skipped unless
+- **13 integration tests** (`test_integration.py`, skipped unless
   `TEST_DATABASE_URL` is set) against a real Postgres -- tenant
   provisioning, asset CRUD, ticket numbering + rule promotion, syslog
   routing, document numbering/linking, custom fields, tags/search, a
   Platform Response Rule firing its actions end to end (and an
   inactive/non-matching one correctly not firing), escalation posting
   its webhook response as both a field-change line and a comment
-  (with the response-body truncation cap), and root-cause's auto
-  comment plus a close-triggered Platform Response Rule both firing
-  once on a status transition into `closed`, never again on a later
-  closed -> closed move. Broad strokes, not deep: each is one
+  (with the response-body truncation cap), root-cause's auto comment
+  plus a close-triggered Platform Response Rule both firing once on a
+  status transition into `closed`, never again on a later closed ->
+  closed move, a tenant configuration bundle's hardest interdependent
+  path (a group, a local user, an approval flow step, an event policy
+  and a Service Catalog item all referencing each other by name)
+  round-tripping through JSON onto a *different* tenant, and a
+  platform bundle redacting a secret by default while still
+  round-tripping it with `include_secrets`. Broad strokes, not deep: each is one
   scenario, not a sweep of edge cases -- and, since this checkout has
-  no Postgres available, the three most recently added ones were
+  no Postgres available, the five most recently added ones were
   written and code-reviewed against the exact service-layer functions
   they exercise but not run live; run them for real before leaning on
   them for a release.
@@ -171,10 +176,11 @@ honest read before assuming it catches something:
   route through FastAPI's `TestClient`. A routing/template bug (a
   filter silently matching nothing, a redirect going to the wrong
   place) has to be caught by hand today.
-- **Whole modules still with zero coverage**: `admin` (every screen),
-  `portal`, `home`, `auth`'s LDAP/SAML flows, and most of
-  `tickets.service` (the single biggest file in the codebase) beyond
-  what the integration tests happen to touch in passing.
+- **Whole modules still with zero coverage**: `admin` (every screen
+  except the config bundle round trip above), `portal`, `home`,
+  `auth`'s LDAP/SAML flows, and most of `tickets.service` (the single
+  biggest file in the codebase) beyond what the integration tests
+  happen to touch in passing.
   `documents.service`'s webhook-refresh *orchestration*
   (`refresh_from_webhook`/`refresh_many_from_webhook`, as opposed to
   the pure helpers they call) is also untested.

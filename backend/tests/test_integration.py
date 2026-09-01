@@ -499,3 +499,161 @@ async def test_rootcause_auto_analyze_and_platform_rule_on_close():
         assert again is True
         comments_after = (await session.execute(select(TicketComment).where(TicketComment.ticket_id == ticket.id))).scalars().all()
         assert len(comments_after) == 1
+
+
+async def test_tenant_config_bundle_round_trips_across_tenants():
+    """rain.modules.admin.config_bundle's tenant bundle, exercised through
+    its hardest interdependent path: a group with a local-user member, an
+    approval flow whose one step is assigned to that group, an event
+    policy and a Service Catalog item that both reference the flow by
+    name, and a Platform Response Rule whose actions reference a webhook
+    and a notification channel -- every one of those is a raw database id
+    in the source tenant and has to come out the other end resolved by
+    name against a *different* tenant's own freshly-created rows. Also
+    proves the bundle is genuinely JSON round-trippable (not just a
+    Python dict) and that re-importing the same bundle upserts instead of
+    duplicating."""
+    import json
+
+    from rain.core.crypto import decrypt_json, encrypt_json
+    from rain.core.security import hash_password
+    from rain.db.base import tenant_session
+    from rain.db.control_models import User
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import (
+        ApprovalFlow,
+        ApprovalFlowStep,
+        AssetType,
+        Group,
+        GroupMembership,
+        NotificationChannel,
+        PlatformEventAction,
+        PlatformEventRule,
+        ServiceCatalogItem,
+        TicketRule,
+        WebhookConfig,
+    )
+    from rain.modules.admin import config_bundle
+
+    source = await provision_tenant(slug="xi", name="Xi Source")
+    target = await provision_tenant(slug="omicron", name="Omicron Target")
+
+    async with control_session() as control_db:
+        source_user = User(
+            tenant_id=source.id, email="oncall@xi.example", password_hash=hash_password("correct horse battery staple"),
+            role_key="client", display_name="On-call", auth_source="local",
+        )
+        control_db.add(source_user)
+        await control_db.commit()
+
+    async with tenant_session(source.schema_name) as session:
+        group = Group(name="On-call")
+        session.add(group)
+        await session.flush()
+        session.add(GroupMembership(group_id=group.id, user_id=source_user.id))
+
+        flow = ApprovalFlow(name="Standard change")
+        session.add(flow)
+        await session.flush()
+        session.add(ApprovalFlowStep(flow_id=flow.id, sort_order=0, label="On-call approval", approver_group_id=group.id))
+
+        webhook = WebhookConfig(name="Escalation hook", url="https://example.com/hook", headers={"Authorization": "Bearer secret"})
+        session.add(webhook)
+        session.add(TicketRule(name="Prod outage", ticket_type="change", pattern="outage", approval_flow_id=flow.id))
+        session.add(ServiceCatalogItem(key="new-user", name="Provision new user", ticket_type="incident", approval_flow_id=flow.id))
+        await session.flush()
+
+        channel = NotificationChannel(channel_type="webhook", name="Escalation channel", config_encrypted=encrypt_json({"webhook_id": webhook.id}))
+        session.add(channel)
+        await session.flush()
+
+        rule = PlatformEventRule(name="Notify on outage", trigger_event="incident_created", match_field="title", pattern="outage")
+        session.add(rule)
+        await session.flush()
+        session.add(PlatformEventAction(rule_id=rule.id, action_type="webhook", config={"webhook_id": webhook.id}))
+        session.add(PlatformEventAction(rule_id=rule.id, action_type="notify_slack", config={"channel_id": channel.id}))
+        session.add(AssetType(key="server", name="Server"))
+        await session.commit()
+
+        bundle = await config_bundle.build_tenant_bundle(session, source, include_secrets=True)
+
+    # Genuinely JSON round-trippable, not just a Python dict in memory.
+    reloaded = json.loads(json.dumps(bundle))
+    assert reloaded["groups"][0]["name"] == "On-call"
+    assert reloaded["approval_flows"][0]["steps"][0]["approver_group_name"] == "On-call"
+    assert reloaded["event_policies"][0]["approval_flow_name"] == "Standard change"
+    assert reloaded["service_catalog"][0]["approval_flow_name"] == "Standard change"
+    assert reloaded["notification_channels"][0]["config"] == {"webhook_name": "Escalation hook"}
+    actions = {a["action_type"]: a for a in reloaded["platform_response_rules"][0]["actions"]}
+    assert actions["webhook"]["webhook_name"] == "Escalation hook"
+    assert actions["notify_slack"]["channel_name"] == "Escalation channel"
+
+    async with tenant_session(target.schema_name) as session:
+        result = await config_bundle.apply_tenant_bundle(session, target, reloaded, updated_by=None)
+        assert result.counts.get("asset types") == 1
+        assert result.counts.get("groups") == 1
+        assert result.counts.get("local users") == 1
+        assert result.counts.get("group memberships") == 1
+        assert result.counts.get("approval flows") == 1
+        assert result.counts.get("approval flow steps") == 1
+        assert result.counts.get("webhooks") == 1
+        assert result.counts.get("event policies") == 1
+        assert result.counts.get("service catalog items") == 1
+        assert result.counts.get("notification channels") == 1
+        assert result.counts.get("platform response rules") == 1
+        assert result.counts.get("platform response rule actions") == 2
+
+        target_group = (await session.execute(select(Group).where(Group.name == "On-call"))).scalar_one()
+        target_flow = (await session.execute(select(ApprovalFlow).where(ApprovalFlow.name == "Standard change"))).scalar_one()
+        steps = (await session.execute(select(ApprovalFlowStep).where(ApprovalFlowStep.flow_id == target_flow.id))).scalars().all()
+        assert len(steps) == 1
+        assert steps[0].approver_group_id == target_group.id
+
+        target_rule = (await session.execute(select(TicketRule).where(TicketRule.name == "Prod outage"))).scalar_one()
+        assert target_rule.approval_flow_id == target_flow.id
+
+        target_catalog_item = (await session.execute(select(ServiceCatalogItem).where(ServiceCatalogItem.key == "new-user"))).scalar_one()
+        assert target_catalog_item.approval_flow_id == target_flow.id
+
+        target_channel = (await session.execute(select(NotificationChannel).where(NotificationChannel.name == "Escalation channel"))).scalar_one()
+        target_webhook = (await session.execute(select(WebhookConfig).where(WebhookConfig.name == "Escalation hook"))).scalar_one()
+        assert decrypt_json(target_channel.config_encrypted) == {"webhook_id": target_webhook.id}
+
+        # Re-importing the same bundle upserts rather than duplicating.
+        result2 = await config_bundle.apply_tenant_bundle(session, target, reloaded, updated_by=None)
+        assert result2.counts.get("groups") is None
+        assert result2.counts.get("groups (updated)") == 1
+        assert result2.warnings, "re-importing the same local user should warn it already exists"
+        all_groups = (await session.execute(select(Group))).scalars().all()
+        assert len(all_groups) == 1
+
+
+async def test_platform_config_bundle_redacts_secrets_by_default():
+    """rain.modules.admin.config_bundle's platform bundle: without
+    include_secrets, the LDAP bind password comes back redacted (empty,
+    flagged) rather than either the real cleartext or the source
+    instance's Fernet ciphertext (which would be undecryptable garbage on
+    a different instance's own APP_SECRET_KEY-derived key anyway). With
+    include_secrets, the real password round-trips."""
+    from rain.modules.admin import config_bundle
+    from rain.modules.auth import ldap_config
+
+    async with control_session() as session:
+        await ldap_config.save_ldap_config(
+            session,
+            is_enabled=True,
+            server_uri="ldaps://dc.example.internal",
+            bind_dn="cn=svc,dc=example",
+            bind_password="hunter2",
+            target_tenant_id=None,
+        )
+
+    redacted = await config_bundle.build_platform_bundle(include_secrets=False)
+    assert redacted["ldap"]["bind_password"] == ""
+    assert redacted["ldap"]["password_redacted"] is True
+    assert redacted["ldap"]["server_uri"] == "ldaps://dc.example.internal"
+    assert any("LDAP bind password redacted" in w for w in redacted["warnings"])
+
+    full = await config_bundle.build_platform_bundle(include_secrets=True)
+    assert full["ldap"]["bind_password"] == "hunter2"
+    assert "password_redacted" not in full["ldap"]

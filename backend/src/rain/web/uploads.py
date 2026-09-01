@@ -19,6 +19,7 @@ uploads volume this is specifically covering for."""
 from __future__ import annotations
 
 import logging
+import mimetypes
 import re
 import secrets
 from pathlib import Path
@@ -146,6 +147,23 @@ async def _restore_branding_asset_if_missing(*, config_key: str, asset_key: str,
     logger.info("restored %s (%s) from its durable backup", label, filename)
 
 
+def read_local_branding_file(path: str | None) -> tuple[bytes, str, str] | None:
+    """(data, content_type, filename) for a stored branding asset path
+    (config_store's logo_path/portal_background_path) -- None if unset or
+    the local file is missing. Reads straight off local disk rather than
+    the durable backup: this backs rain.modules.admin.config_bundle's
+    platform-bundle export, which runs on demand against whatever is
+    currently live, not a startup-time restore path."""
+    if not path:
+        return None
+    filename = Path(path).name
+    local_path = Path(get_settings().uploads_dir) / "branding" / filename
+    if not local_path.exists():
+        return None
+    content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return local_path.read_bytes(), content_type, filename
+
+
 async def restore_logo_if_missing() -> None:
     await _restore_branding_asset_if_missing(config_key="logo_path", asset_key=_LOGO_BACKUP_KEY, label="branding logo")
 
@@ -154,6 +172,39 @@ async def restore_portal_background_if_missing() -> None:
     await _restore_branding_asset_if_missing(
         config_key="portal_background_path", asset_key=_PORTAL_BACKGROUND_BACKUP_KEY, label="portal background image"
     )
+
+
+async def _save_branding_bytes(
+    data: bytes,
+    content_type: str,
+    *,
+    asset_key: str,
+    filename_prefix: str,
+    allowed_types: set[str],
+    max_bytes: int,
+    error_label: str,
+    filename_hint: str = "",
+) -> str:
+    """The actual disk write, shared by _save_branding_upload below (a
+    live admin upload) and rain.modules.admin.config_bundle (an image
+    embedded as base64 in an imported platform configuration bundle) --
+    the two only differ in where the bytes come from, not what happens
+    to them once decoded."""
+    if content_type not in allowed_types:
+        raise UploadError(f"unsupported {error_label} type: {content_type}")
+    if len(data) > max_bytes:
+        raise UploadError(f"{error_label} file too large (max {max_bytes // (1024 * 1024)}MB)")
+
+    ext = Path(filename_hint or filename_prefix).suffix or ".png"
+    filename = f"{filename_prefix}-{secrets.token_hex(8)}{ext}"
+
+    branding_dir = Path(get_settings().uploads_dir) / "branding"
+    branding_dir.mkdir(parents=True, exist_ok=True)
+    (branding_dir / filename).write_bytes(data)
+
+    await _backup_branding_asset(asset_key, filename, content_type, data)
+
+    return f"/media/branding/{filename}"
 
 
 async def _save_branding_upload(
@@ -169,19 +220,16 @@ async def _save_branding_upload(
         raise UploadError(f"unsupported {error_label} type: {upload.content_type}")
 
     data = await upload.read(max_bytes + 1)
-    if len(data) > max_bytes:
-        raise UploadError(f"{error_label} file too large (max {max_bytes // (1024 * 1024)}MB)")
-
-    ext = Path(upload.filename or filename_prefix).suffix or ".png"
-    filename = f"{filename_prefix}-{secrets.token_hex(8)}{ext}"
-
-    branding_dir = Path(get_settings().uploads_dir) / "branding"
-    branding_dir.mkdir(parents=True, exist_ok=True)
-    (branding_dir / filename).write_bytes(data)
-
-    await _backup_branding_asset(asset_key, filename, upload.content_type, data)
-
-    return f"/media/branding/{filename}"
+    return await _save_branding_bytes(
+        data,
+        upload.content_type,
+        asset_key=asset_key,
+        filename_prefix=filename_prefix,
+        allowed_types=allowed_types,
+        max_bytes=max_bytes,
+        error_label=error_label,
+        filename_hint=upload.filename or filename_prefix,
+    )
 
 
 async def save_logo_upload(upload: UploadFile) -> str:
@@ -192,6 +240,32 @@ async def save_logo_upload(upload: UploadFile) -> str:
         allowed_types=ALLOWED_LOGO_TYPES,
         max_bytes=MAX_LOGO_BYTES,
         error_label="logo",
+    )
+
+
+async def save_logo_bytes(data: bytes, content_type: str, filename_hint: str = "") -> str:
+    return await _save_branding_bytes(
+        data,
+        content_type,
+        asset_key=_LOGO_BACKUP_KEY,
+        filename_prefix="logo",
+        allowed_types=ALLOWED_LOGO_TYPES,
+        max_bytes=MAX_LOGO_BYTES,
+        error_label="logo",
+        filename_hint=filename_hint,
+    )
+
+
+async def save_portal_background_bytes(data: bytes, content_type: str, filename_hint: str = "") -> str:
+    return await _save_branding_bytes(
+        data,
+        content_type,
+        asset_key=_PORTAL_BACKGROUND_BACKUP_KEY,
+        filename_prefix="portal-bg",
+        allowed_types=ALLOWED_PORTAL_BACKGROUND_TYPES,
+        max_bytes=MAX_PORTAL_BACKGROUND_BYTES,
+        error_label="portal background image",
+        filename_hint=filename_hint,
     )
 
 

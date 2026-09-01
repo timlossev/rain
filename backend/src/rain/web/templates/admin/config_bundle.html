@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Config Bundles - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Export/import configuration as a JSON file - two independent bundles, platform (instance-wide: branding, SMTP, LDAP/SAML, syslog routing) and tenant (this tenant's own: statuses, groups, users, channels, flows, event/response rules, webhooks, asset types, custom fields, Service Catalog). No ticket/asset/document data either way. Either bundle can be imported on its own, without the other.{% endblock %}
+{% block content %}
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+<div class="two-col-cards">
+{% if ctx.user.is_internal_admin %}
+<div class="card">
+  <div class="card-title">Platform configuration bundle</div>
+  <p class="field-hint" style="margin-top:0;">Everything instance-wide: instance name/accent color/font/logo, the client portal background image, the SMTP relay, LDAP and SAML provider config, and syslog source routing rules. One bundle for the whole install, not per tenant.</p>
+
+  <form method="post" action="/admin/config-bundle/platform/export">
+    <label class="checkbox-row"><input type="checkbox" name="include_secrets" value="true"> Include secrets (SMTP/LDAP passwords)</label>
+    <div class="field-hint">Off by default: the file is still complete and reviewable, just with passwords replaced by a redacted marker to re-enter after import. On: the file contains cleartext credentials - handle and store it accordingly.</div>
+    <button class="btn btn-primary" type="submit" style="margin-top:8px;">Export platform bundle</button>
+  </form>
+
+  <hr style="margin:16px 0; border-color:var(--border);">
+
+  <form method="post" action="/admin/config-bundle/platform/import" enctype="multipart/form-data">
+    <div class="field">
+      <label for="platform_bundle_file">Import platform bundle</label>
+      <input type="file" id="platform_bundle_file" name="bundle_file" accept="application/json,.json" required>
+      <div class="field-hint">Upserts by name - re-importing the same (or an edited) file updates matching rows instead of duplicating them. A syslog rule or LDAP/SAML config targeting a tenant slug that doesn't exist here yet is skipped or imported disabled, noted below.</div>
+    </div>
+    <button class="btn" type="submit">Import platform bundle</button>
+  </form>
+
+  {% if platform_result %}
+  <div style="margin-top:16px;">
+    <p>
+      {% for category, n in platform_result.counts.items() %}<span class="badge badge-accent">{{ n }} {{ category }}</span> {% endfor %}
+      {% if not platform_result.counts %}<span class="muted">Nothing applied.</span>{% endif %}
+    </p>
+    {% if platform_result.warnings %}
+    <h3>Warnings</h3>
+    <ul>{% for w in platform_result.warnings %}<li class="muted">{{ w }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-title">Tenant configuration bundle</div>
+  {% if not ctx.active_tenant %}
+  <p class="muted">Select a tenant (Admin &gt; Tenants &gt; Switch to) to export or import its configuration.</p>
+  {% else %}
+  <p class="field-hint" style="margin-top:0;">For <strong>{{ ctx.active_tenant.name }}</strong>. Ticket statuses, groups and local users, notification channels, webhooks, approval flows, Event Promotion Policies, Platform Response Rules, asset types, custom fields, and Service Catalog items. No tickets, assets, or documents - and an action/field that references one specifically (an "attach document" action, a Service Catalog field sourced from a document) is skipped, noted below, since there's no portable equivalent of "that one document" on a fresh tenant.</p>
+
+  <form method="post" action="/admin/config-bundle/tenant/export">
+    <label class="checkbox-row"><input type="checkbox" name="include_secrets" value="true"> Include secrets (channel/webhook config, local users' password hashes)</label>
+    <div class="field-hint">Off by default. Local users are only carried across when this is on - without it, an existing account with the same email is still recognized and left untouched, but a new one has no password hash to import with.</div>
+    <button class="btn btn-primary" type="submit" style="margin-top:8px;">Export tenant bundle</button>
+  </form>
+
+  <hr style="margin:16px 0; border-color:var(--border);">
+
+  <form method="post" action="/admin/config-bundle/tenant/import" enctype="multipart/form-data">
+    <div class="field">
+      <label for="tenant_bundle_file">Import tenant bundle</label>
+      <input type="file" id="tenant_bundle_file" name="bundle_file" accept="application/json,.json" required>
+      <div class="field-hint">Applies to {{ ctx.active_tenant.name }}, upserting by name/key - a re-import updates matching rows rather than duplicating them. An existing local user is never overwritten.</div>
+    </div>
+    <button class="btn" type="submit">Import tenant bundle</button>
+  </form>
+
+  {% if tenant_result %}
+  <div style="margin-top:16px;">
+    <p>
+      {% for category, n in tenant_result.counts.items() %}<span class="badge badge-accent">{{ n }} {{ category }}</span> {% endfor %}
+      {% if not tenant_result.counts %}<span class="muted">Nothing applied.</span>{% endif %}
+    </p>
+    {% if tenant_result.warnings %}
+    <h3>Warnings</h3>
+    <ul>{% for w in tenant_result.warnings %}<li class="muted">{{ w }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+</div>
+{% endblock %}

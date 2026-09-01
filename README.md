@@ -57,6 +57,8 @@ at RAIN is enough to get started.
 - Global full-text search across tickets, documents, and assets
 - CSV/JSON/Excel import and export wherever records live
 - Branded PDF export for tickets and documents
+- Export/import platform and tenant configuration as JSON, for cloning
+  a setup onto another instance
 - Local auth plus optional LDAP/Active Directory and SAML 2.0 SSO
 - Role-based access control across platform and per-tenant admin tiers
 - Runtime branding: instance name, accent color, logo, font, and custom
