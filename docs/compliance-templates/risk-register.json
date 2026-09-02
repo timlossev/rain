@@ -1,0 +1,80 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-02T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "Risk Register starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "risk",
+      "name": "Risk",
+      "icon": null,
+      "description": "One row per identified risk -- likelihood, impact, treatment, and review status. Each Asset's own \"Name\" field is the risk's short title.",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "risk",
+      "field_key": "category",
+      "label": "Category",
+      "field_type": "select",
+      "select_options": ["Operational", "Technical", "Compliance", "Third-party", "Personnel", "Physical"],
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "risk",
+      "field_key": "likelihood",
+      "label": "Likelihood",
+      "field_type": "select",
+      "select_options": ["Low", "Medium", "High"],
+      "is_required": true,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "risk",
+      "field_key": "impact",
+      "label": "Impact",
+      "field_type": "select",
+      "select_options": ["Low", "Medium", "High"],
+      "is_required": true,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "risk",
+      "field_key": "treatment",
+      "label": "Treatment",
+      "field_type": "select",
+      "select_options": ["Accept", "Mitigate", "Transfer", "Avoid"],
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "risk",
+      "field_key": "treatment_plan",
+      "label": "Treatment plan",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "risk",
+      "field_key": "next_review_date",
+      "label": "Next review date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    }
+  ]
+}

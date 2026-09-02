@@ -95,6 +95,13 @@ async def _issue_session(
     point on, however the user got authenticated, a session is a session."""
     hinted_tenant_id = await _hinted_tenant_id(session, next_path, user)
 
+    # Stamped here rather than in authenticate_user/the SAML provider so
+    # every successful sign-in updates it exactly once, in the one place
+    # both paths already converge -- backs Admin > Users' "Last login"
+    # column and CSV export (see migration 0010's own docstring for the
+    # access-review reasoning).
+    user.last_login_at = dt.datetime.now(dt.timezone.utc)
+
     token = new_session_token()
     session.add(
         SessionRow(

@@ -920,6 +920,15 @@ class Document(TenantBase):
     # view (migration 0047), the same role assignee_user_id plays for the
     # tickets board.
     owner_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Optional (see migration 0048) -- a date after which this document is
+    # flagged "overdue for review" on the Documents list (its flag icon
+    # and the overdue-only filter both key off this) and on its own
+    # Properties tab. Deliberately independent of CalendarEntry.
+    # document_id/recurrence: a review deadline and a recurring reminder
+    # are two different things an owner may want set separately. Never
+    # auto-advanced on its own -- clearing/resetting it after a review is
+    # a manual edit, same as every other Properties field here.
+    next_review_at: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
     # Optional, freeform -- a plain array rather than a normalized tags
     # table (see migration 0039's own docstring for why: nothing here
     # needs a tenant-wide tag registry or tag-scoped browsing, just
@@ -985,6 +994,28 @@ class DocumentLink(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     document: Mapped[Document] = relationship(back_populates="links")
+
+
+class DocumentAcknowledgment(TenantBase):
+    """One row per (document, user) who has clicked "I have read this" on
+    the document's own page -- the staff policy-attestation trail (see
+    migration 0048's own docstring for which controls this is meant to
+    evidence). Upserted rather than accumulated: acknowledging the same
+    document twice updates acknowledged_at in place rather than adding a
+    second row, so this table always answers "when did each person last
+    confirm they'd read the current version," not "how many times have
+    they clicked the button." ON DELETE CASCADE, same reasoning as
+    DocumentLink.document_id."""
+
+    __tablename__ = "document_acknowledgments"
+    __table_args__ = (UniqueConstraint("document_id", "user_id", name="uq_document_acknowledgments_doc_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
+    # control.users id -- cross-schema, plain integer per this file's
+    # documented schema-per-tenant trade-off (see the module docstring).
+    user_id: Mapped[int] = mapped_column(Integer)
+    acknowledged_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ServiceCatalogItem(TenantBase):

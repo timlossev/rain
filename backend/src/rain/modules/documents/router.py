@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import re
-from datetime import datetime
+from datetime import date, datetime, timezone
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
@@ -85,6 +85,7 @@ async def list_documents(
     request: Request,
     search: str | None = None,
     tag: str | None = None,
+    overdue: bool = False,
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
@@ -93,7 +94,7 @@ async def list_documents(
     nav = await build_nav_context(ctx)
     page_size = await get_tenant_config(tenant_db, "default_page_size")
     doc_page = await paginate(
-        tenant_db, service.document_list_stmt(search=search, tag=tag), page=page, page_size=page_size
+        tenant_db, service.document_list_stmt(search=search, tag=tag, overdue_only=overdue), page=page, page_size=page_size
     )
     # Both cheap, tenant-wide lookups backing the list's own flag icons/tag
     # filter -- see their own docstrings (calendar_service.
@@ -110,6 +111,8 @@ async def list_documents(
             "page": doc_page,
             "search": search or "",
             "selected_tag": tag or "",
+            "overdue_only": overdue,
+            "today": datetime.now(timezone.utc).date(),
             "all_tags": all_tags,
             "calendar_linked_ids": calendar_linked_ids,
             "shareable_label": shareable_label,
@@ -445,6 +448,14 @@ async def document_detail(
     asset_numbers = await asset_service.get_ci_numbers(tenant_db, asset_link_ids)
     calendar_entries = await calendar_service.list_entries_for_document(tenant_db, doc.id)
     owner_name = (await resolve_user_names({doc.owner_user_id})).get(doc.owner_user_id, "")
+    acknowledgments = await service.list_acknowledgments(tenant_db, doc.id)
+    ack_names = await resolve_user_names({a.user_id for a in acknowledgments})
+    you_acknowledged_at = next((a.acknowledged_at for a in acknowledgments if a.user_id == ctx.user.id), None)
+    # Split out here rather than filtered in the template -- Jinja's
+    # loop.last inside an `if` filter would key off the unfiltered list's
+    # last item, not the last one actually rendered, and get the trailing
+    # comma wrong whenever the current user's own row isn't last.
+    other_acknowledgments = [a for a in acknowledgments if a.user_id != ctx.user.id]
     return templates.TemplateResponse(
         request,
         "documents/detail.html",
@@ -461,6 +472,10 @@ async def document_detail(
             "calendar_entries": calendar_entries,
             "webhook_refresh_error": webhook_refresh_error,
             "owner_name": owner_name,
+            "today": datetime.now(timezone.utc).date(),
+            "other_acknowledgments": other_acknowledgments,
+            "ack_names": ack_names,
+            "you_acknowledged_at": you_acknowledged_at,
         },
     )
 
@@ -515,6 +530,39 @@ async def update_document_owner(
     # own comment for the Kanban board's identical write path.
     if doc is not None and (new_id is None or await is_assignable_user(new_id, ctx.active_tenant.id)):
         await service.update_owner(tenant_db, doc, new_id)
+    return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{document_id:int}/review-date")
+async def update_document_review_date(
+    document_id: int,
+    next_review_at: str = Form(""),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """The Properties tab's "Review due" field -- same redirect-based
+    shape as /owner and /description right around it. An empty submission
+    clears the date (untracked, not "overdue")."""
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is not None:
+        parsed = date.fromisoformat(next_review_at) if next_review_at else None
+        await service.update_review_date(tenant_db, doc, parsed)
+    return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{document_id:int}/acknowledge")
+async def acknowledge_document(
+    document_id: int,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """The Properties tab's "I have read this" button -- records the
+    signed-in user against this document, see service.acknowledge_document
+    and DocumentAcknowledgment's own docstring for the upsert semantics."""
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is not None:
+        await service.acknowledge_document(tenant_db, document_id, ctx.user.id)
     return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 

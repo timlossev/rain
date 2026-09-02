@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg with context %}
 {% block title %}Documents - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}The document repository. Upload files, edit txt/md documents in-line, link documents to tickets or assets, tag them, and search by title, document number, or tag. A document's number carries a small icon for each of: shown on the Home page, populated from a webhook, linked to a calendar entry, and shareable in the client portal.{% endblock %}
+{% block help_text %}The document repository. Upload files, edit txt/md documents in-line, link documents to tickets or assets, tag them, and search by title, document number, or tag. A document's number carries a small icon for each of: shown on the Home page, populated from a webhook, linked to a calendar entry, shareable in the client portal, and overdue for review.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <a class="btn btn-sm" href="/documents/kanban">Kanban view</a>
@@ -23,8 +23,11 @@
         {% endfor %}
       </select>
     </div>
+    <div class="field" style="margin-bottom:0;">
+      <label class="checkbox-row"><input type="checkbox" name="overdue" value="1" onchange="this.form.submit()" {% if overdue_only %}checked{% endif %}> Overdue for review</label>
+    </div>
     <button class="btn" type="submit">Search</button>
-    {% if selected_tag %}<a class="btn btn-sm" href="/documents?search={{ search | urlencode }}">Clear tag</a>{% endif %}
+    {% if selected_tag %}<a class="btn btn-sm" href="/documents?search={{ search | urlencode }}{% if overdue_only %}&overdue=1{% endif %}">Clear tag</a>{% endif %}
   </form>
 
   <table>
@@ -39,6 +42,7 @@
             {% if doc.webhook_id %}<span class="doc-flag-icon" title="{{ 'Populated from a webhook, auto-refreshes on every view' if doc.refresh_on_view else 'Populated from a webhook' }}">{{ nav_icon("repeat") }}</span>{% endif %}
             {% if doc.id in calendar_linked_ids %}<span class="doc-flag-icon" title="Linked to a calendar entry">{{ nav_icon("calendar") }}</span>{% endif %}
             {% if doc.is_shareable %}<span class="doc-flag-icon" title="Shareable in the client portal ({{ shareable_label }})">{{ nav_icon("shield") }}</span>{% endif %}
+            {% if doc.next_review_at and doc.next_review_at < today %}<span class="doc-flag-icon" title="Overdue for review since {{ doc.next_review_at.strftime('%Y-%m-%d') }}">{{ nav_icon("alert-triangle") }}</span>{% endif %}
           </div>
         </td>
         <td>{{ doc.title }}</td>
@@ -51,7 +55,7 @@
         <td class="muted">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="5" class="muted">{% if selected_tag or search %}No documents match.{% else %}No documents yet. <a href="/documents/new">Upload the first one</a>.{% endif %}</td></tr>
+      <tr><td colspan="5" class="muted">{% if selected_tag or search or overdue_only %}No documents match.{% else %}No documents yet. <a href="/documents/new">Upload the first one</a>.{% endif %}</td></tr>
       {% endfor %}
     </tbody>
   </table>

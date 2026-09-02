@@ -46,7 +46,7 @@ out per-column below as "cross-schema" wherever it appears.
 |---|---|
 | `tenants` | One row per tenant: `slug` (URL/portal-facing), `name`, `schema_name` (the actual `tenant_<slug>` Postgres schema), `is_active`. |
 | `roles` | RBAC roles -- seeded with exactly `internal_admin` and `client` (see Auth & RBAC below); a table, not a hardcoded enum, so finer-grained roles are an admin action later, not a migration. |
-| `users` | Every user, any tenant, any role -- `tenant_id` NULL for `internal_admin` (cross-tenant), required for a `client`/`client_admin`. `auth_source` (`local`/`ldap`/`saml`) decides whether `password_hash` is meaningful; `ldap_dn` only set for `ldap`. |
+| `users` | Every user, any tenant, any role -- `tenant_id` NULL for `internal_admin` (cross-tenant), required for a `client`/`client_admin`. `auth_source` (`local`/`ldap`/`saml`) decides whether `password_hash` is meaningful; `ldap_dn` only set for `ldap`. `last_login_at` (0010) is stamped by every successful sign-in, local/LDAP/SAML alike, from the one place all three converge (`rain.modules.auth.router._issue_session`) -- backs Admin > Users' "Last login" column/CSV export, the dormant-account evidence nothing here produced before. |
 | `sessions` | DB-backed session -- only a sha256 hash of the cookie token is stored, never the token itself. `active_tenant_id` is which tenant an `internal_admin` is currently viewing (irrelevant for a `client`/`client_admin`, pinned to their own tenant). |
 | `password_reset_tokens` | Single-use, hour-lived "Forgot password?" tokens -- `local` auth_source users only. |
 | `global_config` | Instance-wide runtime settings (instance name, accent color, logo path, font) -- key/value, JSONB value. Cached process-wide with `LISTEN`/`NOTIFY` invalidation (`rain.core.config_store`), unlike the per-tenant config table below. |
@@ -117,7 +117,8 @@ out per-column below as "cross-schema" wherever it appears.
 
 | Table | Purpose |
 |---|---|
-| `documents` | A `DOC-xxxxxx` entry -- `storage_key` is an opaque identifier into whichever `StorageBackend` is active (local disk or S3), not a filesystem path. `webhook_id`/`alert_on_change`/`last_refreshed_at`/`webhook_response_is_json`/`webhook_json_path`/`refresh_on_view` back "populate from webhook". `owner_user_id` (cross-schema) is who's currently responsible for keeping it current, reassignable, separate from `uploaded_by` (a one-time creation fact). `tags` is a plain `text[]` (feeds `search_vector` directly). `is_shareable` (client portal) and `show_on_landing_page` (Home) are independent opt-in flags. `search_vector`/`embedding`: same shape as `tickets`' own. |
+| `documents` | A `DOC-xxxxxx` entry -- `storage_key` is an opaque identifier into whichever `StorageBackend` is active (local disk or S3), not a filesystem path. `webhook_id`/`alert_on_change`/`last_refreshed_at`/`webhook_response_is_json`/`webhook_json_path`/`refresh_on_view` back "populate from webhook". `owner_user_id` (cross-schema) is who's currently responsible for keeping it current, reassignable, separate from `uploaded_by` (a one-time creation fact). `next_review_at` (0048, nullable `date`) flags "overdue for review" on the list once it passes -- independent of any calendar reminder. `tags` is a plain `text[]` (feeds `search_vector` directly). `is_shareable` (client portal) and `show_on_landing_page` (Home) are independent opt-in flags. `search_vector`/`embedding`: same shape as `tickets`' own. |
+| `document_acknowledgments` | (0048) One row per (`document_id`, `user_id`) who has clicked "I have read this" on that document's Properties tab, upserted so `acknowledged_at` always reflects the latest read, not the first. `ON DELETE CASCADE` on `document_id`. `user_id` is the same unenforced cross-schema `control.users` id as `owner_user_id`/`uploaded_by`. |
 | `document_links` | Polymorphic link to an asset or a ticket -- `linked_type`/`linked_id` are app-validated (no real FK across two possible target tables). |
 
 ### Service Catalog
@@ -208,6 +209,7 @@ numbering, run independently, and land in different schemas.
 | 0045 | `documents.show_on_landing_page`. |
 | 0046 | `documents.refresh_on_view`. |
 | 0047 | `documents.owner_user_id` -- who's responsible for keeping it current. |
+| 0048 | `documents.next_review_at` + `document_acknowledgments` -- review-due tracking and read acknowledgment. |
 
 ### `control` schema (`backend/migrations/control/versions/`)
 
@@ -222,6 +224,7 @@ numbering, run independently, and land in different schemas.
 | 0007 | `client_admin` role, pinned to one tenant like `client`. |
 | 0008 | `password_reset_tokens` -- self-service "Forgot password?" for local auth. |
 | 0009 | `branding_assets` -- durable backup of the branding logo. |
+| 0010 | `users.last_login_at` -- stamped on every successful sign-in. |
 
 ---
 

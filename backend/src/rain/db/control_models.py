@@ -82,6 +82,13 @@ class User(ControlBase):
     # auth_source == "ldap", used to bind-authenticate them at login.
     ldap_dn: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Stamped by rain.modules.auth.router._issue_session on every
+    # successful sign-in, local/LDAP/SAML alike (see migration 0010) --
+    # NULL means "never logged in since this column existed," not
+    # necessarily "never logged in at all." Backs Admin > Users' "Last
+    # login" column and CSV export, the access-review evidence nothing in
+    # this schema could produce before now.
+    last_login_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     tenant: Mapped[Tenant | None] = relationship()
     role: Mapped[Role] = relationship()

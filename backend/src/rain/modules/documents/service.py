@@ -12,7 +12,7 @@ from sqlalchemy import Sequence, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from rain.db.tenant_models import Document, DocumentLink, Group, GroupMembership, SyslogEvent, WebhookConfig
+from rain.db.tenant_models import Document, DocumentAcknowledgment, DocumentLink, Group, GroupMembership, SyslogEvent, WebhookConfig
 from rain.modules.documents import storage, textbody
 from rain.modules.tickets import rules as ticket_rules
 from rain.modules.webhooks import service as webhook_service
@@ -169,7 +169,9 @@ async def create_document(
     return doc
 
 
-def document_list_stmt(*, search: str | None = None, tag: str | None = None, owner_user_id: int | None = None):
+def document_list_stmt(
+    *, search: str | None = None, tag: str | None = None, owner_user_id: int | None = None, overdue_only: bool = False
+):
     stmt = select(Document).order_by(Document.created_at.desc())
     if search:
         like = f"%{search}%"
@@ -197,6 +199,12 @@ def document_list_stmt(*, search: str | None = None, tag: str | None = None, own
         # "group by owner" mode groups *by*, used here as a plain filter
         # instead when the board's other axis is picked.
         stmt = stmt.where(Document.owner_user_id == owner_user_id)
+    if overdue_only:
+        # Backs the Documents list's "Overdue for review" filter -- a
+        # document with no next_review_at set at all is never "overdue,"
+        # it's just untracked, so this only ever matches a real, passed
+        # deadline, not the absence of one.
+        stmt = stmt.where(Document.next_review_at.is_not(None), Document.next_review_at < datetime.now(timezone.utc).date())
     return stmt
 
 
@@ -265,6 +273,39 @@ async def update_sharing(db: AsyncSession, doc: Document, is_shareable: bool) ->
 async def update_owner(db: AsyncSession, doc: Document, new_owner_user_id: int | None) -> None:
     doc.owner_user_id = new_owner_user_id
     await db.commit()
+
+
+async def update_review_date(db: AsyncSession, doc: Document, next_review_at) -> None:
+    doc.next_review_at = next_review_at
+    await db.commit()
+
+
+async def acknowledge_document(db: AsyncSession, document_id: int, user_id: int) -> None:
+    """Records that `user_id` has clicked "I have read this" just now --
+    upsert, not insert, so re-acknowledging an already-acknowledged
+    document moves acknowledged_at forward instead of piling up a second
+    row for the same person (see DocumentAcknowledgment's own docstring)."""
+    existing = (
+        await db.execute(
+            select(DocumentAcknowledgment).where(
+                DocumentAcknowledgment.document_id == document_id, DocumentAcknowledgment.user_id == user_id
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is None:
+        db.add(DocumentAcknowledgment(document_id=document_id, user_id=user_id))
+    else:
+        existing.acknowledged_at = datetime.now(timezone.utc)
+    await db.commit()
+
+
+async def list_acknowledgments(db: AsyncSession, document_id: int) -> list[DocumentAcknowledgment]:
+    stmt = (
+        select(DocumentAcknowledgment)
+        .where(DocumentAcknowledgment.document_id == document_id)
+        .order_by(DocumentAcknowledgment.acknowledged_at.desc())
+    )
+    return list((await db.execute(stmt)).scalars())
 
 
 async def list_groups(db: AsyncSession) -> list[Group]:

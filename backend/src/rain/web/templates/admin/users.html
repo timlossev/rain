@@ -2,16 +2,17 @@
 {% import "_pagination.html" as pg with context %}
 {% import "_modal.html" as modal %}
 {% block title %}Users - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Manage user accounts, roles, and tenant assignment. Internal Admin users can see the Admin menu and manage every tenant; Client users are scoped to one tenant.{% endblock %}
+{% block help_text %}Manage user accounts, roles, and tenant assignment. Internal Admin users can see the Admin menu and manage every tenant; Client users are scoped to one tenant. "Last login" (also in the CSV export) is a plain access-review aid - use it to find accounts that have gone dormant and should be deactivated.{% endblock %}
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 <div class="panel-row" style="justify-content:flex-end;">
+  <a class="btn btn-sm" href="/admin/users/export">Export CSV</a>
   {{ modal.trigger_button("user", "+ New user") }}
 </div>
 
 <div class="card">
   <table>
-    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Tenant</th><th>Auth</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Tenant</th><th>Auth</th><th>Status</th><th>Last login</th><th></th></tr></thead>
     <tbody>
       {% for u in page.items %}
       <tr>
@@ -21,6 +22,7 @@
         <td class="muted">{{ u.tenant.name if u.tenant else "-" }}</td>
         <td>{% if u.auth_source == "ldap" %}<span class="badge">LDAP</span>{% else %}<span class="muted">local</span>{% endif %}</td>
         <td>{% if u.is_active %}<span class="badge badge-accent">active</span>{% else %}<span class="badge">disabled</span>{% endif %}</td>
+        <td class="muted">{{ u.last_login_at.strftime("%Y-%m-%d %H:%M") if u.last_login_at else "never" }}</td>
         <td class="actions">
           <a class="btn btn-sm" href="/admin/users/{{ u.id }}/edit">Edit</a>
           {% if u.is_active %}
@@ -31,7 +33,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="7" class="muted">No users yet.</td></tr>
+      <tr><td colspan="8" class="muted">No users yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

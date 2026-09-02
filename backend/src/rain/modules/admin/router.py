@@ -13,6 +13,7 @@ rain.modules.tickets.router instead, alongside the rest of Tickets)."""
 from __future__ import annotations
 
 import asyncio
+import csv
 import datetime as dt
 import io
 import json
@@ -33,6 +34,7 @@ from rain.core.security import hash_password
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.tenant_config import get_tenant_config, get_tenant_configs, set_tenant_config, set_tenant_configs
 from rain.core.url_safety import check_outbound_url
+from rain.core.xlsx_export import neutralize_formula
 from rain.core.user_names import is_assignable_user, resolve_user_names
 from rain.db.base import control_session, tenant_session
 from rain.db.control_models import AuthProviderConfig, Session as SessionRow, SyslogSourceMap, Tenant, User
@@ -358,6 +360,39 @@ async def users_list(
         tenants = list((await session.execute(select(Tenant).order_by(Tenant.name))).scalars())
     return templates.TemplateResponse(
         request, "admin/users.html", {**nav, "ctx": ctx, "page": user_page, "tenants": tenants, "error": None}
+    )
+
+
+@router.get("/users/export")
+async def users_export(_: CurrentUser = Depends(require_internal_admin)):
+    """Plain CSV of every platform user, "Last login" included -- the
+    access-review evidence FedRAMP AC-2(3)/EUCS IAM-06-style controls ask
+    for (who has an account, and are any of them dormant and due for
+    deactivation). Deliberately not routed through the Assets/Tickets
+    export-profile machinery (rain.core.export_columns et al) -- this is
+    one fixed, small column set with no per-tenant custom fields to pick
+    from, so a hand-rolled csv.DictWriter is the whole job."""
+    async with control_session() as session:
+        users = list((await session.execute(select(User).options(selectinload(User.tenant)).order_by(User.email))).scalars())
+    headers = ["email", "display_name", "role", "tenant", "auth_source", "status", "last_login_at"]
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=headers)
+    writer.writeheader()
+    for u in users:
+        row = {
+            "email": u.email,
+            "display_name": u.display_name,
+            "role": u.role_key,
+            "tenant": u.tenant.name if u.tenant else "",
+            "auth_source": u.auth_source,
+            "status": "active" if u.is_active else "disabled",
+            "last_login_at": u.last_login_at.isoformat() if u.last_login_at else "never",
+        }
+        writer.writerow({h: neutralize_formula(row.get(h)) for h in headers})
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode("utf-8")),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="rain-users-{dt.date.today().isoformat()}.csv"'},
     )
 
 

@@ -1,0 +1,80 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-02T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "Subprocessor register starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "subprocessor",
+      "name": "Subprocessor",
+      "icon": null,
+      "description": "One row per vendor/subprocessor with access to tenant data or systems. Each Asset's own \"Name\" field is the vendor's name.",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "subprocessor",
+      "field_key": "service_provided",
+      "label": "Service provided",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "subprocessor",
+      "field_key": "data_processed",
+      "label": "Data processed",
+      "field_type": "select",
+      "select_options": ["None", "Internal only", "Customer data", "Regulated/sensitive data"],
+      "is_required": true,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "subprocessor",
+      "field_key": "hosting_region",
+      "label": "Hosting region",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "subprocessor",
+      "field_key": "contract_review_date",
+      "label": "Contract/DPA review date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "subprocessor",
+      "field_key": "certification_status",
+      "label": "Certification on file",
+      "field_type": "select",
+      "select_options": ["None", "SOC 2", "ISO 27001", "C5", "Other (see notes)"],
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "subprocessor",
+      "field_key": "notes",
+      "label": "Notes",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    }
+  ]
+}
