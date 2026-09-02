@@ -1565,7 +1565,13 @@ td.actions { text-align: right; white-space: nowrap; }
    view) is unaffected. */
 .portal-shell.portal-unbranded { --accent: #52525b; }
 .portal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-.portal-header .brand { padding: 0; }
+/* .brand's own height:var(--topbar-height) (60px, see its own rule) only
+   matters where it has to line up against the sidebar/topbar's other
+   60px-tall pieces -- there's nothing here for it to align with, so left
+   alone it just padded a logo-less instance name with dead vertical
+   space above and below. height:auto lets this row size to its actual
+   content (the 44px logo below, when there is one) instead. */
+.portal-header .brand { padding: 0; height: auto; }
 /* text-shadow in all 4 diagonals, not box-shadow/border -- this sits
    directly on .portal-backdrop (an admin-uploaded, arbitrary background
    image, optional), not a card with its own opaque surface, so
