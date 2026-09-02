@@ -4,9 +4,9 @@
 {% block title %}Asset Types - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Categories of assets (e.g. Server, Laptop, Network device). Each type can have its own custom fields and its own assets.{% endblock %}
 {% block content %}
-<div class="panel-row">
-  <a class="btn btn-sm" href="/assets/fields">Manage custom fields &rarr;</a>
-  {{ modal.trigger_button("asset-type", "+ New asset type") }}
+<div class="panel-row" style="justify-content:flex-end;">
+  <a class="btn btn-sm" href="/assets/fields">Manage custom fields</a>
+  {{ modal.trigger_button("asset-type", "+ New asset type", variant="btn-sm btn-primary") }}
 </div>
 
 <div class="card">
