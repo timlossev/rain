@@ -169,7 +169,7 @@ async def create_document(
     return doc
 
 
-def document_list_stmt(*, search: str | None = None):
+def document_list_stmt(*, search: str | None = None, tag: str | None = None):
     stmt = select(Document).order_by(Document.created_at.desc())
     if search:
         like = f"%{search}%"
@@ -183,11 +183,31 @@ def document_list_stmt(*, search: str | None = None):
             | Document.doc_number.ilike(like)
             | func.array_to_string(Document.tags, " ").ilike(like)
         )
+    if tag:
+        # Exact membership (`tag = ANY(tags)`), not another ILIKE
+        # substring match -- this backs the list screen's tag dropdown,
+        # populated from list_all_tags' own exact values below, so a
+        # selection there should only ever match documents actually
+        # carrying that literal tag, not "quarter" also pulling in a
+        # document tagged "Q4-2026".
+        stmt = stmt.where(Document.tags.any(tag))
     return stmt
 
 
 async def list_documents(db: AsyncSession, *, search: str | None = None) -> list[Document]:
     result = await db.execute(document_list_stmt(search=search))
+    return list(result.scalars())
+
+
+async def list_all_tags(db: AsyncSession) -> list[str]:
+    """Every distinct tag across this tenant's documents, alphabetical --
+    backs the Documents list's tag filter dropdown (rain.modules.
+    documents.router.list_documents), so tags can be browsed/selected
+    from directly instead of only found by typing a substring into the
+    search box."""
+    tag_col = func.unnest(Document.tags).label("tag")
+    stmt = select(tag_col).distinct().order_by(tag_col)
+    result = await db.execute(stmt)
     return list(result.scalars())
 
 

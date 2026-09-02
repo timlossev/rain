@@ -613,6 +613,30 @@ data-kanban-assignee>` for exactly this) -- the one piece of card
 content a move actually changes in this mode, unlike status mode where
 nothing on the card's own face reflects its column.
 
+**Narrowing assignee columns to one team.** Every assignable user can
+be a lot of columns on a tenant with many accounts, so a second query
+param, `assignee_group` (a `Group.id`), narrows the column set to one
+tenant Group's own members -- a third filter-bar `<select>`, rendered
+only once `group_by == "assignee"`, listing every `Group` in this
+tenant (plain `select(Group).order_by(Group.name)`, no scoping query
+needed beyond that: `Group` already lives in the tenant schema, so
+`tenant_db` can only ever see this tenant's own rows) plus "All
+members". `kanban_board` intersects `list_assignable_users`' result
+with that group's `GroupMembership.user_id` set when `assignee_group`
+is set, then runs the exact same column-building logic as before --
+still one column per *person*, not per group, so dragging a card is
+unchanged: it assigns to that specific individual, exactly as it did
+before this existed. A ticket assigned to someone outside the selected
+group gets the same extra-column-not-a-drop-target treatment as
+someone no longer assignable to the tenant at all (both are, from
+`known_user_ids`' perspective, simply not in the current column set).
+Deliberately not a "columns are teams" redesign -- a ticket has exactly
+one `assignee_user_id`, no group-assignment concept exists in the
+schema, and asking what a drop onto a team's own column should even
+mean surfaced enough real ambiguity (assign to least-loaded member?
+prompt for one? no drop at all?) that it was worth confirming rather
+than guessing: individual columns, just fewer of them at a time.
+
 ### A routing bug worth knowing about
 
 While wiring `/tickets/live` in next to `/tickets/{ticket_id}`, a
@@ -811,6 +835,26 @@ any pre-existing `policy_ref.document_id` (the only shape `policy_ref`
 has ever had) so an entry that already auto-refreshed a document shows
 up on that document's Calendar tab immediately, not just newly-created
 ones.
+
+**List-view flags and tag filtering.** `documents/list.html` shows a
+small icon next to a document's number for each flag it has set --
+`show_on_landing_page` (Home icon), `webhook_id` (a refresh icon,
+tooltip distinguishing `refresh_on_view` from a manual-only refresh),
+a calendar link (calendar icon, from a new
+`calendar.service.document_ids_with_calendar_entries`, one distinct
+query for the whole page rather than `list_entries_for_document`
+called once per row), and `is_shareable` (a shield icon, tooltip
+naming whatever `portal_shareable_documents_label` is currently set
+to). Deliberately one color for all four rather than one per flag --
+a row with several set stays legible instead of turning into competing
+colored dots; each icon's own `title` carries the actual meaning. A
+tag `<select>` next to the search box (`service.list_all_tags`, a
+`SELECT DISTINCT unnest(tags)`) and each tag badge in the Tags column
+both link to `?tag=<tag>`, an exact-membership filter
+(`Document.tags.any(tag)`, not another substring `ILIKE` the way the
+search box's own tag matching works) added to `document_list_stmt`
+alongside its existing `search` filter -- either one narrows the list,
+together or apart.
 
 ## Home
 

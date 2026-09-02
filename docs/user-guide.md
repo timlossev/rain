@@ -187,15 +187,21 @@ assignee (workload)," picks what the columns actually are:
   someone no longer assignable to this tenant (deactivated, or moved
   off it) still shows in its own column, labeled "not assignable
   here," but isn't a drop target -- a card can be dragged out of it,
-  just not back in.
+  just not back in. A third dropdown appears once this is picked,
+  listing every group defined under Admin > Groups (e.g. "The TRG
+  team") plus "All members" -- picking one narrows the columns to just
+  that group's own members, useful once the full assignable-user list
+  gets long. This only changes which people get a column; dragging
+  still assigns to that specific person, same as always, not to the
+  group as a whole.
 
 Either way, the column's count updates immediately, and the card
 reverts back to its original column if the move didn't actually go
 through (a connectivity hiccup, or the target having been deleted or
 deactivated out from under the board by someone else in the
-meantime). Switching the Group by dropdown keeps every filter
-currently applied; it only changes how the matching tickets are
-grouped, not which ones are shown.
+meantime). Switching either dropdown keeps every filter currently
+applied; it only changes how the matching tickets are grouped, not
+which ones are shown.
 
 Each card shows the ticket number as its own pill (links to the
 ticket, same as the title below it does), then any problematic/
@@ -755,6 +761,24 @@ The document repository, reached from Documents in the sidebar
 A table of every document (Number, Title, Tags, File, Uploaded date)
 with a search box that matches against title, document number
 (`DOC-000123`), or a tag, and an "+ Upload document" button.
+
+A document's number carries a small icon for each of the flags it has
+set, so the state of a document is visible without opening it:
+
+- Home icon: shown on the Home page.
+- Refresh icon: populated from a webhook (the tooltip says whether it
+  also auto-refreshes on every view, or only on the detail page's own
+  "Refresh from webhook" button).
+- Calendar icon: linked to a calendar entry.
+- Shield icon: shareable in the client portal, under whatever that
+  tab is currently named (defaults to "Shareable documents", commonly
+  renamed to something like "Trust Center" -- see Branding under
+  Admin).
+
+A tag dropdown next to the search box narrows the list to one tag at a
+time (auto-submits on change); each tag shown in the Tags column is
+also its own link that does the same thing, so browsing by tag works
+either from the dropdown or by clicking a tag you see on a document.
 
 ### New document
 

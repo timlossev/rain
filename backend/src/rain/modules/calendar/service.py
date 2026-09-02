@@ -38,6 +38,16 @@ async def list_entries_for_document(db: AsyncSession, document_id: int) -> list[
     return list(result.scalars())
 
 
+async def document_ids_with_calendar_entries(db: AsyncSession) -> set[int]:
+    """Every Document.id with at least one linked CalendarEntry -- backs
+    the Documents list's calendar-icon flag (rain.modules.documents.
+    router.list_documents), one cheap distinct query up front instead of
+    list_entries_for_document called once per row."""
+    stmt = select(CalendarEntry.document_id).where(CalendarEntry.document_id.is_not(None)).distinct()
+    result = await db.execute(stmt)
+    return set(result.scalars())
+
+
 async def create_entry(db: AsyncSession, **fields: Any) -> CalendarEntry:
     entry = CalendarEntry(**fields)
     db.add(entry)

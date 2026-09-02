@@ -26,6 +26,7 @@ from rain.db.tenant_models import (
     Asset,
     CustomField,
     Group,
+    GroupMembership,
     NotificationChannel,
     PlatformEventAction,
     PlatformEventRule,
@@ -184,6 +185,7 @@ async def kanban_board(
     problematic: str | None = None,  # "1" | None
     prioritized: str | None = None,  # "1" | None
     group_by: str = "status",  # "status" | "assignee"
+    assignee_group: int | None = None,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
@@ -203,7 +205,16 @@ async def kanban_board(
     the same candidate set the assignee picker itself offers) plus a
     leading "Unassigned" column. Dragging a card between assignee columns
     reassigns it (POST .../kanban-assignee below) the same optimistic way
-    dragging between status columns changes its status."""
+    dragging between status columns changes its status.
+
+    assignee_group (a Group.id, "assignee" mode only) narrows that column
+    set further, to just one tenant Group's own members -- every
+    assignable user can otherwise be a lot of columns. Still one column
+    per *person*, not per group: dragging still assigns to that specific
+    individual, unchanged, this just changes which individuals get
+    columns to begin with. A ticket already assigned to someone outside
+    the selected group still shows, same extra-column-not-a-drop-target
+    treatment as someone no longer assignable to this tenant at all."""
     nav = await build_nav_context(ctx)
     group_by = group_by if group_by in ("status", "assignee") else "status"
     effective_status = "active" if ticket_status is None else ticket_status
@@ -235,8 +246,19 @@ async def kanban_board(
     assignee_users: list[User] = []
     assignee_columns: dict[str, list[Ticket]] = {}
     extra_assignee_ids: list[int] = []
+    assignee_groups: list[Group] = []
     if group_by == "assignee":
+        assignee_groups = list((await tenant_db.execute(select(Group).order_by(Group.name))).scalars())
         assignee_users = await list_assignable_users(ctx.active_tenant.id)
+        if assignee_group is not None:
+            member_ids = set(
+                (
+                    await tenant_db.execute(
+                        select(GroupMembership.user_id).where(GroupMembership.group_id == assignee_group)
+                    )
+                ).scalars()
+            )
+            assignee_users = [u for u in assignee_users if u.id in member_ids]
         known_user_ids = {u.id for u in assignee_users}
         assignee_columns = {"unassigned": []}
         for u in assignee_users:
@@ -271,6 +293,8 @@ async def kanban_board(
             "extra_status_keys": extra_status_keys,
             "columns": columns,
             "selected_group_by": group_by,
+            "assignee_groups": assignee_groups,
+            "selected_assignee_group": assignee_group,
             "assignee_users": assignee_users,
             "assignee_columns": assignee_columns,
             "extra_assignee_ids": extra_assignee_ids,

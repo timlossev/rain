@@ -11,7 +11,12 @@
    -- see qs() below), and selected_group_by *if the caller defines it*
    (kanban_board only -- list.html has nothing to group, so its absence
    from context, not a flag, is what hides the Group by control and
-   keeps qs() from ever adding a group_by= param to a table-view link). #}
+   keeps qs() from ever adding a group_by= param to a table-view link).
+   assignee_groups (every tenant Group, for the "narrow assignee columns
+   to one team" select) and selected_assignee_group are the same
+   kanban_board-only, absence-hides-the-control story, one level deeper
+   -- only relevant once selected_group_by == "assignee" to begin
+   with. #}
 {% import "_search_picker.html" as picker %}
 
 {# Builds a `base`-rooted query string, keeping every filter dimension at
@@ -26,7 +31,7 @@
    Kanban has no equivalent, so it never reads/writes those two);
    selected_sort/selected_dir are read via `default(none)` rather than
    assumed present, since kanban.html's context never defines them. #}
-{% macro qs(base, type=none, status=none, asset_id=none, assigned=none, problematic=none, prioritized=none, sort=none, dir=none, group_by=none, include_sort=true) %}
+{% macro qs(base, type=none, status=none, asset_id=none, assigned=none, problematic=none, prioritized=none, sort=none, dir=none, group_by=none, assignee_group=none, include_sort=true) %}
 {%- set parts = [] -%}
 {%- set t = type if type is not none else selected_type -%}
 {%- set s = status if status is not none else selected_status -%}
@@ -34,11 +39,13 @@
 {%- set a = assigned if assigned is not none else selected_assigned -%}
 {%- set c = problematic if problematic is not none else ("1" if selected_problematic else "") -%}
 {%- set pr = prioritized if prioritized is not none else ("1" if selected_prioritized else "") -%}
-{# selected_group_by only exists in kanban.html's own context (list.html,
-   the table view, has no equivalent of it) -- default(none) reads it
-   without raising when it's plain absent, same as selected_sort/
-   selected_dir below being list.html-only in the other direction. #}
+{# selected_group_by/selected_assignee_group only exist in kanban.html's
+   own context (list.html, the table view, has no equivalent of either)
+   -- default(none) reads them without raising when plain absent, same
+   as selected_sort/selected_dir below being list.html-only in the
+   other direction. #}
 {%- set gb = group_by if group_by is not none else (selected_group_by | default(none)) -%}
+{%- set ag = assignee_group if assignee_group is not none else (selected_assignee_group | default(none)) -%}
 {%- if t %}{% set _ = parts.append("ticket_type=" ~ t) %}{% endif -%}
 {%- if s is not none %}{% set _ = parts.append("ticket_status=" ~ s) %}{% endif -%}
 {%- if aid %}{% set _ = parts.append("asset_id=" ~ aid) %}{% endif -%}
@@ -46,6 +53,7 @@
 {%- if c %}{% set _ = parts.append("problematic=" ~ c) %}{% endif -%}
 {%- if pr %}{% set _ = parts.append("prioritized=" ~ pr) %}{% endif -%}
 {%- if gb and gb != "status" %}{% set _ = parts.append("group_by=" ~ gb) %}{% endif -%}
+{%- if gb == "assignee" and ag %}{% set _ = parts.append("assignee_group=" ~ ag) %}{% endif -%}
 {%- if include_sort -%}
 {%- set so = sort if sort is not none else (selected_sort | default(none)) -%}
 {%- set d = dir if dir is not none else (selected_dir | default(none)) -%}
@@ -105,6 +113,19 @@
         <option value="assignee" {% if selected_group_by == "assignee" %}selected{% endif %}>Group by assignee (workload)</option>
       </select>
       {% endif %}
+      {# Narrows the assignee-mode column set to one tenant Group's own
+         members instead of every assignable user in the tenant, which
+         can be a lot -- only meaningful (and only rendered) once
+         assignee mode is actually picked; assignee_groups is only ever
+         in kanban_board's context when selected_group_by == "assignee". #}
+      {% if selected_group_by == "assignee" and assignee_groups is defined %}
+      <select name="assignee_group" onchange="this.form.submit()" aria-label="Filter assignee columns by team" title="Show only one team's members as columns">
+        <option value="">All members</option>
+        {% for g in assignee_groups %}
+        <option value="{{ g.id }}" {% if selected_assignee_group == g.id %}selected{% endif %}>{{ g.name }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
     </form>
 
     <form method="get" action="{{ base_url }}" style="margin-bottom:0;">
@@ -118,6 +139,7 @@
       {% if selected_problematic %}<input type="hidden" name="problematic" value="1">{% endif %}
       {% if selected_prioritized %}<input type="hidden" name="prioritized" value="1">{% endif %}
       {% if selected_group_by | default(none) and selected_group_by != "status" %}<input type="hidden" name="group_by" value="{{ selected_group_by }}">{% endif %}
+      {% if selected_group_by | default(none) == "assignee" and selected_assignee_group | default(none) %}<input type="hidden" name="assignee_group" value="{{ selected_assignee_group }}">{% endif %}
       {{ picker.search_picker("asset_id", "/tickets/assets/search", initial_value=selected_asset_id, initial_label=selected_asset_name, placeholder="Filter by asset...", auto_submit=True) }}
     </form>
     {% if selected_asset_id %}<a class="btn btn-sm" href="{{ base_url }}?{{ qs(base_url, asset_id='', include_sort=include_sort) }}">Clear asset</a>{% endif %}

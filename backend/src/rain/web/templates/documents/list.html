@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg with context %}
 {% block title %}Documents - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}The document repository. Upload files, edit txt/md documents in-line, link documents to tickets or assets, tag them, and search by title, document number, or tag.{% endblock %}
+{% block help_text %}The document repository. Upload files, edit txt/md documents in-line, link documents to tickets or assets, tag them, and search by title, document number, or tag. A document's number carries a small icon for each of: shown on the Home page, populated from a webhook, linked to a calendar entry, and shareable in the client portal.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <a class="btn btn-primary" href="/documents/new">+ Upload document</a>
@@ -13,7 +13,17 @@
       <label for="search">Search</label>
       <input type="text" id="search" name="search" value="{{ search }}" placeholder="title, DOC-000123, or a tag">
     </div>
+    <div class="field" style="margin-bottom:0;">
+      <label for="tag">Tag</label>
+      <select id="tag" name="tag" onchange="this.form.submit()" aria-label="Filter by tag" title="Filter by tag">
+        <option value="">All tags</option>
+        {% for t in all_tags %}
+        <option value="{{ t }}" {% if selected_tag == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <button class="btn" type="submit">Search</button>
+    {% if selected_tag %}<a class="btn btn-sm" href="/documents?search={{ search | urlencode }}">Clear tag</a>{% endif %}
   </form>
 
   <table>
@@ -21,14 +31,26 @@
     <tbody>
       {% for doc in page.items %}
       <tr>
-        <td><a href="/documents/{{ doc.doc_number }}">{{ doc.doc_number }}</a></td>
+        <td>
+          <div class="doc-number-cell">
+            <a href="/documents/{{ doc.doc_number }}">{{ doc.doc_number }}</a>
+            {% if doc.show_on_landing_page %}<span class="doc-flag-icon" title="Shown on the Home page">{{ nav_icon("home") }}</span>{% endif %}
+            {% if doc.webhook_id %}<span class="doc-flag-icon" title="{{ 'Populated from a webhook, auto-refreshes on every view' if doc.refresh_on_view else 'Populated from a webhook' }}">{{ nav_icon("repeat") }}</span>{% endif %}
+            {% if doc.id in calendar_linked_ids %}<span class="doc-flag-icon" title="Linked to a calendar entry">{{ nav_icon("calendar") }}</span>{% endif %}
+            {% if doc.is_shareable %}<span class="doc-flag-icon" title="Shareable in the client portal ({{ shareable_label }})">{{ nav_icon("shield") }}</span>{% endif %}
+          </div>
+        </td>
         <td>{{ doc.title }}</td>
-        <td>{% for tag in doc.tags %}<span class="badge">{{ tag }}</span> {% endfor %}</td>
+        <td>
+          {% for t in doc.tags %}
+          <a class="badge {% if t == selected_tag %}badge-accent{% endif %}" href="/documents?tag={{ t | urlencode }}" title="Show only documents tagged &quot;{{ t }}&quot;">{{ t }}</a>
+          {% endfor %}
+        </td>
         <td class="muted">{{ doc.filename }}</td>
         <td class="muted">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="5" class="muted">No documents yet. <a href="/documents/new">Upload the first one</a>.</td></tr>
+      <tr><td colspan="5" class="muted">{% if selected_tag or search %}No documents match.{% else %}No documents yet. <a href="/documents/new">Upload the first one</a>.{% endif %}</td></tr>
       {% endfor %}
     </tbody>
   </table>

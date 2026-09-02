@@ -82,6 +82,7 @@ async def _log_ticket_link_activity(
 async def list_documents(
     request: Request,
     search: str | None = None,
+    tag: str | None = None,
     page: int = 1,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
@@ -89,9 +90,28 @@ async def list_documents(
 ):
     nav = await build_nav_context(ctx)
     page_size = await get_tenant_config(tenant_db, "default_page_size")
-    doc_page = await paginate(tenant_db, service.document_list_stmt(search=search), page=page, page_size=page_size)
+    doc_page = await paginate(
+        tenant_db, service.document_list_stmt(search=search, tag=tag), page=page, page_size=page_size
+    )
+    # Both cheap, tenant-wide lookups backing the list's own flag icons/tag
+    # filter -- see their own docstrings (calendar_service.
+    # document_ids_with_calendar_entries, service.list_all_tags).
+    all_tags = await service.list_all_tags(tenant_db)
+    calendar_linked_ids = await calendar_service.document_ids_with_calendar_entries(tenant_db)
+    shareable_label = await get_tenant_config(tenant_db, "portal_shareable_documents_label")
     return templates.TemplateResponse(
-        request, "documents/list.html", {**nav, "ctx": ctx, "page": doc_page, "search": search or ""}
+        request,
+        "documents/list.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "page": doc_page,
+            "search": search or "",
+            "selected_tag": tag or "",
+            "all_tags": all_tags,
+            "calendar_linked_ids": calendar_linked_ids,
+            "shareable_label": shareable_label,
+        },
     )
 
 

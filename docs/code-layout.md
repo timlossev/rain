@@ -151,7 +151,7 @@ honest read before assuming it catches something:
   regression cases (CSV formula injection, markdown sanitization, SSRF
   URL checks, PDF `link_callback` path guards, search snippet
   escaping), and Service Catalog payload rendering.
-- **14 integration tests** (`test_integration.py`, skipped unless
+- **15 integration tests** (`test_integration.py`, skipped unless
   `TEST_DATABASE_URL` is set) against a real Postgres -- tenant
   provisioning, asset CRUD, ticket numbering + rule promotion, syslog
   routing, document numbering/linking, custom fields, tags/search, a
@@ -166,13 +166,15 @@ honest read before assuming it catches something:
   and a Service Catalog item all referencing each other by name)
   round-tripping through JSON onto a *different* tenant, a platform
   bundle redacting a secret by default while still round-tripping it
-  with `include_secrets`, and `list_assignable_users`' tenant/active
+  with `include_secrets`, `list_assignable_users`' tenant/active
   scoping (Kanban's "group by assignee" columns) against another
-  tenant's user and a deactivated one of this tenant's own. Broad
-  strokes, not deep: each is one scenario, not a sweep of edge cases --
-  and, since this checkout has no Postgres available, the six most
-  recently added ones were written and code-reviewed against the exact
-  service-layer functions they exercise but not run live; run them for
+  tenant's user and a deactivated one of this tenant's own, and the
+  Documents list's tag filter (exact membership, not a substring match)
+  plus its calendar-link flag lookup. Broad strokes, not deep: each is
+  one scenario, not a sweep of edge cases -- and, since this checkout
+  has no Postgres available, the seven most recently added ones were
+  written and code-reviewed against the exact service-layer functions
+  they exercise but not run live; run them for
   real before leaning on them for a release.
 - **No HTTP-level tests at all** -- nothing in this suite drives a
   route through FastAPI's `TestClient`. A routing/template bug (a

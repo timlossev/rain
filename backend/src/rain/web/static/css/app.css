@@ -1433,6 +1433,15 @@ td.actions { text-align: right; white-space: nowrap; }
 .approval-icon-unapproved { color: var(--danger); }
 .unapproved-title { color: var(--danger); }
 
+/* Documents list: small, uniformly-muted flag icons next to a document's
+   number (Home/webhook-refresh/calendar/shareable) -- deliberately one
+   color, not one per flag, so a row with several doesn't turn into a
+   row of competing colored dots; each one's title attribute carries the
+   actual meaning. */
+.doc-number-cell { display: flex; align-items: center; gap: 5px; }
+.doc-flag-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }
+.doc-flag-icon svg { width: 14px; height: 14px; }
+
 /* ---------- live syslog viewer ---------- */
 .live-controls { display: flex; align-items: center; gap: 10px; }
 .live-feed {

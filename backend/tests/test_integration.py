@@ -704,3 +704,59 @@ async def test_list_assignable_users_scopes_by_tenant_and_active():
         assert await is_assignable_user(admin.id, tenant_a.id) is True
         assert await is_assignable_user(own_inactive.id, tenant_a.id) is False
         assert await is_assignable_user(other_tenant.id, tenant_a.id) is False
+
+
+async def test_document_list_tag_filter_and_flag_lookups():
+    """rain.modules.documents.service.list_all_tags/document_list_stmt's
+    tag filter, and calendar.service.document_ids_with_calendar_entries --
+    the three pieces backing the Documents list's tag dropdown and
+    calendar-icon flag. Covers the one sharp edge in the tag filter: exact
+    membership (Document.tags.any), not a substring match the way the
+    list's own search box treats tags -- "Q4" must not also match a
+    document only tagged "Q4-2026"."""
+    import datetime as dt
+
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.modules.calendar import service as calendar_service
+    from rain.modules.documents import service as document_service
+
+    tenant = await provision_tenant(slug="sigma", name="Sigma LLC")
+
+    async with tenant_session(tenant.schema_name) as session:
+        doc1 = await document_service.create_document(
+            session, title="Runbook", description=None, filename="runbook.md",
+            storage_key="sigma/runbook.md", mime_type="text/markdown", size_bytes=10, uploaded_by=None,
+            tags=document_service.parse_tags("security, Q4-2026"),
+        )
+        doc2 = await document_service.create_document(
+            session, title="Postmortem", description=None, filename="pm.md",
+            storage_key="sigma/pm.md", mime_type="text/markdown", size_bytes=10, uploaded_by=None,
+            tags=document_service.parse_tags("security, oncall"),
+        )
+        await session.commit()
+
+        # A set comparison, not an exact ordered list -- list_all_tags'
+        # ORDER BY is a real SQL clause (worth keeping), but which of
+        # "Q4-2026" and "oncall" sorts first depends on the database's
+        # collation, not on anything this test should be pinning down.
+        assert set(await document_service.list_all_tags(session)) == {"Q4-2026", "oncall", "security"}
+
+        security_docs = (await session.execute(document_service.document_list_stmt(tag="security"))).scalars().all()
+        assert {d.id for d in security_docs} == {doc1.id, doc2.id}
+
+        # Exact membership: "Q4" alone must not pull in "Q4-2026".
+        exact_only = (await session.execute(document_service.document_list_stmt(tag="Q4"))).scalars().all()
+        assert exact_only == []
+        exact_match = (await session.execute(document_service.document_list_stmt(tag="Q4-2026"))).scalars().all()
+        assert [d.id for d in exact_match] == [doc1.id]
+
+        assert await calendar_service.document_ids_with_calendar_entries(session) == set()
+
+        await calendar_service.create_entry(
+            session, title="Quarterly review", description=None, start_date=dt.date(2026, 1, 1),
+            recurrence="quarterly", recurrence_end=None, emit_syslog_event=False, event_program=None,
+            document_id=doc1.id, policy_ref=None, created_by=None,
+        )
+
+        assert await calendar_service.document_ids_with_calendar_entries(session) == {doc1.id}
