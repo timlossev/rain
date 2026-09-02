@@ -1,0 +1,100 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-02T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "POA&M tracking fields starter template",
+  "secrets_included": false,
+  "custom_fields": [
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "poam_id",
+      "label": "POA&M ID",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 0
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "finding_source",
+      "label": "Finding source",
+      "field_type": "select",
+      "select_options": ["Vulnerability scan", "Security assessment", "Penetration test", "Audit", "Continuous monitoring", "Other"],
+      "is_required": false,
+      "sort_order": 1
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "cve_or_finding_id",
+      "label": "CVE / finding ID",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "risk_rating",
+      "label": "Original risk rating",
+      "field_type": "select",
+      "select_options": ["Low", "Moderate", "High"],
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "scheduled_completion_date",
+      "label": "Scheduled completion date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "point_of_contact",
+      "label": "Point of contact",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "affected_systems",
+      "label": "Affected systems (beyond the linked Asset)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "deviation_type",
+      "label": "Deviation type",
+      "field_type": "select",
+      "select_options": ["None", "Risk accepted", "Operationally required", "False positive"],
+      "is_required": false,
+      "sort_order": 7
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "deviation_justification",
+      "label": "Deviation justification",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 8
+    }
+  ]
+}

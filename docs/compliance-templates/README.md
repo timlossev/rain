@@ -49,16 +49,33 @@ by hand from scratch:
   classification level, system/location, owner, retention period, and
   applicable regulation) for a basic data inventory/classification
   register. Each Asset's own "Name" is the data asset's name.
+- `poam-tracking-fields.json` -- the one template that isn't an asset
+  type. A POA&M item's lifecycle (opened, tracked, closed or
+  risk-accepted) is a ticket's lifecycle, not a persistent asset's, so
+  this seeds *ticket* custom fields instead (POA&M ID, finding source,
+  CVE/finding ID, original risk rating, scheduled completion date,
+  point of contact, affected systems, deviation type and
+  justification) -- applying tenant-wide, across all three ticket
+  types, the same as every ticket-scoped field does. File a POA&M item
+  as a vulnerability ticket (or whichever type the underlying finding
+  actually is) and these fields show up on it. One real gap: FedRAMP's
+  own POA&M template expects discrete, individually-dated milestones
+  per item, and RAIN has no first-class milestone list -- a ticket's
+  timestamped comment thread and status history is the practical
+  substitute, not a literal replacement.
 
 To use one: Admin > Config Bundles > Tenant > Import, and pick the file.
-Each only carries `asset_types` and `custom_fields` -- importing one adds
-that asset type and its fields to the active tenant without touching
-anything else already configured there (tickets, webhooks, groups,
-users, and so on are untouched, since the bundle simply doesn't mention
-them). Once imported, populate it like any other asset type under
-Assets > + New, and use its own custom-fields form the same way you
-would for any other asset.
+Each only carries `custom_fields` (and, for every one but poam-
+tracking-fields.json, `asset_types`) -- importing one adds that to the
+active tenant without touching anything else already configured there
+(tickets, webhooks, groups, users, and so on are untouched, since the
+bundle simply doesn't mention them). Once imported, an asset-type
+template populates like any other asset type under Assets > + New,
+using its own custom-fields form the same way you would for any other
+asset; poam-tracking-fields.json's fields show up directly on the
+ticket form, the same as any other ticket-scoped custom field.
 
 These are starting points, not a fixed schema -- rename, add, or drop
-fields afterward under Admin > Asset Types the same as you would for any
-asset type you built yourself.
+fields afterward under Admin > Asset Types (or, for poam-tracking-
+fields.json, Tickets > Custom Fields) the same as you would for any
+asset type or field you built yourself.
