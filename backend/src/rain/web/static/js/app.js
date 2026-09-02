@@ -1031,24 +1031,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Kanban board (/tickets/kanban): HTML5 drag-and-drop between columns.
-  // Cards are draggable="true" (tickets/kanban.html); each column body is
-  // a dropzone, either status-mode (data-status-key) or, with "Group by"
-  // switched to Assignee, assignee-mode (data-assignee-id, "" meaning
-  // Unassigned -- see dropzone.dataset.assigneeId !== undefined below for
-  // why that has to be a presence check, not a truthiness one). A
-  // successful drop calls the same service.update_status/update_assignee
-  // the ticket detail page's own status-stepper/assignee picker call,
-  // just via a small JSON endpoint (rain.modules.tickets.router.
-  // kanban_update_status/kanban_update_assignee) instead of a full-page
-  // redirect -- the card moves in the DOM right away (optimistic), and
-  // only reverts back to its original column if that call comes back
-  // not-ok or fails outright (a stale status key, someone no longer
-  // assignable, two people dragging the same card at once, a dropped
-  // connection), so the board never shows a move the server never
-  // actually recorded.
-  const kanbanBoard = document.querySelector("[data-kanban-board]");
-  if (kanbanBoard) {
+  // Kanban boards (/tickets/kanban, /documents/kanban): HTML5 drag-and-
+  // drop between columns, one shared setup function since both boards
+  // work the same way underneath -- cards are draggable="true", each
+  // column body is a dropzone, and a successful drop calls a small JSON
+  // endpoint instead of a full-page redirect, moving the card in the DOM
+  // right away (optimistic) and reverting it back to its original column
+  // if that call comes back not-ok or fails outright (a stale target, a
+  // dropped connection, two people dragging the same card at once). Only
+  // buildRequest (what to fetch, and what a success response means for
+  // this card) differs per board/mode -- everything else here is generic.
+  const setupKanbanBoard = (board, idAttr, buildRequest) => {
     let dragged = null; // the card element currently being dragged
     let dragOrigin = null; // its dropzone at dragstart, for a revert
 
@@ -1056,10 +1049,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const countEl = dropzone.closest("[data-kanban-column]")?.querySelector("[data-kanban-count]");
       if (countEl) countEl.textContent = dropzone.querySelectorAll("[data-kanban-card]").length;
     };
-    // A column's own "No tickets." placeholder (kanban.html's {% else %}
-    // on an empty column) has to be maintained by hand here -- there's no
+    // A column's own "No ___." placeholder (kanban.html's {% else %} on
+    // an empty column) has to be maintained by hand here -- there's no
     // template re-render on a client-side move, just a DOM node relocated
-    // from one dropzone to another.
+    // from one dropzone to another (or, for documents' tag mode, removed
+    // outright -- see buildRequest's own onSuccess below).
     const updateEmptyState = (dropzone) => {
       const hasCards = dropzone.querySelector("[data-kanban-card]") !== null;
       const placeholder = dropzone.querySelector("[data-kanban-empty]");
@@ -1067,7 +1061,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const el = document.createElement("div");
         el.className = "kanban-empty muted";
         el.setAttribute("data-kanban-empty", "");
-        el.textContent = "No tickets.";
+        el.textContent = dropzone.dataset.emptyLabel || "Nothing here.";
         dropzone.appendChild(el);
       } else if (hasCards && placeholder) {
         placeholder.remove();
@@ -1077,7 +1071,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const flash = document.createElement("div");
       flash.className = "flash flash-error";
       flash.textContent = message;
-      kanbanBoard.parentNode.insertBefore(flash, kanbanBoard);
+      board.parentNode.insertBefore(flash, board);
       setTimeout(() => flash.remove(), 4000);
     };
     const revert = (card, origin, dropzone) => {
@@ -1088,7 +1082,7 @@ document.addEventListener("DOMContentLoaded", () => {
       updateEmptyState(dropzone);
     };
 
-    kanbanBoard.querySelectorAll("[data-kanban-card]").forEach((card) => {
+    board.querySelectorAll("[data-kanban-card]").forEach((card) => {
       card.addEventListener("dragstart", (evt) => {
         dragged = card;
         dragOrigin = card.closest("[data-kanban-dropzone]");
@@ -1097,7 +1091,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Not actually read back on drop (dragged/dragOrigin above cover
         // that) -- some browsers refuse to start a drag at all unless
         // dragstart sets *some* data, so this is just satisfying that.
-        evt.dataTransfer.setData("text/plain", card.dataset.ticketId || "");
+        evt.dataTransfer.setData("text/plain", card.dataset[idAttr] || "");
       });
       card.addEventListener("dragend", () => {
         card.classList.remove("kanban-dragging");
@@ -1106,7 +1100,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
-    kanbanBoard.querySelectorAll("[data-kanban-dropzone]").forEach((dropzone) => {
+    board.querySelectorAll("[data-kanban-dropzone]").forEach((dropzone) => {
       dropzone.addEventListener("dragover", (evt) => {
         evt.preventDefault(); // required, or "drop" never fires
         evt.dataTransfer.dropEffect = "move";
@@ -1126,17 +1120,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const origin = dragOrigin;
         if (origin === dropzone) return; // dropped back into its own column
 
-        // Presence check, not truthiness -- data-assignee-id="" (the
-        // Unassigned column) is a real, valid assignee-mode dropzone, not
-        // a missing attribute the way a status-mode dropzone's dataset
-        // lacks this key entirely.
-        const isAssigneeMode = dropzone.dataset.assigneeId !== undefined;
-        const url = isAssigneeMode
-          ? `/tickets/${card.dataset.ticketId}/kanban-assignee`
-          : `/tickets/${card.dataset.ticketId}/kanban-status`;
-        const body = isAssigneeMode
-          ? `new_assignee_user_id=${encodeURIComponent(dropzone.dataset.assigneeId)}`
-          : `new_status=${encodeURIComponent(dropzone.dataset.statusKey)}`;
+        const request = buildRequest(card, origin, dropzone);
+        if (!request) return;
 
         dropzone.appendChild(card); // optimistic move -- same node, listeners intact
         updateColumnCount(origin);
@@ -1145,29 +1130,98 @@ document.addEventListener("DOMContentLoaded", () => {
         updateEmptyState(dropzone);
 
         try {
-          const resp = await fetch(url, {
+          const resp = await fetch(request.url, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body,
+            body: request.body,
           });
           const data = resp.ok ? await resp.json() : null;
           if (!data || !data.ok) {
             revert(card, origin, dropzone);
-            flashBoardError((data && data.error) || "Couldn't move that ticket -- try again.");
-          } else if (isAssigneeMode) {
-            // Status-mode needs no client-side text update -- the card's
-            // own status isn't shown as text on it. Assignee-mode's
-            // workload view does show it (kanban.html's kanban_card
-            // macro), so the just-moved card's own meta line has to
-            // reflect the new assignee without a full page reload.
-            const nameEl = card.querySelector("[data-kanban-assignee]");
-            if (nameEl) nameEl.textContent = data.assignee_name;
+            flashBoardError((data && data.error) || "Couldn't move that -- try again.");
+          } else if (request.onSuccess) {
+            request.onSuccess(data, { updateColumnCount, updateEmptyState });
           }
         } catch (err) {
           revert(card, origin, dropzone);
-          flashBoardError("Couldn't move that ticket -- try again.");
+          flashBoardError("Couldn't move that -- try again.");
         }
       });
+    });
+  };
+
+  const ticketKanbanBoard = document.querySelector("[data-kanban-board]");
+  if (ticketKanbanBoard) {
+    setupKanbanBoard(ticketKanbanBoard, "ticketId", (card, origin, dropzone) => {
+      // Presence check, not truthiness -- data-assignee-id="" (the
+      // Unassigned column) is a real, valid assignee-mode dropzone, not
+      // a missing attribute the way a status-mode dropzone's dataset
+      // lacks this key entirely.
+      const isAssigneeMode = dropzone.dataset.assigneeId !== undefined;
+      if (isAssigneeMode) {
+        return {
+          url: `/tickets/${card.dataset.ticketId}/kanban-assignee`,
+          body: `new_assignee_user_id=${encodeURIComponent(dropzone.dataset.assigneeId)}`,
+          // Status-mode needs no client-side text update -- the card's
+          // own status isn't shown as text on it. Assignee-mode's
+          // workload view does show it (kanban.html's kanban_card
+          // macro), so the just-moved card's own meta line has to
+          // reflect the new assignee without a full page reload.
+          onSuccess: (data) => {
+            const nameEl = card.querySelector("[data-kanban-assignee]");
+            if (nameEl) nameEl.textContent = data.assignee_name;
+          },
+        };
+      }
+      return {
+        url: `/tickets/${card.dataset.ticketId}/kanban-status`,
+        body: `new_status=${encodeURIComponent(dropzone.dataset.statusKey)}`,
+      };
+    });
+  }
+
+  const docKanbanBoard = document.querySelector("[data-doc-kanban-board]");
+  if (docKanbanBoard) {
+    setupKanbanBoard(docKanbanBoard, "docId", (card, origin, dropzone) => {
+      const isOwnerMode = dropzone.dataset.ownerId !== undefined; // same presence-check reasoning as ticketId above
+      if (isOwnerMode) {
+        return {
+          url: `/documents/${card.dataset.docId}/kanban-owner`,
+          body: `new_owner_user_id=${encodeURIComponent(dropzone.dataset.ownerId)}`,
+          onSuccess: (data) => {
+            const nameEl = card.querySelector("[data-kanban-owner]");
+            if (nameEl) nameEl.textContent = data.owner_name;
+          },
+        };
+      }
+      // Tag mode: from_tag is the card's OWN tag-value (which tag this
+      // specific card instance represents -- a document with several
+      // tags has one card per tag, see documents/kanban.html's own
+      // doc_card macro), not the origin dropzone's -- both happen to
+      // read the same here since a card only ever starts in the
+      // dropzone matching its own tag-value, but the card is the
+      // semantically correct source: it's what service.retag() actually
+      // swaps out.
+      return {
+        url: `/documents/${card.dataset.docId}/kanban-tag`,
+        body: `from_tag=${encodeURIComponent(card.dataset.tagValue || "")}&to_tag=${encodeURIComponent(dropzone.dataset.tagValue || "")}`,
+        onSuccess: (data, { updateColumnCount, updateEmptyState }) => {
+          card.dataset.tagValue = dropzone.dataset.tagValue || "";
+          // Dropping onto a tag the document already carried merges
+          // instead of duplicating (service.retag's own doing) -- if
+          // that just left two cards for the same document in this one
+          // column (the one just dragged in, plus one already there for
+          // that tag), drop the redundant one rather than showing both.
+          const duplicates = Array.from(
+            dropzone.querySelectorAll(`[data-kanban-card][data-doc-id="${card.dataset.docId}"]`)
+          ).filter((el) => el !== card);
+          if (duplicates.length) {
+            duplicates.forEach((el) => el.remove());
+            updateColumnCount(dropzone);
+            updateEmptyState(dropzone);
+          }
+        },
+      };
     });
   }
 });

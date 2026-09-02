@@ -780,6 +780,43 @@ time (auto-submits on change); each tag shown in the Tags column is
 also its own link that does the same thing, so browsing by tag works
 either from the dropdown or by clicking a tag you see on a document.
 
+### Documents Kanban board
+
+Reached from "Kanban view" on the document list, or Documents > Kanban
+in the sidebar. The same documents, laid out in columns instead of
+table rows, with a "Group by" dropdown picking what the columns are:
+
+- **Tag** (default): one column per tag in use, cleaned up and
+  deduplicated automatically -- "security", "SECURITY", and "Security"
+  on three different documents all collapse onto one "Security"
+  column, capitalized the same way regardless of how any one document
+  had it typed in. A leading "Uncategorized" column holds documents
+  with no tags at all. A document with several tags shows up as its
+  own card in each one of those columns -- drag a card into a
+  different tag column to retag it: the tag it came from is removed,
+  the one it's dropped on is added, and every other tag already on
+  that document is left alone. Dropping onto a tag the document
+  already carries just removes the one it came from, rather than
+  adding a duplicate; dropping into "Uncategorized" removes it
+  entirely.
+- **Owner (workload)**: one column per assignable user plus "No
+  owner" first, same idea as the ticket board's own assignee view.
+  Drag a card into someone's column to make them responsible for
+  keeping that document current, or into "No owner" to clear it. A
+  second dropdown narrows the columns to one team's members (Admin >
+  Groups), same as the ticket board.
+
+Whichever mode you're in, the other one is available as a plain filter
+instead of a grouping -- a "Filter by person" dropdown in Tag mode
+narrows the board to one person's documents before laying out the tag
+columns; a "Filter by tag" dropdown in Owner mode does the same the
+other way, narrowing to one tag before laying out the owner columns.
+
+Each card shows the document's number (with the same flag icons the
+table view uses), title, and current owner. As with the ticket boards,
+a move reverts and shows an error banner if it didn't actually go
+through.
+
 ### New document
 
 Despite the button being labeled "Upload document", this screen offers

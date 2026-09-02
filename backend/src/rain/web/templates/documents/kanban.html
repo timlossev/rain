@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Documents Kanban - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}The document repository, grouped into columns instead of table rows. "Group by" switches what the columns are: Tag (default) - a deduplicated, cleaned, capitalized view of every tag in use, plus "Uncategorized"; drag a card between tag columns to retag it, leaving every other tag on the document alone. Or Owner (workload) - one column per assignable user plus "No owner"; drag a card to assign who's responsible for keeping it current, optionally narrowed to one team's members with the second dropdown that appears.{% endblock %}
+{% block content_class %}content-full{% endblock %}
+{% block content %}
+
+{# Same flag icons as tickets/kanban.html's own kanban_card, next to the
+   document's number -- see documents/list.html's own doc-number-cell for
+   the identical treatment on the table view. tag_value is only set in
+   "tag" mode -- a document with several tags gets its own card per tag,
+   so app.js's drag handler needs to know which specific tag this card
+   instance represents (data-tag-value) to retag rather than replace. #}
+{% macro doc_card(doc, tag_value=none) %}
+<div class="kanban-card" draggable="true" data-kanban-card data-doc-id="{{ doc.id }}" {% if tag_value is not none %}data-tag-value="{{ tag_value }}"{% endif %}>
+  <div class="kanban-card-top">
+    <div class="kanban-card-badges">
+      <a class="badge badge-accent kanban-card-number" href="/documents/{{ doc.doc_number }}">{{ doc.doc_number }}</a>
+      {% if doc.show_on_landing_page %}<span class="doc-flag-icon" title="Shown on the Home page">{{ nav_icon("home") }}</span>{% endif %}
+      {% if doc.webhook_id %}<span class="doc-flag-icon" title="{{ 'Populated from a webhook, auto-refreshes on every view' if doc.refresh_on_view else 'Populated from a webhook' }}">{{ nav_icon("repeat") }}</span>{% endif %}
+      {% if doc.id in calendar_linked_ids %}<span class="doc-flag-icon" title="Linked to a calendar entry">{{ nav_icon("calendar") }}</span>{% endif %}
+      {% if doc.is_shareable %}<span class="doc-flag-icon" title="Shareable in the client portal ({{ shareable_label }})">{{ nav_icon("shield") }}</span>{% endif %}
+    </div>
+  </div>
+  <a class="kanban-card-title" href="/documents/{{ doc.doc_number }}">{{ doc.title }}</a>
+  <div class="kanban-card-meta muted">
+    <span data-kanban-owner>{{ owner_names.get(doc.owner_user_id, "No owner") }}</span>
+  </div>
+</div>
+{% endmacro %}
+
+{# filter_tag/filter_owner are cross-axis filters, not a second grouping
+   dimension -- "group by tag" narrowed by a single tag, or "group by
+   owner" narrowed by a single owner, would just hide every other column
+   for no reason, so each only ever appears (and only ever applies, see
+   documents_kanban's own docstring) in the mode it doesn't already group
+   by: filter_owner narrows "group by tag", filter_tag narrows "group by
+   owner". #}
+<div class="panel-row" style="justify-content:space-between; flex-wrap:wrap; gap:8px;">
+  <form method="get" action="/documents/kanban" class="field" style="margin-bottom:0; flex:1; min-width:220px;">
+    <input type="hidden" name="group_by" value="{{ selected_group_by }}">
+    {% if selected_group_by == "owner" and selected_owner_group %}<input type="hidden" name="owner_group" value="{{ selected_owner_group }}">{% endif %}
+    {% if selected_group_by == "owner" and selected_filter_tag %}<input type="hidden" name="filter_tag" value="{{ selected_filter_tag }}">{% endif %}
+    {% if selected_group_by == "tag" and selected_filter_owner %}<input type="hidden" name="filter_owner" value="{{ selected_filter_owner }}">{% endif %}
+    <input type="text" name="search" value="{{ search }}" placeholder="Search title, DOC-000123, or a tag" aria-label="Search">
+  </form>
+  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <form method="get" action="/documents/kanban" style="display:flex; align-items:center; gap:8px; margin-bottom:0; flex-wrap:wrap;">
+      <input type="hidden" name="search" value="{{ search }}">
+      <select name="group_by" onchange="this.form.submit()" aria-label="Group board by" title="Group the board by tag or by owner workload">
+        <option value="tag" {% if selected_group_by == "tag" %}selected{% endif %}>Group by tag</option>
+        <option value="owner" {% if selected_group_by == "owner" %}selected{% endif %}>Group by owner (workload)</option>
+      </select>
+      {% if selected_group_by == "owner" %}
+      <select name="owner_group" onchange="this.form.submit()" aria-label="Filter owner columns by team" title="Show only one team's members as columns">
+        <option value="">All members</option>
+        {% for g in owner_groups %}
+        <option value="{{ g.id }}" {% if selected_owner_group == g.id %}selected{% endif %}>{{ g.name }}</option>
+        {% endfor %}
+      </select>
+      <select name="filter_tag" onchange="this.form.submit()" aria-label="Filter by tag" title="Only show documents carrying this tag">
+        <option value="">All tags</option>
+        {% for t in all_tags %}
+        <option value="{{ t }}" {% if selected_filter_tag == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+      {% else %}
+      <select name="filter_owner" onchange="this.form.submit()" aria-label="Filter by person" title="Only show documents owned by this person">
+        <option value="">Everyone</option>
+        {% for u in all_assignable_users %}
+        <option value="{{ u.id }}" {% if selected_filter_owner == u.id %}selected{% endif %}>{{ u.display_name }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+    </form>
+    <a class="btn btn-sm" href="/documents">Table view</a>
+  </div>
+</div>
+
+{% if truncated %}
+<div class="flash flash-error">Showing the first 500 matching documents - narrow your search to see the rest.</div>
+{% endif %}
+
+<div class="kanban-board" data-doc-kanban-board>
+{% if selected_group_by == "tag" %}
+  <div class="kanban-column" data-kanban-column>
+    <div class="kanban-column-header" style="--column-color: #6b7280;">
+      <span class="kanban-column-dot" aria-hidden="true"></span>
+      <span class="kanban-column-title">Uncategorized</span>
+      <span class="kanban-column-count" data-kanban-count>{{ tag_columns.get("uncategorized", []) | length }}</span>
+    </div>
+    {# data-tag-value="" (empty, not absent) is what app.js's Kanban
+       block checks for to tell a tag-mode dropzone apart from an
+       owner-mode one -- dropping here removes whatever tag a card came
+       from and adds nothing. #}
+    <div class="kanban-column-body" data-kanban-dropzone data-tag-value="">
+      {% for doc in tag_columns.get("uncategorized", []) %}
+      {{ doc_card(doc, "") }}
+      {% else %}
+      <div class="kanban-empty muted" data-kanban-empty>No documents.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% for label in tag_labels %}
+  <div class="kanban-column" data-kanban-column>
+    <div class="kanban-column-header" style="--column-color: var(--accent);">
+      <span class="kanban-column-dot" aria-hidden="true"></span>
+      <span class="kanban-column-title">{{ label }}</span>
+      <span class="kanban-column-count" data-kanban-count>{{ tag_columns.get(label, []) | length }}</span>
+    </div>
+    <div class="kanban-column-body" data-kanban-dropzone data-tag-value="{{ label }}">
+      {% for doc in tag_columns.get(label, []) %}
+      {{ doc_card(doc, label) }}
+      {% else %}
+      <div class="kanban-empty muted" data-kanban-empty>No documents.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="kanban-column" data-kanban-column>
+    <div class="kanban-column-header" style="--column-color: #6b7280;">
+      <span class="kanban-column-dot" aria-hidden="true"></span>
+      <span class="kanban-column-title">No owner</span>
+      <span class="kanban-column-count" data-kanban-count>{{ owner_columns.get("unowned", []) | length }}</span>
+    </div>
+    <div class="kanban-column-body" data-kanban-dropzone data-owner-id="">
+      {% for doc in owner_columns.get("unowned", []) %}
+      {{ doc_card(doc) }}
+      {% else %}
+      <div class="kanban-empty muted" data-kanban-empty>No documents.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% for u in owner_users %}
+  <div class="kanban-column" data-kanban-column>
+    <div class="kanban-column-header" style="--column-color: var(--accent);">
+      <span class="kanban-column-dot" aria-hidden="true"></span>
+      <span class="kanban-column-title">{{ u.display_name }}</span>
+      <span class="kanban-column-count" data-kanban-count>{{ owner_columns.get(u.id | string, []) | length }}</span>
+    </div>
+    <div class="kanban-column-body" data-kanban-dropzone data-owner-id="{{ u.id }}">
+      {% for doc in owner_columns.get(u.id | string, []) %}
+      {{ doc_card(doc) }}
+      {% else %}
+      <div class="kanban-empty muted" data-kanban-empty>No documents.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% for uid in extra_owner_ids %}
+  {# Owned by someone no longer assignable to this tenant, or simply
+     outside the currently selected team -- shown, not silently dropped,
+     same treatment tickets/kanban.html gives an equivalent case, and
+     deliberately not a drop target for the same reason. #}
+  <div class="kanban-column" data-kanban-column>
+    <div class="kanban-column-header" style="--column-color: #6b7280;">
+      <span class="kanban-column-dot" aria-hidden="true"></span>
+      <span class="kanban-column-title">{{ owner_names.get(uid, "Former user #" ~ uid) }} <span class="muted" style="font-weight:400;">(not assignable here)</span></span>
+      <span class="kanban-column-count" data-kanban-count>{{ owner_columns.get(uid | string, []) | length }}</span>
+    </div>
+    <div class="kanban-column-body">
+      {% for doc in owner_columns.get(uid | string, []) %}
+      {{ doc_card(doc) }}
+      {% else %}
+      <div class="kanban-empty muted" data-kanban-empty>No documents.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+{% endif %}
+</div>
+{% endblock %}

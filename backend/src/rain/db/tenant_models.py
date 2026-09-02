@@ -910,6 +910,16 @@ class Document(TenantBase):
     # webhook never writes on failure). Only does anything once webhook_id
     # above is actually set.
     refresh_on_view: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Who's responsible for keeping this document current -- cross-schema,
+    # plain integer (see this module's own docstring), same trade-off
+    # Ticket.assignee_user_id already makes. Separate from uploaded_by
+    # above (a one-time fact about who created it, never reassigned) and
+    # independent of webhook_id/refresh_on_view -- an owner is accountable
+    # for accuracy whether or not the document happens to auto-refresh
+    # from anywhere. Backs the Documents Kanban board's "group by owner"
+    # view (migration 0047), the same role assignee_user_id plays for the
+    # tickets board.
+    owner_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Optional, freeform -- a plain array rather than a normalized tags
     # table (see migration 0039's own docstring for why: nothing here
     # needs a tenant-wide tag registry or tag-scoped browsing, just

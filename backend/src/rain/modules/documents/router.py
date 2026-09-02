@@ -6,7 +6,7 @@ from datetime import datetime
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.convertors import Convertor, register_url_convertor
 
@@ -14,6 +14,7 @@ from rain.core.pagination import paginate
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.tenant_config import get_tenant_config
+from rain.core.user_names import is_assignable_user, list_assignable_users, resolve_user_names
 from rain.modules.assets import service as asset_service
 from rain.modules.calendar import service as calendar_service
 from rain.modules.documents import service, storage, textbody
@@ -113,6 +114,191 @@ async def list_documents(
             "shareable_label": shareable_label,
         },
     )
+
+
+_KANBAN_DOC_CAP = 500
+
+
+@router.get("/kanban", response_class=HTMLResponse)
+async def documents_kanban(
+    request: Request,
+    search: str | None = None,
+    group_by: str = "tag",  # "tag" | "owner"
+    owner_group: int | None = None,
+    filter_tag: str | None = None,
+    filter_owner: int | None = None,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Documents, grouped into Kanban columns instead of the list view's
+    table rows -- group_by picks what the columns are, the same two-mode
+    shape rain.modules.tickets.router.kanban_board already established
+    for tickets:
+
+    "tag" (default): a normalized (service.normalize_tag), deduplicated-
+    across-documents view of every tag in use, plus a leading
+    "Uncategorized" column for documents with none. A document with
+    several tags appears as its own card in each one -- dragging a card
+    between tag columns retags it (service.retag below), a targeted swap
+    (remove the tag it came from, add the one it's dropped on) that
+    leaves every other tag on the document untouched, not a wholesale
+    replace. filter_owner (only meaningful here) narrows the underlying
+    document set to one person's own documents first -- the board's
+    *columns* are still tags, this is a plain filter on the other axis,
+    not a second grouping dimension.
+
+    "owner": a workload view, one column per this tenant's assignable
+    users (rain.core.user_names.list_assignable_users, the same
+    candidate set the tickets board's own assignee mode uses) plus a
+    leading "No owner" column, optionally narrowed to one Group's own
+    members via owner_group -- same "too many users otherwise" filter
+    the tickets board grew for assignee mode. Dragging a card between
+    owner columns reassigns it (service.update_owner), a single-valued
+    move, unlike tag mode: a document has exactly one owner_user_id.
+    filter_tag (only meaningful here), the mirror of filter_owner above,
+    narrows the document set to one tag first.
+
+    Either filter is accepted regardless of group_by but only ever
+    rendered as a control in the mode it doesn't already group by --
+    filtering "group by tag" by a single tag, or "group by owner" by a
+    single owner, would just hide every other column for no reason."""
+    nav = await build_nav_context(ctx)
+    group_by = group_by if group_by in ("tag", "owner") else "tag"
+    stmt = service.document_list_stmt(
+        search=search,
+        tag=filter_tag if group_by == "owner" else None,
+        owner_user_id=filter_owner if group_by == "tag" else None,
+    ).limit(_KANBAN_DOC_CAP + 1)
+    result = await tenant_db.execute(stmt)
+    docs = list(result.scalars())
+    truncated = len(docs) > _KANBAN_DOC_CAP
+    docs = docs[:_KANBAN_DOC_CAP]
+
+    # Both candidate lists are fetched regardless of group_by: each backs
+    # this mode's own columns in one direction and the *other* mode's
+    # cross-filter dropdown in the other.
+    all_tags = await service.list_all_tags(tenant_db)
+    all_assignable_users = await list_assignable_users(ctx.active_tenant.id)
+
+    tag_columns: dict[str, list] = {}
+    tag_labels: list[str] = []
+    owner_groups: list = []
+    owner_users: list = []
+    owner_columns: dict[str, list] = {}
+    extra_owner_ids: list[int] = []
+
+    if group_by == "tag":
+        tag_columns["uncategorized"] = []
+        for doc in docs:
+            if not doc.tags:
+                tag_columns["uncategorized"].append(doc)
+                continue
+            # A document with more than one tag shows up once per tag --
+            # see this route's own docstring for why a swap, not a
+            # wholesale replace, is what dragging one of those cards does.
+            for raw_tag in doc.tags:
+                label = service.normalize_tag(raw_tag)
+                tag_columns.setdefault(label, []).append(doc)
+        tag_labels = sorted(k for k in tag_columns if k != "uncategorized")
+    else:
+        owner_groups = await service.list_groups(tenant_db)
+        owner_users = all_assignable_users
+        if owner_group is not None:
+            member_ids = await service.group_member_ids(tenant_db, owner_group)
+            owner_users = [u for u in owner_users if u.id in member_ids]
+        known_owner_ids = {u.id for u in owner_users}
+        owner_columns = {"unowned": []}
+        for u in owner_users:
+            owner_columns[str(u.id)] = []
+        for doc in docs:
+            if doc.owner_user_id is None:
+                owner_columns["unowned"].append(doc)
+            elif doc.owner_user_id in known_owner_ids:
+                owner_columns[str(doc.owner_user_id)].append(doc)
+            else:
+                # Owned by someone no longer assignable to this tenant, or
+                # simply outside the currently selected group -- same
+                # "extra column, not a drop target" treatment the tickets
+                # board gives an equivalent case.
+                owner_columns.setdefault(str(doc.owner_user_id), []).append(doc)
+                if doc.owner_user_id not in extra_owner_ids:
+                    extra_owner_ids.append(doc.owner_user_id)
+
+    owner_names = await resolve_user_names({d.owner_user_id for d in docs} | set(extra_owner_ids))
+    calendar_linked_ids = await calendar_service.document_ids_with_calendar_entries(tenant_db)
+    shareable_label = await get_tenant_config(tenant_db, "portal_shareable_documents_label")
+
+    return templates.TemplateResponse(
+        request,
+        "documents/kanban.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "search": search or "",
+            "truncated": truncated,
+            "selected_group_by": group_by,
+            "tag_columns": tag_columns,
+            "tag_labels": tag_labels,
+            "owner_groups": owner_groups,
+            "selected_owner_group": owner_group,
+            "owner_users": owner_users,
+            "owner_columns": owner_columns,
+            "extra_owner_ids": extra_owner_ids,
+            "owner_names": owner_names,
+            "all_tags": all_tags,
+            "selected_filter_tag": filter_tag or "",
+            "all_assignable_users": all_assignable_users,
+            "selected_filter_owner": filter_owner,
+            "calendar_linked_ids": calendar_linked_ids,
+            "shareable_label": shareable_label,
+        },
+    )
+
+
+@router.post("/{document_id:int}/kanban-tag")
+async def documents_kanban_retag(
+    document_id: int,
+    from_tag: str = Form(""),
+    to_tag: str = Form(""),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Kanban's "group by tag" view (documents_kanban above): dragging a
+    card between two tag columns, or into "Uncategorized" (an empty
+    to_tag). Mirrors kanban_update_status/kanban_update_assignee on the
+    tickets board -- JSON instead of a redirect, so the board moves the
+    card in the DOM itself rather than reloading the whole page."""
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is None:
+        return JSONResponse({"ok": False, "error": "Document not found."}, status_code=404)
+    await service.retag(tenant_db, doc, from_tag=from_tag, to_tag=to_tag)
+    return {"ok": True, "tags": doc.tags, "tag_label": service.normalize_tag(to_tag) if to_tag else None}
+
+
+@router.post("/{document_id:int}/kanban-owner")
+async def documents_kanban_owner(
+    document_id: int,
+    new_owner_user_id: str = Form(""),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Kanban's "group by owner" view (documents_kanban above): dragging a
+    card into a different owner column, or into "No owner". Re-checks
+    is_assignable_user() server-side before accepting a drop, same
+    reasoning as the tickets board's own kanban_update_assignee -- the
+    board only ever *offers* this tenant's assignable users as columns,
+    but a crafted POST could still name an arbitrary id."""
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is None:
+        return JSONResponse({"ok": False, "error": "Document not found."}, status_code=404)
+    new_id = int(new_owner_user_id) if new_owner_user_id else None
+    if new_id is not None and not await is_assignable_user(new_id, ctx.active_tenant.id):
+        return JSONResponse({"ok": False, "error": "Not assignable to this tenant."}, status_code=400)
+    await service.update_owner(tenant_db, doc, new_id)
+    names = await resolve_user_names({new_id}) if new_id is not None else {}
+    return {"ok": True, "owner_user_id": new_id, "owner_name": names.get(new_id, "No owner")}
 
 
 @router.get("/new", response_class=HTMLResponse)

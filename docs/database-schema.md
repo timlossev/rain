@@ -11,7 +11,7 @@ should always agree with both:
   docstring there explains the *why*; this doc is the *what*, for
   looking a table up without reading the whole file.
 - **Migrations**: `backend/migrations/control/versions/` (9, as of
-  this writing) and `backend/migrations/tenant/versions/` (46) --
+  this writing) and `backend/migrations/tenant/versions/` (47) --
   Alembic, one linear chain per schema kind, numbered sequentially
   (`0001`, `0002`, ...) rather than Alembic's default random hex
   revision ids, so the chain doubles as a build-number history -- see
@@ -117,7 +117,7 @@ out per-column below as "cross-schema" wherever it appears.
 
 | Table | Purpose |
 |---|---|
-| `documents` | A `DOC-xxxxxx` entry -- `storage_key` is an opaque identifier into whichever `StorageBackend` is active (local disk or S3), not a filesystem path. `webhook_id`/`alert_on_change`/`last_refreshed_at`/`webhook_response_is_json`/`webhook_json_path`/`refresh_on_view` back "populate from webhook". `tags` is a plain `text[]` (feeds `search_vector` directly). `is_shareable` (client portal) and `show_on_landing_page` (Home) are independent opt-in flags. `search_vector`/`embedding`: same shape as `tickets`' own. |
+| `documents` | A `DOC-xxxxxx` entry -- `storage_key` is an opaque identifier into whichever `StorageBackend` is active (local disk or S3), not a filesystem path. `webhook_id`/`alert_on_change`/`last_refreshed_at`/`webhook_response_is_json`/`webhook_json_path`/`refresh_on_view` back "populate from webhook". `owner_user_id` (cross-schema) is who's currently responsible for keeping it current, reassignable, separate from `uploaded_by` (a one-time creation fact). `tags` is a plain `text[]` (feeds `search_vector` directly). `is_shareable` (client portal) and `show_on_landing_page` (Home) are independent opt-in flags. `search_vector`/`embedding`: same shape as `tickets`' own. |
 | `document_links` | Polymorphic link to an asset or a ticket -- `linked_type`/`linked_id` are app-validated (no real FK across two possible target tables). |
 
 ### Service Catalog
@@ -207,6 +207,7 @@ numbering, run independently, and land in different schemas.
 | 0044 | `ticket_rules.approval_flow_id`. |
 | 0045 | `documents.show_on_landing_page`. |
 | 0046 | `documents.refresh_on_view`. |
+| 0047 | `documents.owner_user_id` -- who's responsible for keeping it current. |
 
 ### `control` schema (`backend/migrations/control/versions/`)
 

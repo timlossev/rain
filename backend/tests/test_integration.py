@@ -15,10 +15,23 @@ import os
 import pytest
 from sqlalchemy import select, text
 
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("TEST_DATABASE_URL"),
-    reason="set TEST_DATABASE_URL to a scratch Postgres to run integration tests",
-)
+pytestmark = [
+    pytest.mark.skipif(
+        not os.environ.get("TEST_DATABASE_URL"),
+        reason="set TEST_DATABASE_URL to a scratch Postgres to run integration tests",
+    ),
+    # One event loop for every test in this module, not pytest-asyncio's
+    # own function-scoped default -- rain.db.base.get_engine() caches one
+    # AsyncEngine (and its asyncpg connection pool) at module-global
+    # scope, and _clean_slate below is itself a module-scoped fixture
+    # (one drop-and-recreate per module, not per test). A fresh loop per
+    # test function meant every test past the first one inherited pool
+    # connections still bound to an already-closed loop from an earlier
+    # test -- confirmed live against a real Postgres (the very first time
+    # this suite ever actually ran end to end; previously reviewed but
+    # never executed, since no Postgres was ever available before).
+    pytest.mark.asyncio(loop_scope="module"),
+]
 
 if os.environ.get("TEST_DATABASE_URL"):
     os.environ["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
@@ -49,7 +62,7 @@ async def test_control_migration_seeds_roles():
 
     async with control_session() as session:
         result = await session.execute(select(Role.key).order_by(Role.key))
-        assert list(result.scalars()) == ["client", "internal_admin"]
+        assert list(result.scalars()) == ["client", "client_admin", "internal_admin"]
 
 
 async def test_tenant_provisioning_and_asset_crud():
@@ -57,6 +70,7 @@ async def test_tenant_provisioning_and_asset_crud():
     from rain.db.base import tenant_session
     from rain.db.provisioning import provision_tenant
     from rain.db.tenant_models import Asset, AssetType
+    from rain.modules.assets.service import next_ci_number
 
     await migrate.upgrade_control_async()
     tenant = await provision_tenant(slug="acme", name="Acme Corp")
@@ -67,7 +81,8 @@ async def test_tenant_provisioning_and_asset_crud():
         session.add(asset_type)
         await session.flush()
 
-        session.add(Asset(asset_type_id=asset_type.id, name="web-01", external_id="SN1"))
+        ci_number = await next_ci_number(session)
+        session.add(Asset(ci_number=ci_number, asset_type_id=asset_type.id, name="web-01", external_id="SN1"))
         await session.commit()
 
         result = await session.execute(select(Asset).where(Asset.external_id == "SN1"))
@@ -134,18 +149,23 @@ async def test_syslog_source_routing():
         await session.commit()
 
     async with control_session() as session:
+        # resolve_tenant_for_event returns a RoutingResult, not a bare
+        # Tenant -- .tenant is None either for a genuine no-match or a
+        # deliberate "discard" rule (.discarded distinguishes the two);
+        # neither case applies here, just a plain route match/non-match.
         resolved = await resolve_tenant_for_event(session, host="web-42", program=None)
-        assert resolved is not None
-        assert resolved.slug == "beta"
+        assert resolved.tenant is not None
+        assert resolved.tenant.slug == "beta"
 
         resolved_none = await resolve_tenant_for_event(session, host="db-01", program=None)
-        assert resolved_none is None
+        assert resolved_none.tenant is None
 
 
 async def test_document_numbering_and_linking():
     from rain.db.base import tenant_session
     from rain.db.provisioning import provision_tenant
     from rain.db.tenant_models import Asset, AssetType
+    from rain.modules.assets.service import next_ci_number
     from rain.modules.documents import service as document_service
 
     tenant = await provision_tenant(slug="gamma", name="Gamma LLC")
@@ -154,7 +174,8 @@ async def test_document_numbering_and_linking():
         asset_type = AssetType(key="server", name="Server")
         session.add(asset_type)
         await session.flush()
-        asset = Asset(asset_type_id=asset_type.id, name="web-01")
+        ci_number = await next_ci_number(session)
+        asset = Asset(ci_number=ci_number, asset_type_id=asset_type.id, name="web-01")
         session.add(asset)
         await session.commit()
         await session.refresh(asset)
@@ -324,9 +345,14 @@ async def test_document_tags_search_and_calendar_link():
         for_doc = await calendar_service.list_entries_for_document(session, doc.id)
         assert [e.id for e in for_doc] == [entry.id]
 
-        # Deleting the document cascades to its linked reminder.
+        # Deleting the document cascades to its linked reminder. The DB
+        # does the actual cascading (ON DELETE CASCADE), not the ORM --
+        # session.get()'s default identity-map-first lookup would just
+        # hand back the same still-cached Python object regardless,
+        # populate_existing=True forces a real round-trip to confirm the
+        # row is actually gone.
         await document_service.delete_document(session, doc)
-        remaining = await session.get(CalendarEntry, entry.id)
+        remaining = await session.get(CalendarEntry, entry.id, populate_existing=True)
         assert remaining is None
 
 
@@ -517,7 +543,7 @@ async def test_tenant_config_bundle_round_trips_across_tenants():
 
     from rain.core.crypto import decrypt_json, encrypt_json
     from rain.core.security import hash_password
-    from rain.db.base import tenant_session
+    from rain.db.base import control_session, tenant_session
     from rain.db.control_models import User
     from rain.db.provisioning import provision_tenant
     from rain.db.tenant_models import (
@@ -588,6 +614,16 @@ async def test_tenant_config_bundle_round_trips_across_tenants():
     assert actions["webhook"]["webhook_name"] == "Escalation hook"
     assert actions["notify_slack"]["channel_name"] == "Escalation channel"
 
+    # Email is unique *instance-wide* (control.users' own uq_users_email),
+    # not per-tenant -- source_user has to be gone before import, the same
+    # way it would already be absent importing onto a genuinely different
+    # instance (this bundle format's actual primary use case), or
+    # apply_tenant_bundle correctly refuses to create a second account
+    # under the same email for a different tenant (see its own comment).
+    async with control_session() as control_db:
+        await control_db.delete(await control_db.get(User, source_user.id))
+        await control_db.commit()
+
     async with tenant_session(target.schema_name) as session:
         result = await config_bundle.apply_tenant_bundle(session, target, reloaded, updated_by=None)
         assert result.counts.get("asset types") == 1
@@ -635,6 +671,7 @@ async def test_platform_config_bundle_redacts_secrets_by_default():
     instance's Fernet ciphertext (which would be undecryptable garbage on
     a different instance's own APP_SECRET_KEY-derived key anyway). With
     include_secrets, the real password round-trips."""
+    from rain.db.base import control_session
     from rain.modules.admin import config_bundle
     from rain.modules.auth import ldap_config
 
@@ -670,6 +707,7 @@ async def test_list_assignable_users_scopes_by_tenant_and_active():
     one of this tenant's own."""
     from rain.core.security import hash_password
     from rain.core.user_names import is_assignable_user, list_assignable_users
+    from rain.db.base import control_session
     from rain.db.control_models import User
     from rain.db.provisioning import provision_tenant
 
@@ -760,3 +798,56 @@ async def test_document_list_tag_filter_and_flag_lookups():
         )
 
         assert await calendar_service.document_ids_with_calendar_entries(session) == {doc1.id}
+
+
+async def test_document_retag_and_owner_assignment():
+    """rain.modules.documents.service.retag/update_owner -- the two writes
+    behind the Documents Kanban board's drag-and-drop (documents_kanban's
+    "group by tag"/"group by owner" modes). retag is the one with real
+    edge-case risk: a targeted swap (remove one tag, add another) that
+    must leave every other tag on the document untouched, and must merge
+    rather than duplicate when the destination tag is one the document
+    already carries under a different raw casing."""
+    from rain.core.security import hash_password
+    from rain.db.base import control_session, tenant_session
+    from rain.db.control_models import User
+    from rain.db.provisioning import provision_tenant
+    from rain.modules.documents import service as document_service
+
+    tenant = await provision_tenant(slug="upsilon", name="Upsilon Inc")
+
+    async with control_session() as control_db:
+        owner = User(
+            tenant_id=tenant.id, email="owner@upsilon.example", password_hash=hash_password("x"),
+            role_key="client", display_name="Doc Owner", auth_source="local",
+        )
+        control_db.add(owner)
+        await control_db.commit()
+        await control_db.refresh(owner)
+
+    async with tenant_session(tenant.schema_name) as session:
+        doc = await document_service.create_document(
+            session, title="Runbook", description=None, filename="runbook.md",
+            storage_key="upsilon/runbook.md", mime_type="text/markdown", size_bytes=10, uploaded_by=None,
+            tags=document_service.parse_tags("security, OnCall"),
+        )
+        await session.commit()
+
+        # A targeted swap: "OnCall" -> "Compliance" leaves "security" alone.
+        await document_service.retag(session, doc, from_tag="OnCall", to_tag="Compliance")
+        assert doc.tags == ["security", "Compliance"]
+
+        # Dropping onto a tag the document already carries (case-
+        # insensitively, via normalize_tag) merges instead of duplicating.
+        await document_service.retag(session, doc, from_tag="security", to_tag="compliance")
+        assert doc.tags == ["Compliance"]
+
+        # Dropping into "Uncategorized" (empty to_tag) just removes.
+        await document_service.retag(session, doc, from_tag="Compliance", to_tag="")
+        assert doc.tags == []
+
+        assert doc.owner_user_id is None
+        await document_service.update_owner(session, doc, owner.id)
+        assert doc.owner_user_id == owner.id
+        await document_service.update_owner(session, doc, None)
+        assert doc.owner_user_id is None

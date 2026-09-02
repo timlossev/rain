@@ -151,7 +151,7 @@ honest read before assuming it catches something:
   regression cases (CSV formula injection, markdown sanitization, SSRF
   URL checks, PDF `link_callback` path guards, search snippet
   escaping), and Service Catalog payload rendering.
-- **15 integration tests** (`test_integration.py`, skipped unless
+- **16 integration tests** (`test_integration.py`, skipped unless
   `TEST_DATABASE_URL` is set) against a real Postgres -- tenant
   provisioning, asset CRUD, ticket numbering + rule promotion, syslog
   routing, document numbering/linking, custom fields, tags/search, a
@@ -168,27 +168,60 @@ honest read before assuming it catches something:
   bundle redacting a secret by default while still round-tripping it
   with `include_secrets`, `list_assignable_users`' tenant/active
   scoping (Kanban's "group by assignee" columns) against another
-  tenant's user and a deactivated one of this tenant's own, and the
+  tenant's user and a deactivated one of this tenant's own, the
   Documents list's tag filter (exact membership, not a substring match)
-  plus its calendar-link flag lookup. Broad strokes, not deep: each is
-  one scenario, not a sweep of edge cases -- and, since this checkout
-  has no Postgres available, the seven most recently added ones were
-  written and code-reviewed against the exact service-layer functions
-  they exercise but not run live; run them for
-  real before leaning on them for a release.
+  plus its calendar-link flag lookup, and the Documents Kanban board's
+  retag (a targeted swap that merges rather than duplicates onto a tag
+  already carried under different casing) and owner assignment. Broad
+  strokes, not deep: each is one scenario, not a sweep of edge cases.
+
+  All 16 have actually been run against a real Postgres (a local
+  `docker compose up` stack, once one was available this session for
+  the first time) -- not just reviewed, the state every one of them
+  was in before. That first real run only got 3 of 15 tests to
+  complete at all: `asyncio_mode = "auto"` alone hands every async
+  test function pytest-asyncio's own function-scoped event loop by
+  default, but `rain.db.base.get_engine()` caches one `AsyncEngine`
+  (and its asyncpg connection pool) at module-global scope and
+  `_clean_slate` is a module-scoped fixture -- both assume every test
+  in the module shares one loop. Fixed with
+  `asyncio_default_fixture_loop_scope = "module"` (`pyproject.toml`)
+  plus an explicit `pytest.mark.asyncio(loop_scope="module")` on the
+  module (the ini option alone only reaches fixtures, not a plain
+  `async def test_*`, in this pytest-asyncio version). Getting the rest
+  green surfaced six more real, previously-invisible bugs, three in
+  the tests themselves (two stale assertions -- `client_admin`
+  missing from the seeded-roles check, `resolve_tenant_for_event`
+  returning a `RoutingResult` wrapper the test never accounted for --
+  and one that asserted a document's cascade-deleted `CalendarEntry`
+  was gone by calling `session.get()`, which checks the identity map
+  before the database and so returned the same still-cached Python
+  object regardless of what actually happened server-side) and two in
+  `config_bundle.py` itself (a `NotificationChannel` upsert flushing a
+  NOT NULL `config_encrypted` column before it was ever set; local-user
+  import checking for an existing account only within the *target*
+  tenant when `control.users.email` is unique *instance-wide*, so
+  importing a user whose email already existed under a *different*
+  tenant hit that constraint as a raw, unhandled `IntegrityError`
+  instead of this function's own "already exists, left unchanged"
+  skip). All six are fixed; see the commit that added this paragraph
+  for the specifics.
 - **No HTTP-level tests at all** -- nothing in this suite drives a
   route through FastAPI's `TestClient`. A routing/template bug (a
   filter silently matching nothing, a redirect going to the wrong
   place) has to be caught by hand today.
 - **Whole modules still with zero coverage**: `admin` (every screen
-  and route, including the five new Config Bundle ones -- the
-  integration tests above exercise `config_bundle.py`'s build/apply
-  functions directly, not the admin router or templates in front of
-  them), `portal`, `home`, `auth`'s LDAP/SAML flows, and most of
-  `tickets.service` (the single
-  biggest file in the codebase) beyond what the integration tests
-  happen to touch in passing.
-  `documents.service`'s webhook-refresh *orchestration*
+  and route, including the Config Bundle ones -- the integration tests
+  above exercise `config_bundle.py`'s build/apply functions directly,
+  not the admin router or templates in front of them), `portal`,
+  `home`, `auth`'s LDAP/SAML flows, and most of `tickets.service` (the
+  single biggest file in the codebase) beyond what the integration
+  tests happen to touch in passing. The Documents Kanban board's own
+  router (`GET /documents/kanban` and its two drag-and-drop endpoints)
+  has the same gap -- the integration tests above exercise
+  `service.retag`/`update_owner` directly, not the routes or template
+  in front of them, same shape as the tickets/config-bundle gaps just
+  above. `documents.service`'s webhook-refresh *orchestration*
   (`refresh_from_webhook`/`refresh_many_from_webhook`, as opposed to
   the pure helpers they call) is also untested.
 

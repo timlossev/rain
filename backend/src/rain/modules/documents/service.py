@@ -12,7 +12,7 @@ from sqlalchemy import Sequence, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from rain.db.tenant_models import Document, DocumentLink, SyslogEvent, WebhookConfig
+from rain.db.tenant_models import Document, DocumentLink, Group, GroupMembership, SyslogEvent, WebhookConfig
 from rain.modules.documents import storage, textbody
 from rain.modules.tickets import rules as ticket_rules
 from rain.modules.webhooks import service as webhook_service
@@ -169,7 +169,7 @@ async def create_document(
     return doc
 
 
-def document_list_stmt(*, search: str | None = None, tag: str | None = None):
+def document_list_stmt(*, search: str | None = None, tag: str | None = None, owner_user_id: int | None = None):
     stmt = select(Document).order_by(Document.created_at.desc())
     if search:
         like = f"%{search}%"
@@ -191,6 +191,12 @@ def document_list_stmt(*, search: str | None = None, tag: str | None = None):
         # carrying that literal tag, not "quarter" also pulling in a
         # document tagged "Q4-2026".
         stmt = stmt.where(Document.tags.any(tag))
+    if owner_user_id is not None:
+        # Backs the Kanban board's "group by tag" view cross-filtering to
+        # one person (documents_kanban's filter_owner) -- the same field
+        # "group by owner" mode groups *by*, used here as a plain filter
+        # instead when the board's other axis is picked.
+        stmt = stmt.where(Document.owner_user_id == owner_user_id)
     return stmt
 
 
@@ -253,6 +259,59 @@ async def update_tags(db: AsyncSession, doc: Document, tags: list[str]) -> None:
 
 async def update_sharing(db: AsyncSession, doc: Document, is_shareable: bool) -> None:
     doc.is_shareable = is_shareable
+    await db.commit()
+
+
+async def update_owner(db: AsyncSession, doc: Document, new_owner_user_id: int | None) -> None:
+    doc.owner_user_id = new_owner_user_id
+    await db.commit()
+
+
+async def list_groups(db: AsyncSession) -> list[Group]:
+    """Every tenant Group, for the Kanban board's "narrow owner columns to
+    one team" filter -- same idea as rain.modules.tickets.router's own
+    inline Group listing for the identical control on the tickets board,
+    kept behind a service function here since this router (unlike that
+    one) never queries the DB directly."""
+    result = await db.execute(select(Group).order_by(Group.name))
+    return list(result.scalars())
+
+
+async def group_member_ids(db: AsyncSession, group_id: int) -> set[int]:
+    result = await db.execute(select(GroupMembership.user_id).where(GroupMembership.group_id == group_id))
+    return set(result.scalars())
+
+
+def normalize_tag(raw: str) -> str:
+    """Canonical display form for a tag on the Documents Kanban board's
+    "group by tag" columns -- .strip().capitalize() applied uniformly
+    means "security"/"SECURITY"/"Security" (three documents that each
+    used different casing for what's conceptually the same tag --
+    parse_tags only dedupes within one document's own tag list, not
+    across documents) all collapse onto the same "Security" column,
+    deterministically, with no "whichever document happened to load
+    first" ambiguity the way a stateful/first-seen dedupe would have."""
+    return raw.strip().capitalize()
+
+
+async def retag(db: AsyncSession, doc: Document, *, from_tag: str, to_tag: str) -> None:
+    """Backs a drag between two tag columns on the Kanban board's "group
+    by tag" view -- a document can carry several tags, so this is a
+    targeted swap (remove the one tag this card instance represented,
+    add the one it was dropped on), not a wholesale replace: every other
+    tag already on the document is left untouched. Both sides matched/
+    stored via normalize_tag, same as the columns themselves, so this
+    also folds in whatever cleanup a raw stored tag still needed.
+    Dropping onto a tag the document already carries removes the
+    duplicate rather than adding a second copy -- the board's own drop
+    handler then removes the now-redundant card instead of leaving two
+    in the same column."""
+    normalized_from = normalize_tag(from_tag) if from_tag else None
+    new_tags = [t for t in doc.tags if normalize_tag(t) != normalized_from] if normalized_from else list(doc.tags)
+    normalized_to = normalize_tag(to_tag) if to_tag else None
+    if normalized_to and not any(normalize_tag(t) == normalized_to for t in new_tags):
+        new_tags.append(normalized_to)
+    doc.tags = new_tags
     await db.commit()
 
 

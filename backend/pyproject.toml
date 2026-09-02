@@ -95,4 +95,16 @@ packages = ["src/rain"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# rain.db.base.get_engine() caches one AsyncEngine (and its asyncpg
+# connection pool) at module-global scope, and test_integration.py's own
+# _clean_slate fixture is module-scoped too (one drop-and-recreate per
+# module, not per test) -- both assume every test in that module shares
+# one event loop. This ini option alone doesn't reach that far (it's
+# fixture-loop-scope only in this pytest-asyncio version; a plain async
+# def test_* still defaults to its own function-scoped loop regardless),
+# so test_integration.py also sets an explicit
+# pytest.mark.asyncio(loop_scope="module") -- see that module's own
+# comment for how this was confirmed live, the first time this suite ever
+# ran against a real Postgres (no Postgres was available at all before).
+asyncio_default_fixture_loop_scope = "module"
 testpaths = ["tests"]

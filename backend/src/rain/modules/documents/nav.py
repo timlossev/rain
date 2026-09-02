@@ -25,7 +25,8 @@ nav_registry.register(
         count_provider=_document_count,
         children=[
             NavNode(key="documents-all", label="All Documents", href="/documents", order=1),
-            NavNode(key="documents-upload", label="Upload", href="/documents/new", order=2),
+            NavNode(key="documents-kanban", label="Kanban", href="/documents/kanban", order=2),
+            NavNode(key="documents-upload", label="Upload", href="/documents/new", order=3),
         ],
     )
 )

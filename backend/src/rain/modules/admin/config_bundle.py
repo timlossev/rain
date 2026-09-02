@@ -721,19 +721,34 @@ async def apply_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, data: dic
         group_id_by_name[entry["name"]] = row.id
         result.bump("groups" if created else "groups (updated)")
 
-    # Local users: control schema, tenant-scoped by tenant_id. Created
-    # only, never overwritten -- a re-import must not silently reset an
-    # existing account's password/role out from under an admin who's
-    # since changed it by hand.
+    # Local users: control schema, tenant-scoped by tenant_id, but email
+    # is unique *instance-wide* (control.users' own uq_users_email spans
+    # every tenant, not one per tenant) -- looked up globally, not just
+    # within the target tenant, or a user already on a *different* tenant
+    # would hit that constraint as a raw, unhandled DB error instead of
+    # this function's own "already exists, left unchanged" skip.
+    # Created only, never overwritten either way -- a re-import must not
+    # silently reset an existing account's password/role out from under
+    # an admin who's since changed it by hand.
     user_id_by_email: dict[str, int] = {}
     async with control_session() as control_db:
-        existing_users = {u.email: u for u in (await control_db.execute(select(User).where(User.tenant_id == tenant.id))).scalars()}
+        existing_users = {u.email: u for u in (await control_db.execute(select(User))).scalars()}
         for entry in data.get("users", []):
             email = entry["email"]
             existing = existing_users.get(email)
             if existing is not None:
-                user_id_by_email[email] = existing.id
-                result.warnings.append(f"User '{email}' already exists here -- left unchanged.")
+                if existing.tenant_id == tenant.id or existing.role_key == "internal_admin":
+                    # Same predicate rain.core.user_names.is_assignable_user
+                    # uses elsewhere -- only map this email to a real id
+                    # when it's actually someone this tenant could assign
+                    # a group membership/approval step to; a different
+                    # tenant's own client account left unmapped instead
+                    # of silently wiring a stranger into this tenant's
+                    # groups/flows below.
+                    user_id_by_email[email] = existing.id
+                    result.warnings.append(f"User '{email}' already exists here -- left unchanged.")
+                else:
+                    result.warnings.append(f"User '{email}' already exists on a different tenant -- left unchanged, not moved or reused here.")
                 continue
             if not entry.get("password_hash"):
                 result.warnings.append(f"User '{email}' has no password hash in this bundle -- skipped.")
@@ -752,8 +767,14 @@ async def apply_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, data: dic
             user_id_by_email[email] = new_user.id
             result.bump("local users")
         await control_db.commit()
+        # Also index every OTHER existing user assignable to *this*
+        # tenant (not the whole instance -- existing_users is global, see
+        # this block's own comment above), so group memberships/approver
+        # assignments referencing an existing (not just a just-imported)
+        # user still resolve.
         for email, u in existing_users.items():
-            user_id_by_email.setdefault(email, u.id)
+            if u.tenant_id == tenant.id or u.role_key == "internal_admin":
+                user_id_by_email.setdefault(email, u.id)
 
     for entry in data.get("group_memberships", []):
         group_id = group_id_by_name.get(entry["group_name"])
@@ -806,6 +827,10 @@ async def apply_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, data: dic
             resolved_config = {}
         else:
             resolved_config = cfg
+        # config_encrypted has to be in set_fields itself, not assigned
+        # after -- _upsert_by_key flushes internally right after building
+        # a *new* row from set_fields, and this column is NOT NULL with
+        # no default, so a flush before it's ever set fails outright.
         row, created = await _upsert_by_key(
             tenant_db,
             NotificationChannel,
@@ -813,12 +838,12 @@ async def apply_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, data: dic
             entry["name"],
             {
                 "channel_type": entry["channel_type"],
+                "config_encrypted": encrypt_json(resolved_config),
                 "is_enabled": entry.get("is_enabled", True),
                 "message_template": entry.get("message_template", ""),
                 "subject_template": entry.get("subject_template"),
             },
         )
-        row.config_encrypted = encrypt_json(resolved_config)
         channel_id_by_name[entry["name"]] = row.id
         result.bump("notification channels" if created else "notification channels (updated)")
         if entry.get("config_redacted"):

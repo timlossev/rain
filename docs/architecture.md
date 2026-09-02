@@ -856,6 +856,79 @@ search box's own tag matching works) added to `document_list_stmt`
 alongside its existing `search` filter -- either one narrows the list,
 together or apart.
 
+**Documents Kanban board.** `GET /documents/kanban` (`router.
+documents_kanban`) is a second view over the same `document_list_stmt`
+the list screen uses, the same "same query, different layout" shape
+`tickets/kanban.html` established for tickets -- grouped into columns
+instead of paginated table rows, `group_by` picking what the columns
+*are*:
+
+- `"tag"` (default): columns are `service.normalize_tag`'s
+  (`.strip().capitalize()`, applied uniformly) canonical form of every
+  tag in use, deduplicated *across* documents -- "security"/"SECURITY"/
+  "Security" on three different documents all collapse onto one
+  "Security" column, deterministically, with no "whichever document
+  happened to be read first" ambiguity, since the same pure function
+  produces the same output regardless of input order. Plus a leading
+  "Uncategorized" column for documents with no tags at all. A document
+  with several tags appears as its own card in *each* one
+  (`data-tag-value` on the card records which specific tag that
+  instance represents) -- confirmed live: a document tagged both
+  "security" and "OnCall" showed up in both the "Security" and
+  "Oncall" columns, once each.
+
+  Dragging a card between tag columns retags it -- `POST /documents/
+  {id}/kanban-tag` -> `service.retag(from_tag, to_tag)` -- a *targeted
+  swap* (remove the one tag this card instance represented, add the
+  one it was dropped on), not a wholesale replace: every other tag
+  already on the document is left untouched. This was an explicit
+  design fork worth confirming rather than guessing at: a document can
+  carry several tags at once, unlike a ticket's single status/
+  assignee, so "what does dragging one of its cards even mean" had
+  three genuinely different reasonable answers (retag/swap, add
+  without removing, or a read-only browse-only board) before the
+  answer above was picked. Dropping onto a tag the document already
+  carries (matched via `normalize_tag`, so case differences still
+  merge) removes the origin tag without adding a duplicate --
+  confirmed live -- and `app.js`'s drop handler then removes the now-
+  redundant card from that column instead of showing two for the same
+  document. Dropping into "Uncategorized" (an empty `to_tag`) just
+  removes, with nothing added.
+
+- `"owner"`: a workload view, the same shape as the tickets board's own
+  assignee mode -- one column per this tenant's assignable users
+  (`rain.core.user_names.list_assignable_users`) plus a leading "No
+  owner" column, optionally narrowed to one Group's own members via
+  `owner_group`. `Document.owner_user_id` (migration 0047) is a new
+  column, separate from `uploaded_by` (a one-time fact about who
+  created the document, never reassigned) -- who's *currently*
+  accountable for keeping a document accurate, reassignable at any
+  time the same way `Ticket.assignee_user_id` already is. Dragging a
+  card between owner columns reassigns it -- `POST /documents/{id}/
+  kanban-owner` -> `service.update_owner()` -- a single-valued move,
+  unlike tag mode: a document has exactly one owner. Same
+  `is_assignable_user()` server-side re-check before accepting a drop
+  as the tickets board's own `kanban_update_assignee` -- confirmed
+  live, a crafted id outside this tenant's assignable set is rejected
+  with `{"ok": false, ...}` rather than written.
+
+Each mode also accepts a plain filter on the *other* axis --
+`filter_owner` (a person) narrows `"tag"` mode's underlying document
+set before building tag columns, `filter_tag` narrows `"owner"` mode's
+the same way before building owner columns -- both just pass through
+to `document_list_stmt`'s existing `tag`/`owner_user_id` parameters.
+Neither is a second grouping dimension (filtering "group by tag" down
+to one single tag, or "group by owner" down to one single owner, would
+just hide every other column for no reason), so each control only ever
+renders in the mode it doesn't already group by.
+
+`app.js`'s Kanban drag-and-drop is one shared `setupKanbanBoard()`
+function, extracted this same round from what was previously
+tickets-only inline code -- both boards' cards/dropzones/optimistic-
+move/revert-on-failure mechanics are identical, only `buildRequest()`
+(which endpoint, which body, what a success response means for the
+dragged card) differs per board and mode.
+
 ## Home
 
 `rain.modules.home`, the smallest module in the app -- one route
