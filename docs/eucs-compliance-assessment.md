@@ -70,7 +70,7 @@ asset system addresses.
 | Development of Information Systems | None outside change tracking | RAIN's change tickets can evidence that code changes went through review, but RAIN has no involvement in the CSP's actual SDLC, CI/CD, or secure coding practices. |
 | Procurement Management | Partial | A starter Subprocessor Register bundle template (docs/compliance-templates/) seeds a custom asset type for tracking vendors, data processed, hosting region, and contract/DPA review dates. Still a contractual and organizational matter RAIN doesn't manage end to end. |
 | User Documentation | Partial | The document repository, PDF export, and Trust Center portal are a reasonable place to publish EUCS-required user-facing documentation, but authoring that documentation is the organization's work, not RAIN's. |
-| Dealing with Investigation Requests from Government Agencies | None | A legal and jurisdictional matter for the CSP's own counsel and corporate structure, not something a ticketing system participates in. |
+| Dealing with Investigation Requests from Government Agencies | Partial | The underlying process (intake, legal review and sign-off before any disclosure, a record of what was released) is a tracked-approval workflow, the same shape a Service Catalog item with an ApprovalFlow already gives a Change ticket. The gap: RAIN has no per-ticket visibility restriction -- any signed-in user of the tenant can read any ticket, so a request this sensitive is only as confidential as trusting the whole tenant's user base, not just Legal/whoever approves it. The legal judgment itself is still entirely the organization's own. |
 
 ## The High-assurance sovereignty question
 
@@ -99,13 +99,14 @@ the small number of EUCS operational domains that a ticketing/CMDB
 system can realistically speak to: Asset Management, Change and
 Configuration Management, and Incident Management, with partial support
 for Compliance documentation, Human Resources access review, Risk
-Management, Procurement Management, and Business Continuity
-record-keeping. It has nothing to offer the domains that are actually
-specific to running a cloud service: Cryptography and Key Management,
-Physical Security, Communication Security, Portability and
-Interoperability, and Dealing with Investigation Requests. An
-organization pursuing EUCS needs purpose-built controls and evidence for
-those domains regardless of which ITSM tool it runs.
+Management, Procurement Management, Business Continuity record-keeping,
+and (with the tenant-wide visibility caveat above) government
+investigation requests. It has nothing to offer the domains that are
+actually specific to running a cloud service: Cryptography and Key
+Management, Physical Security, Communication Security, and Portability
+and Interoperability. An organization pursuing EUCS needs purpose-built
+controls and evidence for those domains regardless of which ITSM tool
+it runs.
 
 Use RAIN, if at all, as the record-keeping layer under a subset of an
 EUCS control implementation, not as a compliance product in its own
