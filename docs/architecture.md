@@ -969,6 +969,21 @@ context, which the template turns into one plain-text line above the
 board so an all-empty board reads as "nothing matched", not as
 "something's broken".
 
+**Owner on the document detail page.** The Kanban board's drag-and-drop
+isn't the only way to set `owner_user_id` -- the Properties tab has its
+own type-to-search picker (`_search_picker.html`, the same interaction
+as a ticket's own Assignee field, not a plain `<select>`) plus a
+`POST /documents/{id}/owner`, redirect-based like every other Properties
+field around it rather than the JSON `kanban-owner` endpoint the board
+itself uses (same `service.update_owner()` either way). The predictive-
+search endpoint behind it, `GET /documents/users/search`, and the
+tickets board's own `GET /tickets/users/search`, both now call one
+shared `rain.core.user_names.search_assignable_users()` -- extracted
+from what used to be `tickets.router`'s own inline query once documents
+needed the identical "typed a few characters, tenant-scoped assignable
+users" search; nothing about that query was ever ticket-specific, just
+which record a picked id ends up written onto.
+
 ## Home
 
 `rain.modules.home`, the smallest module in the app -- one route

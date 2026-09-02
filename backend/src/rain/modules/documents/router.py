@@ -15,7 +15,7 @@ from rain.core.query_params import optional_int
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.tenant_config import get_tenant_config
-from rain.core.user_names import is_assignable_user, list_assignable_users, resolve_user_names
+from rain.core.user_names import is_assignable_user, list_assignable_users, resolve_user_names, search_assignable_users
 from rain.modules.assets import service as asset_service
 from rain.modules.calendar import service as calendar_service
 from rain.modules.documents import service, storage, textbody
@@ -444,6 +444,7 @@ async def document_detail(
     asset_link_ids = [link.linked_id for link in doc.links if link.linked_type == "asset"]
     asset_numbers = await asset_service.get_ci_numbers(tenant_db, asset_link_ids)
     calendar_entries = await calendar_service.list_entries_for_document(tenant_db, doc.id)
+    owner_name = (await resolve_user_names({doc.owner_user_id})).get(doc.owner_user_id, "")
     return templates.TemplateResponse(
         request,
         "documents/detail.html",
@@ -459,6 +460,7 @@ async def document_detail(
             "asset_numbers": asset_numbers,
             "calendar_entries": calendar_entries,
             "webhook_refresh_error": webhook_refresh_error,
+            "owner_name": owner_name,
         },
     )
 
@@ -473,6 +475,46 @@ async def update_document_description(
     doc = await service.get_document(tenant_db, document_id)
     if doc is not None:
         await service.update_description(tenant_db, doc, description.strip() or None)
+    return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/users/search")
+async def search_document_owners(
+    q: str = "",
+    ctx: RequestContext = Depends(get_request_context),
+    _: CurrentUser = Depends(require_login),
+):
+    """Backs the Owner predictive-search field on a document's own
+    Properties tab -- same interaction shape, and the same underlying
+    query (rain.core.user_names.search_assignable_users), as the ticket
+    detail page's own assignee picker."""
+    if not ctx.active_tenant:
+        return []
+    return await search_assignable_users(ctx.active_tenant.id, q)
+
+
+@router.post("/{document_id:int}/owner")
+async def update_document_owner(
+    document_id: int,
+    owner_user_id: str = Form(""),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """The Properties tab's own Save button next to the Owner picker --
+    redirect-based, same as /description and /tags right around it,
+    unlike the Kanban board's JSON kanban-owner endpoint (documents_kanban
+    above), which exists purely for that board's own optimistic drag-and-
+    drop and calls the exact same service.update_owner underneath."""
+    doc = await service.get_document(tenant_db, document_id)
+    new_id = int(owner_user_id) if owner_user_id else None
+    # search_document_owners above only ever offers this tenant's own
+    # assignable users, but that's just what the picker shows -- a
+    # crafted POST could still name an arbitrary id, so this re-check is
+    # what actually enforces it, same reasoning as documents_kanban_owner's
+    # own comment for the Kanban board's identical write path.
+    if doc is not None and (new_id is None or await is_assignable_user(new_id, ctx.active_tenant.id)):
+        await service.update_owner(tenant_db, doc, new_id)
     return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 

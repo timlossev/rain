@@ -24,10 +24,10 @@ async def resolve_user_names(user_ids: set[int | None]) -> dict[int, str]:
 
 async def is_assignable_user(user_id: int, tenant_id: int) -> bool:
     """True iff `user_id` is someone `tenant_id` is actually allowed to
-    hand a ticket/group-membership/approval-step to -- that tenant's own
-    users, plus internal_admin (platform-wide, not tenant-scoped). Same
-    predicate rain.modules.tickets.router.search_assignable_users already
-    uses to build the picker's own candidate list; call sites that
+    hand a ticket/document/group-membership/approval-step to -- that
+    tenant's own users, plus internal_admin (platform-wide, not
+    tenant-scoped). Same predicate search_assignable_users above already
+    uses to build a picker's own candidate list; call sites that
     *write* a user id (assign_ticket, group membership, approval steps)
     need to re-apply it server-side too, not just trust that whatever
     arrived came from that same picker -- a plain integer form field
@@ -59,6 +59,34 @@ async def list_assignable_users(tenant_id: int) -> list[User]:
         )
         result = await session.execute(stmt)
         return list(result.scalars())
+
+
+async def search_assignable_users(tenant_id: int, q: str) -> list[dict]:
+    """Same candidate set list_assignable_users above returns, matched
+    against a typed-in query instead of returned in full -- backs a
+    predictive-search picker (_search_picker.html) rather than a plain
+    <select>, since "every assignable user in the tenant" can be a lot to
+    render as options up front. Originally rain.modules.tickets.router's
+    own search_assignable_users route handler, extracted here once
+    rain.modules.documents needed the identical query for a document's
+    Owner field -- nothing about the candidate set is ticket-specific,
+    just which record a picked id gets written onto."""
+    q = q.strip()
+    if len(q) < 2:
+        return []
+    async with control_session() as session:
+        stmt = (
+            select(User)
+            .where(
+                User.is_active.is_(True),
+                (User.tenant_id == tenant_id) | (User.role_key == "internal_admin"),
+                (User.display_name.ilike(f"%{q}%")) | (User.email.ilike(f"%{q}%")),
+            )
+            .order_by(User.display_name)
+            .limit(8)
+        )
+        result = await session.execute(stmt)
+        return [{"id": u.id, "label": f"{u.display_name} ({u.email})"} for u in result.scalars()]
 
 
 async def resolve_user_emails(user_ids: set[int | None]) -> dict[int, str]:

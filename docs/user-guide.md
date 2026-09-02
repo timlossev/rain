@@ -836,20 +836,25 @@ record automatically and the page says so.
 
 ### Document detail
 
-Above the tabs, next to the header, tags show as badges with a pencil
-icon to edit them (comma-separated, same as on upload) -- "No tags."
-if none are set yet. Below that, a "Shareable in the client portal"
-checkbox: on, this document appears in the [Client Portal](#client-portal)'s
-Shareable documents tab for every visitor, including one with no
-account at all, regardless of that tenant's require-sign-in setting --
-off by default, so nothing is exposed until you opt it in here. Next to
-it, a "Show on landing page" checkbox does the same for [Home](#home):
-on, this document's own content (rendered Markdown, or plain text)
-replaces the plain welcome message there instead of just being linked
-to. Below that, an "Uploaded" row shows the upload date as a small
-pill. Below that, the page is split into tabs:
+Next to the header, above the tabs, buttons to Download, Export to
+PDF, and Delete. The page itself is split into tabs, one of them
+Properties:
 
-- Description: a plain textarea, saved independently of the file
+- Properties: tags show as badges with a pencil icon to edit them
+  (comma-separated, same as on upload) -- "No tags." if none are set
+  yet. An Owner field, a type-to-search picker (the same interaction
+  as a ticket's own Assignee field) for who's responsible for keeping
+  this document current -- independent of who originally uploaded it,
+  and not required. A "Shareable in the client portal" checkbox: on,
+  this document appears in the [Client Portal](#client-portal)'s
+  Shareable documents tab for every visitor, including one with no
+  account at all, regardless of that tenant's require-sign-in setting
+  -- off by default, so nothing is exposed until you opt it in here. A
+  "Show on landing page" checkbox does the same for [Home](#home): on,
+  this document's own content (rendered Markdown, or plain text)
+  replaces the plain welcome message there instead of just being
+  linked to. An "Uploaded" row shows the upload date as a small pill.
+  Last, a Description textarea, saved independently of the file
   itself.
 - Contents (only shown for `.txt`/`.md` files): a small "Last updated"
   label at the top (the last successful webhook refresh if this

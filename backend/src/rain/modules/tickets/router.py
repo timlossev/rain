@@ -20,8 +20,7 @@ from rain.core.query_params import optional_int
 from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.tenant_config import get_tenant_config, get_tenant_configs, set_tenant_config
-from rain.core.user_names import is_assignable_user, list_assignable_users, resolve_user_names
-from rain.db.base import control_session
+from rain.core.user_names import is_assignable_user, list_assignable_users, resolve_user_names, search_assignable_users
 from rain.db.control_models import User
 from rain.db.tenant_models import (
     Asset,
@@ -508,7 +507,7 @@ async def create_ticket(
 
 
 @router.get("/users/search")
-async def search_assignable_users(
+async def search_assignable_users_route(
     q: str = "",
     ctx: RequestContext = Depends(get_request_context),
     _: CurrentUser = Depends(require_login),
@@ -517,23 +516,14 @@ async def search_assignable_users(
     page (same interaction shape as Quick Navigation, but this list can't be
     pre-rendered into the page like the nav tree is -- it's a live query
     over every user who could plausibly be assigned: this tenant's client
-    users, plus internal admins, who aren't tenant-scoped)."""
-    q = q.strip()
-    if not ctx.active_tenant or len(q) < 2:
+    users, plus internal admins, who aren't tenant-scoped). The query
+    itself is rain.core.user_names.search_assignable_users, shared with
+    rain.modules.documents' own identically-shaped endpoint for a
+    document's Owner field -- nothing about the candidate set is
+    ticket-specific."""
+    if not ctx.active_tenant:
         return []
-    async with control_session() as session:
-        stmt = (
-            select(User)
-            .where(
-                User.is_active.is_(True),
-                (User.tenant_id == ctx.active_tenant.id) | (User.role_key == "internal_admin"),
-                (User.display_name.ilike(f"%{q}%")) | (User.email.ilike(f"%{q}%")),
-            )
-            .order_by(User.display_name)
-            .limit(8)
-        )
-        result = await session.execute(stmt)
-        return [{"id": u.id, "label": f"{u.display_name} ({u.email})"} for u in result.scalars()]
+    return await search_assignable_users(ctx.active_tenant.id, q)
 
 
 @router.post("/{ticket_id:int}/title")

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
+{% import "_search_picker.html" as picker %}
 {% block title %}{{ doc.doc_number }}: {{ doc.title }} - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}A single document's details - properties (tags, sharing, upload date, description), contents (with an inline editor for txt/md files), auto-update from a webhook, what it's linked to, and any calendar reminders (e.g. a quarterly revision) tied to it.{% endblock %}
+{% block help_text %}A single document's details - properties (tags, owner, sharing, upload date, description), contents (with an inline editor for txt/md files), auto-update from a webhook, what it's linked to, and any calendar reminders (e.g. a quarterly revision) tied to it.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:space-between; align-items:flex-start;">
   <div>
@@ -88,6 +89,15 @@
           <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
         </form>
       </span>
+    </div>
+
+    <div class="field">
+      <label>Owner</label>
+      <form method="post" action="/documents/{{ doc.id }}/owner" class="form-row" style="margin:0; align-items:center;">
+        {{ picker.search_picker("owner_user_id", "/documents/users/search", initial_value=doc.owner_user_id, initial_label=owner_name, placeholder="No owner - search to assign") }}
+        <button class="btn btn-sm" type="submit">Save</button>
+      </form>
+      <div class="field-hint">Who's responsible for keeping this document current - independent of who originally uploaded it.</div>
     </div>
 
     <div class="field">
