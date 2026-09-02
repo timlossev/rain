@@ -1570,8 +1570,13 @@ td.actions { text-align: right; white-space: nowrap; }
    60px-tall pieces -- there's nothing here for it to align with, so left
    alone it just padded a logo-less instance name with dead vertical
    space above and below. height:auto lets this row size to its actual
-   content (the 44px logo below, when there is one) instead. */
-.portal-header .brand { padding: 0; height: auto; }
+   content (the 44px logo below, when there is one) instead. margin-
+   bottom:0 clears .brand's own 16px (meant to space it above the
+   sidebar's nav list below it, not relevant to a single-row header) --
+   left in place, that bottom-only margin became part of .brand's flex
+   item box, and centering *that* against .portal-tenant-pill/the user
+   menu button visibly pushed the instance name up off their center. */
+.portal-header .brand { padding: 0; height: auto; margin-bottom: 0; }
 /* text-shadow in all 4 diagonals, not box-shadow/border -- this sits
    directly on .portal-backdrop (an admin-uploaded, arbitrary background
    image, optional), not a card with its own opaque surface, so
