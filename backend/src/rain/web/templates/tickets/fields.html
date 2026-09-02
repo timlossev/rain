@@ -4,10 +4,9 @@
 {% block title %}Custom Fields - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Define extra fields on tickets - tenant-wide, applying to every ticket type - with a type and select options where applicable.{% endblock %}
 {% block content %}
-<div class="panel-row">
-  <a class="btn btn-sm" href="/tickets">&larr; Tickets</a>
-  {{ modal.trigger_button("custom-field", "+ New custom field") }}
+<div class="panel-row" style="justify-content:flex-end;">
   <a class="btn btn-sm" href="/tickets/fields/import-pack">Import field pack</a>
+  {{ modal.trigger_button("custom-field", "+ New custom field") }}
 </div>
 
 <div class="card">
