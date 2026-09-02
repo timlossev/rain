@@ -33,48 +33,23 @@ Incident Management, Business Continuity, Compliance, and (at High
 assurance specifically) provisions addressing a cloud provider's
 exposure to non-EU legal jurisdiction.
 
-## The scope mismatch that has to be stated up front
-
-EUCS certifies **cloud service providers** and the **cloud services**
-they offer to customers. It is not a scheme for evaluating software
-that an organization runs for its own internal use. RAIN is
-self-hosted: an organization deploys it on infrastructure it already
-controls, and RAIN itself is never the thing being certified.
-
-This means there are exactly two situations where RAIN is relevant to
-an EUCS engagement, and they are different questions:
-
-1. **The organization running RAIN is itself a cloud service provider
-   pursuing EUCS for a service it offers.** In this case RAIN is
-   internal tooling, the same as a ticketing system, CMDB, or document
-   repository would be for any other framework. It can generate and
-   hold evidence supporting a subset of the operational domains below.
-   It does not itself need to be certified, any more than an
-   organization's ticketing system needs to be FedRAMP-authorized for
-   the organization to hold a FedRAMP authorization.
-
-2. **The organization running RAIN is a customer of a certified cloud
-   provider and wants RAIN to help manage its own side of that
-   relationship** (tracking the provider's SLAs, incidents, and
-   contractual obligations as tickets and documents). This is a
-   legitimate but much smaller use case than (1), and is not addressed
-   further in this document beyond noting that RAIN's generic
-   ticket/document/asset model handles it the same way it handles any
-   vendor-management workflow, with no EUCS-specific features involved.
-
-Nothing below should be read as "RAIN is EUCS-compliant" or "RAIN helps
-you get EUCS-certified." RAIN is evidence-generating infrastructure that
-a CSP could use as part of its own control implementation. The
-certification itself is assessed against the CSP's people, processes,
-and cloud service, not against RAIN.
+EUCS certifies cloud service providers and the cloud services they
+offer, not software an organization merely runs for itself -- RAIN is
+self-hosted and is never the thing being certified. Running RAIN does
+not make an organization, or its cloud service, EUCS-compliant; at
+most it's evidence-generating infrastructure a CSP can use toward its
+own control implementation, which is the role the table below
+evaluates.
 
 ## Domain-by-domain fit
 
-Evaluated against the CSP-uses-RAIN-internally scenario above. "Direct"
-means RAIN's own record-keeping is the artifact an assessor would look
-at. "Partial" means RAIN can hold supporting evidence but the control is
-substantially about something RAIN doesn't do. "None" means the control
-is outside anything a ticketing/document/asset system addresses.
+Evaluated as internal tooling for an organization pursuing EUCS itself
+-- the same role a ticketing system or CMDB plays for any other
+framework. "Direct" means RAIN's own record-keeping is the artifact an
+assessor would look at. "Partial" means RAIN can hold supporting
+evidence but the control is substantially about something RAIN doesn't
+do. "None" means the control is outside anything a ticketing/document/
+asset system addresses.
 
 | EUCS domain | Fit | Notes |
 |---|---|---|
