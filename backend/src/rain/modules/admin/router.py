@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from rain.core import ldap_client
-from rain.core.config_store import FONT_CHOICES, config_store
+from rain.core.config_store import BUTTON_STYLE_CHOICES, FONT_CHOICES, config_store
 from rain.core.crypto import decrypt_json, encrypt_json
 from rain.core.pagination import DEFAULT_PAGE_SIZE, paginate
 from rain.core.rbac import require_admin, require_internal_admin, require_login
@@ -147,6 +147,7 @@ async def branding_form(
             "ctx": ctx,
             "error": None,
             "font_choices": FONT_CHOICES,
+            "button_style_choices": BUTTON_STYLE_CHOICES,
             "page_size_choices": PAGE_SIZE_CHOICES,
             **await _tenant_defaults(ctx),
             **await _portal_settings(ctx),
@@ -160,6 +161,7 @@ async def branding_submit(
     instance_name: str = Form(...),
     accent_color: str = Form(...),
     font_family: str = Form(""),
+    button_radius: str = Form(""),
     logo: UploadFile | None = None,
     portal_background: UploadFile | None = None,
     ctx: RequestContext = Depends(get_request_context),
@@ -175,6 +177,7 @@ async def branding_submit(
                 "ctx": ctx,
                 "error": str(exc),
                 "font_choices": FONT_CHOICES,
+                "button_style_choices": BUTTON_STYLE_CHOICES,
                 "page_size_choices": PAGE_SIZE_CHOICES,
                 **await _tenant_defaults(ctx),
                 **await _portal_settings(ctx),
@@ -184,13 +187,16 @@ async def branding_submit(
 
     await config_store.set("instance_name", instance_name.strip(), updated_by=user.id)
     await config_store.set("accent_color", accent_color.strip(), updated_by=user.id)
-    # Whitelisted against FONT_CHOICES (not just server-rendered <select>
-    # options) since the stored value is injected into base.html's <style>
-    # block with the `safe` filter -- an arbitrary POST body must not be
-    # able to smuggle CSS/HTML through it.
+    # Whitelisted against FONT_CHOICES/BUTTON_STYLE_CHOICES (not just
+    # server-rendered <select> options) since both stored values are
+    # injected into base.html's <style> block with the `safe` filter -- an
+    # arbitrary POST body must not be able to smuggle CSS/HTML through it.
     allowed_fonts = {css for _, css in FONT_CHOICES}
     if font_family in allowed_fonts:
         await config_store.set("font_family", font_family, updated_by=user.id)
+    allowed_button_radii = {css for _, css in BUTTON_STYLE_CHOICES}
+    if button_radius in allowed_button_radii:
+        await config_store.set("button_radius", button_radius, updated_by=user.id)
     if logo is not None and logo.filename:
         try:
             logo_path = await save_logo_upload(logo)

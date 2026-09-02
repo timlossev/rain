@@ -34,6 +34,20 @@ FONT_CHOICES: list[tuple[str, str]] = [
 ]
 DEFAULT_FONT_FAMILY = FONT_CHOICES[0][1]
 
+# Same "curated CSS value, not a free-typed one" reasoning as FONT_CHOICES
+# above -- this is what actually gets injected into base.html's <style>
+# block (see branding_submit's own comment on why that has to be
+# whitelist-checked, not trusted verbatim from the POST body). "Rounded"
+# is a full pill (999px, comfortably past any real button's own height,
+# so every corner reads fully round regardless of a button's padding) --
+# modeled on https://www.teneo.ai's own buttons, which use exactly that
+# shape (Tailwind's rounded-full, 9999px) rather than a partial round.
+BUTTON_STYLE_CHOICES: list[tuple[str, str]] = [
+    ("Square (default)", "2px"),
+    ("Rounded", "999px"),
+]
+DEFAULT_BUTTON_RADIUS = BUTTON_STYLE_CHOICES[0][1]
+
 # Defaults used until the setup wizard writes real values.
 DEFAULTS: dict[str, Any] = {
     "instance_name": "RAIN",
@@ -41,6 +55,7 @@ DEFAULTS: dict[str, Any] = {
     "logo_path": None,
     "portal_background_path": None,
     "font_family": DEFAULT_FONT_FAMILY,
+    "button_radius": DEFAULT_BUTTON_RADIUS,
     "setup_complete": False,
 }
 

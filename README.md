@@ -63,8 +63,8 @@ at RAIN is enough to get started.
   a setup onto another instance
 - Local auth plus optional LDAP/Active Directory and SAML 2.0 SSO
 - Role-based access control across platform and per-tenant admin tiers
-- Runtime branding: instance name, accent color, logo, font, and custom
-  JS for analytics/chat widgets
+- Runtime branding: instance name, accent color, logo, font, button
+  style, and custom JS for analytics/chat widgets
 - Schema-per-tenant multi-tenancy on one Postgres instance
 - Self-hosted, air-gapped-capable, no telemetry, no license server
 

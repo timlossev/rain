@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ branding.instance_name }}{% endblock %}</title>
   <link rel="stylesheet" href="/static/css/app.css?v={{ asset_version }}">
-  <style>:root { --accent: {{ branding.accent_color }}; --font-family: {{ branding.font_family | safe }}; }</style>
+  <style>:root { --accent: {{ branding.accent_color }}; --font-family: {{ branding.font_family | safe }}; --btn-radius: {{ branding.button_radius | safe }}; }</style>
 </head>
 <body>
 {# Page-specific help text, captured via self.help_text() below (in the

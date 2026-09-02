@@ -1072,9 +1072,11 @@ every tenant or applies instance-wide.
 
 **Branding.** Instance name, accent color (a color picker), font
 (a dropdown of system/web-safe fonts, since nothing is downloaded from
-a CDN), and an optional product logo (PNG, JPEG, SVG, or WebP, up to
-5MB; leaving the file field empty on a later edit keeps the current
-logo). Changes apply immediately across every tenant.
+a CDN), button style (Square, the default 90-degree-corner look, or
+Rounded, a fully pill-shaped button), and an optional product logo
+(PNG, JPEG, SVG, or WebP, up to 5MB; leaving the file field empty on a
+later edit keeps the current logo). Changes apply immediately across
+every tenant.
 
 **Tenants.** A table of every tenant (Name, Slug, its database schema
 name, Active/inactive), a "+ New tenant" form (Name and Slug), and, for

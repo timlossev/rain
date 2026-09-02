@@ -198,6 +198,22 @@ Accent color and logo are instance-wide (set once by `internal_admin`, not
 per-tenant white-labeling); the setup wizard captures them alongside the
 first tenant and admin account.
 
+**Button style.** `button_radius` follows the exact same shape as
+`font_family` -- a curated `BUTTON_STYLE_CHOICES` list (label, CSS
+value), whitelist-checked on save since the stored value is injected
+straight into `base.html`'s inline `<style>` block, and a new
+`--btn-radius` custom property carrying it. Deliberately split out
+from `--radius-sm` (the token every *other* small element -- inputs,
+badges, table cells -- still uses) rather than sharing it: this
+picker only ever means to change what buttons look like, not round
+every small corner in the app along with them. "Rounded" is a full
+`999px` pill, not a partial round -- modeled on
+[teneo.ai](https://www.teneo.ai)'s own buttons (Tailwind's
+`rounded-full`, confirmed from their actual built CSS, not a guess).
+Their heading font, Neo Sans Pro, is a commercial Monotype typeface
+RAIN has no license to redistribute, so it's deliberately not part of
+this -- only the button shape carried over, not their type system.
+
 ## Why no Tailwind/htmx/Alpine
 
 The plan called for a server-rendered UI with HTMX/Alpine + Tailwind. In

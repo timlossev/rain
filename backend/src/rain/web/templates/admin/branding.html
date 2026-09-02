@@ -29,6 +29,15 @@
       <div class="field-hint">System/web-safe fonts only - nothing downloaded from a CDN.</div>
     </div>
     <div class="field">
+      <label for="button_radius">Button style</label>
+      <select id="button_radius" name="button_radius">
+        {% for label, css_value in button_style_choices %}
+        <option value="{{ css_value }}" {% if branding.button_radius == css_value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <div class="field-hint">Square is the default look across the app; Rounded gives every button a fully pill-shaped corner instead (modeled on teneo.ai's own buttons).</div>
+    </div>
+    <div class="field">
       <label for="logo">Product logo</label>
       {% if branding.logo_path %}<p><img src="{{ branding.logo_path }}" alt="" style="height:36px;"></p>{% endif %}
       <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
