@@ -1084,6 +1084,26 @@ modules.tickets.service._notify_approvers`), plus the Platform Response
 Rules `document_pending_acknowledgment` trigger (see that section
 above) for whatever else an admin has configured to react to it.
 
+**Infrastructure drift detection is an emergent capability, not a
+feature.** No code backs "Documents > Infrastructure drift detection"
+in the user guide -- it's three pieces that already existed for other
+reasons, composed: a webhook-populated document's own diff-on-refresh
+(`_apply_webhook_result`'s `_content_changed` check), a `CalendarEntry`
+with `policy_ref={"type": "refresh_document"}` giving that refresh a
+schedule (`rain.modules.calendar.sweep`, hourly, gated by that entry's
+own recurrence), and `alert_on_change` routing a real diff into a
+`SyslogEvent` (`host="documents"`, `program=doc.doc_number`) through
+the exact same `ticket_rules.evaluate_and_promote` every real syslog
+line goes through -- nothing downstream can tell a document's own
+change alert apart from network-ingested traffic, so an Event
+Promotion Policy reacts to it exactly the same way. `program=doc.
+doc_number` specifically is what makes a policy scoped to one drift
+monitor's alerts possible at all -- without a per-document match key,
+"document changed" would be indistinguishable across every webhook-
+populated document in the tenant. Worth calling out because none of
+these three pieces was built with this use case in mind, and finding
+the combination isn't obvious from any one of their own docs alone.
+
 ## Home
 
 `rain.modules.home`, the smallest module in the app -- one route

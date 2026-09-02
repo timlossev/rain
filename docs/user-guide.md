@@ -937,6 +937,45 @@ the source webhook and last refresh date if the document is
 webhook-populated), and Delete (with confirmation, and this cannot be
 undone).
 
+### Infrastructure drift detection
+
+Not a dedicated feature, just three existing pieces that combine into
+one: point a document's webhook at wherever a scheduled discovery run
+(Terraform + [Terracognita](https://github.com/cycloid-community-catalog/terracognita)
+or similar) publishes its output over HTTP, and this becomes a working
+drift monitor with no extra code.
+
+1. **Documents > New document**, "Populate from webhook" tab. Point
+   "Webhook" at that endpoint (`WebhookConfig` supports POST/PUT/PATCH
+   with a body and arbitrary headers under Admin > Webhooks, so an
+   `Authorization` header for an internal API or an S3 URL both work),
+   and check "Emit syslog alert on change" (`alert_on_change`). From
+   here on, every refresh diffs the new response against what's
+   currently stored and only alerts when they actually differ.
+2. **Calendar > New entry**, on the same document: pick a recurrence
+   (Daily, Weekly, ...), check "Also auto-refresh from its webhook",
+   and set "Related document" to it. The sweep that runs this checks
+   hourly and only actually re-fetches on the day(s) the recurrence
+   says to.
+3. **Tickets > Event Promotion Policies** (optional, to turn a
+   detected diff into a ticket automatically instead of just an
+   alert): a new policy matching field "program" against that
+   document's own number (its `DOC-xxxxxx`, unique per document, so
+   this scopes the rule to just this one drift monitor and nothing
+   else) fires the same way it would for real syslog traffic -- a
+   document's change alert isn't treated any differently once it's a
+   `SyslogEvent`. The diff itself is available in the event's raw
+   text if you want it in the resulting ticket's description.
+
+What this gets you: an "as-built" snapshot of a cloud account that's
+periodically refreshed and automatically flagged the moment it stops
+matching what was captured last time -- a good fit for the "detect a
+change nobody documented" half of configuration management, alongside
+the change-ticket evidence that already covers the "every documented
+change was approved" half. RAIN never runs Terracognita or diffs
+Terraform against live state itself; it's just storing and watching
+whatever text that pipeline already produces.
+
 ## Search results
 
 Reached by typing anything other than an exact record number into the
@@ -1384,10 +1423,10 @@ created with. Importing upserts by name/key, same as the platform
 bundle -- a re-import updates matching rows rather than duplicating
 them, except a local user, which is never overwritten once it exists.
 
-The same Import expects any tenant bundle file, including the four
+The same Import expects any tenant bundle file, including the five
 starter compliance-register templates shipped in `docs/
 compliance-templates/` (a Risk Register, a Subprocessor Register, a
-PIV/CAC Card issuance log, and a Software License/vendor register,
-each just an asset type plus its custom fields) -- import one to get a
-usable register in a few clicks instead of building the asset type by
-hand.
+PIV/CAC Card issuance log, a Software License/vendor register, and a
+Cloud Environment register, each just an asset type plus its custom
+fields) -- import one to get a usable register in a few clicks instead
+of building the asset type by hand.

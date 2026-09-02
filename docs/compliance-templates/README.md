@@ -20,6 +20,13 @@ by hand from scratch:
   auto-renew flag, internal owner, vendor portal URL, and status) for
   vendor/software-asset-management tracking -- each Asset's own "Name"
   is the product or agreement.
+- `cloud-environment-register.json` -- a Cloud Environment asset type
+  (provider, account/subscription/project ID, environment, region, IaC
+  repo URL, owner, last discovery run, drift status) for tracking a
+  cloud account alongside a linked infrastructure-drift-monitoring
+  document -- see "Infrastructure drift detection" in
+  `docs/user-guide.md`. Each Asset's own "Name" is the environment's
+  short name (e.g. "prod-aws-us-east-1").
 
 To use one: Admin > Config Bundles > Tenant > Import, and pick the file.
 Each only carries `asset_types` and `custom_fields` -- importing one adds
