@@ -27,7 +27,9 @@ In a reference FedRAMP High authorization package, 33 of 409
 implemented controls depend on exactly this -- see
 [`docs/itsm-controls-mapping.md`](docs/itsm-controls-mapping.md) for
 the full control-by-control breakdown across a dozen frameworks
-worldwide.
+worldwide, and [`docs/eucs-compliance-assessment.md`](docs/eucs-compliance-assessment.md)
+for a scope-honest look at where that argument does and doesn't extend
+to the EU Cybersecurity Certification Scheme for Cloud Services.
 
 Those tickets have to originate from somewhere, which is why RAIN is
 deliberately "bring your own" for detection -- monitoring, SIEM, XDR,
