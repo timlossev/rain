@@ -1,0 +1,110 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-02T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "Encryption key & certificate register starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "crypto_asset",
+      "name": "Encryption Key / Certificate",
+      "icon": null,
+      "description": "One row per managed cryptographic key or certificate. Each Asset's own \"Name\" field is the key/certificate name or CN. Never store the actual key material or private key here -- this tracks the credential's existence and lifecycle, not its contents.",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "crypto_asset",
+      "field_key": "asset_kind",
+      "label": "Kind",
+      "field_type": "select",
+      "select_options": ["TLS certificate", "Encryption key (KMS/HSM)", "SSH key", "Code signing certificate", "PGP/GPG key", "Other"],
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "crypto_asset",
+      "field_key": "algorithm",
+      "label": "Algorithm",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "crypto_asset",
+      "field_key": "issuer_or_provider",
+      "label": "Issuer / CA / KMS provider",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "crypto_asset",
+      "field_key": "storage_location",
+      "label": "Storage location",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "crypto_asset",
+      "field_key": "issued_date",
+      "label": "Issued date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "crypto_asset",
+      "field_key": "expiration_date",
+      "label": "Expiration date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "crypto_asset",
+      "field_key": "rotation_owner",
+      "label": "Rotation owner",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "crypto_asset",
+      "field_key": "auto_rotates",
+      "label": "Auto-rotates",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "crypto_asset",
+      "field_key": "status",
+      "label": "Status",
+      "field_type": "select",
+      "select_options": ["Active", "Expiring soon", "Expired", "Revoked", "Rotated/retired"],
+      "is_required": true,
+      "sort_order": 8
+    }
+  ]
+}

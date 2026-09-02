@@ -1423,10 +1423,12 @@ created with. Importing upserts by name/key, same as the platform
 bundle -- a re-import updates matching rows rather than duplicating
 them, except a local user, which is never overwritten once it exists.
 
-The same Import expects any tenant bundle file, including the five
+The same Import expects any tenant bundle file, including the nine
 starter compliance-register templates shipped in `docs/
 compliance-templates/` (a Risk Register, a Subprocessor Register, a
-PIV/CAC Card issuance log, a Software License/vendor register, and a
-Cloud Environment register, each just an asset type plus its custom
-fields) -- import one to get a usable register in a few clicks instead
-of building the asset type by hand.
+PIV/CAC Card issuance log, a Software License/vendor register, a Cloud
+Environment register, an Encryption Key/Certificate register, a System
+Interconnection register, a Contractor Access register, and a Data
+Inventory register, each just an asset type plus its custom fields) --
+import one to get a usable register in a few clicks instead of
+building the asset type by hand.

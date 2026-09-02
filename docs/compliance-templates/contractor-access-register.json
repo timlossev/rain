@@ -1,0 +1,100 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-02T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "Third-party personnel & contractor access register starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "contractor_access",
+      "name": "Contractor Access",
+      "icon": null,
+      "description": "One row per third-party individual with access, distinct from the Subprocessor Register (which tracks the vendor company, not the person). Each Asset's own \"Name\" field is the contractor's name.",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "contractor_access",
+      "field_key": "vendor_company",
+      "label": "Vendor/employer",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "contractor_access",
+      "field_key": "role_or_function",
+      "label": "Role/function",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "contractor_access",
+      "field_key": "sponsor",
+      "label": "Internal sponsor",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "contractor_access",
+      "field_key": "access_level",
+      "label": "Access level",
+      "field_type": "select",
+      "select_options": ["Read-only", "Standard", "Privileged/admin", "Physical access only"],
+      "is_required": true,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "contractor_access",
+      "field_key": "background_check_status",
+      "label": "Background check status",
+      "field_type": "select",
+      "select_options": ["Not started", "In progress", "Cleared", "Failed/denied", "Not required"],
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "contractor_access",
+      "field_key": "engagement_start",
+      "label": "Engagement start",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "contractor_access",
+      "field_key": "engagement_end",
+      "label": "Engagement end",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "contractor_access",
+      "field_key": "access_status",
+      "label": "Access status",
+      "field_type": "select",
+      "select_options": ["Active", "Suspended", "Revoked", "Expired"],
+      "is_required": true,
+      "sort_order": 7
+    }
+  ]
+}

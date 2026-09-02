@@ -27,6 +27,28 @@ by hand from scratch:
   document -- see "Infrastructure drift detection" in
   `docs/user-guide.md`. Each Asset's own "Name" is the environment's
   short name (e.g. "prod-aws-us-east-1").
+- `encryption-key-cert-register.json` -- an Encryption Key /
+  Certificate asset type (kind, algorithm, issuer/provider, storage
+  location, issued/expiration dates, rotation owner, auto-rotates, and
+  status). Tracks the credential's lifecycle only -- never store actual
+  key material or private keys here. Each Asset's own "Name" is the
+  key/certificate name or CN.
+- `system-interconnection-register.json` -- a System Interconnection
+  asset type (system A/B, connection type, data exchanged,
+  authorization/review dates, and status). Link the actual
+  Interconnection Security Agreement, if there is one, as a Document on
+  the asset's own Links tab rather than pasting it into a field. Each
+  Asset's own "Name" is a short label for the connection.
+- `contractor-access-register.json` -- a Contractor Access asset type
+  (vendor/employer, role, internal sponsor, access level, background
+  check status, engagement dates, and access status) for tracking
+  third-party *individuals* with access, distinct from the Subprocessor
+  Register's vendor-company level. Each Asset's own "Name" is the
+  contractor's name.
+- `data-inventory-register.json` -- a Data Asset type (data category,
+  classification level, system/location, owner, retention period, and
+  applicable regulation) for a basic data inventory/classification
+  register. Each Asset's own "Name" is the data asset's name.
 
 To use one: Admin > Config Bundles > Tenant > Import, and pick the file.
 Each only carries `asset_types` and `custom_fields` -- importing one adds

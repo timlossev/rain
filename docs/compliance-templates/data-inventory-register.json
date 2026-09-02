@@ -1,0 +1,90 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-02T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "Data inventory & classification register starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "data_asset",
+      "name": "Data Asset",
+      "icon": null,
+      "description": "One row per identified data holding (a database, a data flow, a document set -- whatever level of granularity makes sense). Each Asset's own \"Name\" field is the data asset's name (e.g. \"Customer PII database\").",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "data_asset",
+      "field_key": "data_category",
+      "label": "Data category",
+      "field_type": "select",
+      "select_options": ["PII", "PHI", "Financial", "Intellectual property", "Public", "Internal", "Confidential", "Other"],
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "data_asset",
+      "field_key": "classification_level",
+      "label": "Classification level",
+      "field_type": "select",
+      "select_options": ["Public", "Internal", "Confidential", "Restricted/regulated"],
+      "is_required": true,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "data_asset",
+      "field_key": "system_or_location",
+      "label": "System/location",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "data_asset",
+      "field_key": "owner",
+      "label": "Data owner/steward",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "data_asset",
+      "field_key": "retention_period",
+      "label": "Retention period",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "data_asset",
+      "field_key": "applicable_regulation",
+      "label": "Applicable regulation",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "data_asset",
+      "field_key": "last_reviewed",
+      "label": "Last reviewed",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    }
+  ]
+}

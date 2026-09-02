@@ -1,0 +1,90 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-02T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "System interconnection register starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "interconnection",
+      "name": "System Interconnection",
+      "icon": null,
+      "description": "One row per system-to-system connection. Each Asset's own \"Name\" field is a short label for the connection (e.g. \"RAIN -> Payroll API\"). Link the actual Interconnection Security Agreement, if there is one, as a Document on this Asset's own Links tab rather than pasting it in here.",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "interconnection",
+      "field_key": "system_a",
+      "label": "System A",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "interconnection",
+      "field_key": "system_b",
+      "label": "System B",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "interconnection",
+      "field_key": "connection_type",
+      "label": "Connection type",
+      "field_type": "select",
+      "select_options": ["API", "VPN", "Direct database connection", "File transfer", "Message queue", "Other"],
+      "is_required": true,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "interconnection",
+      "field_key": "data_exchanged",
+      "label": "Data exchanged",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "interconnection",
+      "field_key": "authorization_date",
+      "label": "Authorization date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "interconnection",
+      "field_key": "review_date",
+      "label": "Next review date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "interconnection",
+      "field_key": "status",
+      "label": "Status",
+      "field_type": "select",
+      "select_options": ["Active", "Under review", "Pending authorization", "Decommissioned"],
+      "is_required": true,
+      "sort_order": 6
+    }
+  ]
+}
