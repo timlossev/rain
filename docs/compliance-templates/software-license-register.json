@@ -1,0 +1,110 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-02T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "Software license & service agreement register starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "software_license",
+      "name": "Software License",
+      "icon": null,
+      "description": "One row per software license or vendor service agreement. Each Asset's own \"Name\" field is the product/agreement name.",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "software_license",
+      "field_key": "vendor",
+      "label": "Vendor",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_license",
+      "field_key": "license_type",
+      "label": "License type",
+      "field_type": "select",
+      "select_options": ["Subscription", "Perpetual", "Site license", "Open source / free", "Trial", "Other"],
+      "is_required": true,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_license",
+      "field_key": "seat_count",
+      "label": "Licensed seats/quantity",
+      "field_type": "number",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_license",
+      "field_key": "annual_cost",
+      "label": "Annual cost (USD)",
+      "field_type": "number",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_license",
+      "field_key": "renewal_date",
+      "label": "Renewal/expiration date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_license",
+      "field_key": "auto_renews",
+      "label": "Auto-renews",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_license",
+      "field_key": "internal_owner",
+      "label": "Internal owner",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_license",
+      "field_key": "vendor_portal_url",
+      "label": "Vendor portal / support URL",
+      "field_type": "url",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_license",
+      "field_key": "status",
+      "label": "Status",
+      "field_type": "select",
+      "select_options": ["Active", "Expiring soon", "Expired", "Cancelled", "Under negotiation"],
+      "is_required": true,
+      "sort_order": 8
+    }
+  ]
+}
