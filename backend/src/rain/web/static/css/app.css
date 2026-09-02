@@ -1529,10 +1529,12 @@ td.actions { text-align: right; white-space: nowrap; }
    jumped the whole page. This :has() override (same technique as
    .shell:has(.sidebar.collapsed) above) drops back to normal top-down
    block flow only when a .portal-shell is present -- login/setup, the
-   only other .content-standalone users, are untouched -- and
-   .portal-shell's own padding-top holds the header a fixed distance
-   from the top of the viewport regardless of what's below it. */
-.content-standalone:has(.portal-shell) { display: block; padding-top: 56px; }
+   only other .content-standalone users, are untouched -- and this
+   rule's own padding-top holds the header a fixed distance from the
+   top of the viewport regardless of what's below it, matching .content
+   (the signed-in app's own page padding) rather than the taller value
+   this used to carry. */
+.content-standalone:has(.portal-shell) { display: block; padding-top: 24px; }
 /* Optional (Admin > Branding), instance-wide client-portal wallpaper --
    see report.html's own comment on why this is a fixed/full-viewport
    layer rather than living inside .portal-shell itself. z-index: -1 on
