@@ -16,6 +16,7 @@ from starlette.convertors import Convertor, register_url_convertor
 from rain.core.export_columns import merge_profile_columns
 from rain.core.field_pack import sniff_columns
 from rain.core.pagination import paginate
+from rain.core.query_params import optional_int
 from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.tenant_config import get_tenant_config, get_tenant_configs, set_tenant_config
@@ -93,7 +94,7 @@ async def list_tickets(
     request: Request,
     ticket_type: str | None = None,
     ticket_status: str | None = None,
-    asset_id: int | None = None,
+    asset_id: str | None = None,
     assigned: str | None = None,  # "me" | "unassigned" | None
     problematic: str | None = None,  # "1" | None
     prioritized: str | None = None,  # "1" | None
@@ -105,6 +106,11 @@ async def list_tickets(
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
+    # str, not int | None -- see rain.core.query_params.optional_int's own
+    # docstring for why (the asset picker's hidden input always submits
+    # asset_id="" once cleared/never picked, which int | None rejects as a
+    # raw 422 instead of "no filter").
+    asset_id = optional_int(asset_id)
     dir = "asc" if dir == "asc" else "desc"
     # No ticket_status in the URL at all (a bare /tickets, or the very
     # first visit) defaults to "active" -- every status except whichever
@@ -180,12 +186,12 @@ async def kanban_board(
     request: Request,
     ticket_type: str | None = None,
     ticket_status: str | None = None,
-    asset_id: int | None = None,
+    asset_id: str | None = None,
     assigned: str | None = None,  # "me" | "unassigned" | None
     problematic: str | None = None,  # "1" | None
     prioritized: str | None = None,  # "1" | None
     group_by: str = "status",  # "status" | "assignee"
-    assignee_group: int | None = None,
+    assignee_group: str | None = None,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
@@ -216,6 +222,13 @@ async def kanban_board(
     the selected group still shows, same extra-column-not-a-drop-target
     treatment as someone no longer assignable to this tenant at all."""
     nav = await build_nav_context(ctx)
+    # str, not int | None -- see rain.core.query_params.optional_int's own
+    # docstring for why (the asset picker's hidden input, and the assignee-
+    # group <select>'s own "clear" option, both submit an empty string
+    # once cleared/never picked, which int | None rejects as a raw 422
+    # instead of "no filter").
+    asset_id = optional_int(asset_id)
+    assignee_group = optional_int(assignee_group)
     group_by = group_by if group_by in ("status", "assignee") else "status"
     effective_status = "active" if ticket_status is None else ticket_status
     stmt = service.ticket_list_stmt(

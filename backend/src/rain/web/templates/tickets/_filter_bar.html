@@ -75,7 +75,7 @@
       <a class="type-pill type-pill-change {% if selected_type == 'change' %}active{% endif %}" href="{{ base_url }}?{{ qs(base_url, type='change', include_sort=include_sort) }}">Changes</a>
     </div>
 
-    <form method="get" action="{{ base_url }}" class="field" style="margin-bottom:0;">
+    <form method="get" action="{{ base_url }}" class="filter-bar-controls">
       {# `or ''`, not a bare {{ selected_type }} -- Jinja stringifies
          Python None to the literal text "None" in an attribute value,
          and unlike every other hidden input here this one isn't gated
@@ -95,7 +95,7 @@
       {% if selected_prioritized %}<input type="hidden" name="prioritized" value="1">{% endif %}
       {% if include_sort and selected_sort | default(none) and selected_sort != "created_at" %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
       {% if include_sort and selected_dir | default(none) and selected_dir != "desc" %}<input type="hidden" name="dir" value="{{ selected_dir }}">{% endif %}
-      <select id="ticket_status" name="ticket_status" onchange="this.form.submit()" aria-label="Status" title="Filter by status">
+      <select id="ticket_status" name="ticket_status" class="filter-bar-select" onchange="this.form.submit()" aria-label="Status" title="Filter by status">
         <option value="active" {% if selected_status is none or selected_status == "active" %}selected{% endif %}>All active</option>
         <option value="" {% if selected_status == "" %}selected{% endif %}>All statuses</option>
         {% for s in statuses %}
@@ -108,7 +108,7 @@
          this same form so either one's onchange submits both current
          values together. #}
       {% if selected_group_by is defined %}
-      <select name="group_by" onchange="this.form.submit()" aria-label="Group board by" title="Group the board by status or by assignee workload">
+      <select name="group_by" class="filter-bar-select" onchange="this.form.submit()" aria-label="Group board by" title="Group the board by status or by assignee workload">
         <option value="status" {% if selected_group_by == "status" %}selected{% endif %}>Group by status</option>
         <option value="assignee" {% if selected_group_by == "assignee" %}selected{% endif %}>Group by assignee (workload)</option>
       </select>
@@ -119,7 +119,7 @@
          assignee mode is actually picked; assignee_groups is only ever
          in kanban_board's context when selected_group_by == "assignee". #}
       {% if selected_group_by == "assignee" and assignee_groups is defined %}
-      <select name="assignee_group" onchange="this.form.submit()" aria-label="Filter assignee columns by team" title="Show only one team's members as columns">
+      <select name="assignee_group" class="filter-bar-select" onchange="this.form.submit()" aria-label="Filter assignee columns by team" title="Show only one team's members as columns">
         <option value="">All members</option>
         {% for g in assignee_groups %}
         <option value="{{ g.id }}" {% if selected_assignee_group == g.id %}selected{% endif %}>{{ g.name }}</option>

@@ -657,6 +657,38 @@ script that instantiates the app and asserts no literal path incorrectly
 matches a dynamic sibling pattern -- worth re-running by hand after adding
 new routes.
 
+### Two filter-bar gotchas worth knowing about
+
+**An `int | None` query param and a `<select>`'s "clear" option don't
+mix.** FastAPI/Pydantic reject an `int | None` query param outright (a
+raw 422) the moment it arrives as an empty string, rather than treating
+that the same as the param being absent -- but an empty string is
+exactly what a plain `<select>` with a `value=""` "clear this filter"
+option (`assignee_group`, `owner_group`, `filter_owner`) or
+`_search_picker.html`'s own always-present hidden input (`asset_id`)
+actually submits on a normal GET form submission, not just omitted
+from the URL. Confirmed live: clearing any of those filters 422'd
+instead of falling back to "no filter". `rain.core.query_params.
+optional_int` is the fix -- type the affected param `str | None`
+instead, then `x = optional_int(x)` (reusing the same name) at the top
+of the route body, same as `group_by`'s own "clamp to a known value"
+reassignment right next to it.
+
+**A `<form>` holding more than one `<select>` stacks them unless told
+not to.** `app.css`'s global `select { width: 100%; }` (so a lone
+select in its own `.field` fills it, the common case) means each
+select in a *shared* form -- `tickets/_filter_bar.html`'s Status/Group
+by/team selects, `documents/kanban.html`'s Group by/team/tag/owner
+ones -- individually claims the entire row for itself, which reads as
+the selects stacking vertically one per line rather than sitting side
+by side, even though the form itself is a flex child of `.filter-bar`
+elsewhere (being a flex *item* doesn't make an element's own children
+flex, only `display: flex` on the element itself does). Confirmed
+live: exactly this, before `.filter-bar-controls`
+(`display: flex; flex-wrap: wrap; gap: 8px;`, replacing the plain
+`.field` these forms used to carry) and `.filter-bar-select`
+(`width: auto;`, added to every select inside one) existed.
+
 ## Document Repository
 
 **Storage.** `rain.modules.documents.storage` is a small `StorageBackend`
@@ -928,6 +960,14 @@ tickets-only inline code -- both boards' cards/dropzones/optimistic-
 move/revert-on-failure mechanics are identical, only `buildRequest()`
 (which endpoint, which body, what a success response means for the
 dragged card) differs per board and mode.
+
+A search/filter combination matching zero documents is not an error --
+`documents_kanban` still renders the board (every column already says
+"No documents." on its own, the same empty-state every column has
+regardless of cause), just with `no_matches=True` added to the
+context, which the template turns into one plain-text line above the
+board so an all-empty board reads as "nothing matched", not as
+"something's broken".
 
 ## Home
 

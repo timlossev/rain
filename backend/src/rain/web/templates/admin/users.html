@@ -50,7 +50,7 @@
         <input type="email" id="email" name="email" required>
       </div>
     </div>
-    <div class="form-row">
+    <div class="form-row form-row-top">
       <div class="field">
         <label for="password">Password</label>
         <input type="password" id="password" name="password" minlength="10" required>
@@ -64,13 +64,18 @@
         </select>
       </div>
       <div class="field">
-        <label for="tenant_id">Tenant (required for Client / Client Admin)</label>
+        {# Short label, detail in its own hint below -- see user_edit.html's
+           own copy of this same field for why (the longer label wrapped
+           to two lines here, one line everywhere else in this row,
+           pushing this select out of alignment with its neighbors'). #}
+        <label for="tenant_id">Tenant</label>
         <select id="tenant_id" name="tenant_id">
           <option value="">-</option>
           {% for tenant in tenants %}
           <option value="{{ tenant.id }}">{{ tenant.name }}</option>
           {% endfor %}
         </select>
+        <div class="field-hint">Required for Client and Client Admin roles.</div>
       </div>
     </div>
     <button class="btn btn-primary" type="submit">Create user</button>

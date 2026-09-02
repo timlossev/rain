@@ -35,36 +35,49 @@
    documents_kanban's own docstring) in the mode it doesn't already group
    by: filter_owner narrows "group by tag", filter_tag narrows "group by
    owner". #}
-<div class="panel-row" style="justify-content:space-between; flex-wrap:wrap; gap:8px;">
-  <form method="get" action="/documents/kanban" class="field" style="margin-bottom:0; flex:1; min-width:220px;">
-    <input type="hidden" name="group_by" value="{{ selected_group_by }}">
-    {% if selected_group_by == "owner" and selected_owner_group %}<input type="hidden" name="owner_group" value="{{ selected_owner_group }}">{% endif %}
-    {% if selected_group_by == "owner" and selected_filter_tag %}<input type="hidden" name="filter_tag" value="{{ selected_filter_tag }}">{% endif %}
-    {% if selected_group_by == "tag" and selected_filter_owner %}<input type="hidden" name="filter_owner" value="{{ selected_filter_owner }}">{% endif %}
-    <input type="text" name="search" value="{{ search }}" placeholder="Search title, DOC-000123, or a tag" aria-label="Search">
-  </form>
-  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <form method="get" action="/documents/kanban" style="display:flex; align-items:center; gap:8px; margin-bottom:0; flex-wrap:wrap;">
+{# Same .filter-bar/.filter-bar-controls/.filter-bar-select shape
+   tickets/_filter_bar.html uses -- .filter-bar-select overrides every
+   select/input's own global width:100% (see app.css), which otherwise
+   makes a form holding more than one <select> stack them vertically
+   instead of sitting side by side; see .filter-bar-controls' own
+   comment in app.css for why. #}
+<div class="panel-row" style="margin-bottom:0;">
+  <div class="filter-bar">
+    <form method="get" action="/documents/kanban" class="field" style="margin-bottom:0; flex:1; min-width:220px;">
+      <input type="hidden" name="group_by" value="{{ selected_group_by }}">
+      {% if selected_group_by == "owner" and selected_owner_group %}<input type="hidden" name="owner_group" value="{{ selected_owner_group }}">{% endif %}
+      {% if selected_group_by == "owner" and selected_filter_tag %}<input type="hidden" name="filter_tag" value="{{ selected_filter_tag }}">{% endif %}
+      {% if selected_group_by == "tag" and selected_filter_owner %}<input type="hidden" name="filter_owner" value="{{ selected_filter_owner }}">{% endif %}
+      <input type="text" name="search" value="{{ search }}" placeholder="Search title, DOC-000123, or a tag" aria-label="Search">
+    </form>
+
+    <form method="get" action="/documents/kanban" class="filter-bar-controls">
       <input type="hidden" name="search" value="{{ search }}">
-      <select name="group_by" onchange="this.form.submit()" aria-label="Group board by" title="Group the board by tag or by owner workload">
+      <select name="group_by" class="filter-bar-select" onchange="this.form.submit()" aria-label="Group board by" title="Group the board by tag or by owner workload">
         <option value="tag" {% if selected_group_by == "tag" %}selected{% endif %}>Group by tag</option>
         <option value="owner" {% if selected_group_by == "owner" %}selected{% endif %}>Group by owner (workload)</option>
       </select>
+      {# filter_tag/filter_owner are cross-axis filters, not a second
+         grouping dimension -- "group by tag" narrowed by a single tag,
+         or "group by owner" narrowed by a single owner, would just hide
+         every other column for no reason, so each only ever appears
+         (and only ever applies, see documents_kanban's own docstring)
+         in the mode it doesn't already group by. #}
       {% if selected_group_by == "owner" %}
-      <select name="owner_group" onchange="this.form.submit()" aria-label="Filter owner columns by team" title="Show only one team's members as columns">
+      <select name="owner_group" class="filter-bar-select" onchange="this.form.submit()" aria-label="Filter owner columns by team" title="Show only one team's members as columns">
         <option value="">All members</option>
         {% for g in owner_groups %}
         <option value="{{ g.id }}" {% if selected_owner_group == g.id %}selected{% endif %}>{{ g.name }}</option>
         {% endfor %}
       </select>
-      <select name="filter_tag" onchange="this.form.submit()" aria-label="Filter by tag" title="Only show documents carrying this tag">
+      <select name="filter_tag" class="filter-bar-select" onchange="this.form.submit()" aria-label="Filter by tag" title="Only show documents carrying this tag">
         <option value="">All tags</option>
         {% for t in all_tags %}
         <option value="{{ t }}" {% if selected_filter_tag == t %}selected{% endif %}>{{ t }}</option>
         {% endfor %}
       </select>
       {% else %}
-      <select name="filter_owner" onchange="this.form.submit()" aria-label="Filter by person" title="Only show documents owned by this person">
+      <select name="filter_owner" class="filter-bar-select" onchange="this.form.submit()" aria-label="Filter by person" title="Only show documents owned by this person">
         <option value="">Everyone</option>
         {% for u in all_assignable_users %}
         <option value="{{ u.id }}" {% if selected_filter_owner == u.id %}selected{% endif %}>{{ u.display_name }}</option>
@@ -72,12 +85,23 @@
       </select>
       {% endif %}
     </form>
-    <a class="btn btn-sm" href="/documents">Table view</a>
+
+    <div class="filter-bar-divider"></div>
+
+    <div class="filter-bar-chips">
+      <a class="btn btn-sm" href="/documents">Table view</a>
+    </div>
   </div>
 </div>
 
 {% if truncated %}
 <div class="flash flash-error">Showing the first 500 matching documents - narrow your search to see the rest.</div>
+{% endif %}
+{% if no_matches %}
+{# Not an error -- the board still renders below, every column its own
+   "No documents." already -- just a clearer heads-up than a board that
+   otherwise reads as silently, uniformly empty for no stated reason. #}
+<p class="muted">No documents match the current search/filters.</p>
 {% endif %}
 
 <div class="kanban-board" data-doc-kanban-board>

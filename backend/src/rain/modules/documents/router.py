@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.convertors import Convertor, register_url_convertor
 
 from rain.core.pagination import paginate
+from rain.core.query_params import optional_int
 from rain.core.rbac import require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.tenant_config import get_tenant_config
@@ -124,9 +125,9 @@ async def documents_kanban(
     request: Request,
     search: str | None = None,
     group_by: str = "tag",  # "tag" | "owner"
-    owner_group: int | None = None,
+    owner_group: str | None = None,
     filter_tag: str | None = None,
-    filter_owner: int | None = None,
+    filter_owner: str | None = None,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
@@ -164,6 +165,12 @@ async def documents_kanban(
     filtering "group by tag" by a single tag, or "group by owner" by a
     single owner, would just hide every other column for no reason."""
     nav = await build_nav_context(ctx)
+    # str, not int | None -- see rain.core.query_params.optional_int's own
+    # docstring for why (both <select>s' "clear" options submit an empty
+    # string once cleared, which int | None rejects as a raw 422 instead
+    # of "no filter").
+    owner_group = optional_int(owner_group)
+    filter_owner = optional_int(filter_owner)
     group_by = group_by if group_by in ("tag", "owner") else "tag"
     stmt = service.document_list_stmt(
         search=search,
@@ -237,6 +244,12 @@ async def documents_kanban(
             "ctx": ctx,
             "search": search or "",
             "truncated": truncated,
+            # Zero documents matching the current search/filters is a
+            # legitimate, unremarkable state -- the board still renders,
+            # every column just says "No documents." individually already;
+            # this is only for a single clearer banner above the (otherwise
+            # all-empty-looking) board, not an error of any kind.
+            "no_matches": not docs,
             "selected_group_by": group_by,
             "tag_columns": tag_columns,
             "tag_labels": tag_labels,

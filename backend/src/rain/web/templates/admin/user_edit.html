@@ -25,7 +25,7 @@
       <label for="display_name">Full name</label>
       <input type="text" id="display_name" name="display_name" value="{{ edit_user.display_name }}" required>
     </div>
-    <div class="form-row">
+    <div class="form-row form-row-top">
       <div class="field">
         <label for="role_key">Role</label>
         <select id="role_key" name="role_key">
@@ -35,13 +35,23 @@
         </select>
       </div>
       <div class="field">
-        <label for="tenant_id">Tenant (required for Client / Client Admin)</label>
+        {# Short enough to stay on one line next to "Role" above -- the
+           original "Tenant (required for Client / Client Admin)" wrapped
+           to two lines in this same column width, pushing this field's
+           own <select> a full line below Role's, out of alignment with
+           it. .form-row-top (labels pinned to the row's own top edge,
+           not stretched/centered) is a defensive second layer, not the
+           fix by itself -- it keeps the two *labels* level regardless,
+           but the two *selects* below them still need equal-height
+           labels above to land level too. #}
+        <label for="tenant_id">Tenant</label>
         <select id="tenant_id" name="tenant_id">
           <option value="">-</option>
           {% for tenant in tenants %}
           <option value="{{ tenant.id }}" {% if edit_user.tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }}</option>
           {% endfor %}
         </select>
+        <div class="field-hint">Required for Client and Client Admin roles.</div>
       </div>
     </div>
     {% if edit_user.auth_source != "ldap" %}

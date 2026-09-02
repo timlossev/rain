@@ -808,6 +808,16 @@ form.inline { display: inline; }
 }
 .filter-bar-divider { width: 1px; align-self: stretch; min-height: 34px; background: var(--border); }
 .filter-bar-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* A <form> holding more than one <select> as a "Group by"-style control
+   cluster (tickets/kanban.html, documents/kanban.html) -- without this,
+   each select's own global width:100% (see input/select's own rule
+   above) means every one of them claims the *entire* row for itself,
+   which reads as the selects stacking vertically one per line rather
+   than sitting side by side the way .filter-bar's other controls do,
+   even though the form itself is a flex child of .filter-bar. Confirmed
+   live: exactly this, before this rule existed. */
+.filter-bar-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 0; }
+.filter-bar-select { width: auto; }
 @media (max-width: 720px) {
   .filter-bar-divider { display: none; }
 }
