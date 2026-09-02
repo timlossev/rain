@@ -72,7 +72,17 @@ class AssetType(TenantBase):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
-    custom_fields: Mapped[list["CustomField"]] = relationship(back_populates="asset_type")
+    # passive_deletes=True: without it, deleting an AssetType makes
+    # SQLAlchemy's own unit-of-work null out asset_type_id on every
+    # loaded CustomField row (the ORM's default handling of a nullable
+    # FK with no cascade= set) *before* the DB's own ON DELETE CASCADE
+    # (CustomField.asset_type_id's real FK constraint) ever gets a
+    # chance to fire -- the fields survive as orphaned, tenant-wide
+    # fields instead of being deleted, silently applying to every other
+    # asset type from then on. Confirmed live: deleting an asset type
+    # left its fields' asset_type_id NULL in Postgres rather than
+    # removing the rows. This defers to the DB constraint instead.
+    custom_fields: Mapped[list["CustomField"]] = relationship(back_populates="asset_type", passive_deletes=True)
 
 
 class CustomField(TenantBase):

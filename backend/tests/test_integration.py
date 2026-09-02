@@ -1011,3 +1011,51 @@ async def test_document_acknowledgment_requirement_end_to_end():
         await document_service.clear_acknowledgment_requirement(session, doc)
         assert await document_service.required_acknowledgment_user_ids(session, doc) == set()
         assert await document_service.list_documents_pending_acknowledgment_for(session, reviewer_a.id) == []
+
+
+async def test_deleting_asset_type_cascades_its_custom_fields():
+    """AssetType.custom_fields needs passive_deletes=True -- without it,
+    deleting an AssetType through the ORM makes SQLAlchemy's own unit-of-
+    work null out asset_type_id on every CustomField row it loads to
+    figure out what to do with them (its default handling of a nullable
+    FK with no cascade= set), rather than leaving the DB's own ON DELETE
+    CASCADE (the real FK constraint) to just delete them. The field then
+    survives as an orphaned, tenant-wide field instead of being deleted,
+    silently applying to every other asset type from then on -- confirmed
+    live against a real Postgres before this was fixed, not simulated.
+
+    Mirrors rain.modules.assets.router.delete_type exactly (`db.get`
+    then `db.delete`, the collection never touched) rather than forcing
+    a worse-case reproduction by pre-loading `custom_fields` first --
+    that's a meaningfully different scenario (SQLAlchemy's handling of
+    an already-resident collection isn't governed by passive_deletes the
+    same way an unloaded one is), and isn't the path the app actually
+    takes."""
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import AssetType, CustomField
+
+    tenant = await provision_tenant(slug="chi", name="Chi Networks")
+
+    async with tenant_session(tenant.schema_name) as session:
+        asset_type = AssetType(key="widget", name="Widget")
+        session.add(asset_type)
+        await session.flush()
+        field = CustomField(scope="asset", asset_type_id=asset_type.id, field_key="color", label="Color", field_type="text")
+        session.add(field)
+        await session.commit()
+        field_id = field.id
+        asset_type_id = asset_type.id
+
+    # A fresh session/identity map, same as a fresh request -- `delete_
+    # type` never has `custom_fields` loaded going in, since it never
+    # queries CustomField at all.
+    async with tenant_session(tenant.schema_name) as session:
+        reloaded_type = await session.get(AssetType, asset_type_id)
+        await session.delete(reloaded_type)
+        await session.commit()
+
+        # populate_existing=True: see test_document_tags_search_and_
+        # calendar_link's own comment on why a plain get() would return
+        # a stale identity-mapped object instead of the real DB state.
+        assert await session.get(CustomField, field_id, populate_existing=True) is None
