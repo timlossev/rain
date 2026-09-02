@@ -799,8 +799,8 @@ table rows, with a "Group by" dropdown picking what the columns are:
   already carries just removes the one it came from, rather than
   adding a duplicate; dropping into "Uncategorized" removes it
   entirely.
-- **Owner (workload)**: one column per assignable user plus "No
-  owner" first, same idea as the ticket board's own assignee view.
+- **Owners**: one column per assignable user plus "No owner" first,
+  same idea as the ticket board's own assignee view.
   Drag a card into someone's column to make them responsible for
   keeping that document current, or into "No owner" to clear it. A
   second dropdown narrows the columns to one team's members (Admin >

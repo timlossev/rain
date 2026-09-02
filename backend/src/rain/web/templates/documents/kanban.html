@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Documents Kanban - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}The document repository, grouped into columns instead of table rows. "Group by" switches what the columns are: Tag (default) - a deduplicated, cleaned, capitalized view of every tag in use, plus "Uncategorized"; drag a card between tag columns to retag it, leaving every other tag on the document alone. Or Owner (workload) - one column per assignable user plus "No owner"; drag a card to assign who's responsible for keeping it current, optionally narrowed to one team's members with the second dropdown that appears.{% endblock %}
+{% block help_text %}The document repository, grouped into columns instead of table rows. "Group by" switches what the columns are: Tag (default) - a deduplicated, cleaned, capitalized view of every tag in use, plus "Uncategorized"; drag a card between tag columns to retag it, leaving every other tag on the document alone. Or Owners - one column per assignable user plus "No owner"; drag a card to assign who's responsible for keeping it current, optionally narrowed to one team's members with the second dropdown that appears.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 
@@ -55,7 +55,7 @@
       <input type="hidden" name="search" value="{{ search }}">
       <select name="group_by" class="filter-bar-select" onchange="this.form.submit()" aria-label="Group board by" title="Group the board by tag or by owner workload">
         <option value="tag" {% if selected_group_by == "tag" %}selected{% endif %}>Group by tag</option>
-        <option value="owner" {% if selected_group_by == "owner" %}selected{% endif %}>Group by owner (workload)</option>
+        <option value="owner" {% if selected_group_by == "owner" %}selected{% endif %}>Group by owners</option>
       </select>
       {# filter_tag/filter_owner are cross-axis filters, not a second
          grouping dimension -- "group by tag" narrowed by a single tag,
