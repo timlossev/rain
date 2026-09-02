@@ -31,6 +31,7 @@ docs/
   user-guide.md                  -- task-oriented, organized by the app's own sidebar
   itsm-controls-mapping.md        -- the compliance-control analysis behind the project
   eucs-compliance-assessment.md    -- scope-honest assessment of RAIN against EUCS
+  compliance-templates/             -- starter tenant-config-bundle JSON files (Risk Register, Subprocessor Register)
 ```
 
 ## Backend module map

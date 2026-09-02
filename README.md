@@ -53,7 +53,8 @@ at RAIN is enough to get started.
 - Platform Response Rules react to ticket lifecycle events automatically
 - No-code asset types and custom fields, define your own
 - Document repository with tags, webhook auto-population, and PDF
-  export, plus its own Kanban board grouped by tag or by owner
+  export, plus its own Kanban board grouped by tag or by owner; optional
+  review-due tracking and per-user read acknowledgment
 - Per-tenant calendar with recurring entries and a syslog bridge
 - Tenant-defined Service Catalog forms that produce tickets on submission
 - Public client portal for external incident reporting and requests
@@ -64,7 +65,8 @@ at RAIN is enough to get started.
 - Export/import platform and tenant configuration as JSON, for cloning
   a setup onto another instance
 - Local auth plus optional LDAP/Active Directory and SAML 2.0 SSO
-- Role-based access control across platform and per-tenant admin tiers
+- Role-based access control across platform and per-tenant admin tiers,
+  with a last-login CSV export for periodic access review
 - Runtime branding: instance name, accent color, logo, font, button
   style, and custom JS for analytics/chat widgets
 - Schema-per-tenant multi-tenancy on one Postgres instance

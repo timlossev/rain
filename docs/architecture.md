@@ -1000,6 +1000,40 @@ needed the identical "typed a few characters, tenant-scoped assignable
 users" search; nothing about that query was ever ticket-specific, just
 which record a picked id ends up written onto.
 
+**Review-due tracking and read acknowledgment.** Two additions aimed
+squarely at the compliance-evidence gaps identified in
+`docs/eucs-compliance-assessment.md` and `docs/itsm-controls-mapping.md`
+rather than at any general document-management need, which shaped both
+designs: `next_review_at` is a plain, optional `date` on `Document`,
+deliberately *not* wired into the existing `CalendarEntry.document_id`/
+`recurrence` machinery -- a review deadline and a recurring reminder are
+two different things an owner may want independently, and conflating
+them would have made the simpler of the two (just flag it as overdue)
+depend on setting up the more complex one (a recurring calendar entry).
+`DocumentAcknowledgment` is a new small table, one row per
+(`document_id`, `user_id`), upserted rather than accumulated on every
+click of "I have read this" -- the evidence a periodic-review or
+security-awareness control needs is "did this person confirm they'd
+read the *current* version," not a click-count, so acknowledging twice
+moves `acknowledged_at` forward in place instead of adding a second row.
+Both surface on the existing Properties tab and the existing flag-icon
+row on the Documents list (a new `alert-triangle` icon alongside the
+webhook/calendar/shareable ones already there) rather than introducing
+new UI surface.
+
+**`last_login_at` on `control.users`.** Stamped from the one place
+every sign-in path already converges regardless of `auth_source` --
+`rain.modules.auth.router._issue_session`, shared by local/LDAP password
+login and the SAML ACS handler -- rather than duplicated into
+`authenticate_user` and the SAML provider separately. Nothing populated
+it before this column existed, so `NULL` reads as "never logged in
+since this column existed," not necessarily "never logged in at all";
+an acceptable one-time gap given there's no reliable session history to
+backfill it from. Surfaced in Admin > Users and a plain CSV export
+(hand-rolled `csv.DictWriter`, not the Assets/Tickets export-profile
+machinery -- this is one fixed column set with no per-tenant custom
+fields to pick from, so a profile picker would be pure overhead here).
+
 ## Home
 
 `rain.modules.home`, the smallest module in the app -- one route

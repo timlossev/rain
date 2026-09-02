@@ -185,8 +185,11 @@ A second set of controls, outside the 33, aren't ticket-shaped by nature but can
 
 - CA-5 (POA&M) -- a POA&M item is structurally a ticket (finding, owner, due date, closure); the strongest indirect fit here.
 - RA-5 / RA-7 (Vulnerability Scanning / Risk Response) -- RAIN is the remediation-tracking half, not the scanner.
-- PL-2 (System Security Plan) -- stored and version-tracked as a document, linked to the tickets/assets it references.
-- CP-4 (Contingency Plan Testing), PE-3 / PE-6 (Physical/Visitor Access), SR-2 / SR-6 (Supply Chain Reviews), MP-6 (Media Sanitization) -- each loggable as a ticket or recurring calendar entry, same pattern as MA-5(1)'s escort/sanitization tracking in the direct 33.
+- AC-2(3) (Disable Accounts) -- every platform user's `last_login_at` is stamped on each sign-in and shown/exported from Admin > Users, giving the access-review step the dormancy signal it needs to flag an account for deactivation, rather than relying on someone remembering to check.
+- PL-2 (System Security Plan) -- stored and version-tracked as a document, linked to the tickets/assets it references; an optional per-document review-due date and flag give the periodic-review half of this control a real due date and an overdue indicator instead of a policy that's reviewed "whenever someone remembers."
+- PL-4 / PS-6 (Rules of Behavior / Access Agreements) -- a document's "I have read this" acknowledgment, timestamped per user, is the read-and-attest record these controls ask for when the document in question is a rules-of-behavior or access-agreement document.
+- RA-3 (Risk Assessment) -- a starter Risk Register bundle template (`docs/compliance-templates/risk-register.json`) turns this from a from-scratch custom-asset-type build into a five-minute import.
+- CP-4 (Contingency Plan Testing), PE-3 / PE-6 (Physical/Visitor Access), SR-2 / SR-6 (Supply Chain Reviews), MP-6 (Media Sanitization) -- each loggable as a ticket or recurring calendar entry, same pattern as MA-5(1)'s escort/sanitization tracking in the direct 33; SR-2/SR-6 specifically now also has a starter Subprocessor Register bundle template (`docs/compliance-templates/subprocessor-register.json`).
 
 ---
 

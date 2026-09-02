@@ -774,11 +774,17 @@ set, so the state of a document is visible without opening it:
   tab is currently named (defaults to "Shareable documents", commonly
   renamed to something like "Trust Center" -- see Branding under
   Admin).
+- Warning icon: overdue for review -- past the "Review due" date set on
+  its Properties tab.
 
 A tag dropdown next to the search box narrows the list to one tag at a
 time (auto-submits on change); each tag shown in the Tags column is
 also its own link that does the same thing, so browsing by tag works
-either from the dropdown or by clicking a tag you see on a document.
+either from the dropdown or by clicking a tag you see on a document. An
+"Overdue for review" checkbox next to it narrows the list to only
+documents whose review date has passed -- the practical way to find
+what's due for a policy-review pass; a document with no review date set
+never counts as overdue, only as untracked.
 
 ### Documents Kanban board
 
@@ -845,7 +851,14 @@ Properties:
   yet. An Owner field, a type-to-search picker (the same interaction
   as a ticket's own Assignee field) for who's responsible for keeping
   this document current -- independent of who originally uploaded it,
-  and not required. A "Shareable in the client portal" checkbox: on,
+  and not required. A "Review due" date, optional -- once it passes,
+  this document shows the overdue warning icon and shows up under the
+  list's "Overdue for review" filter, the practical way to run a
+  periodic policy-review cadence. An "I have read this" button, plus who
+  else has clicked it and when -- a per-person read-acknowledgment
+  record for this document, useful for anything staff are expected to
+  read and confirm (a security policy or rules of behavior, say). A
+  "Shareable in the client portal" checkbox: on,
   this document appears in the [Client Portal](#client-portal)'s
   Shareable documents tab for every visitor, including one with no
   account at all, regardless of that tenant's require-sign-in setting
@@ -1136,16 +1149,19 @@ as a regular expression instead of a plain substring, and Order. The
 first matching rule wins; an event matching nothing is dropped.
 
 **Users.** A table of every user across every tenant (Name, Email,
-Role, Tenant, Auth source, Active/disabled) with a Deactivate button
-per active row, an Edit link, and a "+ New user" form (Full name,
-Email, Password, Role, and Tenant, the last required for Client and
-Client Admin roles). Editing a user lets you change their name, role,
-tenant, and, for local accounts, reset their password by typing a new
-one (leave blank to keep the current one) or deactivate them via an
-Active checkbox. LDAP-sourced users show their bind DN instead of a
-password field, since sync overwrites their name, tenant, and active
-status on every run; their role is not touched by sync, so a manual
-role change here sticks.
+Role, Tenant, Auth source, Active/disabled, Last login) with a
+Deactivate button per active row, an Edit link, and a "+ New user" form
+(Full name, Email, Password, Role, and Tenant, the last required for
+Client and Client Admin roles). Editing a user lets you change their
+name, role, tenant, and, for local accounts, reset their password by
+typing a new one (leave blank to keep the current one) or deactivate
+them via an Active checkbox. LDAP-sourced users show their bind DN
+instead of a password field, since sync overwrites their name, tenant,
+and active status on every run; their role is not touched by sync, so a
+manual role change here sticks. "Last login" ("never" if the account
+has been created but never signed in) plus an "Export CSV" button next
+to "+ New user" are a plain access-review aid -- run this periodically
+to find accounts that have gone dormant and should be deactivated.
 
 **API Documentation.** A Swagger UI listing every route the web app
 itself exposes, grouped by area (Tickets, Assets, Admin, Portal, ...),
@@ -1345,3 +1361,10 @@ still recognized and left alone, but a new one has no password to be
 created with. Importing upserts by name/key, same as the platform
 bundle -- a re-import updates matching rows rather than duplicating
 them, except a local user, which is never overwritten once it exists.
+
+The same Import expects any tenant bundle file, including the two
+starter compliance-register templates shipped in `docs/
+compliance-templates/` (a Risk Register and a Subprocessor Register,
+each just an asset type plus its custom fields) -- import one to get a
+usable register in a few clicks instead of building the asset type by
+hand.

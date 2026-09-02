@@ -82,18 +82,18 @@ is outside anything a ticketing/document/asset system addresses.
 | Change and Configuration Management | Direct | Change tickets with approval steps, timestamps, and an audit trail; the same evidence class FedRAMP change-management controls rely on. |
 | Incident Management | Direct | Incident tickets with full timelines, Event Promotion Policies turning syslog events into tickets, root-cause assistance surfacing repeat patterns. |
 | Operational Security | Partial | RAIN records the *tickets* that operational procedures produce (patching, monitoring follow-up, vulnerability tickets) but doesn't perform patching, monitoring, or vulnerability scanning itself; it is "bring your own" detection by design. |
-| Human Resources | Partial | RBAC and per-tenant user records support onboarding/offboarding evidence, but background checks, training records, and HR policy are outside RAIN entirely. |
-| Compliance | Partial | Document repository with tags, PDF export, and a shareable "Trust Center" view supports holding and presenting policy documents and audit artifacts; RAIN doesn't generate compliance judgments or run assessments itself. |
-| Identity and Access Management | Partial | RAIN's own RBAC, local auth, LDAP/AD, and SAML 2.0 SSO are relevant only to access to RAIN itself, not to the CSP's cloud service or its customer-facing IAM, which is what EUCS's IAM domain actually assesses. |
-| Business Continuity | Partial | Ticket/document history can evidence that a BC exercise happened and was tracked; RAIN provides no backup, DR, or failover capability of its own and isn't part of the recovery path it would be documenting. |
-| Organisation of Information Security / Information Security Policies | Partial | The document repository can hold and version policy documents; it does not define or enforce a security organization. |
-| Risk Management | Partial | Risk register data can be modeled as a custom asset type or tracked as tickets, but RAIN has no dedicated risk-assessment methodology or scoring engine. |
+| Human Resources | Partial | Access-review evidence for account deprovisioning: `last_login_at` on every platform user, exported as a CSV, identifies dormant accounts that should be deactivated. Background checks, training records, and HR policy itself stay outside RAIN entirely. |
+| Compliance | Partial | Document repository with tags, PDF export, and a shareable "Trust Center" view holds and presents policy documents and audit artifacts; a per-document review-due date and flag, plus a per-user "I have read this" acknowledgment trail, evidence that policies are reviewed on a cadence and read by staff. RAIN still doesn't generate compliance judgments or run assessments itself. |
+| Identity and Access Management | Partial | RAIN's own RBAC, local auth, LDAP/AD, SAML 2.0 SSO, and now `last_login_at`-based dormant-account detection are relevant only to access to RAIN itself, not to the CSP's cloud service or its customer-facing IAM, which is what EUCS's IAM domain actually assesses. |
+| Business Continuity | Partial | Ticket/document history can evidence that a BC exercise happened and was tracked, including via a document's own review-due date for the BC plan itself; RAIN provides no backup, DR, or failover capability of its own and isn't part of the recovery path it would be documenting. |
+| Organisation of Information Security / Information Security Policies | Partial | The document repository holds and versions policy documents; each document's optional review-due date and read-acknowledgment trail are direct evidence for the periodic-review and staff-attestation requirements this domain leans on. Doesn't define or enforce a security organization on its own. |
+| Risk Management | Partial | A starter Risk Register bundle template (docs/compliance-templates/) seeds a custom asset type with likelihood/impact/treatment/review-date fields, so a risk register is a five-minute import rather than a from-scratch build. RAIN still has no dedicated risk-assessment methodology or scoring engine. |
 | Cryptography and Key Management | None | RAIN uses TLS (via Caddy) and standard at-rest protections for its own data, but provides no key management, HSM integration, or cryptographic control surface for a CSP's service. |
 | Physical Security | None | Not applicable to any software system; entirely a matter of the CSP's data center controls. |
 | Communication Security | None | RAIN doesn't operate or configure the CSP's network; its own network exposure (Caddy, Postgres, syslog listener) is an input to the CSP's own CS controls, not a substitute for them. |
 | Portability and Interoperability | None | Concerns the CSP's cloud service offering, not RAIN. |
 | Development of Information Systems | None outside change tracking | RAIN's change tickets can evidence that code changes went through review, but RAIN has no involvement in the CSP's actual SDLC, CI/CD, or secure coding practices. |
-| Procurement Management | None | Vendor/subprocessor management is a contractual and organizational matter; RAIN can track it as documents or tickets but has no purpose-built procurement workflow. |
+| Procurement Management | Partial | A starter Subprocessor Register bundle template (docs/compliance-templates/) seeds a custom asset type for tracking vendors, data processed, hosting region, and contract/DPA review dates. Still a contractual and organizational matter RAIN doesn't manage end to end. |
 | User Documentation | Partial | The document repository, PDF export, and Trust Center portal are a reasonable place to publish EUCS-required user-facing documentation, but authoring that documentation is the organization's work, not RAIN's. |
 | Dealing with Investigation Requests from Government Agencies | None | A legal and jurisdictional matter for the CSP's own counsel and corporate structure, not something a ticketing system participates in. |
 
@@ -123,13 +123,14 @@ RAIN is a credible source of change, incident, and asset evidence for
 the small number of EUCS operational domains that a ticketing/CMDB
 system can realistically speak to: Asset Management, Change and
 Configuration Management, and Incident Management, with partial support
-for Compliance documentation and Business Continuity record-keeping.
-It has nothing to offer the domains that are actually specific to
-running a cloud service: Cryptography and Key Management, Physical
-Security, Communication Security, Portability and Interoperability, and
-Dealing with Investigation Requests. An organization pursuing EUCS needs
-purpose-built controls and evidence for those domains regardless of
-which ITSM tool it runs.
+for Compliance documentation, Human Resources access review, Risk
+Management, Procurement Management, and Business Continuity
+record-keeping. It has nothing to offer the domains that are actually
+specific to running a cloud service: Cryptography and Key Management,
+Physical Security, Communication Security, Portability and
+Interoperability, and Dealing with Investigation Requests. An
+organization pursuing EUCS needs purpose-built controls and evidence for
+those domains regardless of which ITSM tool it runs.
 
 Use RAIN, if at all, as the record-keeping layer under a subset of an
 EUCS control implementation, not as a compliance product in its own

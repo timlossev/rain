@@ -851,3 +851,67 @@ async def test_document_retag_and_owner_assignment():
         assert doc.owner_user_id == owner.id
         await document_service.update_owner(session, doc, None)
         assert doc.owner_user_id is None
+
+
+async def test_document_review_date_and_acknowledgment():
+    """rain.modules.documents.service.update_review_date/acknowledge_document/
+    list_acknowledgments -- the review-due and read-acknowledgment evidence
+    documented in docs/eucs-compliance-assessment.md and docs/
+    itsm-controls-mapping.md. Two edge cases worth pinning down: the
+    overdue-only filter must never match a document with no review date
+    set at all (untracked isn't the same as overdue), and re-acknowledging
+    must update the existing row's timestamp rather than add a second one
+    for the same person."""
+    import datetime as dt
+
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.modules.documents import service as document_service
+
+    tenant = await provision_tenant(slug="tau", name="Tau Systems")
+
+    async with tenant_session(tenant.schema_name) as session:
+        overdue_doc = await document_service.create_document(
+            session, title="Access Policy", description=None, filename="access-policy.md",
+            storage_key="tau/access-policy.md", mime_type="text/markdown", size_bytes=10, uploaded_by=None, tags=[],
+        )
+        untracked_doc = await document_service.create_document(
+            session, title="Runbook", description=None, filename="runbook.md",
+            storage_key="tau/runbook.md", mime_type="text/markdown", size_bytes=10, uploaded_by=None, tags=[],
+        )
+        future_doc = await document_service.create_document(
+            session, title="Onboarding", description=None, filename="onboarding.md",
+            storage_key="tau/onboarding.md", mime_type="text/markdown", size_bytes=10, uploaded_by=None, tags=[],
+        )
+        await session.commit()
+
+        today = dt.datetime.now(dt.timezone.utc).date()
+        await document_service.update_review_date(session, overdue_doc, today - dt.timedelta(days=1))
+        await document_service.update_review_date(session, future_doc, today + dt.timedelta(days=30))
+        # untracked_doc's next_review_at is left unset entirely.
+
+        overdue_only = (await session.execute(document_service.document_list_stmt(overdue_only=True))).scalars().all()
+        assert [d.id for d in overdue_only] == [overdue_doc.id]
+
+        # Clearing a review date (blank form submission) takes it back out
+        # of the overdue set.
+        await document_service.update_review_date(session, overdue_doc, None)
+        overdue_only = (await session.execute(document_service.document_list_stmt(overdue_only=True))).scalars().all()
+        assert overdue_only == []
+
+        assert await document_service.list_acknowledgments(session, untracked_doc.id) == []
+        await document_service.acknowledge_document(session, untracked_doc.id, user_id=101)
+        first = (await document_service.list_acknowledgments(session, untracked_doc.id))[0]
+        assert first.user_id == 101
+
+        # Re-acknowledging updates acknowledged_at in place rather than
+        # adding a second row for the same (document, user).
+        await document_service.acknowledge_document(session, untracked_doc.id, user_id=101)
+        again = await document_service.list_acknowledgments(session, untracked_doc.id)
+        assert len(again) == 1
+        assert again[0].acknowledged_at >= first.acknowledged_at
+
+        # A different user acknowledging the same document adds a second,
+        # distinct row.
+        await document_service.acknowledge_document(session, untracked_doc.id, user_id=202)
+        assert {a.user_id for a in await document_service.list_acknowledgments(session, untracked_doc.id)} == {101, 202}
