@@ -42,14 +42,16 @@ at RAIN is enough to get started.
 
 - Landing page shows a welcome message, or a flagged document
 - Incident, vulnerability, and change tickets, one shared record shape
-- Drag-and-drop Kanban board, same tickets and filters as the list
+- Drag-and-drop Kanban board, same tickets and filters as the list,
+  groupable by status or by assignee workload
 - Built-in syslog listener, auto-parses plain text, CEF, JSON, key=value
 - Event Promotion Policies turn matching syslog events into tickets
 - Optional ML anomaly detection, no manual tuning required
 - Root cause assistance surfaces repeat patterns and similar past tickets
 - Platform Response Rules react to ticket lifecycle events automatically
 - No-code asset types and custom fields, define your own
-- Document repository with tags, webhook auto-population, and PDF export
+- Document repository with tags, webhook auto-population, and PDF
+  export, plus its own Kanban board grouped by tag or by owner
 - Per-tenant calendar with recurring entries and a syslog bridge
 - Tenant-defined Service Catalog forms that produce tickets on submission
 - Public client portal for external incident reporting and requests
