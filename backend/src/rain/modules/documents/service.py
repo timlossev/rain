@@ -12,8 +12,10 @@ from sqlalchemy import Sequence, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from rain.core.user_names import resolve_user_emails
 from rain.db.tenant_models import Document, DocumentAcknowledgment, DocumentLink, Group, GroupMembership, SyslogEvent, WebhookConfig
 from rain.modules.documents import storage, textbody
+from rain.modules.tickets import notifications
 from rain.modules.tickets import rules as ticket_rules
 from rain.modules.webhooks import service as webhook_service
 
@@ -321,6 +323,131 @@ async def list_groups(db: AsyncSession) -> list[Group]:
 async def group_member_ids(db: AsyncSession, group_id: int) -> set[int]:
     result = await db.execute(select(GroupMembership.user_id).where(GroupMembership.group_id == group_id))
     return set(result.scalars())
+
+
+async def required_acknowledgment_user_ids(db: AsyncSession, doc: Document) -> set[int]:
+    """Who's actually expected to acknowledge `doc` right now -- resolved
+    from ack_required_group_id/ack_required_user_id (exactly one set,
+    same convention as ApprovalFlowStep). Empty whenever no requirement
+    is set at all (ack_requested_at is None), not just when the group/
+    user fields themselves are empty -- callers never need to check
+    ack_requested_at separately."""
+    if doc.ack_requested_at is None:
+        return set()
+    if doc.ack_required_user_id is not None:
+        return {doc.ack_required_user_id}
+    if doc.ack_required_group_id is not None:
+        return await group_member_ids(db, doc.ack_required_group_id)
+    return set()
+
+
+async def pending_acknowledgment_user_ids(db: AsyncSession, doc: Document) -> set[int]:
+    """Required people who haven't acknowledged *this* requirement yet --
+    required_acknowledgment_user_ids() minus whoever has a
+    DocumentAcknowledgment at or after ack_requested_at. An
+    acknowledgment recorded before the current requirement was issued
+    (a stale, pre-re-request one) doesn't count -- see
+    DocumentAcknowledgment/ack_requested_at's own docstrings for why a
+    re-request has to put an already-acknowledged person back on this
+    list."""
+    required = await required_acknowledgment_user_ids(db, doc)
+    if not required:
+        return set()
+    stmt = select(DocumentAcknowledgment.user_id).where(
+        DocumentAcknowledgment.document_id == doc.id,
+        DocumentAcknowledgment.user_id.in_(required),
+        DocumentAcknowledgment.acknowledged_at >= doc.ack_requested_at,
+    )
+    acknowledged = set((await db.execute(stmt)).scalars())
+    return required - acknowledged
+
+
+async def list_documents_pending_acknowledgment_for(db: AsyncSession, user_id: int) -> list[Document]:
+    """Documents with a live acknowledgment requirement (ack_requested_at
+    set) that names this user directly or via group membership, and that
+    this user hasn't acknowledged since that requirement was issued --
+    backs the client portal's "Pending Actions" tab, the document
+    equivalent of rain.modules.tickets.service.
+    list_tickets_pending_approval_for (same shape: a set query, not a
+    per-document loop)."""
+    member_group_ids = select(GroupMembership.group_id).where(GroupMembership.user_id == user_id)
+    already_acknowledged = (
+        select(DocumentAcknowledgment.id)
+        .where(
+            DocumentAcknowledgment.document_id == Document.id,
+            DocumentAcknowledgment.user_id == user_id,
+            DocumentAcknowledgment.acknowledged_at >= Document.ack_requested_at,
+        )
+        .correlate(Document)
+        .exists()
+    )
+    stmt = (
+        select(Document)
+        .where(
+            Document.ack_requested_at.is_not(None),
+            (Document.ack_required_user_id == user_id) | (Document.ack_required_group_id.in_(member_group_ids)),
+            ~already_acknowledged,
+        )
+        .order_by(Document.ack_requested_at.desc())
+    )
+    return list((await db.execute(stmt)).scalars())
+
+
+async def _notify_required_acknowledgers(db: AsyncSession, doc: Document, user_ids: set[int]) -> None:
+    """Emails everyone newly required to acknowledge `doc` -- the same
+    hardcoded, always-on notification rain.modules.tickets.service.
+    _notify_approvers sends a change's approvers when its approval
+    starts. A silent no-op with no required users, no resolvable email
+    address, or no SMTP configured (send_email's own guard)."""
+    if not user_ids:
+        return
+    emails = await resolve_user_emails(user_ids)
+    recipients = [e for e in emails.values() if e]
+    if recipients:
+        await notifications.send_email(
+            recipients,
+            f"[RAIN] Acknowledgment needed: {doc.doc_number}",
+            f'{doc.doc_number}: {doc.title}\n\nThis document is waiting on your acknowledgment ("I have read this").',
+        )
+
+
+async def request_acknowledgment(db: AsyncSession, doc: Document, *, group_id: int | None, user_id: int | None) -> None:
+    """Sets (or replaces) who must acknowledge `doc`, exactly one of
+    group_id/user_id (group wins if a caller somehow passes both -- same
+    precedence rain.modules.admin.router._replace_approval_steps already
+    uses for ApprovalFlowStep). Bumping ack_requested_at to now is what
+    actually puts everyone required back on the "pending" list, including
+    anyone who'd already acknowledged an earlier request -- see
+    pending_acknowledgment_user_ids' own docstring.
+
+    Fires the same two-layer notification a change's approval starting
+    does: an unconditional email to the newly-required audience
+    (_notify_required_acknowledgers), plus the "document_pending_
+    acknowledgment" Platform Response Rule trigger for whatever else an
+    admin has configured to react to it (Slack, a webhook, ...)."""
+    doc.ack_required_group_id = group_id
+    doc.ack_required_user_id = user_id if not group_id else None
+    doc.ack_requested_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    user_ids = await required_acknowledgment_user_ids(db, doc)
+    await _notify_required_acknowledgers(db, doc, user_ids)
+
+    # Imported locally to avoid a module-load-time cycle -- platform_events
+    # itself imports this module (for its own attach_document action), so
+    # this module can't import platform_events back at the top level. Same
+    # reasoning/precedent as rain.modules.tickets.service.create_ticket's
+    # own local import of evaluate_ticket_created.
+    from rain.modules.tickets.platform_events import evaluate_document_pending_acknowledgment
+
+    await evaluate_document_pending_acknowledgment(db, doc)
+
+
+async def clear_acknowledgment_requirement(db: AsyncSession, doc: Document) -> None:
+    doc.ack_required_group_id = None
+    doc.ack_required_user_id = None
+    doc.ack_requested_at = None
+    await db.commit()
 
 
 def normalize_tag(raw: str) -> str:

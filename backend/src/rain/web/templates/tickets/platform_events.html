@@ -2,7 +2,7 @@
 {% import "_pagination.html" as pg with context %}
 {% import "_modal.html" as modal %}
 {% block title %}Platform Response Rules - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}React to tickets as they're created - every active rule whose pattern matches fires (not just the first), each running one or more actions. Open a rule to add actions. Every firing is logged on the ticket itself.{% endblock %}
+{% block help_text %}React to a ticket's lifecycle, or a document pending someone's acknowledgment - every active rule whose pattern matches fires (not just the first), each running one or more actions. Open a rule to add actions. A document trigger only runs the notify/webhook actions - the ticket-only ones (attach, mark problematic, add watcher) skip themselves and say so. Every ticket firing is also logged on the ticket itself.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   {{ modal.trigger_button("platform-rule", "+ New rule") }}

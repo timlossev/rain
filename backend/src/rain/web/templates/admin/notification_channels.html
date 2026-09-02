@@ -2,7 +2,7 @@
 {% import "_pagination.html" as pg with context %}
 {% import "_modal.html" as modal %}
 {% block title %}Notification Channels - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}{% raw %}Slack/email/webhook destinations for the active tenant. These don't fire on their own - point a Platform Response Rule's action at one to decide when it actually gets used. The outbound mail relay itself is configured once, instance-wide, in Admin > SMTP Relay; a webhook channel reuses an existing definition from Admin > Webhooks rather than a fourth place to enter a URL. A channel's own message/subject template fills in {{ticket_number}}, {{ticket_type}}, {{title}}, {{description}}, {{severity}}, and {{status}} from whichever ticket fired the rule that used it - same double-brace placeholders and same six fields a webhook's payload template gets, just rendered as plain text instead of JSON-escaped.{% endraw %}{% endblock %}
+{% block help_text %}{% raw %}Slack/email/webhook destinations for the active tenant. These don't fire on their own - point a Platform Response Rule's action at one to decide when it actually gets used. The outbound mail relay itself is configured once, instance-wide, in Admin > SMTP Relay; a webhook channel reuses an existing definition from Admin > Webhooks rather than a fourth place to enter a URL. A channel's own message/subject template fills in {{ticket_number}}, {{ticket_type}}, {{title}}, {{description}}, {{severity}}, and {{status}} from whichever ticket fired the rule that used it (or, for the one document-based trigger, "When a document is pending your acknowledgment", {{doc_number}}, {{title}}, and {{description}} from the document instead) - same double-brace placeholders and same fields a webhook's payload template gets, just rendered as plain text instead of JSON-escaped.{% endraw %}{% endblock %}
 {% block content %}
 <div class="panel-row">
   <p class="muted" style="margin:0;">Active tenant: {{ ctx.active_tenant.name if ctx.active_tenant else "none selected" }}</p>
@@ -71,7 +71,7 @@
     <div class="field" data-action-fields="email,slack">
       <label for="message_template-{{ c.id }}">Message</label>
       <textarea id="message_template-{{ c.id }}" name="message_template" rows="3" placeholder="{{ default_message_template if c.channel_type == 'slack' else default_email_message_template }}">{{ c.message_template }}</textarea>
-      <div class="field-hint">Leave blank to use the default shown above. Placeholders: {% raw %}{{ticket_number}}, {{title}}, {{description}}, {{severity}}, {{status}}, {{ticket_type}}{% endraw %}.</div>
+      <div class="field-hint">Leave blank to use the default shown above. Placeholders (ticket triggers): {% raw %}{{ticket_number}}, {{title}}, {{description}}, {{severity}}, {{status}}, {{ticket_type}}{% endraw %} - or, for the document acknowledgment trigger: {% raw %}{{doc_number}}, {{title}}, {{description}}{% endraw %}.</div>
     </div>
 
     <button class="btn btn-primary" type="submit">Save changes</button>
@@ -115,7 +115,7 @@
     <div class="field" data-action-fields="email,slack">
       <label for="message_template">Message</label>
       <textarea id="message_template" name="message_template" rows="3" placeholder="{{ default_message_template }}"></textarea>
-      <div class="field-hint">Leave blank to use the default shown above. Placeholders: {% raw %}{{ticket_number}}, {{title}}, {{description}}, {{severity}}, {{status}}, {{ticket_type}}{% endraw %}.</div>
+      <div class="field-hint">Leave blank to use the default shown above. Placeholders (ticket triggers): {% raw %}{{ticket_number}}, {{title}}, {{description}}, {{severity}}, {{status}}, {{ticket_type}}{% endraw %} - or, for the document acknowledgment trigger: {% raw %}{{doc_number}}, {{title}}, {{description}}{% endraw %}.</div>
     </div>
 
     <button class="btn btn-primary" type="submit">Add channel</button>

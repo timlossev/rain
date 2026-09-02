@@ -153,7 +153,7 @@ honest read before assuming it catches something:
   regression cases (CSV formula injection, markdown sanitization, SSRF
   URL checks, PDF `link_callback` path guards, search snippet
   escaping), and Service Catalog payload rendering.
-- **16 integration tests** (`test_integration.py`, skipped unless
+- **18 integration tests** (`test_integration.py`, skipped unless
   `TEST_DATABASE_URL` is set) against a real Postgres -- tenant
   provisioning, asset CRUD, ticket numbering + rule promotion, syslog
   routing, document numbering/linking, custom fields, tags/search, a
@@ -172,10 +172,19 @@ honest read before assuming it catches something:
   scoping (Kanban's "group by assignee" columns) against another
   tenant's user and a deactivated one of this tenant's own, the
   Documents list's tag filter (exact membership, not a substring match)
-  plus its calendar-link flag lookup, and the Documents Kanban board's
+  plus its calendar-link flag lookup, the Documents Kanban board's
   retag (a targeted swap that merges rather than duplicates onto a tag
-  already carried under different casing) and owner assignment. Broad
-  strokes, not deep: each is one scenario, not a sweep of edge cases.
+  already carried under different casing) and owner assignment, the
+  overdue-review filter (an untracked document never counts as
+  overdue) plus acknowledgment's upsert-not-accumulate semantics, and
+  an assignable acknowledgment requirement end to end -- a group
+  resolving to its members, each showing up on the client portal's
+  pending-acknowledgment query, a document-triggered Platform Response
+  Rule firing (with a ticket-only action correctly skipping itself
+  rather than erroring), acknowledging clearing just that one member's
+  pending status, and re-requesting putting an already-acknowledged
+  member back on the list. Broad strokes, not deep: each is one
+  scenario, not a sweep of edge cases.
 
   All 16 have actually been run against a real Postgres (a local
   `docker compose up` stack, once one was available this session for

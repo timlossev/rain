@@ -24,6 +24,7 @@ from rain.modules.tickets import service as ticket_service
 from rain.modules.webhooks import service as webhook_service
 from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
+from rain.web.safe_redirect import safe_relative_path
 from rain.web.templating import templates
 
 
@@ -456,6 +457,17 @@ async def document_detail(
     # last item, not the last one actually rendered, and get the trailing
     # comma wrong whenever the current user's own row isn't last.
     other_acknowledgments = [a for a in acknowledgments if a.user_id != ctx.user.id]
+
+    groups = await service.list_groups(tenant_db)
+    ack_required_group_name = next((g.name for g in groups if g.id == doc.ack_required_group_id), None)
+    ack_required_user_name = (
+        (await resolve_user_names({doc.ack_required_user_id})).get(doc.ack_required_user_id, "")
+        if doc.ack_required_user_id is not None
+        else ""
+    )
+    pending_user_ids = await service.pending_acknowledgment_user_ids(tenant_db, doc)
+    required_user_ids = await service.required_acknowledgment_user_ids(tenant_db, doc)
+
     return templates.TemplateResponse(
         request,
         "documents/detail.html",
@@ -476,6 +488,12 @@ async def document_detail(
             "other_acknowledgments": other_acknowledgments,
             "ack_names": ack_names,
             "you_acknowledged_at": you_acknowledged_at,
+            "groups": groups,
+            "ack_required_group_name": ack_required_group_name,
+            "ack_required_user_name": ack_required_user_name,
+            "pending_for_you": ctx.user.id in pending_user_ids,
+            "pending_count": len(pending_user_ids),
+            "required_count": len(required_user_ids),
         },
     )
 
@@ -553,16 +571,62 @@ async def update_document_review_date(
 @router.post("/{document_id:int}/acknowledge")
 async def acknowledge_document(
     document_id: int,
+    redirect: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     """The Properties tab's "I have read this" button -- records the
     signed-in user against this document, see service.acknowledge_document
-    and DocumentAcknowledgment's own docstring for the upsert semantics."""
+    and DocumentAcknowledgment's own docstring for the upsert semantics.
+    Also the client portal's own "Acknowledge" button on a document
+    pending the visitor's acknowledgment (Pending Actions tab) -- redirect
+    (optional, defaults to this document's own page) is how that embedded
+    form sends the visitor back to the portal instead of here, same
+    pattern rain.modules.calendar.router's own delete/edit routes use."""
     doc = await service.get_document(tenant_db, document_id)
     if doc is not None:
         await service.acknowledge_document(tenant_db, document_id, ctx.user.id)
+    default = f"/documents/{doc.doc_number if doc else document_id}?ok=1"
+    return RedirectResponse(safe_relative_path(redirect, default=default) if redirect else default, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{document_id:int}/require-acknowledgment")
+async def require_document_acknowledgment(
+    document_id: int,
+    ack_group_id: str = Form(""),
+    ack_user_id: str = Form(""),
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """The Properties tab's "Requires acknowledgment from" form -- group
+    takes precedence if both are somehow submitted, same precedence
+    rain.modules.admin.router._replace_approval_steps already uses for an
+    ApprovalFlowStep's own group-or-user pair. The submitted user id is
+    re-validated against this tenant's own assignable users before being
+    trusted, same reasoning as update_document_owner right above."""
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is None:
+        return RedirectResponse("/documents", status_code=status.HTTP_303_SEE_OTHER)
+    group_id = int(ack_group_id) if ack_group_id else None
+    user_id = int(ack_user_id) if ack_user_id and not group_id else None
+    if user_id is not None and not await is_assignable_user(user_id, ctx.active_tenant.id):
+        user_id = None
+    if group_id is not None or user_id is not None:
+        await service.request_acknowledgment(tenant_db, doc, group_id=group_id, user_id=user_id)
+    return RedirectResponse(f"/documents/{doc.doc_number}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{document_id:int}/clear-acknowledgment-requirement")
+async def clear_document_acknowledgment_requirement(
+    document_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is not None:
+        await service.clear_acknowledgment_requirement(tenant_db, doc)
     return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 

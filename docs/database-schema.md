@@ -117,7 +117,7 @@ out per-column below as "cross-schema" wherever it appears.
 
 | Table | Purpose |
 |---|---|
-| `documents` | A `DOC-xxxxxx` entry -- `storage_key` is an opaque identifier into whichever `StorageBackend` is active (local disk or S3), not a filesystem path. `webhook_id`/`alert_on_change`/`last_refreshed_at`/`webhook_response_is_json`/`webhook_json_path`/`refresh_on_view` back "populate from webhook". `owner_user_id` (cross-schema) is who's currently responsible for keeping it current, reassignable, separate from `uploaded_by` (a one-time creation fact). `next_review_at` (0048, nullable `date`) flags "overdue for review" on the list once it passes -- independent of any calendar reminder. `tags` is a plain `text[]` (feeds `search_vector` directly). `is_shareable` (client portal) and `show_on_landing_page` (Home) are independent opt-in flags. `search_vector`/`embedding`: same shape as `tickets`' own. |
+| `documents` | A `DOC-xxxxxx` entry -- `storage_key` is an opaque identifier into whichever `StorageBackend` is active (local disk or S3), not a filesystem path. `webhook_id`/`alert_on_change`/`last_refreshed_at`/`webhook_response_is_json`/`webhook_json_path`/`refresh_on_view` back "populate from webhook". `owner_user_id` (cross-schema) is who's currently responsible for keeping it current, reassignable, separate from `uploaded_by` (a one-time creation fact). `next_review_at` (0048, nullable `date`) flags "overdue for review" on the list once it passes -- independent of any calendar reminder. `ack_required_group_id`/`ack_required_user_id`/`ack_requested_at` (0049) are an optional "who must acknowledge this" assignment -- the same group-or-user shape `ApprovalFlowStep` uses for a change ticket's approvers -- with `ack_requested_at` marking when that requirement was last (re)issued, not just whether one exists. `tags` is a plain `text[]` (feeds `search_vector` directly). `is_shareable` (client portal) and `show_on_landing_page` (Home) are independent opt-in flags. `search_vector`/`embedding`: same shape as `tickets`' own. |
 | `document_acknowledgments` | (0048) One row per (`document_id`, `user_id`) who has clicked "I have read this" on that document's Properties tab, upserted so `acknowledged_at` always reflects the latest read, not the first. `ON DELETE CASCADE` on `document_id`. `user_id` is the same unenforced cross-schema `control.users` id as `owner_user_id`/`uploaded_by`. |
 | `document_links` | Polymorphic link to an asset or a ticket -- `linked_type`/`linked_id` are app-validated (no real FK across two possible target tables). |
 
@@ -134,7 +134,7 @@ out per-column below as "cross-schema" wherever it appears.
 |---|---|
 | `platform_event_rules` | Reacts when a ticket lifecycle event happens (`trigger_event`: created/closed/change-approved, per type) and `pattern` matches `match_field`. Unlike `ticket_rules` (first match wins), every active matching rule fires here -- a reaction layer, not a routing decision. |
 | `platform_event_actions` | One action per rule -- `action_type` (`notify_slack`\|`notify_email`\|`webhook`\|`attach_document`\|`attach_asset`\|`mark_problematic`\|`add_watcher`), `config` JSONB shaped per type. |
-| `platform_event_triggers` | Audit trail: this rule fired for this ticket, with a human-readable `summary` of what each action did. `rule_name` is a snapshot; `rule_id` is `SET NULL` (not cascaded) on rule deletion so the log entry survives. |
+| `platform_event_triggers` | Audit trail: this rule fired for this ticket (`ticket_id`) or, since 0049, this document (`document_id`) -- exactly one of the two set, both nullable now, same unenforced-at-the-DB convention as `ApprovalFlowStep`'s own group-or-user split -- with a human-readable `summary` of what each action did. `rule_name` is a snapshot; `rule_id` is `SET NULL` (not cascaded) on rule deletion so the log entry survives. |
 
 ### Calendar
 
@@ -210,6 +210,7 @@ numbering, run independently, and land in different schemas.
 | 0046 | `documents.refresh_on_view`. |
 | 0047 | `documents.owner_user_id` -- who's responsible for keeping it current. |
 | 0048 | `documents.next_review_at` + `document_acknowledgments` -- review-due tracking and read acknowledgment. |
+| 0049 | `documents.ack_required_group_id`/`ack_required_user_id`/`ack_requested_at` -- an assignable, notified acknowledgment requirement; `platform_event_triggers.ticket_id` becomes nullable, gains `document_id` (Platform Response Rules now also react to a document pending acknowledgment). |
 
 ### `control` schema (`backend/migrations/control/versions/`)
 

@@ -71,3 +71,17 @@ def test_trigger_events_and_action_types_are_well_formed():
     assert len(action_keys) == len(set(action_keys))
     assert "mark_problematic" in action_keys
     assert "incident_created" in trigger_keys
+    assert "document_pending_acknowledgment" in trigger_keys
+
+
+def test_rule_matches_against_a_document_the_same_way_as_a_ticket():
+    """_rule_matches is pure attribute access (getattr(record, match_field)
+    then a regex search) -- it never actually cared whether `record` was a
+    Ticket or a Document, so a document-shaped SimpleNamespace (doc_number
+    instead of ticket_number, everything else the same title/description
+    pair) matches identically. Covers the document_pending_acknowledgment
+    trigger path this module added alongside the ticket ones above."""
+    rule = _rule(match_field="title", pattern="policy")
+    document = SimpleNamespace(doc_number="DOC-000042", title="Security policy v3", description=None)
+    assert _rule_matches(rule, document)
+    assert not _rule_matches(rule, SimpleNamespace(doc_number="DOC-000043", title="Runbook", description=None))

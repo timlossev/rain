@@ -4,10 +4,12 @@ topbar. An anonymous visitor gets a deliberately bare-bones form ("New
 ticket" and, once signed in, "Tickets reported by me"), plus "Today's
 events" (rain.modules.calendar), shown to everyone regardless of
 sign-in status. A signed-in visitor additionally gets a search bar and
-two more tabs, Approvals and Documents. Reachable with or without a
-session (rain.core.tenancy.get_current_user_optional, not
-get_current_user), gated per-tenant by TenantConfig flags an admin sets
-on Admin > Branding:
+two more tabs, Approvals (change tickets pending their approval, and
+documents pending their acknowledgment -- see rain.modules.documents.
+service.list_documents_pending_acknowledgment_for) and Documents.
+Reachable with or without a session (rain.core.tenancy.
+get_current_user_optional, not get_current_user), gated per-tenant by
+TenantConfig flags an admin sets on Admin > Branding:
 
   - portal_require_auth: if true, a visitor with no session is bounced
     to /login?next=... instead of being able to submit anonymously.
@@ -269,6 +271,9 @@ async def portal_form(
         # documents is meant to be reachable, so it's skipped there the
         # same as the signed-in-only tabs.
         pending_approval = await ticket_service.list_tickets_pending_approval_for(tenant_db, user.id) if user is not None else []
+        pending_acknowledgment = (
+            await document_service.list_documents_pending_acknowledgment_for(tenant_db, user.id) if user is not None else []
+        )
         documents = (
             await paginate(tenant_db, document_service.document_list_stmt(), page=doc_page or 1, page_size=page_size)
             if user is not None
@@ -310,6 +315,7 @@ async def portal_form(
             "selected_status": ticket_status,
             "active_tab": active_tab,
             "pending_approval": pending_approval,
+            "pending_acknowledgment": pending_acknowledgment,
             "documents": documents,
             "shareable_documents": shareable_documents,
             "shareable_documents_label": shareable_documents_label,

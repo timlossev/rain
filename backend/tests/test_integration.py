@@ -915,3 +915,99 @@ async def test_document_review_date_and_acknowledgment():
         # distinct row.
         await document_service.acknowledge_document(session, untracked_doc.id, user_id=202)
         assert {a.user_id for a in await document_service.list_acknowledgments(session, untracked_doc.id)} == {101, 202}
+
+
+async def test_document_acknowledgment_requirement_end_to_end():
+    """rain.modules.documents.service.request_acknowledgment end to end --
+    the document equivalent of test_platform_event_rule_fires_matching_
+    actions_only above: a group-assigned requirement resolves to its
+    members, shows up on list_documents_pending_acknowledgment_for (the
+    client portal's Pending Actions query) for each of them, fires the
+    document_pending_acknowledgment Platform Response Rule trigger
+    (including a ticket-only action correctly skipping itself rather than
+    erroring), acknowledging clears a member's own pending status without
+    clearing anyone else's, and re-requesting puts an already-acknowledged
+    member back on the pending list."""
+    from rain.core.security import hash_password
+    from rain.db.base import control_session, tenant_session
+    from rain.db.control_models import User
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import Group, GroupMembership, PlatformEventAction, PlatformEventRule, PlatformEventTrigger
+    from rain.modules.documents import service as document_service
+
+    tenant = await provision_tenant(slug="phi", name="Phi Holdings")
+
+    async with control_session() as control_db:
+        reviewer_a = User(
+            tenant_id=tenant.id, email="reviewer-a@phi.example", password_hash=hash_password("x"),
+            role_key="client", display_name="Reviewer A", auth_source="local",
+        )
+        reviewer_b = User(
+            tenant_id=tenant.id, email="reviewer-b@phi.example", password_hash=hash_password("x"),
+            role_key="client", display_name="Reviewer B", auth_source="local",
+        )
+        control_db.add_all([reviewer_a, reviewer_b])
+        await control_db.commit()
+        await control_db.refresh(reviewer_a)
+        await control_db.refresh(reviewer_b)
+
+    async with tenant_session(tenant.schema_name) as session:
+        group = Group(name="Reviewers", source="local")
+        session.add(group)
+        await session.flush()
+        session.add_all(
+            [
+                GroupMembership(group_id=group.id, user_id=reviewer_a.id),
+                GroupMembership(group_id=group.id, user_id=reviewer_b.id),
+            ]
+        )
+
+        # A ticket-only action on a document-triggered rule -- should skip
+        # itself (see platform_events._TICKET_ONLY_ACTIONS) rather than
+        # raise, and say so in the logged summary.
+        rule = PlatformEventRule(
+            name="Policy pending ack", trigger_event="document_pending_acknowledgment", match_field="title", pattern="Policy"
+        )
+        rule.actions.append(PlatformEventAction(action_type="mark_problematic", config={}))
+        session.add(rule)
+
+        doc = await document_service.create_document(
+            session, title="Security Policy", description=None, filename="policy.md",
+            storage_key="phi/policy.md", mime_type="text/markdown", size_bytes=10, uploaded_by=None, tags=[],
+        )
+        await session.commit()
+
+        await document_service.request_acknowledgment(session, doc, group_id=group.id, user_id=None)
+
+        # Resolved to both group members, both still pending.
+        assert await document_service.required_acknowledgment_user_ids(session, doc) == {reviewer_a.id, reviewer_b.id}
+        assert await document_service.pending_acknowledgment_user_ids(session, doc) == {reviewer_a.id, reviewer_b.id}
+        pending_for_a = await document_service.list_documents_pending_acknowledgment_for(session, reviewer_a.id)
+        assert [d.id for d in pending_for_a] == [doc.id]
+
+        # The matching rule fired -- logged against the document, not any
+        # ticket, and the ticket-only action reports itself skipped rather
+        # than silently doing nothing or raising.
+        triggers = (
+            await session.execute(select(PlatformEventTrigger).where(PlatformEventTrigger.document_id == doc.id))
+        ).scalars().all()
+        assert [t.rule_name for t in triggers] == ["Policy pending ack"]
+        assert triggers[0].ticket_id is None
+        assert "skipped" in triggers[0].summary
+
+        # Reviewer A acknowledges -- clears their own pending status, B is
+        # still pending, and A drops off their own Pending Actions list.
+        await document_service.acknowledge_document(session, doc.id, reviewer_a.id)
+        assert await document_service.pending_acknowledgment_user_ids(session, doc) == {reviewer_b.id}
+        assert await document_service.list_documents_pending_acknowledgment_for(session, reviewer_a.id) == []
+        assert [d.id for d in await document_service.list_documents_pending_acknowledgment_for(session, reviewer_b.id)] == [doc.id]
+
+        # Re-requesting puts A back on the pending list without touching
+        # their earlier (now stale) acknowledgment row.
+        await document_service.request_acknowledgment(session, doc, group_id=group.id, user_id=None)
+        assert await document_service.pending_acknowledgment_user_ids(session, doc) == {reviewer_a.id, reviewer_b.id}
+
+        # Clearing the requirement entirely empties both.
+        await document_service.clear_acknowledgment_requirement(session, doc)
+        assert await document_service.required_acknowledgment_user_ids(session, doc) == set()
+        assert await document_service.list_documents_pending_acknowledgment_for(session, reviewer_a.id) == []

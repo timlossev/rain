@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_search_picker.html" as picker %}
 {% block title %}{{ doc.doc_number }}: {{ doc.title }} - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}A single document's details - properties (tags, owner, review due date, read acknowledgment, sharing, upload date, description), contents (with an inline editor for txt/md files), auto-update from a webhook, what it's linked to, and any calendar reminders (e.g. a quarterly revision) tied to it.{% endblock %}
+{% block help_text %}A single document's details - properties (tags, owner, review due date, read acknowledgment, an optional "requires acknowledgment from" group/person, sharing, upload date, description), contents (with an inline editor for txt/md files), auto-update from a webhook, what it's linked to, and any calendar reminders (e.g. a quarterly revision) tied to it.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:space-between; align-items:flex-start;">
   <div>
@@ -113,6 +113,7 @@
     <div class="field">
       <label>Acknowledgment</label>
       <div>
+        {% if pending_for_you %}<span class="badge badge-accent" style="margin-right:8px;">Pending your acknowledgment</span>{% endif %}
         <form method="post" action="/documents/{{ doc.id }}/acknowledge" class="inline">
           <button class="btn btn-sm{{ '' if you_acknowledged_at else ' btn-primary' }}" type="submit">{{ "Re-acknowledge" if you_acknowledged_at else "I have read this" }}</button>
         </form>
@@ -123,6 +124,31 @@
       {% elif not you_acknowledged_at %}
       <div class="field-hint">Nobody has acknowledged this document yet.</div>
       {% endif %}
+    </div>
+
+    <div class="field">
+      <label>Requires acknowledgment from</label>
+      {% if doc.ack_requested_at %}
+      <div>
+        <span class="badge">{{ "Group: " ~ ack_required_group_name if ack_required_group_name else ("Person: " ~ ack_required_user_name if ack_required_user_name else "Nobody (deleted)") }}</span>
+        <span class="muted">requested {{ doc.ack_requested_at.strftime("%Y-%m-%d %H:%M") }} - {{ required_count - pending_count }} of {{ required_count }} acknowledged</span>
+        <form method="post" action="/documents/{{ doc.id }}/clear-acknowledgment-requirement" class="inline" data-confirm="Clear the acknowledgment requirement on '{{ doc.title }}'? Existing acknowledgments are kept, just no longer required.">
+          <button class="btn btn-sm btn-danger" type="submit">Clear</button>
+        </form>
+      </div>
+      {% endif %}
+      <form method="post" action="/documents/{{ doc.id }}/require-acknowledgment" class="form-row" style="margin:8px 0 0; align-items:end;">
+        <div class="field" style="margin-bottom:0;">
+          <label for="ack_group_id">Group</label>
+          <select id="ack_group_id" name="ack_group_id">
+            <option value="">-</option>
+            {% for g in groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}
+          </select>
+        </div>
+        {{ picker.search_picker("ack_user_id", "/documents/users/search", label="or an individual person", placeholder="Search by name or email...") }}
+        <button class="btn btn-sm" type="submit">{{ "Re-request" if doc.ack_requested_at else "Request" }}</button>
+      </form>
+      <div class="field-hint">Emails whoever's picked, and re-opens acknowledgment for anyone already acknowledged if you request again later. Shows up under this tenant's own "Pending Actions" in the client portal for whoever's required.</div>
     </div>
 
     <div class="field">

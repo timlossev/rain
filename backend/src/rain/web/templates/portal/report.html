@@ -125,7 +125,8 @@
           <button type="button" class="tab-btn {{ 'active' if active_tab == 'tickets' else '' }}" data-tab-btn="tickets">Report Something</button>
           {% endif %}
           {% if user %}
-          <button type="button" class="tab-btn" data-tab-btn="approvals">Pending Actions{% if pending_approval %} ({{ pending_approval | length }}){% endif %}</button>
+          {% set pending_count = (pending_approval | length) + (pending_acknowledgment | length) %}
+          <button type="button" class="tab-btn" data-tab-btn="approvals">Pending Actions{% if pending_count %} ({{ pending_count }}){% endif %}</button>
           <button type="button" class="tab-btn" data-tab-btn="documents">Document Archive</button>
           {% endif %}
           {% if shareable_documents.total %}
@@ -256,6 +257,7 @@
 
       {% if user %}
       <div class="tab-panel" data-tab-panel="approvals">
+        <div class="portal-section-title">Approvals</div>
         <div class="table-scroll">
         <table>
           <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th></tr></thead>
@@ -269,6 +271,29 @@
             </tr>
             {% else %}
             <tr><td colspan="4" class="muted">Nothing waiting on your approval.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+
+        <div class="portal-section-title">Document acknowledgment</div>
+        <div class="table-scroll">
+        <table>
+          <thead><tr><th>Number</th><th>Title</th><th></th></tr></thead>
+          <tbody>
+            {% for d in pending_acknowledgment %}
+            <tr>
+              <td><a href="/documents/{{ d.doc_number }}">{{ d.doc_number }}</a></td>
+              <td>{{ d.title }}</td>
+              <td class="actions">
+                <form class="inline" method="post" action="/documents/{{ d.id }}/acknowledge">
+                  <input type="hidden" name="redirect" value="/portal/{{ tenant.slug }}">
+                  <button class="btn btn-sm btn-primary" type="submit">I have read this</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="muted">Nothing waiting on your acknowledgment.</td></tr>
             {% endfor %}
           </tbody>
         </table>

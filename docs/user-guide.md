@@ -559,18 +559,21 @@ saving, every field stays editable.
 ### Platform Response Rules
 
 At Tickets > Platform Response Rules. These react after a ticket
-already exists, regardless of whether it was promoted automatically or
-created by hand. Unlike the previous two rule types, every active rule
-whose pattern matches fires, not just the first, and each one can run
-several actions.
+already exists (regardless of whether it was promoted automatically or
+created by hand), or after a document's acknowledgment requirement is
+set (see Documents above). Unlike the previous two rule types, every
+active rule whose pattern matches fires, not just the first, and each
+one can run several actions.
 
 The list page's "New rule" form only asks for the rule itself: name, a
-trigger, match on (the ticket's title or description), pattern, and
-order. Saving takes you to that rule's own detail page to add actions.
-The trigger is one of seven: an incident/vulnerability/change being
-created, one of those three being closed (any status flagged "closed"
-under Admin > Ticket Statuses), or a change being fully approved (its
-last approval step clearing).
+trigger, match on (the title or description of whatever the trigger is
+about), pattern, and order. Saving takes you to that rule's own detail
+page to add actions. The trigger is one of: an incident/vulnerability/
+change being created, one of those three being closed (any status
+flagged "closed" under Admin > Ticket Statuses), a change being fully
+approved (its last approval step clearing), or a document entering
+"pending acknowledgment" (its "Requires acknowledgment from" being set
+or re-set).
 
 On a rule's detail page, its own name/trigger/match-on/pattern/order
 and an Active checkbox stay editable at the top. Below that, an
@@ -592,10 +595,19 @@ and an Active checkbox stay editable at the top. Below that, an
   getting emailed on the ticket's activity the same as anyone who
   clicked "Watch" on it themselves.
 
+The last four only ever apply to a ticket -- on a rule using the
+document-acknowledgment trigger, each one just notes itself skipped
+rather than doing anything, so attaching one by habit (or by copying an
+existing ticket rule) is harmless. Notify Slack/Email and Call a
+webhook work the same either way, just filling in `{{doc_number}}`,
+`{{title}}`, and `{{description}}` from the document instead of a
+ticket's own fields.
+
 Every firing of a rule, and the outcome of each of its actions, is
-logged both to that rule's own history and to the matching ticket's
-Activity feed, whether or not the action itself succeeded, so a failed
-Slack post never hides the fact that the rule matched.
+logged to that rule's own history, and (for a ticket-triggered rule)
+to the matching ticket's Activity feed too, whether or not the action
+itself succeeded, so a failed Slack post never hides the fact that the
+rule matched.
 
 Below the rule list, a "Root cause assistance" checkbox: "Automatically
 analyze root cause when a ticket closes" runs the same "Analyze root
@@ -858,7 +870,13 @@ Properties:
   else has clicked it and when -- a per-person read-acknowledgment
   record for this document, useful for anything staff are expected to
   read and confirm (a security policy or rules of behavior, say). A
-  "Shareable in the client portal" checkbox: on,
+  "Requires acknowledgment from" section makes that acknowledgment
+  mandatory instead of voluntary: pick a group or an individual person
+  and click Request, and everyone that resolves to gets emailed and
+  shows up under their own "Pending Actions" in the [Client
+  Portal](#client-portal) until they click "I have read this" -
+  clicking Request again later re-opens it for anyone who'd already
+  acknowledged, useful after a real content change. A "Shareable in the client portal" checkbox: on,
   this document appears in the [Client Portal](#client-portal)'s
   Shareable documents tab for every visitor, including one with no
   account at all, regardless of that tenant's require-sign-in setting
@@ -951,12 +969,16 @@ incident always has.
 
 **Signed in** additionally gets a search bar and two more tabs:
 
-- **Pending Actions**: change tickets currently waiting on your
-  decision -- same list as clicking through to each one's own Approval
-  card would show. A change that gets closed or cancelled without ever
-  being explicitly approved or rejected drops off this list too, even
-  though its approval technically never got a decision -- there's
-  nothing left to act on once the ticket itself is closed.
+- **Pending Actions**: two lists. Change tickets currently waiting on
+  your decision -- same list as clicking through to each one's own
+  Approval card would show. A change that gets closed or cancelled
+  without ever being explicitly approved or rejected drops off this
+  list too, even though its approval technically never got a decision
+  -- there's nothing left to act on once the ticket itself is closed.
+  Below that, documents requiring your acknowledgment (set on the
+  document's own Properties tab, under "Requires acknowledgment from")
+  -- an "I have read this" button right in the table clears a document
+  off this list without leaving the portal.
 - **Document Archive**: every document in the tenant's repository,
   linking out to each one's own page.
 

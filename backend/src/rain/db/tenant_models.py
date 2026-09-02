@@ -929,6 +929,27 @@ class Document(TenantBase):
     # auto-advanced on its own -- clearing/resetting it after a review is
     # a manual edit, same as every other Properties field here.
     next_review_at: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    # Optional (see migration 0049) -- who's required to click "I have
+    # read this" on this document, the same group-or-user shape
+    # ApprovalFlowStep already uses for a change ticket's approvers
+    # (exactly one of the two set, app-validated -- see
+    # rain.modules.documents.service.request_acknowledgment).
+    # ack_requested_at is when that requirement was last (re)issued; NULL
+    # means no requirement is set at all, not just "nobody's acknowledged
+    # yet" -- a required person counts as still pending until they
+    # acknowledge on or after this timestamp, so re-requesting (bumping
+    # it to now) is what makes someone who already acknowledged an
+    # earlier version pending again, without touching their old
+    # DocumentAcknowledgment row. Fires an email to the newly-required
+    # audience and the "document_pending_acknowledgment" Platform
+    # Response Rule trigger the moment it's set -- the same two-layer
+    # notification shape (a hardcoded email plus an optional, admin-
+    # configurable rule) rain.modules.tickets.service.start_approval
+    # already established for approvals, which is why this reuses that
+    # same trigger/action engine rather than inventing a second one.
+    ack_required_group_id: Mapped[int | None] = mapped_column(ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
+    ack_required_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ack_requested_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Optional, freeform -- a plain array rather than a normalized tags
     # table (see migration 0039's own docstring for why: nothing here
     # needs a tenant-wide tag registry or tag-scoped browsing, just
@@ -1157,22 +1178,26 @@ class PlatformEventAction(TenantBase):
 
 
 class PlatformEventTrigger(TenantBase):
-    """Audit trail: this rule fired for this ticket, with a human-readable
-    summary of what each action did. `rule_name` is a snapshot (kept even
-    if the rule is later edited/deleted) so the ticket's history stays
-    meaningful; `rule_id` itself is SET NULL on rule deletion rather than
-    cascading, so the log entry survives."""
+    """Audit trail: this rule fired for this ticket (or, since migration
+    0049, this document -- exactly one of ticket_id/document_id is set,
+    the same unenforced-at-the-DB convention as ApprovalFlowStep's own
+    group-or-user split), with a human-readable summary of what each
+    action did. `rule_name` is a snapshot (kept even if the rule is later
+    edited/deleted) so the record's history stays meaningful; `rule_id`
+    itself is SET NULL on rule deletion rather than cascading, so the log
+    entry survives."""
 
     __tablename__ = "platform_event_triggers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     rule_id: Mapped[int | None] = mapped_column(ForeignKey("platform_event_rules.id", ondelete="SET NULL"), nullable=True)
     rule_name: Mapped[str] = mapped_column(String(255))
-    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True)
+    ticket_id: Mapped[int | None] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), nullable=True, index=True)
+    document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), nullable=True, index=True)
     summary: Mapped[str] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    ticket: Mapped[Ticket] = relationship(back_populates="rule_triggers")
+    ticket: Mapped[Ticket | None] = relationship(back_populates="rule_triggers")
 
 
 class CalendarEntry(TenantBase):

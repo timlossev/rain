@@ -460,27 +460,45 @@ action, below.
 **Platform Response Rules.** `rain.modules.tickets.platform_events`, a
 second, independent rule layer on top of ticket creation -- reacts
 *after* a ticket already exists (auto-promoted or manual), to one of
-`TRIGGER_EVENTS`' seven triggers: an incident/vulnerability/change
-being created (`evaluate_ticket_created`, hooked into `service.
+`TRIGGER_EVENTS`' triggers: an incident/vulnerability/change being
+created (`evaluate_ticket_created`, hooked into `service.
 create_ticket`, covering both origins), one of those three being
 closed (`evaluate_ticket_closed`, hooked into `service.update_status`'s
-`newly_closed` transition), or a change's approval flow clearing its
-last step (`evaluate_change_approved`, hooked into `service.
+`newly_closed` transition), a change's approval flow clearing its last
+step (`evaluate_change_approved`, hooked into `service.
 decide_approval_step`'s `fully_approved` branch, alongside that
-function's own `_emit_syslog_on_full_approval` sibling). Every active,
-pattern-matching rule for the trigger that just fired runs, not just
-the first (unlike the single-event rule engine above); all three
-hooks funnel into the same `_evaluate_and_fire` core. Each hook is
-imported locally at its call site (not at module level) to avoid a
-cycle -- `platform_events` imports `service` at its own top level for
-the actions below, so `service` importing `platform_events` back at
-module level would be circular. Actions: notify Slack/email (reusing
+function's own `_emit_syslog_on_full_approval` sibling), or -- since
+migration 0049 -- a document's acknowledgment requirement being (re)set
+(`evaluate_document_pending_acknowledgment`, hooked into `rain.modules.
+documents.service.request_acknowledgment`, the document equivalent of
+a change's approval starting). Every active, pattern-matching rule for
+the trigger that just fired runs, not just the first (unlike the
+single-event rule engine above); every hook funnels into the same
+`_evaluate_and_fire` core, which now takes a `Ticket | Document`
+(`record`) rather than a bare `Ticket` -- `_rule_matches` was already
+just `getattr(record, match_field)`, so that half needed no change at
+all; `_fire_rule` picks `ticket_id` or `document_id` on the logged
+`PlatformEventTrigger` row by `isinstance(record, Ticket)`, and only
+logs to the record's own activity feed for a ticket (documents have no
+equivalent unified feed to log to). Each hook is imported locally at
+its call site (not at module level) to avoid a cycle -- `platform_events`
+imports both `tickets.service` and `documents.service` at its own top
+level (for its actions below), so either of those importing
+`platform_events` back at module level would be circular; `documents.
+service.request_acknowledgment`'s own local import of `evaluate_
+document_pending_acknowledgment` is the same fix, applied on the new
+side of that cycle. Actions: notify Slack/email (reusing
 `NotificationChannel`), call a webhook, attach a document or asset,
 mark the ticket problematic, or add a watcher (email or system user,
-see above). Every firing -- and each action's individual outcome, even
-a failed one -- is logged to `platform_event_triggers` and the
-ticket's own activity feed, so a failed Slack post doesn't hide the
-fact the rule matched.
+see above) -- the last four only ever apply to a `Ticket` (`_TICKET_
+ONLY_ACTIONS`); run against a document-triggered rule, each reports
+itself skipped in the logged summary instead of raising, so a rule
+author can still attach one out of habit or by copying an existing
+ticket rule without breaking anything. Every firing -- and each
+action's individual outcome, even a failed or skipped one -- is logged
+to `platform_event_triggers` and (for a ticket) the ticket's own
+activity feed, so a failed Slack post doesn't hide the fact the rule
+matched.
 
 **Escalation.** A per-tenant "escalation webhook" (one `WebhookConfig`,
 picked on Admin > Branding next to the portal's own settings, stored as
@@ -1033,6 +1051,38 @@ backfill it from. Surfaced in Admin > Users and a plain CSV export
 (hand-rolled `csv.DictWriter`, not the Assets/Tickets export-profile
 machinery -- this is one fixed column set with no per-tenant custom
 fields to pick from, so a profile picker would be pure overhead here).
+
+**Assignable acknowledgment (migration 0049).** The voluntary "I have
+read this" button above works with no assignment at all -- anyone can
+click it any time. This is the layer on top that makes acknowledgment
+*required* of specific people and trackable as pending: `ack_required_
+group_id`/`ack_required_user_id` on `Document` are the exact same
+group-or-user shape `ApprovalFlowStep` already uses for a change
+ticket's approvers (exactly one set, group wins if a caller somehow
+submits both -- same precedence `rain.modules.admin.router._replace_
+approval_steps` uses), because the user's own framing for this feature
+was "it's a form of approval at the end of the day," and reusing that
+shape rather than inventing a new one is what that took literally.
+`ack_requested_at` is when the current requirement was last issued --
+`NULL` means no requirement at all, not "nobody's acknowledged yet";
+required people count as pending until they acknowledge *on or after*
+this timestamp, so `rain.modules.documents.service.
+request_acknowledgment` bumping it to now on a re-request is what puts
+someone who already acknowledged an earlier version back on the
+pending list, without touching their old `DocumentAcknowledgment` row.
+`pending_acknowledgment_user_ids`/`list_documents_pending_acknowledgment_for`
+(the latter a real SQL join+`NOT EXISTS`, not a Python-side filter --
+the same shape `rain.modules.tickets.service.
+list_tickets_pending_approval_for` already uses for pending approvals)
+back a "Pending your acknowledgment" badge on the document's own page
+and a second table in the client portal's Pending Actions tab,
+alongside pending change approvals. `request_acknowledgment` fires the
+same two-layer notification a change's approval starting already does:
+an unconditional email to the newly-required audience
+(`_notify_required_acknowledgers`, structurally identical to `rain.
+modules.tickets.service._notify_approvers`), plus the Platform Response
+Rules `document_pending_acknowledgment` trigger (see that section
+above) for whatever else an admin has configured to react to it.
 
 ## Home
 

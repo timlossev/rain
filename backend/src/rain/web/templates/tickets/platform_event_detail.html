@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_search_picker.html" as picker %}
 {% block title %}{{ rule.name }} - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Manage this Platform Response Rule's actions - notify Slack/email, call a webhook, attach a document or asset, mark the ticket problematic, or add a watcher. All actions run when the rule's pattern matches a new ticket.{% endblock %}
+{% block help_text %}Manage this Platform Response Rule's actions - notify Slack/email, call a webhook, attach a document or asset, mark the ticket problematic, or add a watcher. All actions run when the rule's pattern matches - a ticket for every trigger except "When a document is pending your acknowledgment", where it matches a document instead and only the notify/webhook actions apply.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <div>

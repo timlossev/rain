@@ -50,11 +50,12 @@ at RAIN is enough to get started.
 - Event Promotion Policies turn matching syslog events into tickets
 - Optional ML anomaly detection, no manual tuning required
 - Root cause assistance surfaces repeat patterns and similar past tickets
-- Platform Response Rules react to ticket lifecycle events automatically
+- Platform Response Rules react to ticket lifecycle events, or a
+  document pending acknowledgment, automatically
 - No-code asset types and custom fields, define your own
 - Document repository with tags, webhook auto-population, and PDF
   export, plus its own Kanban board grouped by tag or by owner; optional
-  review-due tracking and per-user read acknowledgment
+  review-due tracking and assignable, notified read acknowledgment
 - Per-tenant calendar with recurring entries and a syslog bridge
 - Tenant-defined Service Catalog forms that produce tickets on submission
 - Public client portal for external incident reporting and requests

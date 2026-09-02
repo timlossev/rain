@@ -11,7 +11,19 @@ the ticket problematic, or add a watcher (a system user or a bare
 email). Every firing is logged to platform_event_triggers and shown on
 the ticket detail page, regardless of whether the individual actions
 succeeded -- a failed Slack post shouldn't hide the fact the rule matched.
-"""
+
+Since migration 0049 this same engine also reacts to one document
+lifecycle trigger, document_pending_acknowledgment -- fired by
+rain.modules.documents.service.request_acknowledgment the moment a
+document's "who must acknowledge this" requirement is (re)set, the
+document equivalent of a change ticket's approval starting. The
+generic pieces below (_evaluate_and_fire, _rule_matches, _fire_rule,
+_run_action) take either a Ticket or a Document (see TRIGGER_EVENTS for
+which trigger_event goes with which); the four ticket-only actions
+(attach_document, attach_asset, mark_problematic, add_watcher) simply
+report themselves not applicable when the matched record is a document
+-- notify_slack/notify_email/webhook, the three that only ever needed a
+placeholder dict, work for either kind unchanged."""
 from __future__ import annotations
 
 import logging
@@ -54,8 +66,15 @@ TRIGGER_EVENTS = [
     ("vulnerability_closed", "When a vulnerability is closed"),
     ("change_closed", "When a change is closed"),
     ("change_approved", "When a change is fully approved"),
+    ("document_pending_acknowledgment", "When a document is pending your acknowledgment"),
 ]
 MATCH_FIELDS = ["title", "description"]
+# The last four only ever act on a Ticket -- see this module's own
+# docstring. A rule using one of them against
+# document_pending_acknowledgment still saves and still evaluates
+# (match_field/pattern are equally meaningful against a Document's own
+# title/description), it just skips that one action with a note in the
+# trigger's logged summary rather than failing the whole rule.
 ACTION_TYPES = [
     ("notify_slack", "Notify Slack"),
     ("notify_email", "Notify Email"),
@@ -107,11 +126,23 @@ async def evaluate_change_approved(db: AsyncSession, ticket: Ticket) -> None:
     await _evaluate_and_fire(db, "change_approved", ticket)
 
 
-async def _evaluate_and_fire(db: AsyncSession, trigger_event: str, ticket: Ticket) -> None:
+async def evaluate_document_pending_acknowledgment(db: AsyncSession, document: Document) -> None:
+    """Called from rain.modules.documents.service.request_acknowledgment,
+    once, each time a document's "who must acknowledge this" requirement
+    is (re)set -- the document equivalent of evaluate_change_approved
+    above: one entry point, fired at the one moment that matters, not on
+    every read."""
+    await _evaluate_and_fire(db, "document_pending_acknowledgment", document)
+
+
+async def _evaluate_and_fire(db: AsyncSession, trigger_event: str, record: Ticket | Document) -> None:
     """Shared by every evaluate_* entry point above -- load this trigger's
     active rules, run every match, fire every one that matches (not just
-    the first). Never raises -- a broken rule/action must not take down
-    whatever ticket-lifecycle step called this."""
+    the first). `record` is whichever kind of row this trigger_event is
+    actually about -- a Ticket for every trigger except
+    document_pending_acknowledgment, which is about a Document instead.
+    Never raises -- a broken rule/action must not take down whatever
+    lifecycle step called this."""
     try:
         stmt = (
             select(PlatformEventRule)
@@ -121,19 +152,19 @@ async def _evaluate_and_fire(db: AsyncSession, trigger_event: str, ticket: Ticke
         )
         rules = list((await db.execute(stmt)).scalars())
     except Exception:
-        logger.exception("failed to load platform event rules (%s) for ticket %s", trigger_event, ticket.id)
+        logger.exception("failed to load platform event rules (%s) for %s %s", trigger_event, type(record).__name__, record.id)
         return
 
     for rule in rules:
         try:
-            if _rule_matches(rule, ticket):
-                await _fire_rule(db, rule, ticket)
+            if _rule_matches(rule, record):
+                await _fire_rule(db, rule, record)
         except Exception:
-            logger.exception("platform event rule %s failed for ticket %s", rule.id, ticket.id)
+            logger.exception("platform event rule %s failed for %s %s", rule.id, type(record).__name__, record.id)
 
 
-def _rule_matches(rule: PlatformEventRule, ticket: Ticket) -> bool:
-    value = getattr(ticket, rule.match_field, None)
+def _rule_matches(rule: PlatformEventRule, record: Ticket | Document) -> bool:
+    value = getattr(record, rule.match_field, None)
     if not value:
         return False
     try:
@@ -142,27 +173,44 @@ def _rule_matches(rule: PlatformEventRule, ticket: Ticket) -> bool:
         return False
 
 
-async def _fire_rule(db: AsyncSession, rule: PlatformEventRule, ticket: Ticket) -> None:
+async def _fire_rule(db: AsyncSession, rule: PlatformEventRule, record: Ticket | Document) -> None:
     outcomes: list[str] = []
     for action in rule.actions:
         try:
-            outcomes.append(await _run_action(db, action, ticket))
+            outcomes.append(await _run_action(db, action, record))
         except Exception as exc:
-            logger.exception("platform event action %s (rule %s) failed for ticket %s", action.id, rule.id, ticket.id)
+            logger.exception("platform event action %s (rule %s) failed for %s %s", action.id, rule.id, type(record).__name__, record.id)
             outcomes.append(f"{_action_label(action.action_type)}: failed ({exc})")
 
     summary = "; ".join(outcomes) if outcomes else "matched (no actions configured)"
-    db.add(PlatformEventTrigger(rule_id=rule.id, rule_name=rule.name, ticket_id=ticket.id, summary=summary))
-    # Also onto the ticket's own unified activity feed, not just the rule's
-    # trigger-history table -- a rule firing is a system-caused change to
-    # this specific ticket and belongs alongside status/severity/etc
-    # changes, not only visible by navigating to the rule.
-    await ticket_service.log_field_change(db, ticket.id, "platform_rule", rule.name, summary, commit=False)
+    is_ticket = isinstance(record, Ticket)
+    db.add(
+        PlatformEventTrigger(
+            rule_id=rule.id,
+            rule_name=rule.name,
+            ticket_id=record.id if is_ticket else None,
+            document_id=None if is_ticket else record.id,
+            summary=summary,
+        )
+    )
+    if is_ticket:
+        # Also onto the ticket's own unified activity feed, not just the
+        # rule's trigger-history table -- a rule firing is a system-
+        # caused change to this specific ticket and belongs alongside
+        # status/severity/etc changes, not only visible by navigating to
+        # the rule. Documents have no equivalent unified activity feed,
+        # so a document-triggered rule's firing is only visible via
+        # platform_event_triggers itself for now.
+        await ticket_service.log_field_change(db, record.id, "platform_rule", rule.name, summary, commit=False)
     await db.commit()
 
 
 def _action_label(action_type: str) -> str:
     return dict(ACTION_TYPES).get(action_type, action_type)
+
+
+def _record_label(record: Ticket | Document) -> str:
+    return record.ticket_number if isinstance(record, Ticket) else record.doc_number
 
 
 def _ticket_placeholders(ticket: Ticket) -> dict[str, str]:
@@ -180,9 +228,33 @@ def _ticket_placeholders(ticket: Ticket) -> dict[str, str]:
     }
 
 
-async def _run_action(db: AsyncSession, action: PlatformEventAction, ticket: Ticket) -> str:
+def _document_placeholders(document: Document) -> dict[str, str]:
+    """The document-triggered equivalent of _ticket_placeholders --
+    {{doc_number}}, {{title}}, {{description}}. Smaller than a ticket's
+    own set: a document has no severity/status to offer."""
+    return {
+        "doc_number": document.doc_number,
+        "title": document.title,
+        "description": document.description or "",
+    }
+
+
+def _placeholders(record: Ticket | Document) -> dict[str, str]:
+    return _ticket_placeholders(record) if isinstance(record, Ticket) else _document_placeholders(record)
+
+
+# Ticket-only -- see this module's own docstring. Guarded upfront in
+# _run_action rather than duplicated into each branch's own isinstance
+# check below.
+_TICKET_ONLY_ACTIONS = {"attach_document", "attach_asset", "mark_problematic", "add_watcher"}
+
+
+async def _run_action(db: AsyncSession, action: PlatformEventAction, record: Ticket | Document) -> str:
     config = action.config or {}
     label = _action_label(action.action_type)
+
+    if action.action_type in _TICKET_ONLY_ACTIONS and not isinstance(record, Ticket):
+        return f"{label}: only applies to a ticket-triggered rule, skipped for {_record_label(record)}"
 
     if action.action_type in ("notify_slack", "notify_email"):
         channel_id = config.get("channel_id")
@@ -190,7 +262,7 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, ticket: Tic
         if channel is None:
             return f"{label}: channel no longer exists"
         channel_config = decrypt_json(channel.config_encrypted)
-        placeholders = _ticket_placeholders(ticket)
+        placeholders = _placeholders(record)
 
         # Dispatched on the *channel's own* channel_type, not the action's
         # -- a channel is free to be any of the three types regardless of
@@ -206,7 +278,7 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, ticket: Tic
             result = await webhook_service.call_webhook(webhook, placeholders)
             if not result.success and webhook.alert_on_failure:
                 await webhook_service.alert_webhook_failure(
-                    db, webhook, result, context=f"notification channel '{channel.name}' on {ticket.ticket_number}"
+                    db, webhook, result, context=f"notification channel '{channel.name}' on {_record_label(record)}"
                 )
             if result.error:
                 return f"{label}: {channel.name} -> {result.error}"
@@ -233,15 +305,20 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, ticket: Tic
         webhook = await db.get(WebhookConfig, webhook_id) if webhook_id else None
         if webhook is None:
             return f"{label}: webhook no longer exists"
-        placeholders = _ticket_placeholders(ticket)
+        placeholders = _placeholders(record)
         result = await webhook_service.call_webhook(webhook, placeholders)
         if not result.success and webhook.alert_on_failure:
             await webhook_service.alert_webhook_failure(
-                db, webhook, result, context=f"Platform Response Rule action on {ticket.ticket_number}"
+                db, webhook, result, context=f"Platform Response Rule action on {_record_label(record)}"
             )
         if result.error:
             return f"{label}: {webhook.name} -> {result.error}"
         return f"{label}: {webhook.name} -> HTTP {result.status_code}"
+
+    # Every action from here down is ticket-only (see _TICKET_ONLY_ACTIONS
+    # above, already guarded) -- `record` is a Ticket for the rest of
+    # this function.
+    ticket = record
 
     if action.action_type == "attach_document":
         document_id = config.get("document_id")
