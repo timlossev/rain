@@ -58,7 +58,17 @@ update_problematic, all used elsewhere with their own immediate-commit
 expectations) are deliberately left unbatched -- regressions are the
 minority of rows in any real import, so their per-row cost doesn't
 dominate, and batching them too would mean touching several more
-shared functions' transaction semantics for little added benefit."""
+shared functions' transaction semantics for little added benefit.
+
+Platform Response Rules are deliberately *not* evaluated inline during
+the row loop for a newly-created ticket, unlike every other creation
+path (the manual form, syslog promotion) -- a notify_slack/notify_email/
+webhook action makes a real, irreversible outbound call, and a
+commit=False ticket is only flushed, not yet durable; firing one inline
+would mean an external system could be told "ticket created" for a row
+a later, unrelated row in the same batch still rolls back. Evaluated
+once at the very end instead, one call per created ticket, only after
+the batch's own final commit has actually succeeded."""
 from __future__ import annotations
 
 import csv
@@ -69,6 +79,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from rain.db.tenant_models import Ticket
 from rain.modules.assets.schemas import coerce_field_value
 from rain.modules.tickets import service
 from rain.modules.tickets.nessus_parser import NESSUS_COLUMNS, parse_nessus_rows
@@ -128,6 +139,12 @@ async def commit_import(
     result = ImportResult()
     fields_by_id = {f.id: f for f in await service.ticket_fields(db)}
     key_col = mapping.get("upsert_key")
+    # Platform Response Rules fire once per created ticket below, but
+    # only after the final commit succeeds -- see create_ticket's own
+    # comment on why a commit=False ticket can't safely trigger a
+    # notify_slack/notify_email/webhook action inline (a later row's
+    # failure could still roll this one back).
+    newly_created: list[Ticket] = []
 
     for i, row in enumerate(rows, start=1):
         try:
@@ -178,6 +195,7 @@ async def commit_import(
                     commit=False,
                 )
                 result.created += 1
+                newly_created.append(ticket)
             else:
                 ticket = existing
                 status_row = await service.get_status_by_key(db, ticket.status)
@@ -229,4 +247,15 @@ async def commit_import(
             # already makes, not a new one.
 
     await db.commit()
+
+    # Only now -- every ticket in newly_created is guaranteed durable,
+    # not just flushed, so a notify_slack/notify_email/webhook action
+    # can't fire for a row a later one in this same batch ends up
+    # rolling back. Imported locally, same module-load-time-cycle
+    # reasoning as create_ticket's own local import.
+    from rain.modules.tickets.platform_events import evaluate_ticket_created
+
+    for ticket in newly_created:
+        await evaluate_ticket_created(db, ticket)
+
     return result

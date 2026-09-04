@@ -1211,3 +1211,55 @@ async def test_nessus_import_parses_maps_and_dedups_end_to_end():
         second = await importer.commit_import(session, rows=parse_nessus_rows(_SAMPLE_NESSUS_XML), mapping=mapping, actor_id=None)
         assert (second.created, second.unchanged) == (0, 1)
         assert len(await service.list_tickets(session, ticket_type="vulnerability")) == 1
+
+
+async def test_ticket_import_fires_platform_event_rules_once_committed():
+    """commit_import's batching (create_ticket(commit=False), evaluate_
+    ticket_created deferred to a loop after the batch's own final commit
+    -- see both functions' own comments) has to still actually fire
+    Platform Response Rules for every created ticket, just later than
+    the non-batched creation paths do it. Regression coverage for a real
+    ordering bug caught in review before it shipped: evaluate_ticket_
+    created used to run unconditionally inside create_ticket, which for
+    a commit=False (batched) ticket meant a notify_slack/notify_email/
+    webhook action could fire for a row that was only flushed, not yet
+    durable -- an external system told "ticket created" for something a
+    later, unrelated row in the same import could still roll back."""
+    from rain.db.tenant_models import PlatformEventAction, PlatformEventRule, PlatformEventTrigger
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.modules.tickets import importer, service
+
+    tenant = await provision_tenant(slug="chi2", name="Chi Networks 2")
+
+    async with tenant_session(tenant.schema_name) as session:
+        rule = PlatformEventRule(name="Outage import rule", trigger_event="incident_created", match_field="title", pattern="outage")
+        rule.actions.append(PlatformEventAction(action_type="mark_problematic", config={}))
+        session.add(rule)
+        await session.commit()
+
+        rows = [
+            {"Type": "incident", "Title": "major outage in us-east"},
+            {"Type": "incident", "Title": "minor blip, all clear"},
+        ]
+        result = await importer.commit_import(
+            session, rows=rows, mapping={"ticket_type": "Type", "title": "Title"}, actor_id=None
+        )
+        assert (result.created, result.errors) == (2, [])
+
+        tickets = await service.list_tickets(session, ticket_type="incident")
+        outage = next(t for t in tickets if "major outage" in t.title)
+        blip = next(t for t in tickets if "minor blip" in t.title)
+
+        # The matching row's rule fired for real (is_problematic set, a
+        # PlatformEventTrigger logged) -- deferring the evaluation to
+        # after commit_import's own final commit didn't silently drop it.
+        assert outage.is_problematic is True
+        triggers = (
+            await session.execute(select(PlatformEventTrigger).where(PlatformEventTrigger.ticket_id == outage.id))
+        ).scalars().all()
+        assert [t.rule_name for t in triggers] == ["Outage import rule"]
+
+        # The non-matching row's ticket was still created but the rule
+        # correctly never touched it.
+        assert blip.is_problematic is False

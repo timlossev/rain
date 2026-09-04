@@ -195,9 +195,22 @@ async def create_ticket(
     # choke point covers both. Imported locally to avoid a module-load-time
     # cycle (platform_events -> documents.service, notifications -> ... ->
     # back into this module).
-    from rain.modules.tickets.platform_events import evaluate_ticket_created
+    #
+    # commit=False: skipped here, not just deferred -- a notify_slack/
+    # notify_email/webhook action makes a real, irreversible outbound
+    # call, and this ticket is only flushed, not yet durable, inside a
+    # commit=False (importer batch) call. Firing it here would mean an
+    # external system gets told "ticket created" for a row that a later
+    # row in the same batch could still roll back (a genuine DB-level
+    # failure aborts the whole transaction, taking every not-yet-
+    # committed ticket in it down too -- see commit_import's own comment
+    # on that risk). The importer calls evaluate_ticket_created itself,
+    # once per row it created, only after its own final commit succeeds
+    # -- same rule engine, just fired once the ticket is guaranteed real.
+    if commit:
+        from rain.modules.tickets.platform_events import evaluate_ticket_created
 
-    await evaluate_ticket_created(db, ticket)
+        await evaluate_ticket_created(db, ticket)
 
     # No db.refresh(ticket) here: this session's connection carries a
     # schema_translate_map set once at checkout (see rain.db.base.
