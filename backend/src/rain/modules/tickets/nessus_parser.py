@@ -32,6 +32,36 @@ from defusedxml import ElementTree
 
 _SEVERITY_BY_NESSUS_LEVEL = {"1": "low", "2": "medium", "3": "high", "4": "critical"}
 
+#: The fixed column set parse_nessus_rows always produces, in order --
+#: also used by rain.modules.tickets.importer.sniff_headers so the
+#: mapping screen has something to show without re-parsing the file a
+#: second time just for its header list (parse_rows() re-reads the
+#: stash separately at commit time regardless, same two-pass shape
+#: CSV/JSON already have). Single source of truth for these labels --
+#: each row below is built from this same tuple via _row() rather than
+#: repeating the 14 strings a second time as literal dict keys, so
+#: adding/renaming a column can't make the two lists disagree.
+NESSUS_COLUMNS = [
+    "Type",
+    "Title",
+    "Description",
+    "Severity",
+    "Dedup key (optional)",
+    "Nessus plugin ID",
+    "Plugin name",
+    "Plugin family",
+    "Scanned host",
+    "Port",
+    "Protocol",
+    "CVSS base score",
+    "Risk factor (scanner-assigned)",
+    "Last seen in scan",
+]
+
+
+def _row(*values: Any) -> dict[str, Any]:
+    return dict(zip(NESSUS_COLUMNS, values))
+
 
 def parse_nessus_rows(raw: bytes) -> list[dict[str, Any]]:
     root = ElementTree.fromstring(raw)
@@ -85,45 +115,22 @@ def parse_nessus_rows(raw: bytes) -> list[dict[str, Any]]:
 
             host_label = f"{host_ip}:{port}" if port not in ("", "0") else host_ip
             rows.append(
-                {
-                    "Type": "vulnerability",
-                    "Title": f"{plugin_name} ({host_label})" if plugin_name else f"Nessus plugin {plugin_id} ({host_label})",
-                    "Description": long_description,
-                    "Severity": _SEVERITY_BY_NESSUS_LEVEL.get(nessus_severity, "medium"),
-                    "Dedup key (optional)": f"nessus:{host_ip.lower()}:{port}:{protocol}:{plugin_id}",
-                    "Nessus plugin ID": plugin_id,
-                    "Plugin name": plugin_name,
-                    "Plugin family": plugin_family,
-                    "Scanned host": host_ip,
-                    "Port": port,
-                    "Protocol": protocol,
-                    "CVSS base score": child_text("cvss_base_score"),
-                    "Risk factor (scanner-assigned)": child_text("risk_factor"),
-                    "Last seen in scan": import_date,
-                }
+                _row(
+                    "vulnerability",
+                    f"{plugin_name} ({host_label})" if plugin_name else f"Nessus plugin {plugin_id} ({host_label})",
+                    long_description,
+                    _SEVERITY_BY_NESSUS_LEVEL.get(nessus_severity, "medium"),
+                    f"nessus:{host_ip.lower()}:{port}:{protocol}:{plugin_id}",
+                    plugin_id,
+                    plugin_name,
+                    plugin_family,
+                    host_ip,
+                    port,
+                    protocol,
+                    child_text("cvss_base_score"),
+                    child_text("risk_factor"),
+                    import_date,
+                )
             )
 
     return rows
-
-
-#: The fixed column set parse_nessus_rows always produces -- used by
-#: rain.modules.tickets.importer.sniff_headers so the mapping screen has
-#: something to show without re-parsing the file a second time just for
-#: its header list (parse_rows() re-reads the stash separately at commit
-#: time regardless, same two-pass shape CSV/JSON already have).
-NESSUS_COLUMNS = [
-    "Type",
-    "Title",
-    "Description",
-    "Severity",
-    "Dedup key (optional)",
-    "Nessus plugin ID",
-    "Plugin name",
-    "Plugin family",
-    "Scanned host",
-    "Port",
-    "Protocol",
-    "CVSS base score",
-    "Risk factor (scanner-assigned)",
-    "Last seen in scan",
-]
