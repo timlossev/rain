@@ -75,6 +75,14 @@ using its own custom-fields form the same way you would for any other
 asset; poam-tracking-fields.json's fields show up directly on the
 ticket form, the same as any other ticket-scoped custom field.
 
+Every one of these files carries a `source_tenant_slug`/
+`source_tenant_name` of `"template"`/"... starter template" -- that's
+just export provenance metadata (where `apply_tenant_bundle` originally
+wrote it from), never read back on import. A tenant bundle always
+imports into whichever tenant your session currently has active (Admin
+> Tenants > Switch to); it can't create a new tenant or target a
+different one, and nothing about the file's own contents changes that.
+
 These are starting points, not a fixed schema -- rename, add, or drop
 fields afterward under Admin > Asset Types (or, for poam-tracking-
 fields.json, Tickets > Custom Fields) the same as you would for any
