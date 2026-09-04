@@ -12,6 +12,9 @@ Alpine images with no Node/SPA toolchain in the browser.
 
 ![RAIN screenshot](RAIN%20screenshot.png)
 
+More screens -- Kanban, live syslog feed, automation rules, the client
+portal, and more -- in [`docs/screenshots/`](docs/screenshots/).
+
 ## Motivation
 
 Compliance frameworks -- FedRAMP, ISO 27001, PCI-DSS, SOX, and their
