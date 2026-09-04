@@ -19,63 +19,53 @@ codebase and how to add to it.
 Only two inputs are needed outside the database: `POSTGRES_PASSWORD` and
 `APP_SECRET_KEY` (session-cookie signing + the Fernet key that encrypts
 config-at-rest, e.g. the SMTP relay password). `bootstrap.py` /
-`bootstrap.ps1` / `bootstrap.sh` generate both into `.env` on first run,
-and interactively ask (with a working-default fast path, and skipped
-outright when run non-interactively) which of the deployment shapes
-below to set up -- built-in vs external Postgres, tested live before
-being saved, with an explicit override if the test fails; local disk
-vs S3 document storage; separate `worker` vs `EMBED_WORKER=true`.
-`RAIN_DOMAIN` is optional and defaults to `localhost` (Caddy's internal CA).
-Everything else lives in Postgres and is edited at runtime through the
-setup wizard and Admin UI.
+`bootstrap.ps1` / `bootstrap.sh` generate both into `.env` on first run
+and interactively ask (working-default fast path, skipped when run
+non-interactively) which deployment shape to set up: built-in vs
+external Postgres (tested live before saving, override if the test
+fails), local disk vs S3 storage, separate `worker` vs
+`EMBED_WORKER=true`. `RAIN_DOMAIN` defaults to `localhost` (Caddy's
+internal CA). Everything else lives in Postgres, edited at runtime
+through the setup wizard and Admin UI.
 
 ### Deployment shapes
 
 The default shape is four containers (`caddy`, `app`, `worker`, `db`),
-each independently droppable via a Compose profile + one `.env` flag:
-`local-db` (drop with `POSTGRES_URL` set), `web-frontend` (drop with
-`WEB_FRONTEND=false`), `worker` (drop with `EMBED_WORKER=true`). Nothing
-in the app code branches on "which shape am I" beyond reading the
-relevant `Settings` field -- `rain.main`'s `lifespan` starts
-`rain.worker_runtime.WorkerServices` (the same syslog-listener-plus-
-background-loops object the standalone `rain-worker` process uses,
-factored out specifically so both callers share it -- see that module's
-own docstring) when `embed_worker` is true, and
-`rain.modules.documents.storage.get_storage()` returns an
-`S3StorageBackend` instead of a `LocalStorageBackend` when `s3_bucket`
-is set. Neither of those two settings know about the other, or about
-`POSTGRES_URL`/`WEB_FRONTEND` -- each is an independent axis, combinable
-in any mix.
+each independently droppable via a Compose profile + `.env` flag:
+`local-db` (`POSTGRES_URL` set), `web-frontend` (`WEB_FRONTEND=false`),
+`worker` (`EMBED_WORKER=true`). Nothing in the app code branches on
+"which shape am I" beyond reading the relevant `Settings` field --
+`rain.main`'s `lifespan` starts `rain.worker_runtime.WorkerServices`
+(the same syslog-listener-plus-background-loops object the standalone
+`rain-worker` process uses, factored out so both share it) when
+`embed_worker` is true, and `rain.modules.documents.storage.
+get_storage()` returns an `S3StorageBackend` instead of a
+`LocalStorageBackend` when `s3_bucket` is set. The two settings don't
+know about each other or about `POSTGRES_URL`/`WEB_FRONTEND` -- each is
+an independent, combinable axis.
 
-**Minimal mode** is all four axes flipped at once: `EMBED_WORKER=true`,
-`POSTGRES_URL` set, `WEB_FRONTEND=false`, `S3_BUCKET` set, and
-`COMPOSE_PROFILES=` (empty, dropping `local-db`/`web-frontend`/`worker`
-all at once) -- one `app` container, no other RAIN-managed
-infrastructure. Needs `docker-compose.minimal.yml` layered on top of the
-base file too: the base `app` service doesn't publish `SYSLOG_PORT` by
+**Minimal mode** flips all four axes at once: `EMBED_WORKER=true`,
+`POSTGRES_URL` set, `WEB_FRONTEND=false`, `S3_BUCKET` set,
+`COMPOSE_PROFILES=` empty -- one `app` container, no other RAIN-managed
+infrastructure. Needs `docker-compose.minimal.yml` layered on top of
+the base file: the base `app` service doesn't publish `SYSLOG_PORT` by
 default (it would conflict with the separate `worker` service's own
-mapping of that same host port in the normal topology this mode isn't
-running), so the overlay adds it back. Without `S3_BUCKET` set in this
-mode, document bodies live in the container's own writable layer with no
-volume behind it at all, gone the next time the container is recreated
--- an explicit, documented trade-off for genuine single-container simplicity,
-not an oversight. Branding assets (the logo, and the client portal's
-optional background image) don't share that fate either way: each is
-always served from local disk (same as ever), but also always has a
-durable backup to restore that local copy from at next startup -- S3
-when `S3_BUCKET` is set, its own row in `control.branding_assets`
-(Postgres, already required infrastructure) when it isn't. See
+mapping in the normal topology), so the overlay adds it back. Without
+`S3_BUCKET`, document bodies live in the container's own writable
+layer with no volume behind them -- gone on recreate, an explicit
+trade-off for single-container simplicity. Branding assets (logo,
+portal background) always serve from local disk either way, but always
+have a durable backup to restore from at next startup: S3 when
+`S3_BUCKET` is set, a `control.branding_assets` row otherwise. See
 `rain.web.uploads`'s docstring.
 
 **Kubernetes.** `charts/rain/` is a Helm chart covering the same two
-shapes, translated onto the same underlying `Settings` fields (an
-Ingress instead of Caddy, a `worker.embedded` value instead of
-`EMBED_WORKER`/`COMPOSE_PROFILES`, `storage.s3.*`/`storage.persistence.*`
-instead of `S3_BUCKET`/the `rain_uploads` volume) rather than a second,
-independently-maintained deployment story -- see `charts/rain/README.md`.
-Not installed against a real cluster as part of building it (none was
-available); rendered and reviewed by hand against the exact env vars the
-app expects instead.
+shapes, translated onto the same `Settings` fields (an Ingress instead
+of Caddy, `worker.embedded` instead of `EMBED_WORKER`/
+`COMPOSE_PROFILES`, `storage.s3.*`/`storage.persistence.*` instead of
+`S3_BUCKET`/the `rain_uploads` volume) -- see `charts/rain/README.md`.
+Rendered and reviewed by hand against the app's expected env vars, not
+installed against a real cluster (none was available).
 
 ## Multi-tenancy: schema-per-tenant
 
@@ -96,152 +86,142 @@ app expects instead.
 ### Migrations
 
 Two independent Alembic chains, driven from one `alembic.ini` via named
-sections (`[control]` / `[tenant]`, selected with `Config(ini_section=...)`):
+sections (`[control]` / `[tenant]`, selected with
+`Config(ini_section=...)`):
 
 - `migrations/control/` -- applied once, to the `control` schema.
-- `migrations/tenant/` -- the exact same revision history applied to every
+- `migrations/tenant/` -- the same revision history applied to every
   `tenant_<slug>` schema via SQLAlchemy's `schema_translate_map` recipe:
   tenant models declare no explicit schema, so `{None: "tenant_acme"}`
-  redirects every table (and the `alembic_version` table itself, via
+  redirects every table (and `alembic_version`, via
   `version_table_schema`) at execution time.
 
 `rain.db.migrate` runs both programmatically (`upgrade_control_async`,
-`upgrade_tenant_async`), always through `asyncio.to_thread` since Alembic's
-`command.upgrade` blocks on its own internal `asyncio.run(...)`.
-`rain.db.provisioning.provision_tenant()` creates the schema and brings it
-to head; `reconcile_all_tenant_schemas()` runs at every app/worker startup
-so a code upgrade that adds tenant tables doesn't need a manual per-tenant
-step.
+`upgrade_tenant_async`) through `asyncio.to_thread`, since Alembic's
+`command.upgrade` blocks on its own `asyncio.run(...)`.
+`rain.db.provisioning.provision_tenant()` creates the schema and brings
+it to head; `reconcile_all_tenant_schemas()` runs at every app/worker
+startup so a code upgrade adding tenant tables needs no manual
+per-tenant step.
 
 ### Request-time tenant resolution
 
-`rain.core.tenancy` resolves session → user → active tenant per request.
-`client` users are pinned to their one tenant; `internal_admin` users carry
-their current selection on the session row (the tenant switcher in Admin).
-`get_tenant_db()` opens a session with `schema_translate_map={None: schema}`
-applied, so route code queries `rain.db.tenant_models` normally and
-transparently lands in the right tenant's schema.
+`rain.core.tenancy` resolves session → user → active tenant per
+request. `client` users are pinned to their one tenant;
+`internal_admin` users carry their current selection on the session row
+(the tenant switcher in Admin). `get_tenant_db()` opens a session with
+`schema_translate_map={None: schema}` applied, so route code queries
+`rain.db.tenant_models` normally and lands in the right tenant's
+schema.
 
 ## Auth & RBAC
 
-Local email+password (Argon2, `argon2-cffi`), LDAP/Active Directory (bind
-auth + periodic user/group sync, `rain.modules.auth.ldap_sync`), and SAML
-2.0 SSO (`rain.modules.auth.saml_provider`, `python3-saml`) are all
-functional, one `control.auth_providers` row each. Sessions are DB-backed
+Local email+password (Argon2, `argon2-cffi`), LDAP/Active Directory
+(bind auth + periodic user/group sync, `rain.modules.auth.ldap_sync`),
+and SAML 2.0 SSO (`rain.modules.auth.saml_provider`, `python3-saml`) --
+one `control.auth_providers` row each. Sessions are DB-backed
 (`control.sessions`): the cookie holds an opaque token, only its sha256
-hash is stored, revocation is a row delete. A local/LDAP user authenticates
-through the password form (`rain.modules.auth.provider.authenticate_user`
-dispatches on `User.auth_source`); SAML is a separate browser-redirect
-flow entirely (`/auth/saml/login` → IdP → `/auth/saml/acs`) that mints the
-same kind of session at the end instead of checking a password.
+hash is stored, revocation is a row delete. A local/LDAP user
+authenticates through the password form
+(`rain.modules.auth.provider.authenticate_user` dispatches on
+`User.auth_source`); SAML is a separate browser-redirect flow
+(`/auth/saml/login` → IdP → `/auth/saml/acs`) that mints the same kind
+of session instead of checking a password.
 
 Self-service password reset (`/forgot-password`, `/reset-password`)
 follows the same DB-backed-opaque-token shape as sessions:
 `control.password_reset_tokens` stores only a token's sha256 hash,
-single-use (`used_at`) and expiring after an hour. It's gated on an
-SMTP relay being configured (`rain.modules.tickets.notifications.
-send_email`, reused rather than duplicated) and only ever issued for
-`auth_source == "local"` users -- LDAP/SAML accounts have no local
-password to reset. Requesting a reset always returns the same response
-regardless of whether the address matched an account, and completing
-one deletes every `control.sessions` row for that user, signing them
-out everywhere.
+single-use (`used_at`), expiring after an hour. Gated on an SMTP relay
+being configured (`rain.modules.tickets.notifications.send_email`,
+reused) and only ever issued for `auth_source == "local"` users. A
+reset request always returns the same response regardless of whether
+the address matched an account; completing one deletes every
+`control.sessions` row for that user.
 
-Roles come from a `control.roles` table (not a hardcoded enum), seeded with
-`internal_admin` (platform operator, all tenants, every setting),
+Roles come from a `control.roles` table (not a hardcoded enum), seeded
+with `internal_admin` (platform operator, all tenants, every setting),
 `client` (full control scoped to their own tenant, no admin functions),
-and `client_admin` (pinned to one tenant exactly like `client` --
+and `client_admin` (pinned to one tenant like `client` --
 `CurrentUser.is_internal_admin` is false for both -- but also passes
-`rain.core.rbac.require_admin`, giving them admin rights over that one
-tenant's own tenant-scoped settings: Ticket Statuses, Notification
-Channels, Groups, Approval Flows, Webhooks, Event Promotion Policies,
-Platform Response Rules). `require_admin` accepts
-`internal_admin` or `client_admin`; platform-wide settings (Branding,
-Tenants, Users, Auth Providers, SMTP Relay, Syslog Listener) stay on the
-stricter `require_internal_admin` instead. The tenant scoping itself
-needs no extra filtering in the tenant-scoped routes: `get_tenant_db` is
-already bound to the caller's one active tenant regardless of which of
-the two roles is asking, so there's no query path there that could reach
-another tenant's rows. The Admin nav mirrors this split into two
-submenus, Platform Administration and Tenant Administration.
+`rain.core.rbac.require_admin`, giving admin rights over that tenant's
+own settings: Ticket Statuses, Notification Channels, Groups, Approval
+Flows, Webhooks, Event Promotion Policies, Platform Response Rules).
+`require_admin` accepts `internal_admin` or `client_admin`;
+platform-wide settings (Branding, Tenants, Users, Auth Providers, SMTP
+Relay, Syslog Listener) stay on the stricter `require_internal_admin`.
+Tenant scoping needs no extra filtering in tenant-scoped routes:
+`get_tenant_db` is already bound to the caller's one active tenant
+regardless of role. The Admin nav mirrors this split into Platform
+Administration and Tenant Administration.
 
 **API spec.** FastAPI's own `/docs`, `/redoc`, `/openapi.json` are
-disabled (`docs_url=None` etc. on the `FastAPI()` constructor) and
-replaced with equivalents behind `require_internal_admin` -- the
-generated spec covers every route/parameter/response shape, which
-shouldn't be world-readable to an unauthenticated caller any more than
-any other platform-wide setting is. Linked from Admin > Platform
-Administration > API Documentation. Every router registers a `tags=`
-so the generated docs group by module (Tickets, Assets, Admin, Portal,
-...) instead of listing every route flat. There's no separate JSON/
+disabled (`docs_url=None` on the `FastAPI()` constructor) and replaced
+with equivalents behind `require_internal_admin` -- the generated spec
+covers every route/parameter/response shape and shouldn't be
+world-readable. Linked from Admin > Platform Administration > API
+Documentation. Every router registers a `tags=` so the docs group by
+module instead of listing every route flat. There's no separate JSON/
 REST API for external integration -- this spec documents the same
-server-rendered routes the web UI itself calls; Webhooks + Platform
-Response Rules are the supported way to react to RAIN's events from
-outside the app.
+server-rendered routes the web UI calls; Webhooks + Platform Response
+Rules are the supported way to react to RAIN's events externally.
 
 ## Tree navigation
 
-`rain.core.nav_registry` is a registry modules add nodes to at import time
-(`NavNode(key=..., label=..., href=..., children=[...], children_provider=...)`).
-The tree is resolved fresh per request (role-filtered, dynamic children
-like Assets' "By Type" list resolved via `children_provider`) and handed to
-`base.html`, which renders it recursively and lets plain JS handle
-expand/collapse. This is the extension point Ticketing and Documents plug
-into without touching the shell.
+`rain.core.nav_registry` is a registry modules add nodes to at import
+time (`NavNode(key=..., label=..., href=..., children=[...],
+children_provider=...)`). The tree is resolved fresh per request
+(role-filtered, dynamic children like Assets' "By Type" list resolved
+via `children_provider`) and handed to `base.html`, which renders it
+recursively and lets plain JS handle expand/collapse. The extension
+point Ticketing and Documents plug into without touching the shell.
 
 ## Branding & runtime config
 
 `control.global_config` is a typed key/value table, cached in-process
-(`rain.core.config_store`) and kept fresh across the `app` and `worker`
-processes via Postgres `LISTEN`/`NOTIFY` -- no Redis needed just for this.
-Accent color and logo are instance-wide (set once by `internal_admin`, not
-per-tenant white-labeling); the setup wizard captures them alongside the
-first tenant and admin account.
+(`rain.core.config_store`) and kept fresh across `app`/`worker` via
+Postgres `LISTEN`/`NOTIFY` -- no Redis needed. Accent color and logo
+are instance-wide (set once by `internal_admin`); the setup wizard
+captures them alongside the first tenant and admin account.
 
-**Button style.** `button_radius` follows the exact same shape as
+**Button style.** `button_radius` follows the same shape as
 `font_family` -- a curated `BUTTON_STYLE_CHOICES` list (label, CSS
 value), whitelist-checked on save since the stored value is injected
-straight into `base.html`'s inline `<style>` block, and a new
-`--btn-radius` custom property carrying it. Deliberately split out
-from `--radius-sm` (the token every *other* small element -- inputs,
-badges, table cells -- still uses) rather than sharing it: this
-picker only ever means to change what buttons look like, not round
-every small corner in the app along with them. "Rounded" is a full
-`999px` pill, not a partial round -- modeled on
-[teneo.ai](https://www.teneo.ai)'s own buttons (Tailwind's
-`rounded-full`, confirmed from their actual built CSS, not a guess).
-Their heading font, Neo Sans Pro, is a commercial Monotype typeface
-RAIN has no license to redistribute, so it's deliberately not part of
-this -- only the button shape carried over, not their type system.
+into `base.html`'s inline `<style>`, feeding a `--btn-radius` custom
+property. Split out from `--radius-sm` (the token every other small
+element still uses) since this picker is only meant to change button
+shape. "Rounded" is a full `999px` pill, modeled on
+[teneo.ai](https://www.teneo.ai)'s buttons (Tailwind's `rounded-full`,
+confirmed from their built CSS). Their heading font, Neo Sans Pro, is a
+commercial Monotype typeface RAIN has no license to redistribute, so
+only the button shape carried over.
 
 ## Why no Tailwind/htmx/Alpine
 
-The plan called for a server-rendered UI with HTMX/Alpine + Tailwind. In
-practice the UI's actual surface -- nav expand/collapse, reloading a
-custom-fields fragment when the asset type changes, confirm-before-delete
--- is about 70 lines of vanilla JS, and the visual design is one hand-written
-CSS file using custom properties for the accent color. Dropping the three
-libraries removes an entire JS supply chain (nothing to download at image
-build time, nothing to patch for CVEs, no version pinning to maintain) at
-no real cost to the UI. If a later feature's interactions outgrow plain
-`fetch()` calls, htmx is a single `<script>` tag away and nothing here
-would need to change to adopt it. The one addition since, `static/js/live.js`,
-follows the same rule: a plain `WebSocket` client with
-no library, kept in its own file (loaded only on the live-viewer page via
-`{% block extra_scripts %}`) rather than bloating the shared `app.js`.
+The plan called for a server-rendered UI with HTMX/Alpine + Tailwind.
+In practice the UI's actual surface -- nav expand/collapse, reloading a
+custom-fields fragment when the asset type changes, confirm-before-
+delete -- is about 70 lines of vanilla JS, and the visual design is one
+hand-written CSS file using custom properties for the accent color.
+Dropping the three libraries removes a JS supply chain (nothing to
+download at build time, nothing to patch for CVEs, no version pinning)
+at no real cost. If a later feature outgrows plain `fetch()`, htmx is
+a single `<script>` tag away. `static/js/live.js`, the one addition
+since, follows the same rule: a plain `WebSocket` client, no library,
+kept in its own file (loaded only on the live-viewer page) rather than
+bloating the shared `app.js`.
 
 ## Asset Registry
 
 - `asset_types` / `custom_fields` (EAV field definitions, `asset_type_id`
   nullable = applies to every type; `scope="asset"` here, `scope="ticket"`
-  for the Ticketing section's own custom fields below -- one shared
-  definitions table, filtered by scope at every call site) / `assets` /
+  for Ticketing's own custom fields below -- one shared definitions
+  table, filtered by scope at every call site) / `assets` /
   `asset_field_values`.
 - CSV/JSON import: upload → column-to-field mapping (auto-suggested by
   header name) → commit, upserting by `external_id` when present
   (`rain.modules.assets.importer`).
 - CSV/JSON export: ad-hoc or saved `export_profiles` -- pick columns,
-  headers, and order (`rain.modules.assets.exporter`).
+  headers, order (`rain.modules.assets.exporter`).
 
 ## Ticketing
 
@@ -261,76 +241,69 @@ log { source(s_src); destination(d_rain); };
 ```
 
 **Message format detection.** `syslog_parser` only strips the RFC
-envelope (PRI, timestamp, host, tag) -- what's left, the message body
-itself, isn't always plain text. `rain.modules.tickets.event_formats`
-recognizes CEF (`CEF:...`, what most SIEMs/EDRs can emit, Wazuh
-included), a JSON object, or loose Splunk-style `key=value` pairs, and
-parses whichever it finds; a message that's none of those is left
-exactly as `syslog_parser` produced it ("plain"). A recognized body's
-extracted fields (CEF's header + Extension, the full JSON object, or
-every key=value pair) are stored on `SyslogEvent.parsed_fields`, and
-`SyslogEvent.message` becomes a human-readable one-line summary (CEF's
-Name field, a JSON payload's `message`/`msg`/`rule.description`/
-`full_log`, or a kv payload's `msg=`/`message=`/`description=`) instead
-of the raw structured text -- so the live viewer, a promoted ticket's
-title, and Event Promotion Policy matching against `message` all see
-something legible regardless of source format.
-Detection order is deliberately CEF, then JSON, then key=value last:
-each is checked by its own marker (CEF's prefix, JSON's brace-wrapped-
-and-actually-parses), while key=value is the loosest heuristic (needs
-2+ pairs) and would false-positive on a CEF extension's own body if
-checked first. `host`/`program`/`facility`/`severity` are untouched
-either way -- they already came from the envelope, not the message body.
+envelope (PRI, timestamp, host, tag) -- the message body itself isn't
+always plain text. `rain.modules.tickets.event_formats` recognizes CEF
+(`CEF:...`, what most SIEMs/EDRs emit, Wazuh included), a JSON object,
+or loose Splunk-style `key=value` pairs; anything else is left exactly
+as `syslog_parser` produced it ("plain"). A recognized body's extracted
+fields (CEF's header + Extension, the full JSON object, every key=value
+pair) go on `SyslogEvent.parsed_fields`, and `SyslogEvent.message`
+becomes a human-readable one-line summary (CEF's Name field, a JSON
+payload's `message`/`msg`/`rule.description`/`full_log`, a kv payload's
+`msg=`/`message=`/`description=`) instead of the raw structured text --
+so the live viewer, a promoted ticket's title, and Event Promotion
+Policy matching against `message` all see something legible. Detection
+order is CEF, then JSON, then key=value last: key=value is the loosest
+heuristic (needs 2+ pairs) and would false-positive on a CEF
+extension's own body if checked first. `host`/`program`/`facility`/
+`severity` come from the envelope either way, untouched.
 
-**Tenant routing.** The tenant isn't known yet at the point an event
+**Tenant routing.** The tenant isn't known at the point an event
 arrives, so `control.syslog_source_map` (host/program pattern → tenant,
-evaluated in order, first match wins) has to live in `control`, not a
-tenant schema -- see `rain.modules.tickets.routing`. Unmatched events are
+evaluated in order, first match wins) lives in `control`, not a tenant
+schema -- see `rain.modules.tickets.routing`. Unmatched events are
 dropped; Admin > Syslog Sources shows the listener port and lets
 `internal_admin` add mapping rules (a pattern of `.*` + regex acts as a
 catch-all).
 
 **Persistence + live viewer.** Every routed event is written to that
-tenant's `syslog_events` (a rolling window, trimmed by a retention sweep --
-`rain.core.tenant_config` holds the per-tenant `event_retention_days`,
-default 14; promoted events are never deleted) and published to a
-per-tenant Postgres `NOTIFY` channel (`rain.modules.tickets.live_bus`,
-channel `rain_syslog_<schema>`). The live viewer
-(`GET /tickets/live` + `WS /tickets/live/ws`) sends the last 50 buffered
-events on connect, then forwards new ones as they're published; filtering
-(by severity threshold and free-text) happens client-side in
-`static/js/live.js` so the WebSocket protocol stays a plain one-way
-server→client push. The WebSocket route resolves its session manually
+tenant's `syslog_events` (a rolling window, trimmed by a retention
+sweep -- `rain.core.tenant_config` holds `event_retention_days`, default
+14; promoted events are never deleted) and published to a per-tenant
+Postgres `NOTIFY` channel (`rain.modules.tickets.live_bus`, channel
+`rain_syslog_<schema>`). The live viewer (`GET /tickets/live` + `WS
+/tickets/live/ws`) sends the last 50 buffered events on connect, then
+forwards new ones as published; filtering (severity threshold,
+free-text) happens client-side in `static/js/live.js` so the WebSocket
+protocol stays a plain one-way server→client push. The WebSocket route
+resolves its session manually
 (`rain.core.tenancy.resolve_ws_tenant_schema`) rather than through
-FastAPI's `Depends()` chain -- that chain is typed against `Request`, and
-FastAPI only special-cases an exact `Request`/`WebSocket` match even
-though both are Starlette `HTTPConnection` subclasses with the same
-`.cookies`.
+FastAPI's `Depends()` chain -- that chain is typed against `Request`,
+and FastAPI only special-cases an exact `Request`/`WebSocket` match
+even though both are Starlette `HTTPConnection` subclasses.
 
-The WebSocket payload itself only ever carries `message[:500]`, never
-`raw`/`parsed_fields` (`live.py`'s `_event_payload`) -- too much to push
-per event on a busy stream. `GET /tickets/live/{event_id}/full`
+The WebSocket payload only ever carries `message[:500]`, never
+`raw`/`parsed_fields` (`live.py`'s `_event_payload`) -- too much to
+push per event on a busy stream. `GET /tickets/live/{event_id}/full`
 (`live.live_event_full`) is the fetch-and-inject fragment
 (`tickets/_live_event_full.html`) that goes back to the DB for the
 complete row, shown in `#live-message-modal` -- which lives in
-`base.html`, not `live.html`, specifically so a ticket's own "Source
-event" field (`[data-source-event]` in `app.js`, wherever `ticket.
-source_event_id` is set) can open the identical window without a second
-implementation: same route, same modal, same fragment, just a
-different trigger reading a different id (a ticket's `source_event_id`
-instead of a feed row's own `data-id`). 404s past the retention window
-or a deleted event render inline in the modal rather than erroring the
-page underneath it.
+`base.html`, not `live.html`, so a ticket's own "Source event" field
+(`[data-source-event]` in `app.js`) can open the identical window
+without a second implementation: same route, same modal, same
+fragment, just a different id (`source_event_id` vs. a feed row's
+`data-id`). 404s past the retention window or a deleted event render
+inline in the modal rather than erroring the page underneath it.
 
 **Event Promotion Policies (rule engine).** Each persisted event is
 checked against that tenant's active `ticket_rules`
 (`rain.modules.tickets.rules.evaluate_and_promote`) in `sort_order`.
 `TicketRule.promotion_type` picks one of three ways a policy decides
-"this is worth a ticket" -- one table, one screen (`GET /tickets/rules/all`),
-where a single/multi-event, regex/ML distinction used to mean two
-separate models (TicketRule + CorrelationRule) evaluated by two separate
-code paths; see `TicketRule`'s own docstring and migration 0038 for why
-that split didn't earn its keep:
+"this is worth a ticket" -- one table, one screen (`GET
+/tickets/rules/all`); a single/multi-event, regex/ML distinction used
+to mean two separate models (TicketRule + CorrelationRule) evaluated by
+two separate code paths -- see `TicketRule`'s docstring and migration
+0038 for why that split didn't earn its keep:
 
 - `single`: a match (regex on `message`/`host`/`program`) becomes its own
   `Ticket` via `rain.modules.tickets.service.create_ticket`. A policy
