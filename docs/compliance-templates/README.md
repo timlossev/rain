@@ -87,6 +87,29 @@ by hand from scratch:
   (created), imported again unchanged (left alone), closed by hand, then
   imported a third time (reopened, flagged problematic, commented) --
   never more than the one ticket for that key throughout.
+- `fedramp-ocr-fields.json` -- ticket-scoped, and additive alongside
+  poam-tracking-fields.json rather than a replacement for it. Under
+  FedRAMP's 2026 Consolidated Rules (CR26), the monthly CSP-maintained
+  POA&M is being superseded by a quarterly Ongoing Certification Report
+  (OCR) plus a synchronous Quarterly Review -- POA&Ms don't disappear,
+  they become primarily an *agency*-owned artifact ("the POA&M belongs
+  to the agency when the action belongs to the agency," per fedramp.gov)
+  while CSPs report a rolling summary instead. This template covers the
+  three OCR content areas that are genuinely per-ticket concepts:
+  `accepted_vulnerability`/`acceptance_justification`/`accepted_by`/
+  `acceptance_date`/`next_ocr_period` for the OCR's "accepted
+  vulnerabilities" section, `fedramp_reportable_incident` (usable on
+  incident tickets) for its incident section, and `transformative_change`
+  (usable on change tickets) for its transformative-changes section. The
+  OCR's other required content (certification-data changes, which
+  agencies use the service, updated security recommendations) is
+  organizational narrative, not per-finding data -- authoring the actual
+  quarterly report as a RAIN Document, with a quarterly `CalendarEntry`
+  reminder, is the natural fit for that half, not a custom field.
+  poam-tracking-fields.json stays exactly as it was for non-FedRAMP
+  programs and for authorizations still on the pre-CR26 model during the
+  transition (mandatory CR26 adoption is January 1, 2027) -- nothing
+  here replaces it.
 
 To use one: Admin > Config Bundles > Tenant > Import, and pick the file.
 Each only carries `custom_fields` (and, for every asset-type template,
@@ -95,7 +118,7 @@ touching anything else already configured there (tickets, webhooks,
 groups, users, and so on are untouched, since the bundle simply doesn't
 mention them). Once imported, an asset-type template populates like any
 other asset type under Assets > + New, using its own custom-fields form
-the same way you would for any other asset; the two ticket-scoped
+the same way you would for any other asset; the three ticket-scoped
 templates' fields show up directly on the ticket form and in the CSV
 importer's own column-mapping screen, the same as any other
 ticket-scoped custom field.
@@ -109,6 +132,6 @@ imports into whichever tenant your session currently has active (Admin
 different one, and nothing about the file's own contents changes that.
 
 These are starting points, not a fixed schema -- rename, add, or drop
-fields afterward under Admin > Asset Types (or, for the two
+fields afterward under Admin > Asset Types (or, for the three
 ticket-scoped templates, Tickets > Custom Fields) the same as you
 would for any asset type or field you built yourself.

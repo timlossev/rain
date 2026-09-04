@@ -1,0 +1,80 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "FedRAMP Ongoing Certification Report (OCR) fields starter template",
+  "secrets_included": false,
+  "custom_fields": [
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "accepted_vulnerability",
+      "label": "Accepted vulnerability (OCR)",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 0
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "acceptance_justification",
+      "label": "Acceptance justification",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 1
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "accepted_by",
+      "label": "Accepted by",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "acceptance_date",
+      "label": "Acceptance date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "next_ocr_period",
+      "label": "Next OCR reporting period",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "fedramp_reportable_incident",
+      "label": "FedRAMP reportable incident",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "transformative_change",
+      "label": "Transformative change",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    }
+  ]
+}

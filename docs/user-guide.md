@@ -1453,19 +1453,20 @@ created with. Importing upserts by name/key, same as the platform
 bundle -- a re-import updates matching rows rather than duplicating
 them, except a local user, which is never overwritten once it exists.
 
-The same Import expects any tenant bundle file, including the eleven
+The same Import expects any tenant bundle file, including the twelve
 starter compliance-register templates shipped in `docs/
 compliance-templates/` (a Risk Register, a Subprocessor Register, a
 PIV/CAC Card issuance log, a Software License/vendor register, a Cloud
 Environment register, an Encryption Key/Certificate register, a System
 Interconnection register, a Contractor Access register, a Data
-Inventory register, a POA&M tracking-fields set, and a Nessus
-finding-fields set) -- import one to get a usable register in a few
-clicks instead of building the asset type by hand. Every one of them
-is an asset type plus its custom fields except the two ticket-scoped
-templates (POA&M and Nessus), since a ticket's own lifecycle is what
-that data actually tracks, not a persistent asset's -- see
-`docs/compliance-templates/README.md` for what each one actually
-seeds, including how the Nessus one already works with the existing
-CSV ticket importer today, no dedicated Nessus importer needed for a
-one-time bulk import.
+Inventory register, a POA&M tracking-fields set, a Nessus
+finding-fields set, and a FedRAMP OCR-fields set) -- import one to get
+a usable register in a few clicks instead of building the asset type by
+hand. Every one of them is an asset type plus its custom fields except
+the three ticket-scoped templates (POA&M, Nessus, and FedRAMP OCR),
+since a ticket's own lifecycle is what that data actually tracks, not a
+persistent asset's -- see `docs/compliance-templates/README.md` for
+what each one actually seeds, including how Tickets > Import accepts a
+`.nessus` scan export directly (no CSV export/remap step needed) and
+how the POA&M and FedRAMP OCR templates relate to each other (additive,
+not a replacement -- see that README for why).
