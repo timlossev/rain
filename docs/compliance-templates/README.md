@@ -66,17 +66,22 @@ by hand from scratch:
   this one holds the raw scan data (plugin ID, plugin name/family,
   scanned host, port, protocol, CVSS base score, the scanner's own risk
   factor, last-seen-in-scan date), not the remediation-lifecycle
-  metadata. Tenable's own CSV export from a Nessus scan uses column
-  names close enough to these labels (Plugin ID, CVSS Base Score, Risk,
-  Host, Protocol, Port, ...) that the existing CSV ticket importer
-  (Tickets > Import) can map a real scan's findings onto these fields
-  today, with no new code -- add a "Type" column set to `vulnerability`
-  on every row first, since the importer has no fixed-value option and
-  needs a real column to map `ticket_type` from. The import screen's own
-  "Dedup key" field (map it to a column that's unique per finding -- a
-  spreadsheet formula combining host+port+plugin ID works well) is what
-  makes a monthly re-scan safe to just re-import: a still-open match is
-  left alone (its fields still refresh, so "last seen" stays current), a
+  metadata. Entirely optional -- Tickets > Import's "Nessus scan export
+  (.nessus)" format works with zero custom fields installed at all
+  (every finding still lands as a real, deduped vulnerability ticket
+  with the full human-readable detail in its description); installing
+  this template just gets you that same data as separate, filterable/
+  exportable columns instead of only free text. Upload the plain-XML
+  `.nessus` file directly (not the separate, proprietary Nessus DB
+  format -- see rain.modules.tickets.nessus_parser's own docstring) and
+  the mapping screen arrives pre-filled: the parser's own column names
+  are chosen to exactly match this importer's target labels and, when
+  installed, this template's own field labels, so there's nothing left
+  to map by hand, just to review. A CSV export works too, the same way
+  it always has, if you'd rather map columns by hand or your source
+  isn't Nessus. The import screen's own "Dedup key" field is what makes
+  a monthly re-scan safe to just re-import: a still-open match is left
+  alone (its fields still refresh, so "last seen" stays current), a
   closed match is reopened and flagged recurring instead of creating a
   duplicate. Verified live end to end: a sample finding imported once
   (created), imported again unchanged (left alone), closed by hand, then

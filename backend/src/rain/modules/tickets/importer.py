@@ -37,7 +37,28 @@ re-import. A *closed* match is treated as a regression: reopened (into
 whichever status key "open" resolves to for this tenant -- if that key
 doesn't exist, left closed with a warning rather than guessed at),
 flagged is_problematic (this is by definition no longer a one-off), and
-commented with which import row caused it."""
+commented with which import row caused it.
+
+fmt="nessus" is the one format that isn't really "the user maps
+arbitrary columns" -- rain.modules.tickets.nessus_parser turns a
+`.nessus` file into rows pre-keyed by this importer's own target labels
+(and by docs/compliance-templates/nessus-finding-fields.json's own
+field labels, if that template's installed), so the existing
+case-insensitive auto-suggestion in rain.modules.tickets.router.
+import_preview wires up a fully pre-filled mapping screen on its own --
+still reviewable there like any other import, just nothing to actually
+type. See that module's own docstring for the .nessus-vs-Nessus-DB
+distinction and the severity-0 filtering.
+
+Row creation batches into one commit at the very end (see
+commit_import's own comment) rather than one commit per row -- fine for
+a handful of hand-typed CSV rows, not for a real scan's few hundred
+findings in one request. Reopen-path writes (update_status/add_comment/
+update_problematic, all used elsewhere with their own immediate-commit
+expectations) are deliberately left unbatched -- regressions are the
+minority of rows in any real import, so their per-row cost doesn't
+dominate, and batching them too would mean touching several more
+shared functions' transaction semantics for little added benefit."""
 from __future__ import annotations
 
 import csv
@@ -50,10 +71,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from rain.modules.assets.schemas import coerce_field_value
 from rain.modules.tickets import service
+from rain.modules.tickets.nessus_parser import NESSUS_COLUMNS, parse_nessus_rows
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPES
 
 
 def sniff_headers(raw: bytes, fmt: str) -> list[str]:
+    if fmt == "nessus":
+        return list(NESSUS_COLUMNS)
     if fmt == "json":
         data = json.loads(raw.decode("utf-8"))
         return list(data[0].keys()) if data else []
@@ -62,6 +86,8 @@ def sniff_headers(raw: bytes, fmt: str) -> list[str]:
 
 
 def parse_rows(raw: bytes, fmt: str) -> list[dict[str, Any]]:
+    if fmt == "nessus":
+        return parse_nessus_rows(raw)
     if fmt == "json":
         return json.loads(raw.decode("utf-8"))
     text = raw.decode("utf-8-sig")
@@ -136,6 +162,11 @@ async def commit_import(
             existing = await service.get_ticket_by_external_key(db, key) if key else None
 
             if existing is None:
+                # commit=False -- batched into the one commit at the end
+                # of this function instead (see this module's own
+                # docstring on why, and create_ticket's own comment on
+                # why external_finding_key is set here, at construction,
+                # rather than as a second write after the fact).
                 ticket = await service.create_ticket(
                     db,
                     ticket_type=raw_type,
@@ -144,6 +175,7 @@ async def commit_import(
                     severity=severity,
                     reporter_user_id=actor_id,
                     external_finding_key=key or None,
+                    commit=False,
                 )
                 result.created += 1
             else:
@@ -176,10 +208,25 @@ async def commit_import(
                 if col and col in row:
                     values[field_id] = coerce_field_value(field_def.field_type, row.get(col))
             if values:
+                # Not committed here either -- set_ticket_field_values
+                # only ever flushes, same as create_ticket(commit=False)
+                # above; both land in the one commit below.
                 await service.set_ticket_field_values(db, ticket, values)
-                await db.commit()
 
         except Exception as exc:  # one bad row shouldn't abort the whole import
             result.errors.append(f"row {i}: {exc}")
+            # Pre-existing behavior, not something batching changes: a
+            # row can still fail *after* create_ticket already succeeded
+            # (a bad custom field value, say) -- that ticket was already
+            # flushed and has no way to un-flush short of a per-row
+            # SAVEPOINT this importer doesn't take, so it's included in
+            # the commit below despite this row being reported as an
+            # error. What batching actually changes is a different risk:
+            # a real DB-level failure here (not a Python-level one)
+            # leaves the whole transaction aborted, and every row after
+            # it in this same import fails too -- same accepted trade-off
+            # rain.modules.assets.importer's own single-commit-at-the-end
+            # already makes, not a new one.
 
+    await db.commit()
     return result

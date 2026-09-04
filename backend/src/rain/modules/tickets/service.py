@@ -129,6 +129,7 @@ async def create_ticket(
     reporter_user_id: int | None = None,
     reported_anonymously: bool = False,
     external_finding_key: str | None = None,
+    commit: bool = True,
 ) -> Ticket:
     # reported_anonymously only means anything when there's no
     # reporter_user_id to begin with -- normalized here (not just left to
@@ -169,16 +170,23 @@ async def create_ticket(
         if event is not None:
             event.promoted_ticket_id = ticket.id
 
-    await db.commit()
+    # commit=False -- rain.modules.tickets.importer's bulk path, batching
+    # many rows into one commit at the end instead of one round trip per
+    # ticket. Every other caller (manual creation, syslog promotion,
+    # Service Catalog submission) keeps the immediate-commit default,
+    # since each of those is a single ticket per request with no reason
+    # to defer it.
+    if commit:
+        await db.commit()
 
     # The reporter and (if set at creation time) the assignee are always
     # watchers -- not an opt-in the way the ticket detail page's "Watch"
     # button is for anyone else. No-op for an anonymous portal submission
     # (reporter_user_id is None) since there's no account to watch as.
     if reporter_user_id is not None:
-        await add_watcher(db, ticket.id, reporter_user_id)
+        await add_watcher(db, ticket.id, reporter_user_id, commit=commit)
     if assignee_user_id is not None:
-        await add_watcher(db, ticket.id, assignee_user_id)
+        await add_watcher(db, ticket.id, assignee_user_id, commit=commit)
 
     # Platform event rules (Admin > Platform Events) react to every newly
     # created ticket regardless of origin -- both this function's callers
@@ -370,11 +378,14 @@ async def watching_ticket_ids(db: AsyncSession, ticket_ids: set[int], user_id: i
     return set(result.scalars())
 
 
-async def add_watcher(db: AsyncSession, ticket_id: int, user_id: int) -> None:
+async def add_watcher(db: AsyncSession, ticket_id: int, user_id: int, *, commit: bool = True) -> None:
     if await is_watching(db, ticket_id, user_id):
         return
     db.add(TicketWatcher(ticket_id=ticket_id, user_id=user_id))
-    await db.commit()
+    if commit:
+        await db.commit()
+    else:
+        await db.flush()
 
 
 async def add_watcher_by_email(db: AsyncSession, ticket_id: int, email: str) -> None:

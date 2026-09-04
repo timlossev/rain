@@ -1134,3 +1134,80 @@ async def test_ticket_import_dedup_by_external_finding_key():
 
         # Still only ever the one ticket for this key across all three imports.
         assert len(await service.list_tickets(session, ticket_type="vulnerability")) == 1
+
+
+_SAMPLE_NESSUS_XML = b"""<?xml version="1.0" ?>
+<NessusClientData_v2>
+<Report name="Sample Scan">
+<ReportHost name="web01.internal">
+<HostProperties>
+<tag name="host-ip">10.0.0.5</tag>
+</HostProperties>
+<ReportItem port="443" protocol="tcp" severity="2" pluginID="51192" pluginName="SSL Certificate Cannot Be Trusted" pluginFamily="General">
+<description>Cert chain is not trusted.</description>
+<risk_factor>Medium</risk_factor>
+<cvss_base_score>6.4</cvss_base_score>
+</ReportItem>
+<ReportItem port="0" protocol="tcp" severity="0" pluginID="19506" pluginName="Nessus Scan Information" pluginFamily="Settings">
+<description>Scan details.</description>
+</ReportItem>
+</ReportHost>
+</Report>
+</NessusClientData_v2>
+"""
+
+
+async def test_nessus_import_parses_maps_and_dedups_end_to_end():
+    """rain.modules.tickets.nessus_parser.parse_nessus_rows feeding
+    rain.modules.tickets.importer.commit_import, the same pipeline
+    Tickets > Import's "Nessus scan export (.nessus)" format uses --
+    covers the Info-severity (0) finding being dropped before it's even
+    a row, and that the parser's own column names (chosen to match this
+    importer's target labels and nessus-finding-fields.json's field
+    labels exactly) work as a real mapping dict, not just documentation.
+    Re-running the same file is what actually proves the two features
+    compose: the second pass matches by Dedup key and leaves the ticket
+    alone rather than creating a duplicate."""
+    from rain.db.tenant_models import CustomField, Ticket
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.modules.tickets import importer, service
+    from rain.modules.tickets.nessus_parser import parse_nessus_rows
+
+    tenant = await provision_tenant(slug="omega", name="Omega Labs")
+
+    async with tenant_session(tenant.schema_name) as session:
+        plugin_field = CustomField(scope="ticket", field_key="nessus_plugin_id", label="Nessus plugin ID", field_type="text")
+        session.add(plugin_field)
+        await session.commit()
+
+        rows = parse_nessus_rows(_SAMPLE_NESSUS_XML)
+        assert len(rows) == 1  # the severity=0 row never became one
+
+        mapping = {
+            "ticket_type": "Type",
+            "title": "Title",
+            "description": "Description",
+            "severity": "Severity",
+            "upsert_key": "Dedup key (optional)",
+            f"field_{plugin_field.id}": "Nessus plugin ID",
+        }
+        first = await importer.commit_import(session, rows=rows, mapping=mapping, actor_id=None)
+        assert (first.created, first.reopened, first.unchanged, first.errors) == (1, 0, 0, [])
+
+        tickets = await service.list_tickets(session, ticket_type="vulnerability")
+        ticket = next(t for t in tickets if "SSL Certificate" in t.title)
+        assert ticket.severity == "medium"
+        assert ticket.external_finding_key == "nessus:10.0.0.5:443:tcp:51192"
+        assert {fv.field_id: fv.value for fv in ticket.field_values} == {plugin_field.id: "51192"}
+
+        # commit=False batching (create_ticket/add_watcher) didn't skip
+        # committing entirely -- the ticket is really durable once
+        # commit_import returns, not just flushed.
+        assert await session.get(Ticket, ticket.id, populate_existing=True) is not None
+
+        # Re-importing the identical file: same finding, same key,
+        # left unchanged rather than duplicated.
+        second = await importer.commit_import(session, rows=parse_nessus_rows(_SAMPLE_NESSUS_XML), mapping=mapping, actor_id=None)
+        assert (second.created, second.unchanged) == (0, 1)
+        assert len(await service.list_tickets(session, ticket_type="vulnerability")) == 1

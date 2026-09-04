@@ -401,16 +401,28 @@ link.
 
 ### Import (tickets)
 
-At Records Authority > Import. Upload a CSV or JSON file, then map its
-columns to Type, Title, Description, Severity, Dedup key, and (if your
-tenant has defined any) each custom field -- Type and Title are
-required, the rest optional. Each row becomes a new incident or
-vulnerability ticket; a row whose Type is Change is rejected rather
-than silently filed without one, since a change needs an approval flow
-attached, which isn't something a spreadsheet column can express --
-file those by hand instead. The result screen shows how many tickets
-were created (and, if you used a Dedup key, reopened or left
-unchanged) and lists any per-row errors or warnings.
+At Records Authority > Import. Upload a CSV, JSON, or Nessus scan
+export (.nessus) file, then map its columns to Type, Title,
+Description, Severity, Dedup key, and (if your tenant has defined any)
+each custom field -- Type and Title are required, the rest optional.
+Each row becomes a new incident or vulnerability ticket; a row whose
+Type is Change is rejected rather than silently filed without one,
+since a change needs an approval flow attached, which isn't something a
+spreadsheet column can express -- file those by hand instead. The
+result screen shows how many tickets were created (and, if you used a
+Dedup key, reopened or left unchanged) and lists any per-row errors or
+warnings.
+
+A .nessus file (the plain-XML scan export -- "File > Export > Nessus"
+on a completed scan, not the separate, proprietary Nessus DB transfer
+format) arrives at the mapping screen already filled in: Info-severity
+findings are dropped before they're even rows, and everything else --
+Type, Title, Description, Severity, Dedup key, and (if you've imported
+`docs/compliance-templates/nessus-finding-fields.json`) the scanner
+metadata fields -- is pre-mapped, still reviewable there like any other
+import. That template is optional; a .nessus upload creates real,
+deduped vulnerability tickets with the finding detail in Description
+either way, template or not.
 
 Dedup key is what makes re-running the *same* import safe on a
 recurring basis -- map it to a column that's already unique per row

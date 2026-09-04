@@ -756,6 +756,23 @@ the same three-way create/leave-alone/reopen logic) rather than
 Nessus-specific parsing logic living inside a generic CSV/JSON
 importer that has no idea what a "plugin ID" is.
 
+**Native `.nessus` upload (`rain.modules.tickets.nessus_parser`) still
+respects that boundary -- it doesn't live inside the generic importer,
+it feeds it.** `parse_nessus_rows` turns a `.nessus` file into the exact
+same flat `list[dict]` shape CSV/JSON already produce, dispatched via
+the same `fmt` parameter `sniff_headers`/`parse_rows` already branched
+on (`"nessus"` is just a third case, same as `"json"`). The one thing
+that trick buys beyond "one more accepted format": the parser controls
+its own column names, and it deliberately names them to exactly match
+this importer's own target labels ("Type", "Title", "Dedup key
+(optional)", ...) and nessus-finding-fields.json's own field labels --
+so `import_preview`'s existing case-insensitive exact-match
+auto-suggestion (written for arbitrary CSV headers, no changes needed)
+wires up a fully pre-filled mapping screen on its own. A `.nessus`
+upload's dedup key and host+port+plugin-ID composite are synthesized by
+the parser the same way; a CSV upload still needs that composed by hand
+ahead of time, per the paragraph above.
+
 ## Document Repository
 
 **Storage.** `rain.modules.documents.storage` is a small `StorageBackend`

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Import Tickets - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Upload a CSV or JSON file, then map its columns to ticket fields on the next screen. Each row becomes a new incident or vulnerability - change tickets need an approval flow attached by hand, so they aren't importable here.{% endblock %}
+{% block help_text %}Upload a CSV, JSON, or Nessus vulnerability scan (.nessus) file, then map its columns to ticket fields on the next screen (a .nessus file arrives pre-mapped, still reviewable there). Each row becomes a new incident or vulnerability - change tickets need an approval flow attached by hand, so they aren't importable here.{% endblock %}
 {% block content %}
 <div class="card" style="max-width:560px;">
   <form method="post" action="/tickets/import/preview" enctype="multipart/form-data">
@@ -9,12 +9,14 @@
       <select id="fmt" name="fmt">
         <option value="csv">CSV</option>
         <option value="json">JSON (array of objects)</option>
+        <option value="nessus">Nessus scan export (.nessus)</option>
       </select>
     </div>
     <div class="field">
       <label for="file">File</label>
-      <input type="file" id="file" name="file" accept=".csv,.json,application/json,text/csv" required>
+      <input type="file" id="file" name="file" accept=".csv,.json,application/json,text/csv,.nessus,application/xml,text/xml" required>
     </div>
+    <div class="field-hint">A .nessus file is the plain-XML scan export ("File &gt; Export &gt; Nessus" on a completed scan) - not the separate, proprietary Nessus DB transfer format, which this doesn't read. Findings below Low severity (Info) are skipped, and each finding is looked up by a scan-derived dedup key, so re-uploading a later scan of the same hosts updates matching tickets instead of duplicating them.</div>
     <button class="btn btn-primary" type="submit">Continue</button>
   </form>
 </div>

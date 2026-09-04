@@ -77,6 +77,13 @@ dependencies = [
     # without a musllinux wheel concern (same reasoning as argon2-cffi's
     # own comment, just the opposite conclusion: nothing to compile here).
     "jsonpath-ng>=1.6,<2",
+    # XXE-hardened XML parsing for the ticket importer's .nessus (Nessus
+    # vulnerability scan export) format (rain.modules.tickets.importer) --
+    # stdlib xml.etree.ElementTree parses an uploaded, untrusted file with
+    # no protection against entity expansion/external entity attacks;
+    # this wraps it with the same API, refusing the dangerous constructs
+    # outright rather than trying to sanitize them.
+    "defusedxml>=0.7.1,<0.8",
 ]
 
 [project.optional-dependencies]
