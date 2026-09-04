@@ -1,50 +1,47 @@
 # RAIN
 
 **RAIN** (Response to Asynchronous Interactions in Networks) is a
-self-hosted IT system of record built for environments that can't (or
-won't) depend on a SaaS vendor -- air-gapped networks, classified or
-controlled-unclassified enclaves, and any organization that needs its
-asset inventory, incident/vulnerability/change tickets, and compliance
-documentation to live entirely on infrastructure it controls. One
-`docker compose up` stands up the whole stack with no external service
-to reach, no telemetry phoning home, and no license server to check in
-with. It's multi-tenant, configures itself at runtime through an in-app
-setup wizard and Admin console, and every image is a minimal,
-Alpine-based build with no Node/SPA toolchain in the browser.
+self-hosted IT system of record for environments that can't rely on a
+SaaS vendor: air-gapped networks, classified or controlled-unclassified
+enclaves, and anywhere else asset inventory, tickets, and compliance
+documentation need to stay on infrastructure you control. `docker
+compose up` brings up the whole stack -- no external service to reach,
+no telemetry, no license server. It's multi-tenant, configures itself
+through an in-app setup wizard and Admin console, and ships as minimal
+Alpine images with no Node/SPA toolchain in the browser.
 
 ![RAIN screenshot](RAIN%20screenshot.png)
 
 ## Motivation
 
 Compliance frameworks -- FedRAMP, ISO 27001, PCI-DSS, SOX, and their
-international counterparts -- don't accept a policy document as evidence
-that a control is satisfied. They require an artifact: a change ticket
-showing who approved what and when, an incident record with a full
-timeline, a CMDB entry proving an asset was tracked. A structured
-system of record is the only mechanism that generates that evidence
-continuously, at a scale a third-party assessor can sample and verify.
-In a reference FedRAMP High authorization package, 33 of 409
+international counterparts -- don't accept a policy document as proof a
+control is satisfied. They want an artifact: a change ticket showing
+who approved what and when, an incident record with a full timeline, a
+CMDB entry proving an asset was tracked. A structured system of record
+is what generates that evidence continuously, at a scale an assessor
+can actually sample. In a reference FedRAMP High package, 33 of 409
 implemented controls depend on exactly this -- see
 [`docs/itsm-controls-mapping.md`](docs/itsm-controls-mapping.md) for
-the full control-by-control breakdown across a dozen frameworks
-worldwide, and [`docs/eucs-compliance-assessment.md`](docs/eucs-compliance-assessment.md)
-for a scope-honest look at where that argument does and doesn't extend
-to the EU Cybersecurity Certification Scheme for Cloud Services. Custom
-asset types and ticket fields are how RAIN adapts to any framework's own
-paperwork with no code -- [`docs/compliance-templates/`](docs/compliance-templates/)
-ships a dozen of these as ready-to-import `.rain` config bundles (a risk
-register, a Nessus finding-fields set, FedRAMP's own 2026 quarterly
-reporting fields, and others) for common registers most compliance-
-minded tenants would otherwise build by hand.
+the full breakdown across a dozen frameworks, and
+[`docs/eucs-compliance-assessment.md`](docs/eucs-compliance-assessment.md)
+for how far that argument extends to the EU Cybersecurity Certification
+Scheme for Cloud Services. Custom asset types and ticket fields let
+RAIN adapt to any framework's paperwork with no code --
+[`docs/compliance-templates/`](docs/compliance-templates/) ships a
+dozen ready-to-import `.rain` config bundles (a risk register, a Nessus
+finding-fields set, FedRAMP's 2026 quarterly reporting fields, and
+others) for registers most compliance teams would otherwise build by
+hand.
 
-Those tickets have to originate from somewhere, which is why RAIN is
-deliberately "bring your own" for detection -- monitoring, SIEM, XDR,
-antivirus, whatever's already watching the environment. RAIN doesn't
-try to replace any of that; the event bus is a built-in Syslog listener
-(auto-detecting plain text, CEF, JSON, and Splunk-style key=value
-bodies, no per-source configuration) rather than a growing list of
-bespoke integrations, so pointing whatever's already generating alerts
-at RAIN is enough to get started.
+Those tickets have to come from somewhere, so RAIN is deliberately
+"bring your own" for detection -- monitoring, SIEM, XDR, antivirus,
+whatever's already watching the environment. It doesn't try to replace
+any of that. The event bus is a built-in syslog listener, not a
+growing list of bespoke integrations, that auto-detects plain text,
+CEF, JSON, and Splunk-style key=value bodies with no per-source setup
+-- pointing whatever's already generating alerts at RAIN is enough to
+get started.
 
 ## Capabilities
 
