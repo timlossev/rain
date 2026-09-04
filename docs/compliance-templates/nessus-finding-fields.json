@@ -1,0 +1,100 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-04T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "Nessus finding fields starter template",
+  "secrets_included": false,
+  "custom_fields": [
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "nessus_plugin_id",
+      "label": "Nessus plugin ID",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 0
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "nessus_plugin_name",
+      "label": "Plugin name",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 1
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "nessus_plugin_family",
+      "label": "Plugin family",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "nessus_host",
+      "label": "Scanned host",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "port",
+      "label": "Port",
+      "field_type": "number",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "protocol",
+      "label": "Protocol",
+      "field_type": "select",
+      "select_options": ["tcp", "udp", "icmp", "other"],
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "cvss_base_score",
+      "label": "CVSS base score",
+      "field_type": "number",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "risk_factor",
+      "label": "Risk factor (scanner-assigned)",
+      "field_type": "select",
+      "select_options": ["None", "Low", "Medium", "High", "Critical"],
+      "is_required": false,
+      "sort_order": 7
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "field_key": "last_seen_scan_date",
+      "label": "Last seen in scan",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 8
+    }
+  ]
+}

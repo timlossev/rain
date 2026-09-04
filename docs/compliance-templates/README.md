@@ -49,31 +49,50 @@ by hand from scratch:
   classification level, system/location, owner, retention period, and
   applicable regulation) for a basic data inventory/classification
   register. Each Asset's own "Name" is the data asset's name.
-- `poam-tracking-fields.json` -- the one template that isn't an asset
-  type. A POA&M item's lifecycle (opened, tracked, closed or
-  risk-accepted) is a ticket's lifecycle, not a persistent asset's, so
-  this seeds *ticket* custom fields instead (POA&M ID, finding source,
-  CVE/finding ID, original risk rating, scheduled completion date,
-  point of contact, affected systems, deviation type and
-  justification) -- applying tenant-wide, across all three ticket
-  types, the same as every ticket-scoped field does. File a POA&M item
-  as a vulnerability ticket (or whichever type the underlying finding
-  actually is) and these fields show up on it. One real gap: FedRAMP's
-  own POA&M template expects discrete, individually-dated milestones
-  per item, and RAIN has no first-class milestone list -- a ticket's
-  timestamped comment thread and status history is the practical
-  substitute, not a literal replacement.
+- `poam-tracking-fields.json` -- ticket-scoped, not an asset type. A
+  POA&M item's lifecycle (opened, tracked, closed or risk-accepted) is
+  a ticket's lifecycle, not a persistent asset's: POA&M ID, finding
+  source, CVE/finding ID, original risk rating, scheduled completion
+  date, point of contact, affected systems, deviation type and
+  justification. File a POA&M item as a vulnerability ticket (or
+  whichever type the underlying finding actually is) and these fields
+  show up on it. One real gap: FedRAMP's own POA&M template expects
+  discrete, individually-dated milestones per item, and RAIN has no
+  first-class milestone list -- a ticket's timestamped comment thread
+  and status history is the practical substitute, not a literal
+  replacement.
+- `nessus-finding-fields.json` -- also ticket-scoped, and deliberately
+  complementary to poam-tracking-fields.json rather than overlapping it:
+  this one holds the raw scan data (plugin ID, plugin name/family,
+  scanned host, port, protocol, CVSS base score, the scanner's own risk
+  factor, last-seen-in-scan date), not the remediation-lifecycle
+  metadata. Tenable's own CSV export from a Nessus scan uses column
+  names close enough to these labels (Plugin ID, CVSS Base Score, Risk,
+  Host, Protocol, Port, ...) that the existing CSV ticket importer
+  (Tickets > Import) can map a real scan's findings onto these fields
+  today, with no new code -- add a "Type" column set to `vulnerability`
+  on every row first, since the importer has no fixed-value option and
+  needs a real column to map `ticket_type` from. Verified live: a
+  2-finding sample scan CSV, mapped through the existing import
+  screen, created two vulnerability tickets with plugin ID/host/port
+  landing on the right fields. What this *doesn't* give you: the CSV
+  importer has no dedup key, so re-importing next month's scan of the
+  same hosts creates fresh duplicate tickets for every still-open
+  finding rather than recognizing them -- a real re-scan workflow needs
+  a dedicated `.nessus` (XML) importer with its own dedup/regression
+  logic on top of this same field set, not yet built.
 
 To use one: Admin > Config Bundles > Tenant > Import, and pick the file.
-Each only carries `custom_fields` (and, for every one but poam-
-tracking-fields.json, `asset_types`) -- importing one adds that to the
-active tenant without touching anything else already configured there
-(tickets, webhooks, groups, users, and so on are untouched, since the
-bundle simply doesn't mention them). Once imported, an asset-type
-template populates like any other asset type under Assets > + New,
-using its own custom-fields form the same way you would for any other
-asset; poam-tracking-fields.json's fields show up directly on the
-ticket form, the same as any other ticket-scoped custom field.
+Each only carries `custom_fields` (and, for every asset-type template,
+`asset_types`) -- importing one adds that to the active tenant without
+touching anything else already configured there (tickets, webhooks,
+groups, users, and so on are untouched, since the bundle simply doesn't
+mention them). Once imported, an asset-type template populates like any
+other asset type under Assets > + New, using its own custom-fields form
+the same way you would for any other asset; the two ticket-scoped
+templates' fields show up directly on the ticket form and in the CSV
+importer's own column-mapping screen, the same as any other
+ticket-scoped custom field.
 
 Every one of these files carries a `source_tenant_slug`/
 `source_tenant_name` of `"template"`/"... starter template" -- that's
@@ -84,6 +103,6 @@ imports into whichever tenant your session currently has active (Admin
 different one, and nothing about the file's own contents changes that.
 
 These are starting points, not a fixed schema -- rename, add, or drop
-fields afterward under Admin > Asset Types (or, for poam-tracking-
-fields.json, Tickets > Custom Fields) the same as you would for any
-asset type or field you built yourself.
+fields afterward under Admin > Asset Types (or, for the two
+ticket-scoped templates, Tickets > Custom Fields) the same as you
+would for any asset type or field you built yourself.
