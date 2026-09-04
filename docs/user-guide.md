@@ -402,14 +402,32 @@ link.
 ### Import (tickets)
 
 At Records Authority > Import. Upload a CSV or JSON file, then map its
-columns to Type, Title, Description, Severity, and (if your tenant has
-defined any) each custom field -- Type and Title are required, the rest
-optional. Each row becomes a new incident or vulnerability ticket; a row
-whose Type is Change is rejected rather than silently filed without one,
-since a change needs an approval flow attached, which isn't something a
-spreadsheet column can express -- file those by hand instead. The result
-screen shows how many tickets were created and lists any per-row errors
-or warnings.
+columns to Type, Title, Description, Severity, Dedup key, and (if your
+tenant has defined any) each custom field -- Type and Title are
+required, the rest optional. Each row becomes a new incident or
+vulnerability ticket; a row whose Type is Change is rejected rather
+than silently filed without one, since a change needs an approval flow
+attached, which isn't something a spreadsheet column can express --
+file those by hand instead. The result screen shows how many tickets
+were created (and, if you used a Dedup key, reopened or left
+unchanged) and lists any per-row errors or warnings.
+
+Dedup key is what makes re-running the *same* import safe on a
+recurring basis -- map it to a column that's already unique per row
+(a vulnerability scan's own finding ID, or a spreadsheet formula
+combining a few columns, e.g. host+port+plugin ID) and each row is
+looked up by that value before deciding what to do: no match creates a
+new ticket same as always; a match that's still open is left alone
+(title/description/severity are never overwritten -- only its custom
+field values refresh, so a "last seen" or "current CVSS score" field
+stays current); a match that's been closed is treated as a regression
+-- reopened, flagged Problematic, and commented with which import
+caused it, rather than filed as a second ticket for the same
+underlying issue. Leave Dedup key unmapped for a plain one-time import,
+same as before this existed. See "Infrastructure drift detection"
+above for the closest sibling pattern (a document's own diff-on-
+refresh) and `docs/compliance-templates/nessus-finding-fields.json`
+for a ready-made field set this pairs well with.
 
 ### Service Catalog
 

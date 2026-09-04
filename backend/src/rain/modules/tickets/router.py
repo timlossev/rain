@@ -1352,6 +1352,7 @@ async def import_preview(
         ("title", "Title"),
         ("description", "Description"),
         ("severity", "Severity"),
+        ("upsert_key", "Dedup key (optional)"),
     ] + [(f"field_{f.id}", f.label) for f in fields]
     suggestions = {}
     for target_key, target_label in targets:

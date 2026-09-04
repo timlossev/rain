@@ -128,6 +128,7 @@ async def create_ticket(
     assignee_user_id: int | None = None,
     reporter_user_id: int | None = None,
     reported_anonymously: bool = False,
+    external_finding_key: str | None = None,
 ) -> Ticket:
     # reported_anonymously only means anything when there's no
     # reporter_user_id to begin with -- normalized here (not just left to
@@ -152,8 +153,15 @@ async def create_ticket(
         assignee_user_id=assignee_user_id,
         reporter_user_id=reporter_user_id,
         reported_anonymously=reported_anonymously,
+        external_finding_key=external_finding_key,
     )
     db.add(ticket)
+    # Set on construction, not after the fact -- external_finding_key
+    # carries a real DB-level UniqueConstraint (migration 0050), and
+    # this flush is what lets a racing duplicate fail *before* the
+    # ticket exists at all, rather than after (an importer catching the
+    # error post-creation would otherwise be left with an orphaned
+    # ticket it already counted as created).
     await db.flush()
 
     if source_event_id is not None:
@@ -318,6 +326,15 @@ async def get_ticket_by_ref(db: AsyncSession, ref: str) -> Ticket | None:
     match = _TICKET_REF_RE.match(ref)
     normalized = f"{match.group(1).upper()}-{int(match.group(2)):06d}" if match else ref
     result = await db.execute(_ticket_detail_stmt().where(Ticket.ticket_number == normalized))
+    return result.scalar_one_or_none()
+
+
+async def get_ticket_by_external_key(db: AsyncSession, external_finding_key: str) -> Ticket | None:
+    """Backs rain.modules.tickets.importer's dedup path -- looked up
+    regardless of the matched ticket's current status (open or closed),
+    since telling "still open" from "closed, now regressed" apart is the
+    whole point of the lookup."""
+    result = await db.execute(_ticket_detail_stmt().where(Ticket.external_finding_key == external_finding_key))
     return result.scalar_one_or_none()
 
 

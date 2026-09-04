@@ -1059,3 +1059,78 @@ async def test_deleting_asset_type_cascades_its_custom_fields():
         # calendar_link's own comment on why a plain get() would return
         # a stale identity-mapped object instead of the real DB state.
         assert await session.get(CustomField, field_id, populate_existing=True) is None
+
+
+async def test_ticket_import_dedup_by_external_finding_key():
+    """rain.modules.tickets.importer's opt-in "Dedup key" mapping end to
+    end (migration 0050, Ticket.external_finding_key): a first import
+    creates; a second import of the same key while the ticket is still
+    open leaves it alone but refreshes its custom field values; closing
+    the ticket and importing the same key again reopens it, flags it
+    is_problematic (a regression is by definition no longer a one-off),
+    and logs a comment -- and the DB's own UniqueConstraint is what a
+    racing duplicate would actually be caught by, not just the
+    service's own SELECT-before-insert check (see create_ticket's own
+    comment on why the key is set at construction time, not after)."""
+    from rain.db.tenant_models import CustomField, Ticket, TicketComment
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.modules.tickets import importer, service
+
+    tenant = await provision_tenant(slug="psi", name="Psi Analytics")
+
+    async with tenant_session(tenant.schema_name) as session:
+        # "open"/"closed" don't need seeding here -- migration 0005 seeds
+        # them (plus in_progress/resolved) for every tenant already.
+        cvss_field = CustomField(scope="ticket", field_key="cvss", label="CVSS", field_type="number")
+        session.add(cvss_field)
+        await session.commit()
+
+        row = {"Type": "vulnerability", "Title": "Outdated TLS", "Key": "nessus:10.0.0.5:443:51192", "CVSS": "4.3"}
+        first = await importer.commit_import(
+            session, rows=[row], mapping={"ticket_type": "Type", "title": "Title", "upsert_key": "Key", f"field_{cvss_field.id}": "CVSS"}, actor_id=None
+        )
+        assert (first.created, first.reopened, first.unchanged) == (1, 0, 0)
+
+        tickets = await service.list_tickets(session, ticket_type="vulnerability")
+        ticket = next(t for t in tickets if t.title == "Outdated TLS")
+        assert ticket.external_finding_key == "nessus:10.0.0.5:443:51192"
+
+        # Same key, still open, a different CVSS this time -- left alone
+        # (no second ticket), but the field value refreshes.
+        row["CVSS"] = "5.4"
+        second = await importer.commit_import(
+            session, rows=[row], mapping={"ticket_type": "Type", "title": "Title", "upsert_key": "Key", f"field_{cvss_field.id}": "CVSS"}, actor_id=None
+        )
+        assert (second.created, second.reopened, second.unchanged) == (0, 0, 1)
+        reloaded = await service.get_ticket(session, ticket.id)
+        assert reloaded is not None
+        assert {fv.field_id: fv.value for fv in reloaded.field_values} == {cvss_field.id: 5.4}
+
+        # Close it (simulating remediation), then the same finding
+        # reappears in a later scan -- reopened, not duplicated.
+        await service.update_status(session, ticket, "closed")
+        third = await importer.commit_import(
+            session, rows=[row], mapping={"ticket_type": "Type", "title": "Title", "upsert_key": "Key", f"field_{cvss_field.id}": "CVSS"}, actor_id=None
+        )
+        assert (third.created, third.reopened, third.unchanged) == (0, 1, 0)
+        # populate_existing=True: ticket.id has already been loaded once
+        # this session (its .comments collection eagerly populated as
+        # empty at that point) -- without it, get_ticket's own
+        # selectinload(Ticket.comments) hands back that stale, already-
+        # in-the-identity-map collection instead of re-querying it, same
+        # gotcha test_document_tags_search_and_calendar_link's own
+        # comment on populate_existing already documents for a scalar
+        # field, here for a relationship collection instead.
+        reopened_ticket = (
+            await session.execute(select(Ticket).where(Ticket.id == ticket.id).execution_options(populate_existing=True))
+        ).scalar_one()
+        assert reopened_ticket.status == "open"
+        assert reopened_ticket.is_problematic is True
+        comment_bodies = (
+            await session.execute(select(TicketComment.body).where(TicketComment.ticket_id == ticket.id))
+        ).scalars().all()
+        assert any("Reopened" in body for body in comment_bodies)
+
+        # Still only ever the one ticket for this key across all three imports.
+        assert len(await service.list_tickets(session, ticket_type="vulnerability")) == 1

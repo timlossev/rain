@@ -72,15 +72,16 @@ by hand from scratch:
   (Tickets > Import) can map a real scan's findings onto these fields
   today, with no new code -- add a "Type" column set to `vulnerability`
   on every row first, since the importer has no fixed-value option and
-  needs a real column to map `ticket_type` from. Verified live: a
-  2-finding sample scan CSV, mapped through the existing import
-  screen, created two vulnerability tickets with plugin ID/host/port
-  landing on the right fields. What this *doesn't* give you: the CSV
-  importer has no dedup key, so re-importing next month's scan of the
-  same hosts creates fresh duplicate tickets for every still-open
-  finding rather than recognizing them -- a real re-scan workflow needs
-  a dedicated `.nessus` (XML) importer with its own dedup/regression
-  logic on top of this same field set, not yet built.
+  needs a real column to map `ticket_type` from. The import screen's own
+  "Dedup key" field (map it to a column that's unique per finding -- a
+  spreadsheet formula combining host+port+plugin ID works well) is what
+  makes a monthly re-scan safe to just re-import: a still-open match is
+  left alone (its fields still refresh, so "last seen" stays current), a
+  closed match is reopened and flagged recurring instead of creating a
+  duplicate. Verified live end to end: a sample finding imported once
+  (created), imported again unchanged (left alone), closed by hand, then
+  imported a third time (reopened, flagged problematic, commented) --
+  never more than the one ticket for that key throughout.
 
 To use one: Admin > Config Bundles > Tenant > Import, and pick the file.
 Each only carries `custom_fields` (and, for every asset-type template,

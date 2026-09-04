@@ -25,6 +25,7 @@
         {% endfor %}
       </tbody>
     </table>
+    <div class="field-hint">"Dedup key" is optional -- map a column that's already a unique value per row (or a spreadsheet formula combining a few, e.g. host+port+plugin ID for a vulnerability scan) and re-running this same import later updates matching tickets instead of duplicating them: an already-open match is left alone (its custom fields still refresh), a closed match is reopened and flagged recurring. Leave it unmapped for a plain one-time import, same as before.</div>
 
     <button class="btn btn-primary" type="submit" style="margin-top:16px;">Import</button>
     <a class="btn" href="/tickets/import">Start over</a>

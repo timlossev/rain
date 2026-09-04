@@ -723,6 +723,39 @@ live: exactly this, before `.filter-bar-controls`
 `.field` these forms used to carry) and `.filter-bar-select`
 (`width: auto;`, added to every select inside one) existed.
 
+**Ticket import dedup (`Ticket.external_finding_key`, migration 0050)
+mirrors the assets importer's own `external_id` upsert deliberately --
+select-then-branch, not an atomic `ON CONFLICT`, relying on a real DB
+`UniqueConstraint` to catch a race rather than a fancier upsert (see
+`rain.modules.assets.importer`'s own docstring for why that's judged
+"clean enough" here: single-admin-runs-one-import-at-a-time is the
+realistic usage pattern, and the constraint is the actual safety net
+either way). One deliberate departure from that precedent, though:
+`create_ticket` takes `external_finding_key` as a constructor argument
+now, set on the `Ticket` object *before* its own first `flush()`,
+rather than an importer setting it in a second step after the row
+already exists (the assets importer's own `external_id` was already
+right about this -- passed into `Asset(...)` at construction, same
+reasoning). Setting it after the fact would mean a racing duplicate's
+`UniqueConstraint` violation fires on that *second* write, by which
+point the ticket already exists and has already been counted as
+created -- an importer catching that exception would be left with an
+orphaned, un-deduped ticket rather than a clean "this row failed"
+outcome. Constructing it with the key already set makes the whole
+insert atomic: a race fails before the ticket exists at all.
+
+A single mapped "Dedup key" column is deliberately the entire
+mechanism -- no multi-column composite-key builder in the importer
+itself. A source whose natural identity spans several fields (a
+vulnerability scanner's host+port+plugin-ID, say -- see "Infrastructure
+drift detection" above for the closest sibling pattern, a document's
+own diff-on-refresh) needs that composed into one column before the
+file reaches this importer. Keeps the mechanism generic (any future
+source with its own stable per-row identity reuses the same column and
+the same three-way create/leave-alone/reopen logic) rather than
+Nessus-specific parsing logic living inside a generic CSV/JSON
+importer that has no idea what a "plugin ID" is.
+
 ## Document Repository
 
 **Storage.** `rain.modules.documents.storage` is a small `StorageBackend`

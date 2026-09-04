@@ -529,6 +529,14 @@ class Ticket(TenantBase):
     source_catalog_item_id: Mapped[int | None] = mapped_column(
         ForeignKey("service_catalog_items.id", ondelete="SET NULL"), nullable=True
     )
+    # Optional (see migration 0050) -- a deterministic identity from an
+    # external system's own recurring export (a vulnerability scanner's
+    # CSV, today), unique when set, NULL for every ticket created any
+    # other way. What rain.modules.tickets.importer's "Dedup key" mapping
+    # target looks a row up by before deciding whether to create a new
+    # ticket, leave an already-open match alone, or reopen a closed one
+    # (a regression) -- see that module's own docstring.
+    external_finding_key: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
     # change tickets only -- the maintenance/implementation window, with a
     # time of day (not just a day -- <input type="datetime-local">).
     # Shown on the tenant calendar alongside CalendarEntry rows, which

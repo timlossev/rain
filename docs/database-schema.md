@@ -97,7 +97,7 @@ out per-column below as "cross-schema" wherever it appears.
 | Table | Purpose |
 |---|---|
 | `ticket_statuses` | Tenant-defined status set (`Open`, `In Progress`, ...) replacing a fixed enum -- `key`/`label`/`color`/`is_closed`/`is_active`/`sort_order`. `Ticket.status` stores `key` as a plain string, app-validated, not a real FK. |
-| `tickets` | The record itself -- `ticket_number` (`INC-`/`VULN-`/`CHG-000123`), `ticket_type`, `title`, `description`, `status`, `severity`, `asset_id`, `source_event_id`/`source_rule_id`/`source_ticket_id`/`source_catalog_item_id` (where it came from, all nullable), `start_date`/`end_date` (change tickets' maintenance window), `is_problematic`, `assignee_user_id`/`reporter_user_id` (cross-schema), `reported_anonymously`, `closed_at`. `search_vector` is a `GENERATED ALWAYS AS ... STORED` `tsvector` (never written from Python). `embedding` (`pgvector`, dimension 1536) only exists when `ENABLE_PGVECTOR` is on -- unpopulated, nothing reads or writes it (see `docs/architecture.md`'s Search section). |
+| `tickets` | The record itself -- `ticket_number` (`INC-`/`VULN-`/`CHG-000123`), `ticket_type`, `title`, `description`, `status`, `severity`, `asset_id`, `source_event_id`/`source_rule_id`/`source_ticket_id`/`source_catalog_item_id` (where it came from, all nullable), `start_date`/`end_date` (change tickets' maintenance window), `is_problematic`, `assignee_user_id`/`reporter_user_id` (cross-schema), `reported_anonymously`, `closed_at`, `external_finding_key` (0050, nullable, unique) -- an optional deterministic identity from a recurring external import (a vulnerability scan's own finding ID, typically), what the ticket importer's opt-in "Dedup key" mapping looks a row up by to create/leave-alone/reopen instead of always creating. `search_vector` is a `GENERATED ALWAYS AS ... STORED` `tsvector` (never written from Python). `embedding` (`pgvector`, dimension 1536) only exists when `ENABLE_PGVECTOR` is on -- unpopulated, nothing reads or writes it (see `docs/architecture.md`'s Search section). |
 | `ticket_field_values` | EAV storage for a ticket's custom field values -- same shape as `asset_field_values`, always against a `scope="ticket"` `custom_fields` row. |
 | `ticket_comments` | Plain-text activity feed comments -- `author_user_id` NULL for a system-posted one (root-cause analysis, an automatic notice). |
 | `ticket_status_changes` | Audit trail: one row per status transition (`from_status` NULL for the very first). |
@@ -211,6 +211,7 @@ numbering, run independently, and land in different schemas.
 | 0047 | `documents.owner_user_id` -- who's responsible for keeping it current. |
 | 0048 | `documents.next_review_at` + `document_acknowledgments` -- review-due tracking and read acknowledgment. |
 | 0049 | `documents.ack_required_group_id`/`ack_required_user_id`/`ack_requested_at` -- an assignable, notified acknowledgment requirement; `platform_event_triggers.ticket_id` becomes nullable, gains `document_id` (Platform Response Rules now also react to a document pending acknowledgment). |
+| 0050 | `tickets.external_finding_key` (nullable, unique) -- opt-in dedup identity for the ticket CSV/JSON importer's "Dedup key" mapping. |
 
 ### `control` schema (`backend/migrations/control/versions/`)
 

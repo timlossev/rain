@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Import Result - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Summary of the ticket import you just ran - created, and any per-row errors.{% endblock %}
+{% block help_text %}Summary of the ticket import you just ran - created, reopened (a "Dedup key" match that was closed - see Documents > user guide), left unchanged (an already-open match), and any per-row errors.{% endblock %}
 {% block content %}
 <div class="card" style="max-width:640px;">
   <p><span class="badge badge-accent">{{ result.created }} created</span>
+  {% if result.reopened %} &nbsp; <span class="badge badge-accent">{{ result.reopened }} reopened</span>{% endif %}
+  {% if result.unchanged %} &nbsp; <span class="badge">{{ result.unchanged }} unchanged</span>{% endif %}
   {% if result.errors %} &nbsp; <span class="badge">{{ result.errors | length }} errors</span>{% endif %}
   {% if result.warnings %} &nbsp; <span class="badge">{{ result.warnings | length }} warnings</span>{% endif %}</p>
 
