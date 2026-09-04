@@ -12,7 +12,7 @@ ticket fields for a common compliance register, with no code involved.
 | `subprocessor-register.rain` | Subprocessor asset type | SR-2/SR-6, PCI-DSS Req 12.8, ISO 27001 5.19-5.23 |
 | `piv-cac-card-issuance.rain` | PIV/CAC Card asset type | IA-2/PE-2, PS-3 (federal credential issuance) |
 | `software-license-register.rain` | Software License asset type | CM-10 (Software Usage Restrictions) |
-| `cloud-environment-register.rain` | Cloud Environment asset type | CM-2/CM-8(3)/SI-7 (pairs with the drift-detection pattern in `docs/user-guide.md`) |
+| `cloud-environment-register.rain` | Cloud Environment asset type | CM-2/CM-8(3)/SI-7 (pairs with the pattern in [`docs/drift-detection.md`](../drift-detection.md)) |
 | `encryption-key-cert-register.rain` | Encryption Key/Certificate asset type | SC-12/SC-13, ISO 27001 8.24 |
 | `system-interconnection-register.rain` | System Interconnection asset type | CA-3 |
 | `contractor-access-register.rain` | Contractor Access asset type | PS-7 (individual level, distinct from the Subprocessor Register's company level) |

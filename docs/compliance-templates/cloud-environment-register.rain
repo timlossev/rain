@@ -10,7 +10,7 @@
       "key": "cloud_environment",
       "name": "Cloud Environment",
       "icon": null,
-      "description": "One row per cloud account/subscription/project RAIN tracks for drift. Each Asset's own \"Name\" field is the environment's short name (e.g. \"prod-aws-us-east-1\"). Link a drift-monitoring Document to this Asset (the document's own Links tab) to pair it with a scheduled Terraform/discovery-tool snapshot -- see docs/user-guide.md's \"Infrastructure drift detection\" section.",
+      "description": "One row per cloud account/subscription/project RAIN tracks for drift. Each Asset's own \"Name\" field is the environment's short name (e.g. \"prod-aws-us-east-1\"). Link a drift-monitoring Document to this Asset (the document's own Links tab) to pair it with a scheduled Terraform/discovery-tool snapshot -- see docs/drift-detection.md.",
       "is_active": true,
       "sort_order": 0
     }
