@@ -29,7 +29,13 @@ implemented controls depend on exactly this -- see
 the full control-by-control breakdown across a dozen frameworks
 worldwide, and [`docs/eucs-compliance-assessment.md`](docs/eucs-compliance-assessment.md)
 for a scope-honest look at where that argument does and doesn't extend
-to the EU Cybersecurity Certification Scheme for Cloud Services.
+to the EU Cybersecurity Certification Scheme for Cloud Services. Custom
+asset types and ticket fields are how RAIN adapts to any framework's own
+paperwork with no code -- [`docs/compliance-templates/`](docs/compliance-templates/)
+ships a dozen of these as ready-to-import `.rain` config bundles (a risk
+register, a Nessus finding-fields set, FedRAMP's own 2026 quarterly
+reporting fields, and others) for common registers most compliance-
+minded tenants would otherwise build by hand.
 
 Those tickets have to originate from somewhere, which is why RAIN is
 deliberately "bring your own" for detection -- monitoring, SIEM, XDR,
@@ -63,8 +69,9 @@ at RAIN is enough to get started.
 - Global full-text search across tickets, documents, and assets
 - CSV/JSON/Excel import and export wherever records live
 - Branded PDF export for tickets and documents
-- Export/import platform and tenant configuration as JSON, for cloning
-  a setup onto another instance
+- Export/import platform and tenant configuration as a `.rain` config
+  bundle, for cloning a setup onto another instance or seeding one from
+  a starter template
 - Local auth plus optional LDAP/Active Directory and SAML 2.0 SSO
 - Role-based access control across platform and per-tenant admin tiers,
   with a last-login CSV export for periodic access review

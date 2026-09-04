@@ -21,7 +21,7 @@
   <form method="post" action="/admin/config-bundle/platform/import" enctype="multipart/form-data">
     <div class="field">
       <label for="platform_bundle_file">Import platform bundle</label>
-      <input type="file" id="platform_bundle_file" name="bundle_file" accept="application/json,.json" required>
+      <input type="file" id="platform_bundle_file" name="bundle_file" accept="application/json,.json,.rain" required>
       <div class="field-hint">Upserts by name - re-importing the same (or an edited) file updates matching rows instead of duplicating them. A syslog rule or LDAP/SAML config targeting a tenant slug that doesn't exist here yet is skipped or imported disabled, noted below.</div>
     </div>
     <button class="btn" type="submit">Import platform bundle</button>
@@ -60,7 +60,7 @@
   <form method="post" action="/admin/config-bundle/tenant/import" enctype="multipart/form-data">
     <div class="field">
       <label for="tenant_bundle_file">Import tenant bundle</label>
-      <input type="file" id="tenant_bundle_file" name="bundle_file" accept="application/json,.json" required>
+      <input type="file" id="tenant_bundle_file" name="bundle_file" accept="application/json,.json,.rain" required>
       <div class="field-hint">Applies to {{ ctx.active_tenant.name }}, upserting by name/key - a re-import updates matching rows rather than duplicating them. An existing local user is never overwritten.</div>
     </div>
     <button class="btn" type="submit">Import tenant bundle</button>

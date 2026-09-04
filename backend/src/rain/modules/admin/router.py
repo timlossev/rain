@@ -1787,8 +1787,17 @@ async def config_bundle_form(
 
 
 def _bundle_filename(prefix: str, suffix: str = "") -> str:
+    # .rain, not .json -- the content is still plain JSON (config_bundle_
+    # tenant_import/config_bundle_platform_import both just do json.loads
+    # on the raw bytes regardless of extension, no format sniffing), but
+    # the extension is purely a naming signal: this is a RAIN config
+    # bundle produced by this same screen's own Export, round-trips
+    # through Import unmodified, and isn't something meant to be written
+    # by hand or fed through a general-purpose JSON tool. Import's own
+    # <input accept> still lists .json too, so a bundle exported before
+    # this change keeps working.
     stamp = dt.date.today().isoformat()
-    return f"{prefix}{suffix}-{stamp}.json"
+    return f"{prefix}{suffix}-{stamp}.rain"
 
 
 @router.post("/config-bundle/platform/export")

@@ -418,7 +418,7 @@ on a completed scan, not the separate, proprietary Nessus DB transfer
 format) arrives at the mapping screen already filled in: Info-severity
 findings are dropped before they're even rows, and everything else --
 Type, Title, Description, Severity, Dedup key, and (if you've imported
-`docs/compliance-templates/nessus-finding-fields.json`) the scanner
+`docs/compliance-templates/nessus-finding-fields.rain`) the scanner
 metadata fields -- is pre-mapped, still reviewable there like any other
 import. That template is optional; a .nessus upload creates real,
 deduped vulnerability tickets with the finding detail in Description
@@ -438,7 +438,7 @@ caused it, rather than filed as a second ticket for the same
 underlying issue. Leave Dedup key unmapped for a plain one-time import,
 same as before this existed. See "Infrastructure drift detection"
 above for the closest sibling pattern (a document's own diff-on-
-refresh) and `docs/compliance-templates/nessus-finding-fields.json`
+refresh) and `docs/compliance-templates/nessus-finding-fields.rain`
 for a ready-made field set this pairs well with.
 
 ### Service Catalog
