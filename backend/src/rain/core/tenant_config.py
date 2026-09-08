@@ -44,14 +44,6 @@ DEFAULTS: dict[str, Any] = {
     # the escalation webhook's own name, which is a separate, admin-only
     # concept (Admin > Webhooks) a visitor never sees.
     "escalate_button_label": "Escalate",
-    # rain.modules.tickets.rootcause.analyze: off by default -- a comment
-    # on every single closed ticket is noise for a tenant that never asked
-    # for it. An admin opts in under Tickets > Platform Response Rules
-    # (it's a reaction to a ticket event, closure, same as every rule on
-    # that screen -- not a property of the statuses themselves); the
-    # on-demand "Analyze root cause" button on a ticket works regardless
-    # of this flag.
-    "auto_root_cause_on_close": False,
     # rain.core.pagination.paginate's own page_size, tenant-overridable
     # (Admin > Branding > "Tenant defaults") for every tenant-scoped
     # record list in the app (Tickets, Assets, Documents, and every

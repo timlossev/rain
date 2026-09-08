@@ -15,7 +15,7 @@ nothing here is mocked up.
 
 | | |
 |---|---|
-| ![Event Promotion Policies](12-event-promotion-policies.png) Event Promotion Policies turn matching syslog events into tickets automatically. | ![Platform Response Rules](13-platform-response-rules.png) Platform Response Rules react to ticket lifecycle events -- notify, tag, escalate. |
+| ![Event Promotion Policies](12-event-promotion-policies.png) Event Promotion Policies turn matching syslog events into tickets automatically. | ![Platform Response Rules](13-platform-response-rules.png) A rule's own actions -- notify, tag, attach, watch, analyze root cause -- each pattern-matched independently, not a single tenant-wide switch. |
 
 ## Assets, documents, calendar
 

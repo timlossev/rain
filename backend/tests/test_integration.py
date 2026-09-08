@@ -469,25 +469,26 @@ async def test_escalate_ticket_captures_webhook_response_as_comment(monkeypatch)
 
 
 async def test_rootcause_auto_analyze_and_platform_rule_on_close():
-    """Two independent close-time reactions covered together, both wired
-    through rain.modules.tickets.service.update_status's single
-    newly_closed branch: rootcause.analyze's opt-in auto-comment (gated
-    by the auto_root_cause_on_close tenant config) summarizing the
-    ticket's repeat promoted syslog events, and an active "incident is
-    closed" Platform Response Rule's own action firing alongside it."""
+    """Two actions on the same "incident is closed" Platform Response
+    Rule, both wired through rain.modules.tickets.service.update_status's
+    single newly_closed branch -> platform_events.evaluate_ticket_closed:
+    mark_problematic, and analyze_root_cause (rootcause.analyze, posted
+    as a comment) -- the latter used to be a separate, tenant-wide
+    "auto-analyze every closed ticket" checkbox; it's a first-class,
+    pattern-matched action now, same as every other reaction on this
+    screen, so this rule's own "outage" pattern is what decides whether
+    it applies, not a blanket tenant setting."""
     from rain.db.base import tenant_session
     from rain.db.provisioning import provision_tenant
     from rain.db.tenant_models import PlatformEventAction, PlatformEventRule, SyslogEvent, TicketComment
-    from rain.core.tenant_config import set_tenant_config
-    from rain.modules.tickets import rootcause, service
+    from rain.modules.tickets import service
 
     tenant = await provision_tenant(slug="nu", name="Nu Corp")
 
     async with tenant_session(tenant.schema_name) as session:
-        await set_tenant_config(session, rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY, True)
-
         closed_rule = PlatformEventRule(name="Outage closed", trigger_event="incident_closed", match_field="title", pattern="outage")
         closed_rule.actions.append(PlatformEventAction(action_type="mark_problematic", config={}))
+        closed_rule.actions.append(PlatformEventAction(action_type="analyze_root_cause", config={}))
         session.add(closed_rule)
 
         ticket = await service.create_ticket(session, ticket_type="incident", title="recurring outage", description=None)

@@ -19,12 +19,13 @@ from rain.core.pagination import paginate
 from rain.core.query_params import optional_int
 from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
-from rain.core.tenant_config import get_tenant_config, get_tenant_configs, set_tenant_config
+from rain.core.tenant_config import get_tenant_config, get_tenant_configs
 from rain.core.user_names import is_assignable_user, list_assignable_users, resolve_user_names, search_assignable_users
 from rain.db.control_models import User
 from rain.db.tenant_models import (
     Asset,
     CustomField,
+    Document,
     Group,
     GroupMembership,
     NotificationChannel,
@@ -960,9 +961,9 @@ async def analyze_root_cause(
     _: CurrentUser = Depends(require_login),
 ):
     """"Post as a comment" inside the analysis modal above -- always
-    available on demand regardless of whether the tenant also opted into
-    running this automatically at closure (Tickets > Platform Response
-    Rules, rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY). Recomputes the analysis
+    available on demand regardless of whether a Platform Response Rule
+    also runs this automatically at closure (an "Analyze root cause"
+    action, Tickets > Platform Response Rules). Recomputes the analysis
     itself rather than trusting anything the client echoes back from the
     preview above, so this always posts a fresh result."""
     ticket = await tenant_db.get(Ticket, ticket_id)
@@ -1723,7 +1724,6 @@ async def platform_events_list(
     )
     page_size = await get_tenant_config(tenant_db, "default_page_size")
     rule_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
-    auto_root_cause = await get_tenant_config(tenant_db, "auto_root_cause_on_close", False)
     return templates.TemplateResponse(
         request,
         "tickets/platform_events.html",
@@ -1734,27 +1734,8 @@ async def platform_events_list(
             "trigger_events": platform_events.TRIGGER_EVENTS,
             "trigger_event_labels": dict(platform_events.TRIGGER_EVENTS),
             "match_fields": platform_events.MATCH_FIELDS,
-            "auto_root_cause": auto_root_cause,
         },
     )
-
-
-@router.post("/platform-events/automation")
-async def platform_events_automation(
-    auto_root_cause_on_close: bool = Form(False),
-    tenant_db: AsyncSession = Depends(get_tenant_db),
-    ctx: RequestContext = Depends(get_request_context),
-    _: CurrentUser = Depends(require_admin),
-):
-    """Saves rain.modules.tickets.rootcause's opt-in auto-analyze-at-
-    closure flag for the active tenant. Off by default (see
-    rain.core.tenant_config.DEFAULTS) -- the on-demand "Analyze root
-    cause" button on a ticket works regardless of this setting. Lives
-    here, not Admin > Ticket Statuses, since it's a reaction to a
-    ticket event (closure) the same way every Platform Response Rule
-    is, not a property of the statuses themselves."""
-    await set_tenant_config(tenant_db, "auto_root_cause_on_close", auto_root_cause_on_close, updated_by=ctx.user.id)
-    return RedirectResponse("/tickets/platform-events", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/platform-events")
@@ -1812,6 +1793,28 @@ async def platform_event_detail(
     channels = list((await tenant_db.execute(select(NotificationChannel).order_by(NotificationChannel.name))).scalars())
     assets = await asset_service.list_assets(tenant_db)
     webhooks = await webhook_service.list_webhooks(tenant_db)
+
+    # Everything below is display-only -- turning each action's stored
+    # config (a plain id, never a name) into something a human reads
+    # instead of "channel_id: 3" or "asset_id: 12" in the Actions table.
+    # A deleted reference (channel/asset/document/user removed since the
+    # action was added) just falls back to a "no longer exists" label,
+    # same as webhook_names already did before this -- the action itself
+    # still runs and reports that failure for real at fire time (see
+    # platform_events._run_action), this is only the summary table.
+    document_ids = {
+        a.config.get("document_id") for a in rule.actions if a.action_type == "attach_document" and a.config.get("document_id")
+    }
+    documents = (
+        list((await tenant_db.execute(select(Document).where(Document.id.in_(document_ids)))).scalars())
+        if document_ids
+        else []
+    )
+    watcher_user_ids = {
+        a.config.get("user_id") for a in rule.actions if a.action_type == "add_watcher" and a.config.get("user_id")
+    }
+    watcher_user_names = await resolve_user_names(watcher_user_ids)
+
     return templates.TemplateResponse(
         request,
         "tickets/platform_event_detail.html",
@@ -1823,10 +1826,16 @@ async def platform_event_detail(
             "trigger_event_labels": dict(platform_events.TRIGGER_EVENTS),
             "match_fields": platform_events.MATCH_FIELDS,
             "action_types": platform_events.ACTION_TYPES,
+            "action_type_labels": dict(platform_events.ACTION_TYPES),
+            "action_type_descriptions": platform_events.ACTION_DESCRIPTIONS,
             "channels": channels,
             "assets": assets,
             "webhooks": webhooks,
+            "channel_names": {c.id: c.name for c in channels},
+            "asset_names": {a.id: a.name for a in assets},
             "webhook_names": {w.id: w.name for w in webhooks},
+            "document_labels": {d.id: f"{d.doc_number}: {d.title}" for d in documents},
+            "watcher_user_names": watcher_user_names,
         },
     )
 

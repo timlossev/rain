@@ -380,16 +380,24 @@ Trigger: incident/vulnerability/change created; one of those three
 closed; a change fully approved; a document entering "pending
 acknowledgment".
 
-Actions, any number per rule:
+Actions, any number per rule -- each shows a one-line description as
+you pick it:
 
 - Notify Slack / Notify Email: pick a notification channel -- delivery
   actually follows the channel's own type, not the action label.
 - Call a webhook: pick a webhook definition.
 - Attach a document / Attach an asset (as the ticket's affected asset).
 - Mark problematic.
+- Analyze root cause: posts the same repeat-occurrence and similar-
+  past-ticket analysis the ticket detail page's own "Analyze root
+  cause" button computes, as a comment. Attach it to a rule on a
+  "<type> is closed" trigger, with whatever pattern makes sense
+  (or none, to run on every ticket of that type) -- there's no
+  separate tenant-wide switch for this anymore, it's an action like
+  any other.
 - Add a watcher: an email address, or a system user (not both).
 
-The last four apply only to tickets -- on a document-acknowledgment
+The last five apply only to tickets -- on a document-acknowledgment
 rule they're skipped, harmless if attached by habit. Notify/webhook
 actions work either way, filling in `{{doc_number}}`, `{{title}}`,
 `{{description}}` for a document trigger.
@@ -397,10 +405,6 @@ actions work either way, filling in `{{doc_number}}`, `{{title}}`,
 Every firing and its actions' outcomes are logged to the rule's own
 history and (for a ticket trigger) to the ticket's Activity feed,
 success or failure.
-
-Below the rule list: "Automatically analyze root cause when a ticket
-closes" (off by default) runs Analyze root cause once, the first time a
-ticket moves into a closed status.
 
 ## Calendar
 
@@ -777,8 +781,7 @@ membership is overwritten on every sync.
 open/closed enum. Table: Order, Status (colored pill), Key, "counts as
 closed" (stamps a closed date), Active. "+ New status" (Label, Key,
 Color, "Counts as closed", Order). Deactivating/deleting a status
-doesn't affect tickets already set to it. (The "Root cause assistance"
-toggle lives under Platform Response Rules, not here.)
+doesn't affect tickets already set to it.
 
 **Notification Channels.** Named destinations a Platform Response Rule
 notifies. Type (email/Slack/webhook) plus Name; fields depend on type

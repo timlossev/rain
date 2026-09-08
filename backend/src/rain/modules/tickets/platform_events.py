@@ -7,10 +7,21 @@ lifecycle triggers (see TRIGGER_EVENTS: created, closed, or, change
 tickets only, fully approved), and every active, matching rule fires
 (not just the first), each running one or more actions: notify Slack,
 notify email, call a webhook, attach a document, attach an asset, mark
-the ticket problematic, or add a watcher (a system user or a bare
-email). Every firing is logged to platform_event_triggers and shown on
-the ticket detail page, regardless of whether the individual actions
-succeeded -- a failed Slack post shouldn't hide the fact the rule matched.
+the ticket problematic, analyze root cause, or add a watcher (a system
+user or a bare email). Every firing is logged to platform_event_triggers
+and shown on the ticket detail page, regardless of whether the
+individual actions succeeded -- a failed Slack post shouldn't hide the
+fact the rule matched.
+
+analyze_root_cause (rain.modules.tickets.rootcause.analyze) used to be
+a single tenant-wide "auto-analyze on every closed ticket" checkbox
+(rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY, since removed) rather than an
+action here. As a checkbox it couldn't be scoped -- a tenant that only
+wanted this for, say, incidents matching "database" had no way to say
+so short of turning it on for every closed ticket tenant-wide. As an
+action it gets the same match_field/pattern targeting every other
+action already has for free, on whichever "<type> is closed"
+trigger(s) a rule author actually wants it for.
 
 Since migration 0049 this same engine also reacts to one document
 lifecycle trigger, document_pending_acknowledgment -- fired by
@@ -45,7 +56,7 @@ from rain.db.tenant_models import (
     WebhookConfig,
 )
 from rain.modules.documents import service as document_service
-from rain.modules.tickets import service as ticket_service
+from rain.modules.tickets import rootcause, service as ticket_service
 from rain.modules.tickets.notifications import (
     DEFAULT_EMAIL_MESSAGE_TEMPLATE,
     DEFAULT_MESSAGE_TEMPLATE,
@@ -82,8 +93,27 @@ ACTION_TYPES = [
     ("attach_document", "Attach a document"),
     ("attach_asset", "Attach an asset"),
     ("mark_problematic", "Mark problematic"),
+    ("analyze_root_cause", "Analyze root cause"),
     ("add_watcher", "Add a watcher"),
 ]
+
+# One short sentence per action, shown under the "Add action" picker as
+# it's selected (rule_form.html's ml_algorithm dropdown already does
+# this for the same reason -- a value chosen from a name alone isn't
+# always obvious what it actually does). Keyed separately from
+# ACTION_TYPES itself rather than folded into a 3-tuple there, since
+# dict(ACTION_TYPES) (this module's own _action_label, and the plain
+# label lookup the Actions table renders with) needs 2-tuples.
+ACTION_DESCRIPTIONS = {
+    "notify_slack": "Send a message through a Slack notification channel.",
+    "notify_email": "Send a message through an email notification channel.",
+    "webhook": "Call one of this tenant's configured webhooks.",
+    "attach_document": "Link a specific document to the ticket.",
+    "attach_asset": "Set a specific asset as the ticket's affected asset, if it doesn't already have one.",
+    "mark_problematic": "Flag the ticket problematic -- same as the ticket detail page's own quick action.",
+    "analyze_root_cause": "Post the same repeat-occurrence and similar-past-ticket analysis the ticket detail page's own \"Analyze root cause\" button computes, as a comment.",
+    "add_watcher": "Add a system user or a bare email as a watcher -- they start getting emailed on the ticket's activity.",
+}
 
 _TRIGGER_BY_TICKET_TYPE = {
     "incident": "incident_created",
@@ -246,7 +276,7 @@ def _placeholders(record: Ticket | Document) -> dict[str, str]:
 # Ticket-only -- see this module's own docstring. Guarded upfront in
 # _run_action rather than duplicated into each branch's own isinstance
 # check below.
-_TICKET_ONLY_ACTIONS = {"attach_document", "attach_asset", "mark_problematic", "add_watcher"}
+_TICKET_ONLY_ACTIONS = {"attach_document", "attach_asset", "mark_problematic", "analyze_root_cause", "add_watcher"}
 
 
 async def _run_action(db: AsyncSession, action: PlatformEventAction, record: Ticket | Document) -> str:
@@ -349,6 +379,19 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, record: Tic
             return f"{label}: already problematic"
         await ticket_service.update_problematic(db, ticket, True)
         return f"{label}: done"
+
+    if action.action_type == "analyze_root_cause":
+        # Same two signals (repeat-occurrence pattern, similar past
+        # closed tickets) the on-demand "Analyze root cause" button
+        # computes -- see rootcause's own docstring. None means neither
+        # signal turned anything up, same "skip rather than post a
+        # content-free comment" rule the button's own preview step
+        # follows.
+        analysis = await rootcause.analyze(db, ticket)
+        if not analysis:
+            return f"{label}: nothing to add"
+        await ticket_service.add_comment(db, ticket.id, author_user_id=None, body=analysis)
+        return f"{label}: posted a comment"
 
     if action.action_type == "add_watcher":
         email = (config.get("email") or "").strip()

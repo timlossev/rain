@@ -368,18 +368,26 @@ two separate code paths -- see `TicketRule`'s docstring and migration
 
 Root cause assistance (`rain.modules.tickets.rootcause`) revisits a
 ticket -- on demand (an "Analyze root cause" button on the ticket detail
-page or its tickets-list row menu) or automatically, once, the first
-time it's moved into an `is_closed` status, opt-in per tenant
-(`auto_root_cause_on_close` tenant_config, off by default) -- computing
-two honest, non-causal signals: a repeat-occurrence pattern (host/
-program distribution and time span across every `SyslogEvent` promoted
-into the ticket via `promoted_ticket_id`) and similar past *closed*
-tickets (the same `websearch_to_tsquery`/`ts_rank` full-text search the
-global search bar uses, scoped to `is_closed` statuses). Deliberately
-not framed as "AI root cause analysis" -- nothing here, or in `river`,
-does causal reasoning; both signals are things a human would otherwise
-do by hand scrolling the timeline or searching past tickets, just
-automated.
+page or its tickets-list row menu) or automatically, via a Platform
+Response Rule's `analyze_root_cause` action on a "<type> is closed"
+trigger (see Platform Response Rules below) -- computing two honest,
+non-causal signals: a repeat-occurrence pattern (host/program
+distribution and time span across every `SyslogEvent` promoted into the
+ticket via `promoted_ticket_id`) and similar past *closed* tickets (the
+same `websearch_to_tsquery`/`ts_rank` full-text search the global
+search bar uses, scoped to `is_closed` statuses). Deliberately not
+framed as "AI root cause analysis" -- nothing here, or in `river`, does
+causal reasoning; both signals are things a human would otherwise do by
+hand scrolling the timeline or searching past tickets, just automated.
+
+`analyze_root_cause` used to be a separate, tenant-wide
+`auto_root_cause_on_close` checkbox on the Platform Response Rules
+screen, run unconditionally against every closed ticket rather than
+matched against a rule's own pattern -- moved into the same action
+mechanism every other reaction on that screen already uses (see
+platform_events's own docstring for why), so a tenant can scope it
+("only incidents matching 'database'") instead of an all-or-nothing
+tenant setting.
 
 The on-demand path is a two-step, not a direct post: `POST /tickets/
 {id}/analyze/preview` computes the analysis and returns it as a fragment
@@ -390,9 +398,10 @@ step. From there, "Post as a comment" submits to the unchanged `POST
 /tickets/{id}/analyze` (which recomputes the analysis itself rather than
 trusting anything echoed back from the preview, so what gets posted is
 always freshly computed), "Copy to clipboard" copies the shown text
-client-side, and "Close" just dismisses the modal. The automatic-at-
-closure path (`service.update_status`'s `newly_closed` hook) skips this
-preview step entirely and posts directly, same as before.
+client-side, and "Close" just dismisses the modal. The Platform
+Response Rule path (`platform_events._run_action`'s own
+`analyze_root_cause` branch) skips this preview step entirely and posts
+directly, same as the old automatic-at-closure path did.
 
 `single`/`repetition` are evaluated first-match-wins (an event never
 spawns two tickets that way); `ml_anomaly` policies never "consume" the
@@ -462,12 +471,13 @@ service.request_acknowledgment`'s own local import of `evaluate_
 document_pending_acknowledgment` is the same fix, applied on the new
 side of that cycle. Actions: notify Slack/email (reusing
 `NotificationChannel`), call a webhook, attach a document or asset,
-mark the ticket problematic, or add a watcher (email or system user,
-see above) -- the last four only ever apply to a `Ticket` (`_TICKET_
-ONLY_ACTIONS`); run against a document-triggered rule, each reports
-itself skipped in the logged summary instead of raising, so a rule
-author can still attach one out of habit or by copying an existing
-ticket rule without breaking anything. Every firing -- and each
+mark the ticket problematic, analyze root cause (see above), or add a
+watcher (email or system user, see above) -- the last five only ever
+apply to a `Ticket` (`_TICKET_ONLY_ACTIONS`); run against a document-
+triggered rule, each reports itself skipped in the logged summary
+instead of raising, so a rule author can still attach one out of habit
+or by copying an existing ticket rule without breaking anything. Every
+firing -- and each
 action's individual outcome, even a failed or skipped one -- is logged
 to `platform_event_triggers` and (for a ticket) the ticket's own
 activity feed, so a failed Slack post doesn't hide the fact the rule

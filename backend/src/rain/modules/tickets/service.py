@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from rain.core.pagination import DEFAULT_PAGE_SIZE, Page
-from rain.core.tenant_config import get_tenant_config
 from rain.core.user_names import resolve_user_emails
 from rain.db.tenant_models import (
     ApprovalFlow,
@@ -36,7 +35,6 @@ from rain.db.tenant_models import (
     WebhookConfig,
 )
 from rain.modules.tickets import notifications
-from rain.modules.tickets import rootcause
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
 from rain.modules.tickets.syslog_parser import severity_label
 
@@ -522,14 +520,15 @@ async def update_status(
     entry for re-clicking the current pill).
 
     A transition into an is_closed status, from a status that wasn't
-    already is_closed, also triggers rootcause.analyze if the tenant has
-    opted into it (rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY, off by default --
-    see that module for what it actually looks at) and evaluates this
-    ticket's type against any active "<type> is closed" Platform Response
-    Rules (rain.modules.tickets.platform_events.evaluate_ticket_closed).
-    Never fires again on a later closed->closed move (e.g. "Closed" ->
-    "Cancelled"), and never blocks the status change itself if either
-    turns up nothing or errors."""
+    already is_closed, evaluates this ticket's type against any active
+    "<type> is closed" Platform Response Rules (rain.modules.tickets.
+    platform_events.evaluate_ticket_closed) -- an "Analyze root cause"
+    action on one of those rules is what used to be a separate, tenant-
+    wide "auto-analyze every closed ticket" checkbox here; see platform_
+    events's own docstring for why that moved. Never fires again on a
+    later closed->closed move (e.g. "Closed" -> "Cancelled"), and never
+    blocks the status change itself if a rule turns up nothing or
+    errors."""
     if new_status == ticket.status:
         return True
     status_row = await get_status_by_key(db, new_status)
@@ -553,14 +552,6 @@ async def update_status(
         subject=f"[RAIN] {ticket.ticket_number} status changed",
         body=f"{ticket.ticket_number}: {ticket.title}\n\nStatus changed from {old_status} to {new_status}.",
     )
-    if newly_closed and await get_tenant_config(db, rootcause.AUTO_ROOT_CAUSE_CONFIG_KEY, False):
-        try:
-            analysis = await rootcause.analyze(db, ticket)
-        except Exception:
-            logger.exception("automatic root-cause analysis failed for ticket %s", ticket.ticket_number)
-            analysis = None
-        if analysis:
-            await add_comment(db, ticket.id, author_user_id=None, body=analysis)
     if newly_closed:
         # Imported locally to avoid a module-load-time cycle -- same
         # reason create_ticket's own evaluate_ticket_created import is

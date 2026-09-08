@@ -46,18 +46,20 @@
     <tbody>
       {% for a in rule.actions %}
       <tr>
-        <td><span class="badge">{{ a.action_type }}</span></td>
+        <td><span class="badge">{{ action_type_labels.get(a.action_type, a.action_type) }}</span></td>
         <td class="muted">
           {% if a.action_type in ("notify_slack", "notify_email") %}
-            channel_id: {{ a.config.get("channel_id", "-") }}
+            {{ channel_names.get(a.config.get("channel_id"), "channel no longer exists") }}
           {% elif a.action_type == "webhook" %}
-            {{ webhook_names.get(a.config.get("webhook_id"), "deleted webhook") }}
+            {{ webhook_names.get(a.config.get("webhook_id"), "webhook no longer exists") }}
           {% elif a.action_type == "attach_document" %}
-            document_id: {{ a.config.get("document_id", "-") }}
+            {{ document_labels.get(a.config.get("document_id"), "document no longer exists") }}
           {% elif a.action_type == "attach_asset" %}
-            asset_id: {{ a.config.get("asset_id", "-") }}
+            {{ asset_names.get(a.config.get("asset_id"), "asset no longer exists") }}
           {% elif a.action_type == "add_watcher" %}
-            {% if a.config.get("email") %}{{ a.config.get("email") }}{% else %}user_id: {{ a.config.get("user_id", "-") }}{% endif %}
+            {% if a.config.get("email") %}{{ a.config.get("email") }}{% else %}{{ watcher_user_names.get(a.config.get("user_id"), "user no longer exists") }}{% endif %}
+          {% elif a.action_type == "mark_problematic" or a.action_type == "analyze_root_cause" %}
+            &mdash;
           {% endif %}
         </td>
         <td class="actions">
@@ -79,9 +81,10 @@
   <form method="post" action="/tickets/platform-events/{{ rule.id }}/actions">
     <div class="field">
       <label for="action_type">Action</label>
-      <select id="action_type" name="action_type" data-action-type-select>
-        {% for value, label in action_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      <select id="action_type" name="action_type" data-action-type-select onchange="document.getElementById('action_type_hint').textContent = this.options[this.selectedIndex].dataset.desc">
+        {% for value, label in action_types %}<option value="{{ value }}" data-desc="{{ action_type_descriptions.get(value, '') }}">{{ label }}</option>{% endfor %}
       </select>
+      <div class="field-hint" id="action_type_hint">{{ action_type_descriptions.get(action_types[0][0], '') }}</div>
     </div>
 
     <div class="field" data-action-fields="notify_slack,notify_email">

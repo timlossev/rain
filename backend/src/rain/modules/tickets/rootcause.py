@@ -21,7 +21,11 @@ cheaply, from data already on hand:
 Both are surfaced as one comment (analyze()), authored by RAIN System
 (author_user_id=None, same convention rules.combine_event_into_ticket
 already uses) -- see rain.modules.tickets.router's on-demand /analyze
-route and service.update_status's opt-in auto-trigger."""
+route and rain.modules.tickets.platform_events's "Analyze root cause"
+action (Platform Response Rules, triggered on a "<type> is closed"
+event, pattern-matched like any other action there -- not a tenant-wide
+checkbox that ran on every closed ticket, which is what this used to
+be before it moved)."""
 from __future__ import annotations
 
 import datetime as dt
@@ -31,13 +35,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from rain.db.tenant_models import SyslogEvent, Ticket, TicketStatus
-
-# rain.core.tenant_config key: opt-in, default off (see that module's
-# DEFAULTS) -- an automatic comment on every closed ticket is noise for a
-# tenant that never wanted it, so this only fires once an admin turns it
-# on under Tickets > Platform Response Rules (a reaction to a ticket
-# event, same as every rule on that screen, not a status property).
-AUTO_ROOT_CAUSE_CONFIG_KEY = "auto_root_cause_on_close"
 
 # Cap how many promoted events summarize_chronic pulls back -- a genuinely
 # chronic rule/group can accumulate a lot of occurrences, and this only
