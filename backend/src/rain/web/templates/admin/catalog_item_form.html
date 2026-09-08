@@ -18,6 +18,16 @@
         <div class="field field-w100"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="is_active" {% if item is none or item.is_active %}checked{% endif %}> Active</label></div>
       </div>
       <div class="field"><label for="description">Description (shown on the catalog list)</label><textarea id="description" name="description" rows="2">{{ item.description or '' if item else '' }}</textarea></div>
+      <div class="form-row">
+        <div class="field">
+          <label for="icon">Icon (optional)</label>
+          <select id="icon" name="icon">
+            <option value="">Default (by ticket type)</option>
+            {% for value in icon_choices %}<option value="{{ value }}" {% if item and item.icon == value %}selected{% endif %}>{{ value | replace("-", " ") | capitalize }}</option>{% endfor %}
+          </select>
+          <div class="field-hint">Shown on the Service Catalog tile. Left on Default, it matches whatever the service Produces (Incident/Vulnerability/Change) below.</div>
+        </div>
+      </div>
     </div>
 
     <div class="form-section">

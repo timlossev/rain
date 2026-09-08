@@ -1214,6 +1214,22 @@ async def list_tickets_reported_by(
     return Page(items=items, page=page, page_size=page_size, total=total)
 
 
+async def count_open_tickets_reported_by(db: AsyncSession, user_id: int) -> int:
+    """Backs the incident portal's own status-summary strip -- how many
+    still-open tickets this visitor has reported, independent of
+    whatever status filter "Tickets reported by me" (list_tickets_
+    reported_by above) happens to be showing right now. That table
+    defaults to the same "active" set this counts, but a visitor can
+    change its filter without this summary changing underneath them --
+    a plain count, not reusing that function's own Page machinery, since
+    nothing here needs the join/pagination it carries for the table."""
+    closed_keys = select(TicketStatus.key).where(TicketStatus.is_closed.is_(True))
+    stmt = select(func.count()).select_from(Ticket).where(
+        Ticket.reporter_user_id == user_id, Ticket.status.not_in(closed_keys)
+    )
+    return (await db.execute(stmt)).scalar_one()
+
+
 def build_activity(ticket: Ticket) -> list[dict]:
     """Comments, status changes, assignment changes, asset changes, field
     changes (severity/problematic/title), and (change tickets only) approval

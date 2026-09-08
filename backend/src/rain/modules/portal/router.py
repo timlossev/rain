@@ -250,6 +250,15 @@ async def portal_form(
             if user is not None
             else []
         )
+        # Status-summary strip at the top of the page -- deliberately its
+        # own count, not reported.total: that total tracks whatever
+        # status filter the table below happens to be showing (defaults
+        # to "active", but a visitor can change it), and this should
+        # read the same regardless of what they've got that table
+        # filtered to at the moment.
+        open_ticket_count = (
+            await ticket_service.count_open_tickets_reported_by(tenant_db, user.id) if user is not None else 0
+        )
         statuses = await ticket_service.list_statuses(tenant_db) if user is not None else []
         # Confirmed against this tenant's own tickets, not just pattern-
         # matched -- the regex alone still lets a well-formed-but-fake
@@ -311,6 +320,7 @@ async def portal_form(
             "interactions": PORTAL_INTERACTIONS,
             "severities": SEVERITIES,
             "reported": reported,
+            "open_ticket_count": open_ticket_count,
             "statuses": statuses,
             "selected_status": ticket_status,
             "active_tab": active_tab,

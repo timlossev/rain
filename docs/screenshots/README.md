@@ -28,7 +28,7 @@ nothing here is mocked up.
 
 | | |
 |---|---|
-| ![Search results](11-search-results.png) Global full-text search across tickets and documents. | ![Client portal](15-client-portal.png) The public client portal -- file a request with no account. |
+| ![Search results](11-search-results.png) Global full-text search across tickets and documents. | ![Client portal](15-client-portal.png) The public client portal -- file a request with no account, with an at-a-glance status strip once signed in. |
 | ![Admin branding](14-admin-branding.png) Runtime branding and the public-portal settings, no redeploy needed. | ![Home](02-home.png) The landing page, driven by a flagged document. |
 
 ![Sign in](01-login.png)

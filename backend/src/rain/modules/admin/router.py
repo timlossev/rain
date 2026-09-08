@@ -54,7 +54,7 @@ from rain.modules.auth import saml_config
 from rain.modules.auth.ldap_config import get_provider_row, get_raw_config, save_ldap_config
 from rain.modules.auth.ldap_sync import run_ldap_sync
 from rain.modules.catalog import service as catalog_service
-from rain.modules.catalog.schemas import MAX_CATALOG_FIELDS, PAYLOAD_FORMATS, SOURCE_MODES
+from rain.modules.catalog.schemas import CATALOG_ICON_CHOICES, MAX_CATALOG_FIELDS, PAYLOAD_FORMATS, SOURCE_MODES
 from rain.modules.tickets import notifications
 from rain.modules.tickets.schemas import CHANNEL_TYPES, SEVERITIES, TICKET_TYPES
 from rain.modules.webhooks import service as webhook_service
@@ -1435,6 +1435,7 @@ async def _catalog_form_context(tenant_db: AsyncSession, ctx: RequestContext, *,
         "payload_formats": PAYLOAD_FORMATS,
         "source_modes": SOURCE_MODES,
         "severities": SEVERITIES,
+        "icon_choices": CATALOG_ICON_CHOICES,
         "field_range": range(1, MAX_CATALOG_FIELDS + 1),
         "field_prefill": field_prefill,
     }
@@ -1469,6 +1470,7 @@ async def catalog_item_create(
     name: str = Form(...),
     key: str = Form(...),
     description: str = Form(""),
+    icon: str = Form(""),
     ticket_type: str = Form("incident"),
     default_severity: str = Form("medium"),
     payload_format: str = Form("json"),
@@ -1499,6 +1501,12 @@ async def catalog_item_create(
         name=name.strip(),
         key=key.strip().lower(),
         description=description.strip() or None,
+        # Only a recognized nav_icon() name is ever stored -- the select
+        # only ever offers CATALOG_ICON_CHOICES, but nothing stops a
+        # crafted request from posting an arbitrary string, and an
+        # unrecognized one would just be dead data (nav_icon renders its
+        # generic-circle fallback for it either way, not an error).
+        icon=icon.strip() if icon.strip() in CATALOG_ICON_CHOICES else None,
         ticket_type=ticket_type,
         default_severity=default_severity,
         payload_format=payload_format,
@@ -1544,6 +1552,7 @@ async def catalog_item_edit(
     name: str = Form(...),
     key: str = Form(...),
     description: str = Form(""),
+    icon: str = Form(""),
     ticket_type: str = Form("incident"),
     default_severity: str = Form("medium"),
     payload_format: str = Form("json"),
@@ -1572,6 +1581,7 @@ async def catalog_item_edit(
     item.name = name.strip()
     item.key = key.strip().lower()
     item.description = description.strip() or None
+    item.icon = icon.strip() if icon.strip() in CATALOG_ICON_CHOICES else None
     item.ticket_type = ticket_type
     item.default_severity = default_severity
     item.payload_format = payload_format

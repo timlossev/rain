@@ -58,9 +58,26 @@
     {% endif %}
   </div>
 
+  {% if user %}
+  {# anonymous_shared_only is always False whenever user is set (see its
+     own definition in portal_form -- it only ever applies to an
+     anonymous visitor), so this alone is the right guard both here and
+     for the "Pending Actions (N)" tab label further down, which reuses
+     this same pending_count rather than recomputing it. #}
+  {% set pending_count = (pending_approval | length) + (pending_acknowledgment | length) %}
+  {% endif %}
+
   {% if not anonymous_shared_only %}
   <div class="card portal-card portal-today">
-    <div class="portal-section-title" style="margin-top:0;">Today's events</div>
+    <div class="portal-section-title" style="margin-top:0; justify-content:space-between; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <span>Today's events</span>
+      {% if user %}
+      <span class="portal-status-strip">
+        <span class="badge{{ ' badge-accent' if open_ticket_count else '' }}">{{ open_ticket_count }} open ticket{{ 's' if open_ticket_count != 1 else '' }}</span>
+        {% if pending_count %}<span class="badge badge-accent">{{ pending_count }} pending your action</span>{% endif %}
+      </span>
+      {% endif %}
+    </div>
     {% if todays_events %}
     <ul class="portal-today-list">
       {% for e in todays_events[:5] %}<li>{% if e.ticket_number is defined %}{{ e.ticket_number }}: {% endif %}{{ e.title }}</li>{% endfor %}
@@ -125,7 +142,9 @@
           <button type="button" class="tab-btn {{ 'active' if active_tab == 'tickets' else '' }}" data-tab-btn="tickets">Report Something</button>
           {% endif %}
           {% if user %}
-          {% set pending_count = (pending_approval | length) + (pending_acknowledgment | length) %}
+          {# pending_count itself is set once, near the top of this
+             template, alongside the status-summary strip that also
+             uses it. #}
           <button type="button" class="tab-btn" data-tab-btn="approvals">Pending Actions{% if pending_count %} ({{ pending_count }}){% endif %}</button>
           <button type="button" class="tab-btn" data-tab-btn="documents">Document Archive</button>
           {% endif %}
@@ -156,19 +175,21 @@
           {% else %}
           <input type="hidden" name="interaction" value="{{ interactions[0][0] }}">
           {% endif %}
-          <div class="field">
-            <label for="title">What's happening?</label>
-            <input type="text" id="title" name="title" placeholder="Short summary" required autofocus>
+          <div class="form-row">
+            <div class="field">
+              <label for="title">What's happening?</label>
+              <input type="text" id="title" name="title" placeholder="Short summary" required autofocus>
+            </div>
+            <div class="field field-w140">
+              <label for="severity">Criticality</label>
+              <select id="severity" name="severity">
+                {% for s in severities %}<option value="{{ s }}" {% if s == "medium" %}selected{% endif %}>{{ s | capitalize }}</option>{% endfor %}
+              </select>
+            </div>
           </div>
           <div class="field">
             <label for="description">Details (optional)</label>
             <textarea id="description" name="description" rows="5"></textarea>
-          </div>
-          <div class="field">
-            <label for="severity">Criticality</label>
-            <select id="severity" name="severity">
-              {% for s in severities %}<option value="{{ s }}" {% if s == "medium" %}selected{% endif %}>{{ s | capitalize }}</option>{% endfor %}
-            </select>
           </div>
           <button class="btn btn-primary" type="submit" style="width:100%;">New ticket</button>
         </form>

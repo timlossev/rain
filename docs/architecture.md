@@ -1455,18 +1455,58 @@ close plumbing is portal-page-local (`report.html`), not base.html's
 shared `#doc-preview-modal`, since that one is wrapped in `{% if ctx %}`
 and never renders on this `content_alone` page at all.
 
+**Header + status strip.** `.portal-header` gained a color-mix(accent,
+9%, surface) tint and border -- the same `.badge-accent` idiom used
+throughout the rest of the app, just against `--surface` instead of
+white, so a tenant with no `portal_background_path` set (the common
+case -- see `.portal-backdrop` above) isn't left with plain text on the
+bare page background as this page's only source of visual presence.
+The "Today's events" card's own title row now doubles as a status
+strip for a signed-in visitor: how many of their own reported tickets
+are still open (`ticket_service.count_open_tickets_reported_by`, a
+plain count query, deliberately not `reported.total` -- that Page's
+total tracks whatever status filter "Tickets reported by me" happens
+to be showing at the moment, which a visitor can change independently,
+so reusing it here would make the strip drift from what it's supposed
+to mean), and, if nonzero, how many things are pending their action
+(`pending_count`, computed once near the top of `report.html` and
+reused by the "Pending Actions (N)" tab label further down rather than
+recomputed). `pending_count` reuses data the Pending Actions tab already computed;
+`open_ticket_count` is the one new query this adds -- small and cheap
+(a single `COUNT(*)` with no join), and deliberately its own function
+rather than a parameter bolted onto `list_tickets_reported_by`, which
+already does more than a plain count needs (the last-comment join,
+pagination) for a row of badges that don't want any of that.
+
 ## Service Catalog
 
-`rain.modules.catalog`. `ServiceCatalogItem` (name, description, ticket_
-type, default_severity, payload_format, requires_approval/approval_flow_
-id, is_active) plus up to 10 `ServiceCatalogField` rows per item (field_
-key, label, field_type -- the same set `rain.modules.assets.schemas.
-FieldType` already defines, reused rather than duplicated -- select_
-options, is_required, sort_order). Configured under Admin > Tenant
-Administration > Service Catalog (`admin.router`'s `/admin/catalog*`
-routes, same "server pre-renders `MAX_CATALOG_FIELDS` rows, a blank
-`field_key` is skipped on submit" shape as Approval Flows' own step
-builder, including the identical `[data-step-field]` JS).
+`rain.modules.catalog`. `ServiceCatalogItem` (name, description, icon,
+ticket_type, default_severity, payload_format, requires_approval/
+approval_flow_id, is_active) plus up to 10 `ServiceCatalogField` rows
+per item (field_key, label, field_type -- the same set `rain.modules.
+assets.schemas.FieldType` already defines, reused rather than
+duplicated -- select_options, is_required, sort_order). Configured
+under Admin > Tenant Administration > Service Catalog (`admin.router`'s
+`/admin/catalog*` routes, same "server pre-renders `MAX_CATALOG_FIELDS`
+rows, a blank `field_key` is skipped on submit" shape as Approval
+Flows' own step builder, including the identical `[data-step-field]`
+JS).
+
+`icon` predates its own UI -- the column existed, and round-tripped
+through config bundle export/import, well before the admin form or
+`catalog/_grid_fragment.html` actually did anything with it. Now a
+`<select>` of `CATALOG_ICON_CHOICES` (a curated subset of `nav_icon`
+names), not free text like `AssetType.icon`'s own Icon field -- that
+one's a typo away from silently falling back to `nav_icon`'s generic
+circle with no warning; a fixed list means every choice is guaranteed
+to render as something recognizable, and the create/edit routes
+double-check the posted value is still a member of that list before
+storing it regardless of what a bypassed client submits. Left unset
+(the default), the grid fragment falls back to the same per-
+`ticket_type` icon a ticket's own type badge already uses
+(`tickets/detail.html`) -- inlined as a ternary in the fragment itself
+rather than threaded through every caller's own context, since it's a
+pure function of a field the item already carries.
 
 **Two client-facing entry points, one shared service layer.** `/catalog`
 (main app, under Records Authority, require_login) and the client

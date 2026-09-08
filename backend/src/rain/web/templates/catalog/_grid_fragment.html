@@ -1,8 +1,18 @@
 {# Shared by catalog/list.html (main app) and portal/report.html's own
-   Catalog tab -- `base_href` is "/catalog" or "/portal/<slug>/catalog". #}
+   Catalog tab -- `base_href` is "/catalog" or "/portal/<slug>/catalog".
+   Icon: item.icon if the admin set one (a fixed nav_icon() name, see
+   rain.modules.catalog.schemas.CATALOG_ICON_CHOICES -- the select never
+   offers anything else, but a bundle-imported item could carry an older/
+   foreign value, in which case nav_icon's own generic-circle fallback
+   takes over same as an unset one below), else the same per-ticket_type
+   icon a ticket's own type badge already uses (tickets/detail.html) --
+   DEFAULT_ICON_BY_TICKET_TYPE, inlined here rather than threaded through
+   every caller's own context since it's a pure function of a field
+   already on `item`. #}
 <div class="catalog-grid">
   {% for item in items %}
   <a class="card catalog-item-card" href="{{ base_href }}/{{ item.key }}">
+    <span class="catalog-item-icon">{{ nav_icon(item.icon or ("alert-triangle" if item.ticket_type == "incident" else ("shield" if item.ticket_type == "vulnerability" else "swap"))) }}</span>
     <div class="catalog-item-title">{{ item.name }}</div>
     {% if item.description %}<p class="muted catalog-item-desc">{{ item.description }}</p>{% endif %}
     <span class="badge">{{ item.ticket_type | capitalize }}</span>

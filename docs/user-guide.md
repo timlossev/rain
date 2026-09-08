@@ -638,7 +638,11 @@ navigating away, with an "Edit ticket" button to the full page.
 
 **Today's events**, above the tabs: calendar entries and change-ticket
 windows due today, or "None" -- shown to every visitor, capped at 5
-with a "+N more" link.
+with a "+N more" link. Signed in, this card's own header also shows how
+many tickets you've reported are still open, and, if anything's
+waiting on you, how many -- the same counts "Tickets reported by me"
+and Pending Actions show below, just visible without opening either
+tab.
 
 **Shareable documents** (shown once at least one exists): every
 document marked shareable, reachable by every visitor including
@@ -808,6 +812,9 @@ final approval, matchable by Event Promotion Policies.
 question count, Active. "+ New service":
 
 - Name, Key (URL slug), Description, Active.
+- Icon (optional): shown on the service's own tile in the catalog grid
+  (main app and client portal alike). Left on Default, the tile shows
+  an icon matching whatever Produces is set to below instead.
 - Produces (ticket type), Severity (fixed per submission), Payload
   format (JSON or `key=value`).
 - Requires approval + Approval flow picker (shown only for Produces =

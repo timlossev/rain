@@ -797,6 +797,18 @@ form.inline[hidden] { display: none; } /* same [hidden]-losing-the-cascade fix a
 .catalog-grid .card + .card { margin-top: 0; } /* override the generic stacked-card rule -- these sit in a grid, not a column */
 .catalog-item-card { display: block; text-decoration: none; color: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
 .catalog-item-card:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.catalog-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 10px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 12%, white);
+  color: var(--accent);
+}
+.catalog-item-icon svg { width: 20px; height: 20px; }
 .catalog-item-title { font-weight: 700; margin-bottom: 6px; }
 .catalog-item-desc { margin: 0 0 10px; }
 .panel-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
@@ -1630,7 +1642,26 @@ td.actions { text-align: right; white-space: nowrap; }
    other page's --accent (including this same tenant's authenticated app
    view) is unaffected. */
 .portal-shell.portal-unbranded { --accent: #52525b; }
-.portal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+/* A subtle accent-tinted bar rather than bare text on the page
+   background -- most tenants never set a portal_background_path (the
+   one other source of visual presence this page has), and without
+   either this read as flatter than the rest of the app, where every
+   page has a topbar. Same color-mix(accent, X%) idiom .badge-accent
+   already uses, just against --surface instead of white -- low enough
+   opacity that it stays a light tint rather than fighting an optional
+   background image behind it (.portal-backdrop, still visible through
+   it), and the existing .brand-name text-shadow trick (below) still
+   carries its own legibility guarantee regardless of what's under it. */
+.portal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 14px 20px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+}
 /* .brand's own height:var(--topbar-height) (60px, see its own rule) only
    matters where it has to line up against the sidebar/topbar's other
    60px-tall pieces -- there's nothing here for it to align with, so left
@@ -1665,6 +1696,15 @@ td.actions { text-align: right; white-space: nowrap; }
   white-space: nowrap;
 }
 .portal-card { width: 100%; }
+/* At-a-glance status strip, in the "Today's events" card's own title
+   row -- badge-styled the same way the sidebar's own nav count badges
+   and a ticket's severity pill already are, so this reads as "the same
+   kind of thing" rather than a new visual element the portal invented
+   for itself. Inline-flex, not block: it sits alongside the "Today's
+   events" text in a flex row (report.html's own .portal-section-title
+   override), not stacked under it. */
+.portal-status-strip { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+.portal-status-strip .badge { padding: 5px 12px; font-size: 0.78rem; }
 .portal-today { margin-bottom: 16px; }
 .portal-today-list { margin: 0; padding-left: 20px; }
 .portal-today-list li { margin-bottom: 4px; }

@@ -24,3 +24,28 @@ SOURCE_MODES = ["content", "regex", "jsonpath"]
 #: N rows, a blank one is simply skipped on submit" trade-off as
 #: admin.router._MAX_APPROVAL_STEPS.
 MAX_CATALOG_FIELDS = 10
+
+#: ServiceCatalogItem.icon's own valid values -- a curated subset of
+#: rain.web.templates.base.html's shared nav_icon(name) macro (the same
+#: icon set nav sections/action types/etc. already draw from), picked for
+#: being plausible fits for a requestable service rather than the full
+#: set (nav-mechanical icons like "chevron-left"/"menu"/"dots-vertical"
+#: excluded). A <select> of these, not free text -- the asset-type Icon
+#: field is free text and a typo there just silently falls back to
+#: nav_icon's own generic circle with no warning; a fixed list here
+#: means every choice is guaranteed to render as something recognizable.
+CATALOG_ICON_CHOICES = [
+    "user", "mail", "bell", "shield", "server", "calendar",
+    "flag", "file", "zap", "settings", "check-circle", "home", "repeat",
+]
+
+#: catalog/_grid_fragment.html's own fallback when a ServiceCatalogItem
+#: has no icon set -- the same per-ticket_type icon a ticket's own type
+#: badge already uses (tickets/detail.html), so an un-iconed service
+#: still shows *something* consistent with what its own resulting
+#: ticket would look like, not a bare generic circle.
+DEFAULT_ICON_BY_TICKET_TYPE = {
+    "incident": "alert-triangle",
+    "vulnerability": "shield",
+    "change": "swap",
+}
