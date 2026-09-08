@@ -115,6 +115,27 @@ ACTION_DESCRIPTIONS = {
     "add_watcher": "Add a system user or a bare email as a watcher -- they start getting emailed on the ticket's activity.",
 }
 
+# rain.web.templates.base's nav_icon(name) macro -- one icon per action,
+# shown on the "Add action" picker and on an existing action's own node
+# in the rule detail page's flowchart. Reused from the app's existing
+# icon set where a decent match already exists (mark_problematic ->
+# "repeat", the same recurring-arrow icon a problematic ticket already
+# shows elsewhere in the app; analyze_root_cause -> "search"; attach_
+# document/attach_asset -> "file"/"server", already standing in for
+# those record types on the sidebar) rather than adding a near-duplicate
+# icon; "bell"/"mail"/"zap" were added to that shared set for the three
+# with no existing equivalent.
+ACTION_ICONS = {
+    "notify_slack": "bell",
+    "notify_email": "mail",
+    "webhook": "zap",
+    "attach_document": "file",
+    "attach_asset": "server",
+    "mark_problematic": "repeat",
+    "analyze_root_cause": "search",
+    "add_watcher": "user",
+}
+
 _TRIGGER_BY_TICKET_TYPE = {
     "incident": "incident_created",
     "vulnerability": "vulnerability_created",

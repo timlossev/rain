@@ -1814,6 +1814,31 @@ async def platform_event_detail(
         a.config.get("user_id") for a in rule.actions if a.action_type == "add_watcher" and a.config.get("user_id")
     }
     watcher_user_names = await resolve_user_names(watcher_user_ids)
+    channel_names = {c.id: c.name for c in channels}
+    asset_names = {a.id: a.name for a in assets}
+    webhook_names = {w.id: w.name for w in webhooks}
+    document_labels = {d.id: f"{d.doc_number}: {d.title}" for d in documents}
+
+    # One JSON-serializable blob per action, embedded on its flow node
+    # (data-config) so app.js can populate the shared properties panel
+    # when that node is clicked to edit it -- config values plus their
+    # already-resolved display labels, so the panel needs no extra
+    # lookups of its own to pre-fill a select/picker with what's
+    # currently set.
+    action_display_configs = {}
+    for a in rule.actions:
+        cfg = dict(a.config or {})
+        if a.action_type in ("notify_slack", "notify_email"):
+            cfg["channel_label"] = channel_names.get(cfg.get("channel_id"), "")
+        elif a.action_type == "webhook":
+            cfg["webhook_label"] = webhook_names.get(cfg.get("webhook_id"), "")
+        elif a.action_type == "attach_document":
+            cfg["document_label"] = document_labels.get(cfg.get("document_id"), "")
+        elif a.action_type == "attach_asset":
+            cfg["asset_label"] = asset_names.get(cfg.get("asset_id"), "")
+        elif a.action_type == "add_watcher" and cfg.get("user_id"):
+            cfg["user_label"] = watcher_user_names.get(cfg.get("user_id"), "")
+        action_display_configs[a.id] = cfg
 
     return templates.TemplateResponse(
         request,
@@ -1828,13 +1853,15 @@ async def platform_event_detail(
             "action_types": platform_events.ACTION_TYPES,
             "action_type_labels": dict(platform_events.ACTION_TYPES),
             "action_type_descriptions": platform_events.ACTION_DESCRIPTIONS,
+            "action_type_icons": platform_events.ACTION_ICONS,
+            "action_display_configs": action_display_configs,
             "channels": channels,
             "assets": assets,
             "webhooks": webhooks,
-            "channel_names": {c.id: c.name for c in channels},
-            "asset_names": {a.id: a.name for a in assets},
-            "webhook_names": {w.id: w.name for w in webhooks},
-            "document_labels": {d.id: f"{d.doc_number}: {d.title}" for d in documents},
+            "channel_names": channel_names,
+            "asset_names": asset_names,
+            "webhook_names": webhook_names,
+            "document_labels": document_labels,
             "watcher_user_names": watcher_user_names,
         },
     )
@@ -1864,6 +1891,33 @@ async def platform_event_edit(
     return RedirectResponse(f"/tickets/platform-events/{rule_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
+def _build_action_config(action_type: str, form) -> dict:
+    """Shared by platform_event_action_create and platform_event_action_edit
+    -- the same per-type "which form field(s) actually make up this
+    action's config" mapping, so adding or editing an action can't drift
+    on what a given type's config is supposed to look like."""
+    if action_type in ("notify_slack", "notify_email"):
+        channel_id = form.get("channel_id")
+        return {"channel_id": int(channel_id)} if channel_id else {}
+    if action_type == "webhook":
+        webhook_id = form.get("webhook_config_id")
+        return {"webhook_id": int(webhook_id)} if webhook_id else {}
+    if action_type == "attach_document":
+        document_id = form.get("document_id")
+        return {"document_id": int(document_id)} if document_id else {}
+    if action_type == "attach_asset":
+        asset_id = form.get("asset_id")
+        return {"asset_id": int(asset_id)} if asset_id else {}
+    if action_type == "add_watcher":
+        email = (form.get("watcher_email") or "").strip()
+        watcher_user_id = form.get("watcher_user_id")
+        # Email wins if both were somehow filled in -- matches
+        # add_watcher_by_email/add_watcher's own "email first" order in
+        # platform_events._run_action.
+        return {"email": email} if email else ({"user_id": int(watcher_user_id)} if watcher_user_id else {})
+    return {}
+
+
 @router.post("/platform-events/{rule_id:int}/actions")
 async def platform_event_action_create(
     request: Request,
@@ -1873,29 +1927,30 @@ async def platform_event_action_create(
     _: CurrentUser = Depends(require_admin),
 ):
     form = await request.form()
-    if action_type in ("notify_slack", "notify_email"):
-        channel_id = form.get("channel_id")
-        config = {"channel_id": int(channel_id)} if channel_id else {}
-    elif action_type == "webhook":
-        webhook_id = form.get("webhook_config_id")
-        config = {"webhook_id": int(webhook_id)} if webhook_id else {}
-    elif action_type == "attach_document":
-        document_id = form.get("document_id")
-        config = {"document_id": int(document_id)} if document_id else {}
-    elif action_type == "attach_asset":
-        asset_id = form.get("asset_id")
-        config = {"asset_id": int(asset_id)} if asset_id else {}
-    elif action_type == "add_watcher":
-        email = (form.get("watcher_email") or "").strip()
-        watcher_user_id = form.get("watcher_user_id")
-        # Email wins if both were somehow filled in -- matches
-        # add_watcher_by_email/add_watcher's own "email first" order in
-        # platform_events._run_action.
-        config = {"email": email} if email else ({"user_id": int(watcher_user_id)} if watcher_user_id else {})
-    else:
-        config = {}
+    config = _build_action_config(action_type, form)
     tenant_db.add(PlatformEventAction(rule_id=rule_id, action_type=action_type, config=config))
     await tenant_db.commit()
+    return RedirectResponse(f"/tickets/platform-events/{rule_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/platform-events/{rule_id:int}/actions/{action_id:int}/edit")
+async def platform_event_action_edit(
+    request: Request,
+    rule_id: int,
+    action_id: int,
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_admin),
+):
+    """Changes an existing action's config in place -- not its
+    action_type, which the properties panel never offers to change on an
+    already-added action (same reasoning create-vs-edit already gets
+    elsewhere in this app: picking a different type is closer to "remove
+    this, add a different one" than an in-place edit)."""
+    action = await tenant_db.get(PlatformEventAction, action_id)
+    if action is not None and action.rule_id == rule_id:
+        form = await request.form()
+        action.config = _build_action_config(action.action_type, form)
+        await tenant_db.commit()
     return RedirectResponse(f"/tickets/platform-events/{rule_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 

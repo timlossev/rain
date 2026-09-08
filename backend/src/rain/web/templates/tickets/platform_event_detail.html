@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_search_picker.html" as picker %}
 {% block title %}{{ rule.name }} - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Manage this Platform Response Rule's actions - notify Slack/email, call a webhook, attach a document or asset, mark the ticket problematic, or add a watcher. All actions run when the rule's pattern matches - a ticket for every trigger except "When a document is pending your acknowledgment", where it matches a document instead and only the notify/webhook actions apply.{% endblock %}
+{% block help_text %}Manage this Platform Response Rule's actions - notify Slack/email, call a webhook, attach a document or asset, mark the ticket problematic, analyze root cause, or add a watcher. Actions fire in order, top of the flow to bottom, when the rule's pattern matches - a ticket for every trigger except "When a document is pending your acknowledgment", where it matches a document instead and only the notify/webhook actions apply. Click a step in the flow to edit it, or "+ Add action" to add another.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <div>
@@ -40,52 +40,42 @@
 
 <div class="card">
   <div class="card-title">Actions ({{ rule.actions | length }})</div>
-  {% if rule.actions %}
-  <table>
-    <thead><tr><th>Type</th><th>Config</th><th></th></tr></thead>
-    <tbody>
-      {% for a in rule.actions %}
-      <tr>
-        <td><span class="badge">{{ action_type_labels.get(a.action_type, a.action_type) }}</span></td>
-        <td class="muted">
-          {% if a.action_type in ("notify_slack", "notify_email") %}
-            {{ channel_names.get(a.config.get("channel_id"), "channel no longer exists") }}
-          {% elif a.action_type == "webhook" %}
-            {{ webhook_names.get(a.config.get("webhook_id"), "webhook no longer exists") }}
-          {% elif a.action_type == "attach_document" %}
-            {{ document_labels.get(a.config.get("document_id"), "document no longer exists") }}
-          {% elif a.action_type == "attach_asset" %}
-            {{ asset_names.get(a.config.get("asset_id"), "asset no longer exists") }}
-          {% elif a.action_type == "add_watcher" %}
-            {% if a.config.get("email") %}{{ a.config.get("email") }}{% else %}{{ watcher_user_names.get(a.config.get("user_id"), "user no longer exists") }}{% endif %}
-          {% elif a.action_type == "mark_problematic" or a.action_type == "analyze_root_cause" %}
-            &mdash;
-          {% endif %}
-        </td>
-        <td class="actions">
-          <form class="inline" method="post" action="/tickets/platform-events/{{ rule.id }}/actions/{{ a.id }}/delete" data-confirm="Remove this action?">
-            <button class="btn btn-sm btn-danger" type="submit">Remove</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="muted">No actions yet - this rule matches but does nothing. Add one below.</p>
-  {% endif %}
+  <p class="field-hint" style="margin-top:-4px;">Fires top to bottom when the rule matches. Click a step below to edit or remove it.</p>
+
+  <div class="action-flow" id="action-flow">
+    {% for a in rule.actions %}
+    {% if not loop.first %}<span class="action-flow-arrow">{{ nav_icon("arrow-right") }}</span>{% endif %}
+    <button type="button" class="action-node" data-action-node="{{ a.id }}" data-action-node-type="{{ a.action_type }}" data-config='{{ action_display_configs.get(a.id, {}) | tojson }}'>
+      <span class="action-node-icon">{{ nav_icon(action_type_icons.get(a.action_type, "settings")) }}</span>
+      <span class="action-node-label">{{ action_type_labels.get(a.action_type, a.action_type) }}</span>
+    </button>
+    {% endfor %}
+    {% if rule.actions %}<span class="action-flow-arrow">{{ nav_icon("arrow-right") }}</span>{% endif %}
+    <button type="button" class="action-node action-node-add" id="action-node-add">
+      <span class="action-node-icon">{{ nav_icon("plus") }}</span>
+      <span class="action-node-label">Add action</span>
+    </button>
+  </div>
 </div>
 
 <div class="card">
-  <div class="card-title">Add action</div>
-  <form method="post" action="/tickets/platform-events/{{ rule.id }}/actions">
-    <div class="field">
-      <label for="action_type">Action</label>
-      <select id="action_type" name="action_type" data-action-type-select onchange="document.getElementById('action_type_hint').textContent = this.options[this.selectedIndex].dataset.desc">
-        {% for value, label in action_types %}<option value="{{ value }}" data-desc="{{ action_type_descriptions.get(value, '') }}">{{ label }}</option>{% endfor %}
-      </select>
-      <div class="field-hint" id="action_type_hint">{{ action_type_descriptions.get(action_types[0][0], '') }}</div>
-    </div>
+  <div class="card-title" id="action-panel-title">Add action</div>
+
+  <div class="action-icon-grid" id="action-icon-grid">
+    {% for value, label in action_types %}
+    <button type="button" class="action-icon-btn" data-action-icon="{{ value }}" data-desc="{{ action_type_descriptions.get(value, '') }}">
+      <span class="action-node-icon">{{ nav_icon(action_type_icons.get(value, "settings")) }}</span>
+      <span>{{ label }}</span>
+    </button>
+    {% endfor %}
+  </div>
+  <div class="field-hint" id="action_type_hint">&nbsp;</div>
+
+  <form method="post" action="/tickets/platform-events/{{ rule.id }}/actions" id="action-panel-form">
+    <select id="action_type" name="action_type" data-action-type-select hidden>
+      <option value=""></option>
+      {% for value, label in action_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+    </select>
 
     <div class="field" data-action-fields="notify_slack,notify_email">
       <label for="channel_id">Notification channel</label>
@@ -125,7 +115,135 @@
       <div class="field-hint">Fill in one or the other. Either way, they start getting emailed on this ticket's activity the same as anyone who clicked "Watch" on it.</div>
     </div>
 
-    <button class="btn btn-primary" type="submit">Add action</button>
+    <div class="panel-row" style="justify-content:flex-start; gap:8px; margin-top:10px;">
+      <button class="btn btn-primary" type="submit" id="action-panel-submit" disabled>Add action</button>
+      <button class="btn btn-sm" type="button" id="action-panel-cancel" hidden>Cancel</button>
+      {# A <button form="..."> submits a *different* form than the one it's
+         nested in -- lets this sit in the same row as Save/Cancel above
+         while still posting to its own action-remove-form below, since
+         HTML forbids actually nesting one <form> inside another. #}
+      <button class="btn btn-sm btn-danger" type="submit" form="action-remove-form" id="action-panel-remove" hidden>Remove this action</button>
+    </div>
   </form>
+  <form method="post" id="action-remove-form" data-confirm="Remove this action?"></form>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  const grid = document.getElementById("action-icon-grid");
+  const select = document.getElementById("action_type");
+  const hint = document.getElementById("action_type_hint");
+  const form = document.getElementById("action-panel-form");
+  const submitBtn = document.getElementById("action-panel-submit");
+  const cancelBtn = document.getElementById("action-panel-cancel");
+  const title = document.getElementById("action-panel-title");
+  const removeForm = document.getElementById("action-remove-form");
+  const removeBtn = document.getElementById("action-panel-remove");
+  const flow = document.getElementById("action-flow");
+  const addNode = document.getElementById("action-node-add");
+  if (!grid || !select || !form || !flow) return;
+
+  const createAction = form.action; // .../actions -- the create endpoint, form.action always resets back to this in add mode
+
+  function setSelectValue(value) {
+    select.value = value;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function clearFieldValues() {
+    form.querySelectorAll("input[type=text], input[type=email]").forEach((el) => { el.value = ""; });
+    form.querySelectorAll("input[type=hidden]:not(#action_type)").forEach((el) => { el.value = ""; });
+    form.querySelectorAll("select:not(#action_type)").forEach((el) => { el.value = ""; });
+  }
+
+  function highlightIcon(value) {
+    grid.querySelectorAll("[data-action-icon]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.actionIcon === value);
+    });
+  }
+
+  function highlightNode(node) {
+    flow.querySelectorAll(".action-node").forEach((el) => el.classList.remove("active"));
+    if (node) node.classList.add("active");
+  }
+
+  function enterAddMode() {
+    form.action = createAction;
+    title.textContent = "Add action";
+    grid.classList.remove("locked");
+    submitBtn.textContent = "Add action";
+    submitBtn.disabled = true;
+    cancelBtn.hidden = true;
+    removeBtn.hidden = true;
+    clearFieldValues();
+    setSelectValue("");
+    hint.innerHTML = "&nbsp;";
+    highlightIcon("");
+    highlightNode(addNode);
+  }
+
+  grid.querySelectorAll("[data-action-icon]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (grid.classList.contains("locked")) return; // an existing action's type can't be changed, only its config -- see this page's own edit route
+      const value = btn.dataset.actionIcon;
+      setSelectValue(value);
+      hint.textContent = btn.dataset.desc || "";
+      submitBtn.disabled = false;
+      highlightIcon(value);
+    });
+  });
+
+  addNode.addEventListener("click", enterAddMode);
+  cancelBtn.addEventListener("click", enterAddMode);
+
+  flow.querySelectorAll("[data-action-node]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const actionId = node.dataset.actionNode;
+      const actionType = node.dataset.actionNodeType;
+      let config = {};
+      try {
+        config = JSON.parse(node.dataset.config || "{}");
+      } catch (e) {
+        config = {};
+      }
+
+      form.action = `${createAction}/${actionId}/edit`;
+      title.textContent = "Edit " + (node.querySelector(".action-node-label").textContent || "action");
+      grid.classList.add("locked");
+      submitBtn.textContent = "Save changes";
+      submitBtn.disabled = false;
+      cancelBtn.hidden = false;
+      hint.innerHTML = "&nbsp;";
+
+      clearFieldValues();
+      setSelectValue(actionType);
+      highlightIcon(actionType);
+
+      if (config.channel_id) document.getElementById("channel_id").value = config.channel_id;
+      if (config.webhook_id) document.getElementById("webhook_config_id").value = config.webhook_id;
+      if (config.asset_id) document.getElementById("asset_id").value = config.asset_id;
+      if (config.document_id) {
+        document.getElementById("up-document_id").value = config.document_label || "";
+        const hidden = form.querySelector('input[name="document_id"][data-user-picker-value]');
+        if (hidden) hidden.value = config.document_id;
+      }
+      if (config.email) {
+        document.getElementById("watcher_email").value = config.email;
+      } else if (config.user_id) {
+        document.getElementById("up-watcher_user_id").value = config.user_label || "";
+        const hidden = form.querySelector('input[name="watcher_user_id"][data-user-picker-value]');
+        if (hidden) hidden.value = config.user_id;
+      }
+
+      removeForm.action = `${createAction}/${actionId}/delete`;
+      removeBtn.hidden = false;
+      highlightNode(node);
+    });
+  });
+
+  enterAddMode();
+})();
+</script>
 {% endblock %}

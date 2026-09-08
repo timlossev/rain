@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from rain.modules.tickets.platform_events import ACTION_TYPES, TRIGGER_EVENTS, _action_label, _rule_matches
+from rain.modules.tickets.platform_events import ACTION_DESCRIPTIONS, ACTION_ICONS, ACTION_TYPES, TRIGGER_EVENTS, _action_label, _rule_matches
 
 
 def _rule(**kwargs):
@@ -62,9 +62,10 @@ def test_action_label_falls_back_to_raw_type_for_unknown_action():
 
 
 def test_trigger_events_and_action_types_are_well_formed():
-    """Both are rendered directly into admin/platform_event_detail.html's
-    dropdowns -- a duplicate or malformed key there would silently offer
-    two identical options or break the config lookup in _run_action."""
+    """Both are rendered directly into tickets/platform_event_detail.html's
+    trigger dropdown and action icon picker -- a duplicate or malformed
+    key there would silently offer two identical options or break the
+    config lookup in _run_action."""
     trigger_keys = [key for key, _label in TRIGGER_EVENTS]
     assert len(trigger_keys) == len(set(trigger_keys))
     action_keys = [key for key, _label in ACTION_TYPES]
@@ -72,6 +73,18 @@ def test_trigger_events_and_action_types_are_well_formed():
     assert "mark_problematic" in action_keys
     assert "incident_created" in trigger_keys
     assert "document_pending_acknowledgment" in trigger_keys
+
+
+def test_every_action_type_has_an_icon_and_description():
+    """ACTION_ICONS/ACTION_DESCRIPTIONS are keyed separately from
+    ACTION_TYPES (see that dict's own comment for why) -- nothing at the
+    type level enforces they stay in sync, so a new action type added to
+    one without the other would silently fall back to a generic gear
+    icon (the template's own `action_type_icons.get(value, "settings")`)
+    or an empty hint, not fail loudly. Covered here instead."""
+    action_keys = {key for key, _label in ACTION_TYPES}
+    assert action_keys == set(ACTION_ICONS.keys())
+    assert action_keys == set(ACTION_DESCRIPTIONS.keys())
 
 
 def test_rule_matches_against_a_document_the_same_way_as_a_ticket():

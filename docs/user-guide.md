@@ -380,8 +380,12 @@ Trigger: incident/vulnerability/change created; one of those three
 closed; a change fully approved; a document entering "pending
 acknowledgment".
 
-Actions, any number per rule -- each shows a one-line description as
-you pick it:
+A rule's own actions show as a flowchart -- one icon per action,
+connected by arrows in the order they fire, plus a trailing "+ Add
+action" step. Click an existing step to edit its configuration or
+remove it; click an icon on "+ Add action" to configure and add a new
+one. Any number per rule, each shown as an icon with a one-line
+description as you pick it:
 
 - Notify Slack / Notify Email: pick a notification channel -- delivery
   actually follows the channel's own type, not the action label.

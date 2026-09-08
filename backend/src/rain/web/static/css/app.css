@@ -624,6 +624,11 @@ nav > .nav-tree > .nav-item > .nav-toggle:hover .nav-label {
 }
 .btn:hover { border-color: var(--accent); text-decoration: none; }
 .btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Same fix, same reason, as .modal-overlay[hidden] etc. below: .btn's own
+   `display: inline-flex` above beats the browser's UA-stylesheet default
+   `[hidden] { display: none }` for any button/link carrying both. */
+.btn[hidden] { display: none; }
 /* A solid, hard-edged offset shadow that grows on hover and flattens on
    press -- like an actual physical button -- instead of the generic
    `filter: brightness()` a default component-library button reaches
@@ -733,6 +738,7 @@ input[type=checkbox] { width: auto; margin-right: 6px; }
 .form-section { background: var(--surface-sunken); border-radius: var(--radius-sm); padding: 14px 16px 2px; margin-bottom: 16px; }
 .form-section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 12px; }
 form.inline { display: inline; }
+form.inline[hidden] { display: none; } /* same [hidden]-losing-the-cascade fix as .btn[hidden] above */
 
 /* ---------- tabs (list / create pairs on the same screen) ---------- */
 .tab-buttons { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
@@ -1241,6 +1247,58 @@ td.actions { text-align: right; white-space: nowrap; }
 .flash { padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 0.88rem; }
 .flash-ok { background: var(--ok-bg); color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 30%, white); }
 .flash-error { background: var(--danger-bg); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 30%, white); }
+
+/* ---------- Platform Response Rule action flow (platform_event_detail.html) ---------- */
+.action-flow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.action-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.action-node:hover { border-color: var(--accent); }
+.action-node.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, white); color: var(--accent); }
+.action-node-add { color: var(--text-muted); border-style: dashed; font-weight: 500; }
+.action-node-add:hover { color: var(--accent); border-color: var(--accent); }
+.action-node-icon svg { width: 17px; height: 17px; flex-shrink: 0; }
+.action-flow-arrow { display: flex; color: var(--text-muted); flex-shrink: 0; }
+.action-flow-arrow svg { width: 16px; height: 16px; }
+
+.action-icon-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.action-icon-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100px;
+  padding: 12px 6px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.74rem;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--text-muted);
+}
+.action-icon-btn .action-node-icon svg { width: 22px; height: 22px; }
+.action-icon-btn:hover { border-color: var(--accent); color: var(--text); }
+.action-icon-btn.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, white); color: var(--accent); font-weight: 600; }
+.action-icon-grid.locked .action-icon-btn { cursor: default; }
+.action-icon-grid.locked .action-icon-btn:not(.active) { opacity: 0.35; pointer-events: none; }
 
 /* ---------- ticket status (tenant-customizable) ---------- */
 .status-pill {

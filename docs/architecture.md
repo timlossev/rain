@@ -483,6 +483,43 @@ to `platform_event_triggers` and (for a ticket) the ticket's own
 activity feed, so a failed Slack post doesn't hide the fact the rule
 matched.
 
+**Actions UI.** `tickets/platform_event_detail.html` shows a rule's
+actions as a flowchart (`.action-flow`) -- one node per `PlatformEventAction`
+in `id` order (the same order `PlatformEventRule.actions`' `order_by`
+already fires them in, so the diagram's left-to-right sequence *is* the
+real firing order, not a separate display concern that could drift from
+it), connected by `arrow-right` icons, plus a trailing "+ Add action"
+node. Both the "Add action" icon grid and an existing node share one
+properties panel and one underlying `<select id="action_type"
+data-action-type-select hidden>` -- a real `<select>`, just visually
+hidden, kept so the existing `[data-action-type-select]`/`[data-action-
+fields]` show-hide wiring (app.js, originally written for a visible
+dropdown) needs no changes: clicking an icon sets `select.value` and
+dispatches a `change` event at it instead of a user picking an option
+directly. Clicking an existing node switches the same panel into edit
+mode -- `grid.classList.add("locked")` dims every icon but the matched
+one (`.action-icon-grid.locked .action-icon-btn:not(.active)`) since an
+action's `action_type` isn't editable after creation, only its config
+(`POST .../actions/{id}/edit`, new alongside the existing create/delete
+routes, sharing `_build_action_config` with create so the two can't
+drift on what a given type's config fields are); pre-fill comes from a
+`data-config` JSON blob on each node -- config values plus their
+already-resolved display labels (`action_display_configs`, built
+server-side in `platform_event_detail` alongside the existing
+`channel_names`/`asset_names`/`webhook_names`/`document_labels`/
+`watcher_user_names` maps the Actions table itself already needed) --
+so the panel needs no extra round trip to show what's currently set.
+The "Remove this action" button lives in the same button row as Save/
+Cancel despite posting to a *different* `<form>` (browsers forbid
+nesting one form in another) via HTML5's `<button form="other-form-
+id">` cross-form association, rather than a visually separate form
+underneath. Two `[hidden]`-losing-the-cascade fixes (see the modal/
+tab-buttons ones elsewhere in this doc for the same class of bug) came
+out of this: `.btn[hidden]`/`form.inline[hidden]`, both needed since
+`.btn`'s own `display: inline-flex` and `form.inline`'s `display:
+inline` are same-specificity author rules that beat the browser's UA
+default `[hidden] { display: none }` for any element carrying both.
+
 **Escalation.** A per-tenant "escalation webhook" (one `WebhookConfig`,
 picked on Admin > Branding next to the portal's own settings, stored as
 `tenant_config["escalation_webhook_id"]`) backs a manual escalate
