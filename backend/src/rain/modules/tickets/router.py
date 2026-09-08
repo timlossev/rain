@@ -1791,7 +1791,6 @@ async def platform_event_detail(
     if rule is None:
         return RedirectResponse("/tickets/platform-events", status_code=status.HTTP_303_SEE_OTHER)
     channels = list((await tenant_db.execute(select(NotificationChannel).order_by(NotificationChannel.name))).scalars())
-    assets = await asset_service.list_assets(tenant_db)
     webhooks = await webhook_service.list_webhooks(tenant_db)
 
     # Everything below is display-only -- turning each action's stored
@@ -1802,6 +1801,12 @@ async def platform_event_detail(
     # same as webhook_names already did before this -- the action itself
     # still runs and reports that failure for real at fire time (see
     # platform_events._run_action), this is only the summary table.
+    # Both attach_document and attach_asset are now type-to-search
+    # pickers on the "Add action" form (not a <select> listing every
+    # document/asset -- see that picker's own docstring on why a large
+    # tenant can't have its whole table baked into the page), so only
+    # the handful of ids this rule's own actions actually reference are
+    # worth a query here, not every row in either table.
     document_ids = {
         a.config.get("document_id") for a in rule.actions if a.action_type == "attach_document" and a.config.get("document_id")
     }
@@ -1809,6 +1814,12 @@ async def platform_event_detail(
         list((await tenant_db.execute(select(Document).where(Document.id.in_(document_ids)))).scalars())
         if document_ids
         else []
+    )
+    asset_ids = {
+        a.config.get("asset_id") for a in rule.actions if a.action_type == "attach_asset" and a.config.get("asset_id")
+    }
+    assets = (
+        list((await tenant_db.execute(select(Asset).where(Asset.id.in_(asset_ids)))).scalars()) if asset_ids else []
     )
     watcher_user_ids = {
         a.config.get("user_id") for a in rule.actions if a.action_type == "add_watcher" and a.config.get("user_id")
@@ -1856,7 +1867,6 @@ async def platform_event_detail(
             "action_type_icons": platform_events.ACTION_ICONS,
             "action_display_configs": action_display_configs,
             "channels": channels,
-            "assets": assets,
             "webhooks": webhooks,
             "channel_names": channel_names,
             "asset_names": asset_names,

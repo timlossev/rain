@@ -509,6 +509,16 @@ server-side in `platform_event_detail` alongside the existing
 `channel_names`/`asset_names`/`webhook_names`/`document_labels`/
 `watcher_user_names` maps the Actions table itself already needed) --
 so the panel needs no extra round trip to show what's currently set.
+`attach_asset`'s own config field is a `_search_picker.html` instance
+(`GET /tickets/assets/search`, the same predictive endpoint the ticket
+form's own Affected asset field already used) rather than a `<select>`
+listing every asset, same reasoning `attach_document` already had one
+for -- a tenant with a couple thousand assets shouldn't mean a couple
+thousand `<option>` tags baked into this page. `asset_names`/
+`document_labels` themselves only ever query the specific ids this
+rule's own actions reference (`Asset.id.in_(asset_ids)`, mirroring
+`Document.id.in_(document_ids)`), not every row in either table, for
+the same reason.
 The "Remove this action" button lives in the same button row as Save/
 Cancel despite posting to a *different* `<form>` (browsers forbid
 nesting one form in another) via HTML5's `<button form="other-form-

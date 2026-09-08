@@ -1278,6 +1278,12 @@ td.actions { text-align: right; white-space: nowrap; }
 .action-flow-arrow svg { width: 16px; height: 16px; }
 
 .action-icon-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+/* Extra room between the icon picker + its hint (the buttons) and
+   whichever config fields appear underneath once one's picked (its
+   properties) -- .field-hint's own default margin-top is 4px, meant
+   for a hint sitting directly under its own field, not for the space
+   before an unrelated fields section below it. */
+.action-panel-fields { margin-top: 20px; }
 .action-icon-btn {
   display: flex;
   flex-direction: column;

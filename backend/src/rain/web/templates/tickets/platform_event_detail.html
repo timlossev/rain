@@ -71,7 +71,7 @@
   </div>
   <div class="field-hint" id="action_type_hint">&nbsp;</div>
 
-  <form method="post" action="/tickets/platform-events/{{ rule.id }}/actions" id="action-panel-form">
+  <form method="post" action="/tickets/platform-events/{{ rule.id }}/actions" id="action-panel-form" class="action-panel-fields">
     <select id="action_type" name="action_type" data-action-type-select hidden>
       <option value=""></option>
       {% for value, label in action_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
@@ -98,12 +98,8 @@
     <div data-action-fields="attach_document">
       {{ picker.search_picker("document_id", "/documents/search", label="Document", placeholder="Search documents...") }}
     </div>
-    <div class="field" data-action-fields="attach_asset">
-      <label for="asset_id">Asset</label>
-      <select id="asset_id" name="asset_id">
-        <option value="">-</option>
-        {% for a in assets %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}
-      </select>
+    <div data-action-fields="attach_asset">
+      {{ picker.search_picker("asset_id", "/tickets/assets/search", label="Asset", placeholder="Search assets...") }}
     </div>
 
     <div data-action-fields="add_watcher">
@@ -223,11 +219,15 @@
 
       if (config.channel_id) document.getElementById("channel_id").value = config.channel_id;
       if (config.webhook_id) document.getElementById("webhook_config_id").value = config.webhook_id;
-      if (config.asset_id) document.getElementById("asset_id").value = config.asset_id;
       if (config.document_id) {
         document.getElementById("up-document_id").value = config.document_label || "";
         const hidden = form.querySelector('input[name="document_id"][data-user-picker-value]');
         if (hidden) hidden.value = config.document_id;
+      }
+      if (config.asset_id) {
+        document.getElementById("up-asset_id").value = config.asset_label || "";
+        const hidden = form.querySelector('input[name="asset_id"][data-user-picker-value]');
+        if (hidden) hidden.value = config.asset_id;
       }
       if (config.email) {
         document.getElementById("watcher_email").value = config.email;
