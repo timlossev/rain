@@ -110,6 +110,23 @@ class Settings(BaseSettings):
     # point on.
     enable_pgvector: bool = True
 
+    # rain.core.security.hash_password's own algorithm switch -- Argon2id
+    # (the default, and every password hash already in the database) has
+    # no FIPS 140-3 approved status at all, regardless of which OpenSSL
+    # build or base image backs the rest of the app (see rain.core.crypto's
+    # own docstring for that distinction). On, new/reset/changed passwords
+    # hash with PBKDF2-HMAC-SHA256 (SP 800-132) instead -- the FIPS-
+    # approved alternative. This alone does not make RAIN "FIPS 140-3
+    # compliant": that's a property of the validated cryptographic module
+    # underneath (the system OpenSSL, which Alpine's own build isn't),
+    # not something this flag can claim on its own. Flipping it doesn't
+    # invalidate any password already set -- verify_password recognizes
+    # either hash format by its own prefix, independent of this setting,
+    # so existing Argon2 hashes keep working; only a *new* hash_password
+    # call (password reset, admin-set password, first-run setup) is
+    # affected.
+    fips_password_hashing: bool = False
+
     @field_validator("database_url")
     @classmethod
     def _normalize_driver(cls, value: str) -> str:

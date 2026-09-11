@@ -59,6 +59,14 @@ services:
       # ship the vector extension (a managed-database role without
       # CREATE EXTENSION privilege, or standard RDS in AWS GovCloud).
       ENABLE_PGVECTOR: ${ENABLE_PGVECTOR:-true}
+      # See .env.example -- Argon2id (default) vs PBKDF2-HMAC-SHA256 for
+      # new/reset/changed passwords. Passed to both containers, same
+      # reasoning as ENABLE_PGVECTOR above: nothing here forces web and
+      # worker to agree at the DB-schema level the way that one does, but
+      # they should still agree in practice so a password changed via one
+      # process hashes the same way a password changed via the other
+      # would.
+      FIPS_PASSWORD_HASHING: ${FIPS_PASSWORD_HASHING:-false}
     ports:
       - "${APP_PORT:-8000}:${APP_PORT:-8000}"
     volumes:
@@ -92,6 +100,9 @@ services:
       # own value so the two never disagree on whether the embedding
       # columns/extension exist.
       ENABLE_PGVECTOR: ${ENABLE_PGVECTOR:-true}
+      # See app's own comment above -- keeps both containers hashing
+      # passwords the same way.
+      FIPS_PASSWORD_HASHING: ${FIPS_PASSWORD_HASHING:-false}
       # See app's own comment above -- the calendar sweep's "refresh
       # document from webhook" policy runs here and needs the same
       # storage backend the app's document routes use.
