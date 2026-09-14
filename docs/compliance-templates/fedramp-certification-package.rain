@@ -1,0 +1,150 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-14T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "FedRAMP Certification Package starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "fedramp_certification_package",
+      "name": "FedRAMP Certification Package",
+      "icon": null,
+      "description": "One row per FedRAMP-certified cloud service offering this tenant operates -- most tenants only ever need one. Mirrors fedramp.gov's own Certification Package Overview schema (fedramp-certification-package-overview-schema-2026-06-24.json): the CSP/service-identity metadata FedRAMP's marketplace listing expects, not a control-implementation SSP. Each Asset's own \"Name\" field is the service's own name (serviceName in that schema) -- pairs with fedramp-package-contacts.rain and fedramp-package-repositories.rain for the two repeating sections that schema carries as arrays.",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "provider_name",
+      "label": "Provider name",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "service_acronym",
+      "label": "Service acronym",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "service_description",
+      "label": "Service description",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "certification_type",
+      "label": "Certification type",
+      "field_type": "select",
+      "select_options": ["20x", "Rev5"],
+      "is_required": true,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "fedramp_package_id",
+      "label": "FedRAMP package ID",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "uei_number",
+      "label": "UEI number (SAM.gov)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "website",
+      "label": "Website",
+      "field_type": "url",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "service_type",
+      "label": "Service type (comma-separated -- SaaS, PaaS, IaaS)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "deployment_model",
+      "label": "Deployment model",
+      "field_type": "select",
+      "select_options": ["Public Cloud", "Government-Only Cloud", "Hybrid Cloud", "Community Cloud", "Government Community Cloud"],
+      "is_required": true,
+      "sort_order": 8
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "business_category",
+      "label": "Business category (comma-separated, up to 10)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 9
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "assessor_name",
+      "label": "Assessor (3PAO) name",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 10
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "assessor_id",
+      "label": "Assessor ID (6 digits)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 11
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "next_ocr_date",
+      "label": "Next Ongoing Certification Report date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 12
+    }
+  ]
+}

@@ -20,11 +20,21 @@ ticket fields for a common compliance register, with no code involved.
 | `poam-tracking-fields.rain` | *Ticket* fields | CA-5 (POA&M) |
 | `nessus-finding-fields.rain` | *Ticket* fields | RA-5/RA-7 -- optional; Tickets > Import reads a `.nessus` file natively either way |
 | `fedramp-ocr-fields.rain` | *Ticket* fields | FedRAMP CR26's Ongoing Certification Report -- additive alongside the POA&M template, not a replacement for it (see `docs/itsm-controls-mapping.md`'s CA-5 entry) |
+| `fedramp-certification-package.rain` | FedRAMP Certification Package asset type | Mirrors fedramp.gov's Certification Package Overview schema (2026-06-24) -- CSP/service-identity metadata, only relevant to a tenant that's itself a FedRAMP-certified CSP, not a general-purpose register |
+| `fedramp-package-contacts.rain` | FedRAMP Package Contact asset type | The same schema's repeating `contactInformation` array -- pairs with `fedramp-certification-package.rain` |
+| `fedramp-package-repositories.rain` | FedRAMP Package Repository asset type | The same schema's `trustCenter`/`secureConfigurationGuidance`/`additionalRepositories` -- pairs with `fedramp-certification-package.rain` |
 
 Everything except the three ticket-scoped ones (POA&M, Nessus, FedRAMP
 OCR) seeds an asset type plus its fields; those three seed tenant-wide
 ticket custom fields instead, since that data tracks a ticket's own
 lifecycle, not a persistent asset's.
+
+The three FedRAMP Package templates are also referenced from
+`subprocessor-register.rain`, which picked up three additional fields
+(2026-09-14) for a FedRAMP-certified CSP's own third-party resources
+(the same schema's `thirdPartyInformationResources`) -- additive to
+that template, not a new one, since it's the same vendor-plus-use-case
+shape the register already tracks.
 
 ## Why these
 
@@ -35,6 +45,12 @@ they're common enough that most compliance-minded tenants would
 otherwise build the same custom asset type or field set by hand. None
 of them are required for RAIN to work; they're a five-minute head
 start, not a dependency.
+
+The three FedRAMP Package templates are the one exception to "most
+compliance-minded tenants" -- they only make sense for a tenant that's
+itself a FedRAMP-certified cloud service provider preparing or
+maintaining its own certification package, not for an agency or any
+other tenant tracking compliance against a framework generally.
 
 **Don't see your framework?** These aren't the only ones that'll ever
 exist -- if you're working against a program we haven't covered (a

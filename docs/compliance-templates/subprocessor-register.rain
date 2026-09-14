@@ -1,7 +1,7 @@
 {
   "bundle_type": "rain_tenant_config",
   "bundle_version": 1,
-  "exported_at": "2026-09-02T00:00:00+00:00",
+  "exported_at": "2026-09-14T00:00:00+00:00",
   "source_tenant_slug": "template",
   "source_tenant_name": "Subprocessor register starter template",
   "secrets_included": false,
@@ -10,7 +10,7 @@
       "key": "subprocessor",
       "name": "Subprocessor",
       "icon": null,
-      "description": "One row per vendor/subprocessor with access to tenant data or systems. Each Asset's own \"Name\" field is the vendor's name.",
+      "description": "One row per vendor/subprocessor with access to tenant data or systems. Each Asset's own \"Name\" field is the vendor's name. The three FedRAMP fields below (2026-09-14) are for a tenant that's itself a FedRAMP-certified CSP and needs to report its own third-party resources -- fedramp.gov's Certification Package Overview schema's thirdPartyInformationResources.certified/nonCertified is exactly this same vendor-plus-use-case shape, just with a FedRAMP certification status attached; see fedramp-certification-package.rain.",
       "is_active": true,
       "sort_order": 0
     }
@@ -75,6 +75,36 @@
       "select_options": null,
       "is_required": false,
       "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "subprocessor",
+      "field_key": "is_fedramp_certified",
+      "label": "FedRAMP certified (as a third-party resource)",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "subprocessor",
+      "field_key": "fedramp_certified_resource_id",
+      "label": "FedRAMP package ID (if certified)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "subprocessor",
+      "field_key": "use_case",
+      "label": "Use case in this offering",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 8
     }
   ]
 }

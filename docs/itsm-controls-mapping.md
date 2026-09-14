@@ -219,7 +219,17 @@ lowers setup cost, it doesn't change a control's classification here.
   become primarily agency-owned rather than disappearing. The
   `fedramp-ocr-fields.rain` template covers OCR content (accepted
   vulnerabilities, reportable incidents, transformative changes)
-  alongside, not instead of, the POA&M template.
+  alongside, not instead of, the POA&M template. A CSP-side FedRAMP
+  artifact, not a control-implementation one: `fedramp-certification-
+  package.rain`, `fedramp-package-contacts.rain`, and `fedramp-package-
+  repositories.rain` track the CSP/service-identity metadata fedramp.gov's
+  own Certification Package Overview schema expects (provider/service
+  identity, contacts, Trust Center/SCG repository links, assessor,
+  next-OCR date) -- only relevant to a tenant that's itself a FedRAMP-
+  certified CSP, unlike every other template on this list.
+  `subprocessor-register.rain` picked up three matching fields for that
+  same schema's third-party-resource reporting rather than a fourth new
+  template, since it's the same vendor register either way.
 - **RA-5 / RA-7 (Vulnerability Scanning / Risk Response)** -- RAIN is
   the remediation-tracking half, not the scanner. Tickets > Import
   accepts a `.nessus` scan export directly, turning every non-Info

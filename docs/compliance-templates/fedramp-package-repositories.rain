@@ -1,0 +1,70 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-14T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "FedRAMP Package Repositories starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "fedramp_package_repository",
+      "name": "FedRAMP Package Repository",
+      "icon": null,
+      "description": "One row per external repository referenced on a FedRAMP Certification Package Overview -- pairs with fedramp-certification-package.rain. Covers that schema's trustCenter, secureConfigurationGuidance, and additionalRepositories in one register instead of three different single-value fields, since they all share this same repository shape and additionalRepositories is explicitly open-ended. Each Asset's own \"Name\" field is a short label you choose for the repository (e.g. \"Public Trust Center\"), independent of repository type.",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_package_repository",
+      "field_key": "repository_type",
+      "label": "Repository type(s) (comma-separated -- e.g. Trust Center, Secure Configuration Guidance, Assessment Reports)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_package_repository",
+      "field_key": "url",
+      "label": "URL",
+      "field_type": "url",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_package_repository",
+      "field_key": "repository_description",
+      "label": "What's in it",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_package_repository",
+      "field_key": "authentication_required",
+      "label": "Authentication required",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_package_repository",
+      "field_key": "access_request_instructions",
+      "label": "Access request instructions (required by the schema when Authentication required is set)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    }
+  ]
+}
