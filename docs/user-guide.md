@@ -518,12 +518,12 @@ see that section for what it does.
 
 ## Documents
 
-Submenu: All Documents, Upload.
+Submenu: All Documents, Kanban, New document.
 
 ### Document list
 
 A table (Number, Title, Tags, File, Uploaded) with a search box
-(title/number/tag) and "+ Upload document".
+(title/number/tag) and "+ New document".
 
 A document's number carries flag icons:
 
@@ -564,15 +564,17 @@ reverts with an error banner if it didn't go through.
 
 ### New document
 
-Labeled "Upload document" but offers two tabs:
+Two large cards at the top pick the source -- click one to switch
+which panel shows underneath, next to Title/Description/Tags rather
+than below them:
 
 - Upload a file: up to 25MB.
 - Type new content: `.txt`, `.md`, or `.jq` (a saved export transform
   ruleset -- see Export above), typed directly -- for a placeholder
   document with nothing to upload yet.
 
-Title (required), Description, Tags (comma-separated) apply to either
-tab. Arriving from another record's "link a document" action attaches
+Title (required), Description, Tags (comma-separated) apply either
+way. Arriving from another record's "link a document" action attaches
 the new document automatically.
 
 ### Document detail

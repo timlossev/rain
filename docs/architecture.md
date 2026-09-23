@@ -891,6 +891,29 @@ form -- one POST creates the `Document` and the `DocumentLink` together.
 Documents can also be linked to additional assets/tickets later from the
 document's own detail page.
 
+**New Document screen layout.** Upload-vs-type used to be a plain
+`.tab-buttons` pair sitting below Title/Description/Tags, on a
+640px-capped `.card` like most of this app's forms -- functional, but
+the "type new content" path (the whole point of picking that tab) was
+a single `<textarea>` reached only after three unrelated fields, and
+the choice itself was two small text links easy to skim past. Replaced
+with `.doc-source-card`s (the same bigger "obvious clickable option"
+treatment `.action-icon-btn` gives Platform Response Rule's own action
+picker) up front, and a `.doc-new-grid` two-column layout below them --
+the chosen panel (file input or the format-select-plus-textarea) on
+the wider left column, Title/Description/Tags on a narrower fixed-ish
+right column, so typing content and naming the document happen side
+by side instead of one after the other. The card itself dropped its
+`max-width:640px` to take the full content width, matching the
+document detail page's own uncapped `.card`. None of this touched
+`data-tab-btn`/`data-tab-panel` semantics -- `app.js`'s tab JS matches
+on those attributes regardless of the button's own styling, so the
+visual swap needed no script changes. The sidebar's "Upload" submenu
+entry and the list page's "+ Upload document" button were renamed to
+"New document" at the same time, since "Upload" undersold what the
+screen has done since the jq-ruleset feature added a second creation
+path.
+
 **Change alerting.** `Document.alert_on_change`, when set, raises a
 synthetic `SyslogEvent` (host `documents`, program the doc number) whenever
 the stored content actually changes -- from a webhook refresh

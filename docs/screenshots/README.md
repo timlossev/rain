@@ -22,7 +22,7 @@ nothing here is mocked up.
 | | |
 |---|---|
 | ![Asset list](07-asset-list.png) The asset registry, with no-code custom fields per type. | ![Document list](08-document-list.png) The document repository, with tags and status flags. |
-| ![Document detail](09-document-detail.png) A document's own page -- properties, contents, links, calendar. | ![Calendar](10-calendar.png) The per-tenant calendar, with recurring entries and a syslog bridge. |
+| ![Document detail](09-document-detail.png) A document's own page -- Basics, Ownership, Acknowledgment, and Visibility as their own tabs, plus contents, links, and calendar. | ![Calendar](10-calendar.png) The per-tenant calendar, with recurring entries and a syslog bridge. |
 
 ## Search, portal, admin
 

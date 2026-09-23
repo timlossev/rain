@@ -975,6 +975,49 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
 .doc-md-preview h1, .doc-md-preview h2, .doc-md-preview h3 { margin: 0.6em 0 0.3em; }
 .doc-md-preview p { margin: 0 0 0.8em; }
 
+/* ---------- New Document form (documents/form.html) ----------
+   Upload-vs-type is the first decision this screen asks for, so it
+   gets the same "obvious clickable card, not a small tab" treatment
+   Platform Response Rule's own action-type picker uses
+   (.action-icon-btn/.action-node.active) rather than the plain
+   .tab-buttons row this used to be -- data-tab-btn/data-tab-panel
+   still drive it (app.js's tab JS matches on those attributes
+   generically, not on any particular button styling), so no JS
+   changes were needed to swap the look. */
+.doc-source-picker { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.doc-source-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  flex: 1 1 260px;
+  max-width: 360px;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+}
+.doc-source-card:hover { border-color: var(--accent); }
+.doc-source-card.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, white); }
+.doc-source-card-icon svg { width: 22px; height: 22px; color: var(--accent); }
+.doc-source-card-title { font-weight: 700; }
+.doc-source-card-desc { margin: 0; color: var(--text-muted); font-size: 0.85rem; }
+/* The content-entry panel (file picker or the type-it-yourself
+   textarea) sits beside the Title/Description/Tags fields rather than
+   above or below them -- on the old single-column layout, reaching the
+   "type new content" textarea meant scrolling past those three fields
+   first even though it's the entire point of picking that option.
+   Right column is a fixed-ish width since metadata fields don't need
+   room to grow; the left column (and its textarea) takes whatever's
+   left, which is a lot now that the form isn't capped at 640px. */
+.doc-new-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 28px; align-items: start; }
+@media (max-width: 860px) {
+  .doc-new-grid { grid-template-columns: 1fr; }
+}
+
 /* Auto-update tab's "Refresh from webhook" action -- a border-top
    separates it from the settings form above (was previously a bare
    <button> immediately followed by a <span>, glued together with a
