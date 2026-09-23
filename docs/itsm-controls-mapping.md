@@ -189,7 +189,13 @@ a dedicated mechanism instead of relying on judgment:
   Response Rule trigger.
 - PL-2 (System Security Plan), supporting tier -- a document's
   review-due date is a dedicated field with an overdue flag and
-  filter.
+  filter. A stronger claim on the same control: the Security Control
+  asset type (`docs/compliance-templates/security-control-register.rain`)
+  tracks per-control implementation statements directly, and its own
+  jq export transformer (`oscal-control-implementation.jq`) produces
+  a machine-readable OSCAL `control-implementation` fragment from
+  them -- the actual control-implementation content an SSP's bulk
+  consists of, not just a reminder to keep one current.
 
 That's a real promotion into the same category the 33 already uses.
 What it isn't is a re-stated 37/409 headline: the 33 was counted

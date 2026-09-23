@@ -90,6 +90,39 @@ async def test_tenant_provisioning_and_asset_crud():
         assert asset.name == "web-01"
 
 
+async def test_asset_export_includes_ci_number():
+    """Regression test: build_rows' if/elif chain over `col["source"]`
+    had a case for every BUILTIN_SOURCES entry except "ci_number" --
+    typing/CSV/Excel/JSON exports all silently produced null for that
+    column regardless of the export screen's own "CI Number" checkbox,
+    caught only when the OSCAL control-implementation jq template
+    (docs/compliance-templates/) needed a real, non-null CI Number to
+    derive each control's uuid from and got null on every row instead."""
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import Asset, AssetType
+    from rain.modules.assets import exporter
+    from rain.modules.assets.service import next_ci_number
+
+    tenant = await provision_tenant(slug="epsilon", name="Epsilon LLC")
+
+    async with tenant_session(tenant.schema_name) as session:
+        asset_type = AssetType(key="server", name="Server")
+        session.add(asset_type)
+        await session.flush()
+        ci_number = await next_ci_number(session)
+        session.add(Asset(ci_number=ci_number, asset_type_id=asset_type.id, name="web-01"))
+        await session.commit()
+
+        rows = await exporter.build_rows(
+            session,
+            asset_type_id=None,
+            columns=[{"source": "ci_number", "header": "CI Number"}, {"source": "name", "header": "Name"}],
+        )
+        row = next(r for r in rows if r["Name"] == "web-01")
+        assert row["CI Number"] == ci_number
+
+
 async def test_reconcile_all_tenant_schemas_is_idempotent():
     from rain.db.provisioning import reconcile_all_tenant_schemas
 

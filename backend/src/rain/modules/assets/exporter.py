@@ -31,7 +31,7 @@ async def available_columns(db: AsyncSession, asset_type_id: int | None) -> list
 async def build_rows(
     db: AsyncSession, *, asset_type_id: int | None, columns: list[dict[str, str]]
 ) -> list[dict[str, Any]]:
-    """columns: [{"source": "name" | "external_id" | "status" | "asset_type" | "field_<id>", "header": str}]"""
+    """columns: [{"source": "ci_number" | "name" | "external_id" | "status" | "asset_type" | "field_<id>", "header": str}]"""
     assets = await service.list_assets(db, asset_type_id=asset_type_id)
     rows: list[dict[str, Any]] = []
     for asset in assets:
@@ -39,7 +39,9 @@ async def build_rows(
         row: dict[str, Any] = {}
         for col in columns:
             source, header = col["source"], col["header"]
-            if source == "name":
+            if source == "ci_number":
+                row[header] = asset.ci_number
+            elif source == "name":
                 row[header] = asset.name
             elif source == "external_id":
                 row[header] = asset.external_id

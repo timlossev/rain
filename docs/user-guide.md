@@ -892,8 +892,9 @@ carry across -- without it, a matching-email account is recognized but
 a new one has no password. Importing upserts by name/key; a local user
 is never overwritten once it exists.
 
-The same Import expects any tenant bundle, including the twelve starter
-compliance-register templates under `docs/compliance-templates/` --
+The same Import expects any tenant bundle, including the sixteen
+starter compliance-register templates under
+`docs/compliance-templates/` --
 import one for a usable register in a few clicks instead of building
 the asset type by hand. All but the three ticket-scoped templates
 (POA&M, Nessus, FedRAMP OCR) are an asset type plus its custom fields;

@@ -601,6 +601,37 @@ that fails to compile or raises at runtime re-renders the export form
 `export_columns.merge_profile_columns`) with a flash error instead of
 either crashing or silently falling back to the untransformed export.
 
+**OSCAL control-implementation export, as an application of the above.**
+`docs/compliance-templates/security-control-register.rain` (a Security
+Control asset type: Control ID, Statement ID, Implementation Status,
+Narrative, Responsible Role, Parameters, Remarks) plus
+`oscal-control-implementation.jq` (a packaged transformer for the
+mechanism above) turn a tenant's own populated control register into
+an OSCAL `control-implementation` fragment -- `implemented-
+requirements[]`, `group_by`'d on Control ID so either one row per
+control (narrative goes straight on that requirement's own
+`description`) or several rows sharing a Control ID with distinct
+Statement IDs (nested into a `statements[]` array instead) both
+produce a valid shape from the same export. Deliberately scoped to
+that one fragment, not a full `system-security-plan` -- OSCAL's
+`metadata`/`system-characteristics`/`system-implementation` sections
+need information (system name, authorization boundary, component
+inventory) no per-control asset row has, and modeling those as their
+own asset types was left out rather than half-done. Every OSCAL object
+needs a globally-unique `uuid`; rather than pull in a UUID-generating
+dependency for one jq filter, `num_uuid(salt)` derives a schema-shaped
+one (`00000000-0000-4000-8000-<12 hex digits>`) from each row's own
+already-unique RAIN CI Number, zero-padded -- deterministic on purpose
+(re-exporting the same control later reproduces the same uuid rather
+than a new one each time), with the one-character `salt` argument
+existing only so an implemented-requirement and the first entry in its
+own `statements[]` -- which, for a multi-row control, comes from the
+exact same CI Number as `$first` -- don't collide just because they're
+derived from the same row (`tests/test_jq_transform.py`'s own
+`test_oscal_control_implementation_template` asserts every uuid in a
+sample document is unique for exactly this reason -- it caught this
+collision once, before the salt argument existed).
+
 **Document linking** (the ticketing spec's "link to a document repository
 as a knowledge base") is live -- see Document Repository below.
 

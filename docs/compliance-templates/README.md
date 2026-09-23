@@ -23,6 +23,7 @@ ticket fields for a common compliance register, with no code involved.
 | `fedramp-certification-package.rain` | FedRAMP Certification Package asset type | Mirrors fedramp.gov's Certification Package Overview schema (2026-06-24) -- CSP/service-identity metadata, only relevant to a tenant that's itself a FedRAMP-certified CSP, not a general-purpose register |
 | `fedramp-package-contacts.rain` | FedRAMP Package Contact asset type | The same schema's repeating `contactInformation` array -- pairs with `fedramp-certification-package.rain` |
 | `fedramp-package-repositories.rain` | FedRAMP Package Repository asset type | The same schema's `trustCenter`/`secureConfigurationGuidance`/`additionalRepositories` -- pairs with `fedramp-certification-package.rain` |
+| `security-control-register.rain` | Security Control asset type | Any control catalog (NIST 800-53, ISO 27001 Annex A, ...) -- one row per control implementation statement. Pairs with `oscal-control-implementation.jq`, below, which exports this register as an OSCAL control-implementation fragment. |
 
 Everything except the three ticket-scoped ones (POA&M, Nessus, FedRAMP
 OCR) seeds an asset type plus its fields; those three seed tenant-wide
@@ -70,3 +71,40 @@ A template's `source_tenant_slug`/`source_tenant_name` are just export
 provenance -- never read on import. A bundle always imports into
 whichever tenant your session currently has active; it can't create a
 new tenant or target a different one.
+
+## OSCAL control-implementation export
+
+`oscal-control-implementation.jq` isn't a `.rain` bundle -- it's a jq
+program, the same kind of file the Tickets/Assets JSON export screens'
+optional transform step runs (see the "Export" sections of
+`docs/user-guide.md`). It's not something Config Bundles imports
+either; make it selectable from the Assets export screen the same way
+you'd make any jq ruleset selectable:
+
+1. Import `security-control-register.rain` (above), then populate the
+   Security Control asset type with your own controls -- one row per
+   control (Statement ID left blank), or several rows sharing a
+   Control ID with a different Statement ID each, for a control you
+   track at the lettered-part level.
+2. Documents > New document > Type new content > `.jq`, paste in
+   `oscal-control-implementation.jq`'s contents (or upload the file
+   directly as a one-off, without saving it as a Document at all).
+3. Assets > Export, format JSON, asset type Security Control, select
+   at least the CI Number/Control ID/Statement ID/Implementation
+   Status/Narrative/Responsible Role/Parameters/Remarks columns
+   (leaving their headers as the defaults -- the transformer keys off
+   those exact header names), pick the saved ruleset (or upload the
+   file again) under "JSON transform (optional)", Export.
+
+The result is an OSCAL `control-implementation` fragment --
+`implemented-requirements[]`, one per control, each with its
+narrative, `implementation-status` prop, responsible role, and (for a
+part-tracked control) a `statements[]` array -- not a complete
+`system-security-plan`. OSCAL's `metadata`, `system-characteristics`,
+and `system-implementation` sections describe things a per-control
+asset row has no way to know (system name, authorization boundary,
+component inventory, ...); author those separately and splice this
+fragment's `implemented-requirements` into that document's own
+`control-implementation` object. See the comment block at the top of
+the `.jq` file itself for exactly what it expects and how it derives
+each object's `uuid`.
