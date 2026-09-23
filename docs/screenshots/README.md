@@ -17,6 +17,11 @@ nothing here is mocked up.
 |---|---|
 | ![Event Promotion Policies](12-event-promotion-policies.png) Event Promotion Policies turn matching syslog events into tickets automatically. | ![Platform Response Rules](13-platform-response-rules.png) A rule's own actions as a flowchart -- icons connected by arrows in firing order, click a step to edit or remove it. |
 
+For repetition folding and ML anomaly detection walked through against
+real syslog events end to end (policy config, then the resulting
+tickets), see
+[`../correlation-showcase.md`](../correlation-showcase.md).
+
 ## Assets, documents, calendar
 
 | | |
