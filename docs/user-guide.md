@@ -892,7 +892,7 @@ carry across -- without it, a matching-email account is recognized but
 a new one has no password. Importing upserts by name/key; a local user
 is never overwritten once it exists.
 
-The same Import expects any tenant bundle, including the sixteen
+The same Import expects any tenant bundle, including the seventeen
 starter compliance-register templates under
 `docs/compliance-templates/` --
 import one for a usable register in a few clicks instead of building

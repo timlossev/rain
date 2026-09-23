@@ -655,6 +655,40 @@ personnel or roles]`, rather than left as an opaque OSCAL id-ref.
 answering a handful of controls, and exporting the result end to end
 against a live instance.
 
+**FedRAMP Significant Change Notification export.**
+`fedramp-scn-fields.rain` (11 ticket-scoped custom fields, prefixed
+`scn_`/labeled `SCN ...` to stay identifiable in the tenant-wide
+Tickets > Custom Fields list once several other templates' fields are
+also in there) plus `fedramp-scn-export.jq` turn a Change ticket into a
+FedRAMP Significant Change Notification, the same "populate a register,
+export the standard shape" pattern as the OSCAL export above but on
+Tickets instead of Assets -- confirming this jq-transform mechanism
+generalizes to both exporters and not just the one it shipped with.
+`changeDescription` is deliberately not its own custom field: it reads
+the ticket's own built-in Description (falling back to Title), since
+duplicating "what is this ticket about" into a second field would just
+invite the two to drift. `certificationPackageOverviewUri` is a
+per-CSP constant, not per-change data, so it lives as a `def` at the
+top of the `.jq` file itself for the user to edit once, rather than
+a column repeated identically on every Change ticket's own row.
+Caught two real bugs building and verifying this against a live
+instance (both now covered by `tests/test_jq_transform.py`'s own
+`test_fedramp_scn_template`): first, the exact same "a `+`-chain object
+construction produces zero outputs, not just a missing key, when any
+one term evaluates to jq's `empty`" class of bug the OSCAL transformer
+already had independently -- a `milestones_from`/`list_from` helper
+here returned `empty` for "this optional column was blank" instead of
+`[]`, which silently dropped the *entire* ticket from the export output
+whenever any of its optional SCN fields were left blank (the common
+case, since all of them are optional) rather than just omitting that
+one key. Second, and unrelated: the packaged milestones field's first
+draft used a "one per line" convention, discovered live to be
+impossible -- every RAIN custom field of type "text" renders as a
+single-line `<input>` (`rain.web.templates.tickets._fields_fragment`),
+with no distinct textarea type in the schema, so a value filled in with
+embedded newlines silently lost them on save; switched to
+semicolon-separated instead, which survives a single-line input fine.
+
 **Document linking** (the ticketing spec's "link to a document repository
 as a knowledge base") is live -- see Document Repository below.
 

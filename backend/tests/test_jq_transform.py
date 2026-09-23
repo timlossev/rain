@@ -146,3 +146,92 @@ def test_oscal_control_implementation_template():
     assert len(uuids) == len(set(uuids))
     for u in uuids:
         assert len(u) == 36 and u.count("-") == 4
+
+
+def _scn_row(**overrides):
+    row = {
+        "Ticket Number": "CHG-000001", "Type": "change", "Title": "Bump base image",
+        "Status": "open", "Severity": "low", "Asset": "", "Description": "",
+        "Created": "2026-09-01",
+        "SCN change type": "", "SCN categorization explanation": "", "SCN reason for change": "",
+        "SCN customer impact": "", "SCN assessor name": "", "SCN related vulnerability": "",
+        "SCN plan and timeline summary": "", "SCN planned start": "", "SCN planned completion": "",
+        "SCN milestones (semicolon-separated: description | YYYY-MM-DD; description | YYYY-MM-DD)": "",
+        "SCN impacted KSIs or Rev5 controls (comma-separated)": "",
+        "SCN business or security impact analysis": "",
+    }
+    row.update(overrides)
+    return row
+
+
+def test_fedramp_scn_template():
+    """docs/compliance-templates/fedramp-scn-export.jq, run against rows
+    shaped like a Tickets export with fedramp-scn-fields.rain's own
+    columns selected. Covers the exact bug caught building this file:
+    an optional column left entirely blank (the common case -- most of
+    these fields are optional) must not make the whole row vanish from
+    the output. It did, the first time this was written: a helper that
+    returned jq's `empty` for "no value" (instead of an empty array)
+    sat inside a `+`-chain building the row's own object, and object
+    construction with any `+` term equal to `empty` produces zero
+    outputs for that *entire* object, not just a missing key -- same
+    class of bug oscal-control-implementation.jq's own object
+    construction had, independently, in this same session."""
+    program = (COMPLIANCE_TEMPLATES_DIR / "fedramp-scn-export.jq").read_text()
+
+    full = _scn_row(
+        Description="Rotated the API signing key pair ahead of scheduled expiry.",
+        **{
+            "SCN change type": "Adaptive",
+            "SCN reason for change": "Scheduled key rotation per policy.",
+            "SCN plan and timeline summary": "Rotated during a maintenance window.",
+            "SCN planned start": "2026-09-10",
+            "SCN milestones (semicolon-separated: description | YYYY-MM-DD; description | YYYY-MM-DD)": "Generate new keys | 2026-09-10; Cutover | 2026-09-11",
+            "SCN impacted KSIs or Rev5 controls (comma-separated)": "SC-12, SC-13",
+        },
+    )
+    minimal = _scn_row(**{"Ticket Number": "CHG-000002"})
+    non_change = _scn_row(**{"Ticket Number": "INC-000005", "Type": "incident", "Description": "db down"})
+
+    result = json.loads(apply_jq_filter([full, minimal, non_change], program))
+
+    # The incident row never shows up -- only "change"-typed tickets do.
+    assert len(result) == 2
+
+    notif = result[0]
+    assert notif["changeDescription"] == "Rotated the API signing key pair ahead of scheduled expiry."
+    assert notif["changeType"] == "Adaptive"
+    assert notif["impactedControls"] == ["SC-12", "SC-13"]
+    assert notif["planAndTimeline"]["summary"] == "Rotated during a maintenance window."
+    assert notif["planAndTimeline"]["plannedStart"] == "2026-09-10"
+    assert notif["planAndTimeline"]["milestones"] == [
+        {"milestoneDescription": "Generate new keys", "targetDate": "2026-09-10"},
+        {"milestoneDescription": "Cutover", "targetDate": "2026-09-11"},
+    ]
+
+    # The row with every SCN-specific column blank: this is the case
+    # that used to make the whole row disappear. It must still produce
+    # a notification, falling back to Title since Description is blank,
+    # with every optional key simply absent rather than present-as-null.
+    fallback = result[1]
+    assert fallback == {"changeDescription": "Bump base image"}
+
+
+def test_fedramp_scn_certification_package_uri_is_a_constant_to_edit():
+    """certification_package_overview_uri is a jq-level def, not a
+    column -- a per-CSP constant meant to be edited once in the file
+    rather than repeated on every change ticket. Left blank (the
+    packaged default), the key is omitted rather than emitted as ""
+    or null, since an empty string wouldn't satisfy the schema's own
+    format:"uri" requirement any better than omitting it would."""
+    program = (COMPLIANCE_TEMPLATES_DIR / "fedramp-scn-export.jq").read_text()
+    result = json.loads(apply_jq_filter([_scn_row()], program))
+    assert "certificationPackageOverviewUri" not in result[0]
+
+    edited = program.replace(
+        'def certification_package_overview_uri: "";',
+        'def certification_package_overview_uri: "https://acme.example.com/fedramp/overview.json";',
+    )
+    assert edited != program  # the replace actually matched something
+    result = json.loads(apply_jq_filter([_scn_row()], edited))
+    assert result[0]["certificationPackageOverviewUri"] == "https://acme.example.com/fedramp/overview.json"

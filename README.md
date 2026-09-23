@@ -38,11 +38,11 @@ for how far that argument extends to the EU Cybersecurity Certification
 Scheme for Cloud Services. Custom asset types and ticket fields let
 RAIN adapt to any framework's paperwork with no code --
 [`docs/compliance-templates/`](docs/compliance-templates/) ships
-sixteen ready-to-import `.rain` config bundles (a risk register, a
+seventeen ready-to-import `.rain` config bundles (a risk register, a
 Nessus finding-fields set, FedRAMP's 2026 quarterly reporting fields,
-a NIST 800-53 control register with an OSCAL export transformer, and
-others) for registers most compliance teams would otherwise build by
-hand.
+a NIST 800-53 control register with an OSCAL export transformer, a
+Significant Change Notification export, and others) for registers most
+compliance teams would otherwise build by hand.
 
 Those tickets have to come from somewhere, so RAIN is deliberately
 "bring your own" for detection -- monitoring, SIEM, XDR, antivirus,
