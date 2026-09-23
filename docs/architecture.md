@@ -899,20 +899,27 @@ a single `<textarea>` reached only after three unrelated fields, and
 the choice itself was two small text links easy to skim past. Replaced
 with `.doc-source-card`s (the same bigger "obvious clickable option"
 treatment `.action-icon-btn` gives Platform Response Rule's own action
-picker) up front, and a `.doc-new-grid` two-column layout below them --
-the chosen panel (file input or the format-select-plus-textarea) on
-the wider left column, Title/Description/Tags on a narrower fixed-ish
-right column, so typing content and naming the document happen side
-by side instead of one after the other. The card itself dropped its
-`max-width:640px` to take the full content width, matching the
-document detail page's own uncapped `.card`. None of this touched
-`data-tab-btn`/`data-tab-panel` semantics -- `app.js`'s tab JS matches
-on those attributes regardless of the button's own styling, so the
-visual swap needed no script changes. The sidebar's "Upload" submenu
-entry and the list page's "+ Upload document" button were renamed to
-"New document" at the same time, since "Upload" undersold what the
-screen has done since the jq-ruleset feature added a second creation
-path.
+picker), each `flex: 1 1 0` with no `max-width` so the pair splits the
+full card width evenly instead of floating as a small island at the
+top-left of an otherwise wide screen -- a two-column layout (the
+chosen panel beside Title/Description/Tags in a narrower side column)
+was tried first and dropped as awkward in practice: a fixed-width
+column of short fields next to a tall textarea just relocated the
+"unrelated fields crowd the interesting part" problem sideways instead
+of solving it. Settled on a single full-width column instead -- Title,
+then the picker, then the chosen panel (file input or format-select-
+plus-textarea, both now free to use the card's full width), then
+Description/Tags together in one `.form-row` since they're secondary
+either way. The card itself dropped its `max-width:640px` to take the
+full content width, matching the document detail page's own uncapped
+`.card`. None of this touched `data-tab-btn`/`data-tab-panel`
+semantics -- `app.js`'s tab JS matches on those attributes regardless
+of the button's own styling or the surrounding layout, so neither
+round of changes needed any script changes. The sidebar's "Upload"
+submenu entry and the list page's "+ Upload document" button were
+renamed to "New document" at the same time, since "Upload" undersold
+what the screen has done since the jq-ruleset feature added a second
+creation path.
 
 **Change alerting.** `Document.alert_on_change`, when set, raises a
 synthetic `SyslogEvent` (host `documents`, program the doc number) whenever

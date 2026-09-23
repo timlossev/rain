@@ -984,14 +984,21 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
    still drive it (app.js's tab JS matches on those attributes
    generically, not on any particular button styling), so no JS
    changes were needed to swap the look. */
-.doc-source-picker { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+/* Cards split the full card width evenly (flex:1 1 0, no max-width) --
+   an earlier version capped each at 360px, which read as an awkward
+   island of buttons floating at the top-left of an otherwise full-width
+   screen. Below them the form is a single full-width column (Title,
+   then the picked panel, then Description/Tags) rather than a two-
+   column layout that put Title/Description/Tags in a cramped fixed-
+   width side column next to a tall textarea -- simpler, and every
+   field gets to use the width this screen dropped its 640px cap for. */
+.doc-source-picker { display: flex; gap: 12px; margin-bottom: 20px; }
 .doc-source-card {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  flex: 1 1 260px;
-  max-width: 360px;
+  flex: 1 1 0;
   padding: 16px 18px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -1005,17 +1012,8 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
 .doc-source-card-icon svg { width: 22px; height: 22px; color: var(--accent); }
 .doc-source-card-title { font-weight: 700; }
 .doc-source-card-desc { margin: 0; color: var(--text-muted); font-size: 0.85rem; }
-/* The content-entry panel (file picker or the type-it-yourself
-   textarea) sits beside the Title/Description/Tags fields rather than
-   above or below them -- on the old single-column layout, reaching the
-   "type new content" textarea meant scrolling past those three fields
-   first even though it's the entire point of picking that option.
-   Right column is a fixed-ish width since metadata fields don't need
-   room to grow; the left column (and its textarea) takes whatever's
-   left, which is a lot now that the form isn't capped at 640px. */
-.doc-new-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 28px; align-items: start; }
-@media (max-width: 860px) {
-  .doc-new-grid { grid-template-columns: 1fr; }
+@media (max-width: 640px) {
+  .doc-source-picker { flex-direction: column; }
 }
 
 /* Auto-update tab's "Refresh from webhook" action -- a border-top
