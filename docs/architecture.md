@@ -603,8 +603,9 @@ either crashing or silently falling back to the untransformed export.
 
 **OSCAL control-implementation export, as an application of the above.**
 `docs/compliance-templates/security-control-register.rain` (a Security
-Control asset type: Control ID, Statement ID, Implementation Status,
-Narrative, Responsible Role, Parameters, Remarks) plus
+Control asset type: Control ID, Statement ID, Control Question,
+Implementation Status, Narrative, Responsible Role, Parameters,
+Remarks) plus
 `oscal-control-implementation.jq` (a packaged transformer for the
 mechanism above) turn a tenant's own populated control register into
 an OSCAL `control-implementation` fragment -- `implemented-
@@ -631,6 +632,28 @@ derived from the same row (`tests/test_jq_transform.py`'s own
 `test_oscal_control_implementation_template` asserts every uuid in a
 sample document is unique for exactly this reason -- it caught this
 collision once, before the salt argument existed).
+
+**Starting from a populated register, not a blank one.** The asset
+type also picked up an eighth field, Control Question, after checking
+the actual FedRAMP Rev 5 baseline source
+([oscal-compass/compliance-trestle-fedramp](https://github.com/oscal-compass/compliance-trestle-fedramp)'s
+resolved OSCAL catalog XML) rather than assuming a shape -- its own
+`response-point` prop marks the exact statement parts FedRAMP expects
+an SSP author to answer (always at the bare-statement or single-letter
+level, confirmed by inspecting all three baselines before relying on
+it, never deeper), which is exactly what Statement ID/Control Question
+needed to line up with. `nist-800-53-rev5-{low,moderate,high}.csv`
+(424/688/791 rows) are that parsing applied to all three baselines --
+Assets > Import data, not a Config Bundle, since these are register
+*rows* (real, if unanswered, FedRAMP content) rather than schema.
+Params resolved from each control's own `<param>` definitions
+(`<label>` text, or `<select>/<choice>` options joined with `|` when a
+param has no label -- both occur in the real data) into bracketed
+placeholder text inline in the question, e.g. `[organization-defined
+personnel or roles]`, rather than left as an opaque OSCAL id-ref.
+`docs/oscal-ssp-showcase.md` walks through importing the High baseline,
+answering a handful of controls, and exporting the result end to end
+against a live instance.
 
 **Document linking** (the ticketing spec's "link to a document repository
 as a knowledge base") is live -- see Document Repository below.

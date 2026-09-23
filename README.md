@@ -16,7 +16,10 @@ More screens -- Kanban, live syslog feed, automation rules, the client
 portal, and more -- in [`docs/screenshots/`](docs/screenshots/). For a
 walkthrough of repetition folding and ML anomaly detection against real
 syslog events, see
-[`docs/correlation-showcase.md`](docs/correlation-showcase.md).
+[`docs/correlation-showcase.md`](docs/correlation-showcase.md); for
+importing the real FedRAMP High baseline as a control register and
+exporting it as OSCAL, see
+[`docs/oscal-ssp-showcase.md`](docs/oscal-ssp-showcase.md).
 
 ## Motivation
 

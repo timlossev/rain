@@ -10,7 +10,7 @@
       "key": "security_control",
       "name": "Security Control",
       "icon": null,
-      "description": "One row per control implementation statement -- a NIST 800-53 (or other catalog) control, how it's implemented, and by whom. Each Asset's own \"Name\" field is the control's title (e.g. \"Account Management\"). Pairs with the oscal-control-implementation.jq transformer (see docs/compliance-templates/README.md) to export this register as an OSCAL control-implementation fragment.",
+      "description": "One row per control implementation statement -- a NIST 800-53 (or other catalog) control, how it's implemented, and by whom. Each Asset's own \"Name\" field identifies the control (and part, if tracked at that level), e.g. \"AC-2(a) Account Management\". Populate by hand, or bulk-import one of the FedRAMP rev5 baseline question lists (nist-800-53-rev5-low/moderate/high.csv, same directory) to start from the real, currently-applicable control set instead of a blank register. Pairs with the oscal-control-implementation.jq transformer (see docs/compliance-templates/README.md) to export this register as an OSCAL control-implementation fragment.",
       "is_active": true,
       "sort_order": 0
     }
@@ -39,12 +39,22 @@
     {
       "scope": "asset",
       "asset_type_key": "security_control",
+      "field_key": "control_question",
+      "label": "Control Question",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
       "field_key": "implementation_status",
       "label": "Implementation Status",
       "field_type": "select",
       "select_options": ["Implemented", "Partially Implemented", "Planned", "Alternative Implementation", "Not Applicable"],
       "is_required": true,
-      "sort_order": 2
+      "sort_order": 3
     },
     {
       "scope": "asset",
@@ -54,7 +64,7 @@
       "field_type": "text",
       "select_options": null,
       "is_required": true,
-      "sort_order": 3
+      "sort_order": 4
     },
     {
       "scope": "asset",
@@ -64,7 +74,7 @@
       "field_type": "text",
       "select_options": null,
       "is_required": false,
-      "sort_order": 4
+      "sort_order": 5
     },
     {
       "scope": "asset",
@@ -74,7 +84,7 @@
       "field_type": "text",
       "select_options": null,
       "is_required": false,
-      "sort_order": 5
+      "sort_order": 6
     },
     {
       "scope": "asset",
@@ -84,7 +94,7 @@
       "field_type": "text",
       "select_options": null,
       "is_required": false,
-      "sort_order": 6
+      "sort_order": 7
     }
   ]
 }
