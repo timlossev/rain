@@ -1103,11 +1103,11 @@ board so an all-empty board reads as "nothing matched", not as
 "something's broken".
 
 **Owner on the document detail page.** The Kanban board's drag-and-drop
-isn't the only way to set `owner_user_id` -- the Properties tab has its
+isn't the only way to set `owner_user_id` -- the Ownership tab has its
 own type-to-search picker (`_search_picker.html`, the same interaction
 as a ticket's own Assignee field, not a plain `<select>`) plus a
-`POST /documents/{id}/owner`, redirect-based like every other Properties
-field around it rather than the JSON `kanban-owner` endpoint the board
+`POST /documents/{id}/owner`, redirect-based like every other field
+around it rather than the JSON `kanban-owner` endpoint the board
 itself uses (same `service.update_owner()` either way). The predictive-
 search endpoint behind it, `GET /documents/users/search`, and the
 tickets board's own `GET /tickets/users/search`, both now call one
@@ -1133,7 +1133,8 @@ click of "I have read this" -- the evidence a periodic-review or
 security-awareness control needs is "did this person confirm they'd
 read the *current* version," not a click-count, so acknowledging twice
 moves `acknowledged_at` forward in place instead of adding a second row.
-Both surface on the existing Properties tab and the existing flag-icon
+Both surface on the document detail page's own tabs (review due on
+Ownership, acknowledgment on Acknowledgment) and the existing flag-icon
 row on the Documents list (a new `alert-triangle` icon alongside the
 webhook/calendar/shareable ones already there) rather than introducing
 new UI surface.
@@ -1141,12 +1142,16 @@ new UI surface.
 **Properties tab layout.** As the Properties tab accumulated the fields
 above (review due, acknowledgment, sharing/landing-page visibility) on
 top of its original tags/owner/description set, it became one long
-undifferentiated list. Regrouped into four `.form-section` blocks
-(Basics, Ownership & review, Acknowledgment, Visibility) -- the same
-`.form-section`/`.form-section-title` CSS the Service Catalog admin form
-already uses to group its own long form -- purely a template-level
-reorganization: every field's id/name/action is unchanged, so nothing
-downstream (routes, JS) needed to change with it.
+undifferentiated list. First regrouped into four `.form-section` blocks
+within that one tab, then split further into four separate top-level
+tabs -- Basics, Ownership, Acknowledgment, Visibility -- sitting
+alongside Contents/Auto-update/Links/Calendar rather than nested inside
+a single "Properties" tab, since `[data-tabs]`'s tab-switching JS
+(`app.js`) already matches any number of sibling `data-tab-btn`/
+`data-tab-panel` pairs generically -- no JS changes needed, just more
+buttons and panels. Purely a template-level reorganization each time:
+every field's id/name/action stayed unchanged throughout, so nothing
+downstream (routes) needed to change with it.
 
 **`last_login_at` on `control.users`.** Stamped from the one place
 every sign-in path already converges regardless of `auth_source` --
@@ -1232,7 +1237,7 @@ Content comes from `Document.show_on_landing_page` (migration 0045,
 same opt-in-per-document shape `is_shareable` already established for
 "Shareable documents," and independent of it -- a document can be
 either, both, or neither): every document with the flag set (from its
-own Properties tab) renders on Home, ordered by title, in place of the
+own Visibility tab) renders on Home, ordered by title, in place of the
 route's own plain "Welcome to `<instance>`" fallback text (which never
 renders at all once at least one document is flagged). Rendering reuses
 `rain.modules.documents.textbody` exactly the way `document_pdf`

@@ -76,7 +76,7 @@ fixed per list, not user-configurable.
 The first sidebar item, shown after signing in. Default: a plain
 "Welcome to `<instance name>`". To replace it, open a Markdown or
 plain-text document and check "Show on landing page" under its
-Properties tab -- its content renders here instead (Markdown formatted,
+Visibility tab -- its content renders here instead (Markdown formatted,
 plain text as-is). Several documents can be checked at once, shown in
 title order, each with a "Version from `<timestamp>`" pill.
 
@@ -533,7 +533,7 @@ A document's number carries flag icons:
 - Calendar icon: linked to a calendar entry.
 - Shield icon: shareable in the client portal (tab commonly renamed
   "Trust Center" -- see Branding under Admin).
-- Warning icon: overdue for review (past its Properties-tab review
+- Warning icon: overdue for review (past its Ownership-tab review
   date).
 
 A tag dropdown narrows to one tag; each tag in the Tags column is also
@@ -579,24 +579,23 @@ the new document automatically.
 
 Header: Download, Export to PDF, Delete. Tabs:
 
-- **Properties**, grouped into four labeled sections:
-  - *Basics*: tags as editable badges, a Description textarea (saved
-    independently of the file), the Uploaded date.
-  - *Ownership & review*: Owner (type-to-search, independent of who
-    uploaded it); Review due date -- past it, the document shows the
-    overdue icon and the list's overdue filter.
-  - *Acknowledgment*: an "I have read this" button plus a per-person
-    acknowledgment log. "Requires acknowledgment from" (a group or
-    person) makes it mandatory instead of voluntary: everyone it
-    resolves to gets emailed and shows up under their own Pending
-    Actions in the [Client Portal](#client-portal) until they click "I
-    have read this" -- clicking Request again re-opens it for anyone
-    who'd already acknowledged.
-  - *Visibility*: "Shareable in the client portal" exposes it on the
-    [Client Portal](#client-portal)'s Shareable documents tab to every
-    visitor, including anonymous ones, regardless of require-sign-in --
-    off by default. "Show on landing page" does the same for
-    [Home](#home).
+- **Basics**: tags as editable badges, a Description textarea (saved
+  independently of the file), the Uploaded date.
+- **Ownership**: Owner (type-to-search, independent of who uploaded
+  it); Review due date -- past it, the document shows the overdue icon
+  and the list's overdue filter.
+- **Acknowledgment**: an "I have read this" button plus a per-person
+  acknowledgment log. "Requires acknowledgment from" (a group or
+  person) makes it mandatory instead of voluntary: everyone it
+  resolves to gets emailed and shows up under their own Pending
+  Actions in the [Client Portal](#client-portal) until they click "I
+  have read this" -- clicking Request again re-opens it for anyone
+  who'd already acknowledged.
+- **Visibility**: "Shareable in the client portal" exposes it on the
+  [Client Portal](#client-portal)'s Shareable documents tab to every
+  visitor, including anonymous ones, regardless of require-sign-in --
+  off by default. "Show on landing page" does the same for
+  [Home](#home).
 - **Contents** (`.txt`/`.md` only): a "Last updated" label (last webhook
   refresh, or last manual save), then an inline editor. Markdown gets a
   Write/Preview tab using the same renderer as PDF export. Saving diffs

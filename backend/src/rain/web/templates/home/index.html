@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Home - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}The landing page. Shows a plain welcome message by default, or the contents of any document flagged "Show on landing page" (from that document's own Properties tab) instead - Markdown documents render as formatted text, plain-text documents as-is. More than one flagged document all show, stacked in title order.{% endblock %}
+{% block help_text %}The landing page. Shows a plain welcome message by default, or the contents of any document flagged "Show on landing page" (from that document's own Visibility tab) instead - Markdown documents render as formatted text, plain-text documents as-is. More than one flagged document all show, stacked in title order.{% endblock %}
 {% block content %}
 {% if landing_docs %}
 {% for entry in landing_docs %}
