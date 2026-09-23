@@ -13,16 +13,20 @@ Alpine images with no Node/SPA toolchain in the browser.
 ![RAIN screenshot](RAIN%20screenshot.png)
 
 More screens -- Kanban, live syslog feed, automation rules, the client
-portal, and more -- in [`docs/screenshots/`](docs/screenshots/). For a
-walkthrough of repetition folding and ML anomaly detection against real
-syslog events, see
-[`docs/correlation-showcase.md`](docs/correlation-showcase.md); for
-importing the real FedRAMP High baseline as a control register and
-exporting it as OSCAL, see
-[`docs/oscal-ssp-showcase.md`](docs/oscal-ssp-showcase.md); and for
-FedRAMP's 2026 Consolidated Rules (CR26) explained through a real
-Significant Change Notification example, see
-[`docs/fedramp-cr26-primer.md`](docs/fedramp-cr26-primer.md).
+portal, and more -- in [`docs/screenshots/`](docs/screenshots/).
+
+A few features are walked through end to end, against a live
+instance, in their own primers:
+
+- [`docs/correlation-showcase.md`](docs/correlation-showcase.md) --
+  repetition folding and ML anomaly detection against real syslog
+  events.
+- [`docs/oscal-ssp-showcase.md`](docs/oscal-ssp-showcase.md) --
+  importing the real FedRAMP High baseline as a control register and
+  exporting it as OSCAL.
+- [`docs/fedramp-cr26-primer.md`](docs/fedramp-cr26-primer.md) --
+  FedRAMP's 2026 Consolidated Rules (CR26) explained through a real
+  Significant Change Notification example.
 
 ## Motivation
 
