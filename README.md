@@ -19,7 +19,10 @@ syslog events, see
 [`docs/correlation-showcase.md`](docs/correlation-showcase.md); for
 importing the real FedRAMP High baseline as a control register and
 exporting it as OSCAL, see
-[`docs/oscal-ssp-showcase.md`](docs/oscal-ssp-showcase.md).
+[`docs/oscal-ssp-showcase.md`](docs/oscal-ssp-showcase.md); and for
+FedRAMP's 2026 Consolidated Rules (CR26) explained through a real
+Significant Change Notification example, see
+[`docs/fedramp-cr26-primer.md`](docs/fedramp-cr26-primer.md).
 
 ## Motivation
 

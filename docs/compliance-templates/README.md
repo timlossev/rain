@@ -130,6 +130,10 @@ this time for the *Tickets* JSON export -- a FedRAMP Significant
 Change Notification is structurally a Change ticket's own metadata
 (what changed, why, the plan and timeline), so `fedramp-scn-fields.rain`
 adds fields to Change tickets rather than defining a new asset type.
+See [`docs/fedramp-cr26-primer.md`](../fedramp-cr26-primer.md) for
+what CR26 actually requires here (the three change categories, their
+notification timing) and a full worked example against a real Change
+ticket.
 
 1. Import `fedramp-scn-fields.rain` (above); the fields show up on
    every ticket type (ticket-scoped custom fields apply tenant-wide in

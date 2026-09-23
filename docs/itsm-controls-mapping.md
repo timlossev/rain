@@ -225,7 +225,13 @@ lowers setup cost, it doesn't change a control's classification here.
   become primarily agency-owned rather than disappearing. The
   `fedramp-ocr-fields.rain` template covers OCR content (accepted
   vulnerabilities, reportable incidents, transformative changes)
-  alongside, not instead of, the POA&M template. A CSP-side FedRAMP
+  alongside, not instead of, the POA&M template. The same CR26 also
+  replaces the old Significant Change Request process with Significant
+  Change Notification (SCN) -- see
+  [`docs/fedramp-cr26-primer.md`](fedramp-cr26-primer.md) for the rule
+  itself (three change categories, each with its own notification
+  timing) and `fedramp-scn-fields.rain`/`fedramp-scn-export.jq` worked
+  all the way through against a real Change ticket. A CSP-side FedRAMP
   artifact, not a control-implementation one: `fedramp-certification-
   package.rain`, `fedramp-package-contacts.rain`, and `fedramp-package-
   repositories.rain` track the CSP/service-identity metadata fedramp.gov's
