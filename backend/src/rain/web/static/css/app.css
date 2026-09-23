@@ -728,6 +728,19 @@ input[type=checkbox] { width: auto; margin-right: 6px; }
    without needing it. */
 .field-label-spacer { visibility: hidden; }
 
+/* A ticket/asset's own custom fields -- an open-ended, tenant-defined
+   set (a Security Control's 8, a FedRAMP SCN's 11, ...) that a plain
+   .form-row squeezed onto one unbroken flex line, each field shrinking
+   to stay on it -- with enough fields, every input goes cramped and
+   nearly unreadable. This wraps instead: same auto-fill-grid technique
+   .catalog-grid already uses, each field claiming at least 220px and
+   the grid packing as many per row as actually fit, wrapping the rest
+   -- readable at any field count, no field narrower than the last one
+   that still fit. margin-bottom zeroed on .field here since the grid's
+   own gap already spaces rows; keeping both stacked the two doubled up. */
+.custom-fields-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.custom-fields-grid > .field { margin-bottom: 0; }
+
 /* Light grouping for a "busy" form with many fields -- a tinted,
    rounded band per logical group (e.g. Approval Flows' own per-step
    rows and Service Catalog's per-question rows already use this same

@@ -193,7 +193,7 @@
 <div class="card">
   <div class="card-title">Custom fields</div>
   <form method="post" action="/tickets/{{ ticket.id }}/fields">
-    <div class="form-row" data-fields-container>
+    <div class="custom-fields-grid" data-fields-container>
       {% with values = field_values %}
       {% include "tickets/_fields_fragment.html" %}
       {% endwith %}
