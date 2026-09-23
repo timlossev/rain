@@ -13,7 +13,10 @@ Alpine images with no Node/SPA toolchain in the browser.
 ![RAIN screenshot](RAIN%20screenshot.png)
 
 More screens -- Kanban, live syslog feed, automation rules, the client
-portal, and more -- in [`docs/screenshots/`](docs/screenshots/).
+portal, and more -- in [`docs/screenshots/`](docs/screenshots/). For a
+walkthrough of repetition folding and ML anomaly detection against real
+syslog events, see
+[`docs/correlation-showcase.md`](docs/correlation-showcase.md).
 
 ## Motivation
 
