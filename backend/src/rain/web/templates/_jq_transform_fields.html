@@ -1,0 +1,29 @@
+{#
+  Shared by tickets/export.html and assets/export.html -- the optional
+  jq-filter transform step for a JSON export (rain.core.jq_transform).
+  Only meaningful once Format is set to JSON, so it reuses the same
+  data-action-fields/data-action-type-select show-hide convention
+  Platform Response Rules' own action picker already established
+  (app.js) -- the page's own #fmt select just needs data-action-type-
+  select added to it for this to activate, no new JS.
+
+  Usage: {% include "_jq_transform_fields.html" %} inside a <form> that
+  already has enctype="multipart/form-data" (for jq_file below) and a
+  #fmt select with data-action-type-select on it.
+#}
+{% import "_search_picker.html" as picker %}
+<div class="form-section" data-action-fields="json">
+  <div class="form-section-title">JSON transform (optional)</div>
+  <p class="field-hint">
+    Reshape the exported rows with a <a href="https://jqlang.org/manual/" target="_blank" rel="noopener">jq</a>
+    filter before download -- runs against the whole row list as one JSON
+    document. Leave both fields below blank to export the plain row list,
+    same as before this existed.
+  </p>
+  {{ picker.search_picker("jq_document_id", "/documents/search", label="Use a saved ruleset", placeholder="Search documents...") }}
+  <div class="field">
+    <label for="jq_file">...or upload a one-off .jq file for this export</label>
+    <input type="file" id="jq_file" name="jq_file" accept=".jq,text/plain">
+    <div class="field-hint">A saved ruleset above wins if both are given. To reuse a filter across exports instead of uploading it each time, save it once as a Document (Documents &gt; New document -- upload a <code>.jq</code> file, or type one directly and choose "jq export transform (.jq)").</div>
+  </div>
+</div>

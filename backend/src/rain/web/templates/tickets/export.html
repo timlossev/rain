@@ -4,6 +4,7 @@
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 <div class="card">
+  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
   <form method="get" action="/tickets/export/run">
     <div class="field" style="max-width:360px;">
       <label for="profile_id">Load a saved profile</label>
@@ -16,7 +17,7 @@
     </div>
   </form>
 
-  <form method="post" action="/tickets/export/run">
+  <form method="post" action="/tickets/export/run" enctype="multipart/form-data">
     <div class="form-row">
       <div class="field">
         <label for="ticket_type">Type</label>
@@ -34,7 +35,7 @@
       </div>
       <div class="field field-w160">
         <label for="fmt">Format</label>
-        <select id="fmt" name="fmt">
+        <select id="fmt" name="fmt" data-action-type-select>
           <option value="csv" {% if selected_fmt == "csv" %}selected{% endif %}>CSV</option>
           <option value="json" {% if selected_fmt == "json" %}selected{% endif %}>JSON</option>
           <option value="xlsx" {% if selected_fmt == "xlsx" %}selected{% endif %}>Excel (.xlsx)</option>
@@ -56,6 +57,8 @@
         {% endfor %}
       </tbody>
     </table>
+
+    {% include "_jq_transform_fields.html" %}
 
     <div class="form-row" style="margin-top:16px;">
       <div class="field">

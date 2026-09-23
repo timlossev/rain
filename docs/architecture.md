@@ -582,6 +582,25 @@ mapped columns become a new incident/vulnerability per row (a change
 needs an approval flow attached by hand, so it's rejected here rather
 than silently created without one).
 
+**JSON export transform.** Both `/tickets/export/run` and
+`/assets/export`'s `fmt=json` branch accept an optional jq filter,
+applied to the same `list[dict]` rows the exporter already built before
+handing them to `render_json` (`rain.core.jq_transform.apply_jq_filter`,
+`jq.compile(program).input_value(rows).all()`). The filter comes from
+either an uploaded `.jq` file (one-off) or a picked Document (reusable --
+see Document Repository below): no new "ruleset" entity was added,
+because a Document (typed via "Type new content" > jq, or uploaded) with
+a search picker (the same `_search_picker.html`/`/documents/search`
+machinery every other type-to-search field in the app uses) already
+covers "save this text, find it again by name" without a second table.
+The `jq` PyPI package ships musllinux wheels for this project's pin, so
+-- like `cryptography`'s vendored OpenSSL -- it needs nothing added to
+the Alpine Dockerfile despite wrapping a C extension (libjq). A filter
+that fails to compile or raises at runtime re-renders the export form
+(preserving the caller's column selections via the existing
+`export_columns.merge_profile_columns`) with a flash error instead of
+either crashing or silently falling back to the untransformed export.
+
 **Document linking** (the ticketing spec's "link to a document repository
 as a knowledge base") is live -- see Document Repository below.
 
@@ -1118,6 +1137,16 @@ Both surface on the existing Properties tab and the existing flag-icon
 row on the Documents list (a new `alert-triangle` icon alongside the
 webhook/calendar/shareable ones already there) rather than introducing
 new UI surface.
+
+**Properties tab layout.** As the Properties tab accumulated the fields
+above (review due, acknowledgment, sharing/landing-page visibility) on
+top of its original tags/owner/description set, it became one long
+undifferentiated list. Regrouped into four `.form-section` blocks
+(Basics, Ownership & review, Acknowledgment, Visibility) -- the same
+`.form-section`/`.form-section-title` CSS the Service Catalog admin form
+already uses to group its own long form -- purely a template-level
+reorganization: every field's id/name/action is unchanged, so nothing
+downstream (routes, JS) needed to change with it.
 
 **`last_login_at` on `control.users`.** Stamped from the one place
 every sign-in path already converges regardless of `auth_source` --

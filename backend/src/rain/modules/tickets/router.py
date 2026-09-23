@@ -15,6 +15,7 @@ from starlette.convertors import Convertor, register_url_convertor
 
 from rain.core.export_columns import merge_profile_columns
 from rain.core.field_pack import sniff_columns
+from rain.core.jq_transform import JqTransformError, apply_jq_filter
 from rain.core.pagination import paginate
 from rain.core.query_params import optional_int
 from rain.core.rbac import require_admin, require_login
@@ -38,6 +39,7 @@ from rain.db.tenant_models import (
 from rain.modules.assets import service as asset_service
 from rain.modules.assets.schemas import coerce_field_value
 from rain.modules.documents import service as document_service
+from rain.modules.documents import textbody
 from rain.modules.tickets import exporter, importer, platform_events, rootcause, service
 from rain.modules.tickets.rules import (
     DEFAULT_ML_ALGORITHM,
@@ -1241,6 +1243,47 @@ async def field_pack_commit(
 # ------------------------------------------------------------- export ----
 
 
+async def _resolve_jq_filter_text(tenant_db: AsyncSession, form) -> str | None:
+    """Which of the two "JSON transform" fields _jq_transform_fields.html
+    offers actually supplies the filter, if either -- a saved Document
+    (jq_document_id) wins over a one-off jq_file upload if both were
+    somehow given, matching that template's own stated precedence. None
+    (not an empty string) when neither was filled in, so the caller's
+    `if jq_filter_text:` falls straight through to the plain,
+    untransformed export -- identical to this route's behavior before
+    this feature existed."""
+    jq_document_id = str(form.get("jq_document_id") or "").strip()
+    if jq_document_id:
+        return await document_service.get_document_text_body(tenant_db, int(jq_document_id))
+    jq_file = form.get("jq_file")
+    if jq_file is not None and getattr(jq_file, "filename", ""):
+        return textbody.decode_body(await jq_file.read())
+    return None
+
+
+async def _export_form_context(
+    tenant_db: AsyncSession,
+    ctx: RequestContext,
+    *,
+    profile_id: int | None,
+    columns: list[dict],
+    fmt: str,
+    error: str | None = None,
+) -> dict:
+    nav = await build_nav_context(ctx)
+    return {
+        **nav,
+        "ctx": ctx,
+        "ticket_types": TICKET_TYPES,
+        "statuses": await service.list_statuses(tenant_db),
+        "columns": columns,
+        "profiles": await service.list_export_profiles(tenant_db),
+        "selected_profile_id": profile_id,
+        "selected_fmt": fmt,
+        "error": error,
+    }
+
+
 @router.get("/export/run", response_class=HTMLResponse)
 async def export_form(
     request: Request,
@@ -1249,26 +1292,19 @@ async def export_form(
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
-    nav = await build_nav_context(ctx)
-    statuses = await service.list_statuses(tenant_db)
     profiles = await service.list_export_profiles(tenant_db)
     selected_profile = next((p for p in profiles if p.id == profile_id), None) if profile_id else None
-    return templates.TemplateResponse(
-        request,
-        "tickets/export.html",
-        {
-            **nav,
-            "ctx": ctx,
-            "ticket_types": TICKET_TYPES,
-            "statuses": statuses,
-            "columns": merge_profile_columns(
-                await exporter.available_columns(tenant_db), selected_profile.columns if selected_profile else None
-            ),
-            "profiles": profiles,
-            "selected_profile_id": profile_id,
-            "selected_fmt": selected_profile.format if selected_profile else "csv",
-        },
+    columns = merge_profile_columns(
+        await exporter.available_columns(tenant_db), selected_profile.columns if selected_profile else None
     )
+    context = await _export_form_context(
+        tenant_db,
+        ctx,
+        profile_id=profile_id,
+        columns=columns,
+        fmt=selected_profile.format if selected_profile else "csv",
+    )
+    return templates.TemplateResponse(request, "tickets/export.html", context)
 
 
 @router.post("/export/run")
@@ -1304,7 +1340,23 @@ async def export_run(
 
     headers = [c["header"] for c in columns]
     if fmt == "json":
-        body, media_type, filename = exporter.render_json(rows).encode("utf-8"), "application/json", "tickets-export.json"
+        jq_filter_text = await _resolve_jq_filter_text(tenant_db, form)
+        if jq_filter_text:
+            try:
+                body = apply_jq_filter(rows, jq_filter_text).encode("utf-8")
+            except JqTransformError as exc:
+                context = await _export_form_context(
+                    tenant_db,
+                    ctx,
+                    profile_id=None,
+                    columns=merge_profile_columns(await exporter.available_columns(tenant_db), columns),
+                    fmt=fmt,
+                    error=str(exc),
+                )
+                return templates.TemplateResponse(request, "tickets/export.html", context, status_code=400)
+        else:
+            body = exporter.render_json(rows).encode("utf-8")
+        media_type, filename = "application/json", "tickets-export.json"
     elif fmt == "xlsx":
         body = exporter.render_xlsx(rows, headers)
         media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

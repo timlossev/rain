@@ -74,119 +74,131 @@
   {% endif %}
 
   <div class="tab-panel{{ '' if body_kind else ' active' }}" data-tab-panel="properties">
-    <div class="field">
-      <label>Tags</label>
-      <span class="doc-tags-edit" data-inline-edit>
-        <span class="doc-tags-display" data-inline-edit-display>
-          {% for tag in doc.tags %}<span class="badge">{{ tag }}</span> {% else %}<span class="muted">No tags.</span>{% endfor %}
-          <button type="button" class="inline-edit-btn" data-inline-edit-toggle title="Edit tags" aria-label="Edit tags">
-            <span class="nav-icon">{{ nav_icon("pencil") }}</span>
-          </button>
+    <div class="form-section">
+      <div class="form-section-title">Basics</div>
+      <div class="field">
+        <label>Tags</label>
+        <span class="doc-tags-edit" data-inline-edit>
+          <span class="doc-tags-display" data-inline-edit-display>
+            {% for tag in doc.tags %}<span class="badge">{{ tag }}</span> {% else %}<span class="muted">No tags.</span>{% endfor %}
+            <button type="button" class="inline-edit-btn" data-inline-edit-toggle title="Edit tags" aria-label="Edit tags">
+              <span class="nav-icon">{{ nav_icon("pencil") }}</span>
+            </button>
+          </span>
+          <form method="post" action="/documents/{{ doc.id }}/tags" class="doc-tags-form" data-inline-edit-form hidden>
+            <input type="text" name="tags" value="{{ doc.tags | join(', ') }}" placeholder="runbook, security, onboarding" style="min-width:320px;">
+            <button type="submit" class="btn btn-sm">Save</button>
+            <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
+          </form>
         </span>
-        <form method="post" action="/documents/{{ doc.id }}/tags" class="doc-tags-form" data-inline-edit-form hidden>
-          <input type="text" name="tags" value="{{ doc.tags | join(', ') }}" placeholder="runbook, security, onboarding" style="min-width:320px;">
-          <button type="submit" class="btn btn-sm">Save</button>
-          <button type="button" class="btn btn-sm" data-inline-edit-cancel>Cancel</button>
-        </form>
-      </span>
-    </div>
-
-    <div class="field">
-      <label>Owner</label>
-      <form method="post" action="/documents/{{ doc.id }}/owner" class="form-row" style="margin:0; align-items:center;">
-        {{ picker.search_picker("owner_user_id", "/documents/users/search", initial_value=doc.owner_user_id, initial_label=owner_name, placeholder="No owner - search to assign") }}
-        <button class="btn btn-sm" type="submit">Save</button>
-      </form>
-      <div class="field-hint">Who's responsible for keeping this document current - independent of who originally uploaded it.</div>
-    </div>
-
-    <div class="field">
-      <label for="next_review_at">Review due</label>
-      <form method="post" action="/documents/{{ doc.id }}/review-date" class="form-row" style="margin:0; align-items:center;">
-        <input type="date" id="next_review_at" name="next_review_at" value="{{ doc.next_review_at.isoformat() if doc.next_review_at else '' }}" style="width:auto;">
-        <button class="btn btn-sm" type="submit">Save</button>
-        {% if doc.next_review_at and doc.next_review_at < today %}<span class="badge badge-accent">Overdue since {{ doc.next_review_at.strftime("%Y-%m-%d") }}</span>{% endif %}
-      </form>
-      <div class="field-hint">Optional - flags this document "overdue for review" on the Documents list once the date passes. Leave blank to leave it untracked.</div>
-    </div>
-
-    <div class="field">
-      <label>Acknowledgment</label>
-      <div>
-        {% if pending_for_you %}<span class="badge badge-accent" style="margin-right:8px;">Pending your acknowledgment</span>{% endif %}
-        <form method="post" action="/documents/{{ doc.id }}/acknowledge" class="inline">
-          <button class="btn btn-sm{{ '' if you_acknowledged_at else ' btn-primary' }}" type="submit">{{ "Re-acknowledge" if you_acknowledged_at else "I have read this" }}</button>
-        </form>
-        {% if you_acknowledged_at %}<span class="badge timestamp-pill">You acknowledged this {{ you_acknowledged_at.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
       </div>
-      {% if other_acknowledgments %}
-      <div class="field-hint">Also acknowledged by: {% for a in other_acknowledgments %}{{ ack_names.get(a.user_id, "a deleted user") }} ({{ a.acknowledged_at.strftime("%Y-%m-%d") }}){{ ", " if not loop.last }}{% endfor %}</div>
-      {% elif not you_acknowledged_at %}
-      <div class="field-hint">Nobody has acknowledged this document yet.</div>
-      {% endif %}
-    </div>
 
-    <div class="field">
-      <label>Requires acknowledgment from</label>
-      {% if doc.ack_requested_at %}
-      <div>
-        <span class="badge">{{ "Group: " ~ ack_required_group_name if ack_required_group_name else ("Person: " ~ ack_required_user_name if ack_required_user_name else "Nobody (deleted)") }}</span>
-        <span class="muted">requested {{ doc.ack_requested_at.strftime("%Y-%m-%d %H:%M") }} - {{ required_count - pending_count }} of {{ required_count }} acknowledged</span>
-        <form method="post" action="/documents/{{ doc.id }}/clear-acknowledgment-requirement" class="inline" data-confirm="Clear the acknowledgment requirement on '{{ doc.title }}'? Existing acknowledgments are kept, just no longer required.">
-          <button class="btn btn-sm btn-danger" type="submit">Clear</button>
-        </form>
-      </div>
-      {% endif %}
-      <form method="post" action="/documents/{{ doc.id }}/require-acknowledgment" class="form-row" style="margin:8px 0 0; align-items:end;">
-        <div class="field" style="margin-bottom:0;">
-          <label for="ack_group_id">Group</label>
-          <select id="ack_group_id" name="ack_group_id">
-            <option value="">-</option>
-            {% for g in groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}
-          </select>
+      <form method="post" action="/documents/{{ doc.id }}/description">
+        <div class="field">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" rows="5" placeholder="No description.">{{ doc.description or '' }}</textarea>
         </div>
-        {{ picker.search_picker("ack_user_id", "/documents/users/search", label="or an individual person", placeholder="Search by name or email...") }}
-        <button class="btn btn-sm" type="submit">{{ "Re-request" if doc.ack_requested_at else "Request" }}</button>
+        <button class="btn btn-primary" type="submit">Save</button>
       </form>
-      <div class="field-hint">Emails whoever's picked, and re-opens acknowledgment for anyone already acknowledged if you request again later. Shows up under this tenant's own "Pending Actions" in the client portal for whoever's required.</div>
-    </div>
 
-    <div class="field">
-      <label>Sharing</label>
-      <div>
-        <form method="post" action="/documents/{{ doc.id }}/sharing" class="inline">
-          <label class="checkbox-row"><input type="checkbox" name="is_shareable" onchange="this.form.submit()" {% if doc.is_shareable %}checked{% endif %}> Shareable in the client portal</label>
-        </form>
-        {% if doc.is_shareable %}<div class="field-hint">Visible to every portal visitor, including those without an account.</div>{% endif %}
+      <div class="field field-inline-row">
+        <label>Uploaded</label>
+        <span class="badge timestamp-pill">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</span>
       </div>
     </div>
 
-    <div class="field">
-      <label>Landing page</label>
-      <div>
-        <form method="post" action="/documents/{{ doc.id }}/landing-page" class="inline">
-          <label class="checkbox-row"><input type="checkbox" name="show_on_landing_page" onchange="this.form.submit()" {% if doc.show_on_landing_page %}checked{% endif %}> Show on landing page</label>
+    <div class="form-section">
+      <div class="form-section-title">Ownership &amp; review</div>
+      <div class="field">
+        <label>Owner</label>
+        <form method="post" action="/documents/{{ doc.id }}/owner" class="form-row" style="margin:0; align-items:center;">
+          {{ picker.search_picker("owner_user_id", "/documents/users/search", initial_value=doc.owner_user_id, initial_label=owner_name, placeholder="No owner - search to assign") }}
+          <button class="btn btn-sm" type="submit">Save</button>
         </form>
-        {% if body_kind %}
-        <div class="field-hint">Rendered {{ "as Markdown" if body_kind == "markdown" else "as plain text" }} on Home once checked{% if not doc.show_on_landing_page %} - not checked yet{% endif %}.</div>
-        {% else %}
-        <div class="field-hint">This document has no inline body (not a .txt/.md file) - checking this does nothing until it does.</div>
+        <div class="field-hint">Who's responsible for keeping this document current - independent of who originally uploaded it.</div>
+      </div>
+
+      <div class="field">
+        <label for="next_review_at">Review due</label>
+        <form method="post" action="/documents/{{ doc.id }}/review-date" class="form-row" style="margin:0; align-items:center;">
+          <input type="date" id="next_review_at" name="next_review_at" value="{{ doc.next_review_at.isoformat() if doc.next_review_at else '' }}" style="width:auto;">
+          <button class="btn btn-sm" type="submit">Save</button>
+          {% if doc.next_review_at and doc.next_review_at < today %}<span class="badge badge-accent">Overdue since {{ doc.next_review_at.strftime("%Y-%m-%d") }}</span>{% endif %}
+        </form>
+        <div class="field-hint">Optional - flags this document "overdue for review" on the Documents list once the date passes. Leave blank to leave it untracked.</div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Acknowledgment</div>
+      <div class="field">
+        <label>Read receipt</label>
+        <div>
+          {% if pending_for_you %}<span class="badge badge-accent" style="margin-right:8px;">Pending your acknowledgment</span>{% endif %}
+          <form method="post" action="/documents/{{ doc.id }}/acknowledge" class="inline">
+            <button class="btn btn-sm{{ '' if you_acknowledged_at else ' btn-primary' }}" type="submit">{{ "Re-acknowledge" if you_acknowledged_at else "I have read this" }}</button>
+          </form>
+          {% if you_acknowledged_at %}<span class="badge timestamp-pill">You acknowledged this {{ you_acknowledged_at.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
+        </div>
+        {% if other_acknowledgments %}
+        <div class="field-hint">Also acknowledged by: {% for a in other_acknowledgments %}{{ ack_names.get(a.user_id, "a deleted user") }} ({{ a.acknowledged_at.strftime("%Y-%m-%d") }}){{ ", " if not loop.last }}{% endfor %}</div>
+        {% elif not you_acknowledged_at %}
+        <div class="field-hint">Nobody has acknowledged this document yet.</div>
         {% endif %}
       </div>
-    </div>
 
-    <div class="field field-inline-row">
-      <label>Uploaded</label>
-      <span class="badge timestamp-pill">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</span>
-    </div>
-
-    <form method="post" action="/documents/{{ doc.id }}/description">
       <div class="field">
-        <label for="description">Description</label>
-        <textarea id="description" name="description" rows="5" placeholder="No description.">{{ doc.description or '' }}</textarea>
+        <label>Requires acknowledgment from</label>
+        {% if doc.ack_requested_at %}
+        <div>
+          <span class="badge">{{ "Group: " ~ ack_required_group_name if ack_required_group_name else ("Person: " ~ ack_required_user_name if ack_required_user_name else "Nobody (deleted)") }}</span>
+          <span class="muted">requested {{ doc.ack_requested_at.strftime("%Y-%m-%d %H:%M") }} - {{ required_count - pending_count }} of {{ required_count }} acknowledged</span>
+          <form method="post" action="/documents/{{ doc.id }}/clear-acknowledgment-requirement" class="inline" data-confirm="Clear the acknowledgment requirement on '{{ doc.title }}'? Existing acknowledgments are kept, just no longer required.">
+            <button class="btn btn-sm btn-danger" type="submit">Clear</button>
+          </form>
+        </div>
+        {% endif %}
+        <form method="post" action="/documents/{{ doc.id }}/require-acknowledgment" class="form-row" style="margin:8px 0 0; align-items:end;">
+          <div class="field" style="margin-bottom:0;">
+            <label for="ack_group_id">Group</label>
+            <select id="ack_group_id" name="ack_group_id">
+              <option value="">-</option>
+              {% for g in groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}
+            </select>
+          </div>
+          {{ picker.search_picker("ack_user_id", "/documents/users/search", label="or an individual person", placeholder="Search by name or email...") }}
+          <button class="btn btn-sm" type="submit">{{ "Re-request" if doc.ack_requested_at else "Request" }}</button>
+        </form>
+        <div class="field-hint">Emails whoever's picked, and re-opens acknowledgment for anyone already acknowledged if you request again later. Shows up under this tenant's own "Pending Actions" in the client portal for whoever's required.</div>
       </div>
-      <button class="btn btn-primary" type="submit">Save</button>
-    </form>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Visibility</div>
+      <div class="field">
+        <label>Sharing</label>
+        <div>
+          <form method="post" action="/documents/{{ doc.id }}/sharing" class="inline">
+            <label class="checkbox-row"><input type="checkbox" name="is_shareable" onchange="this.form.submit()" {% if doc.is_shareable %}checked{% endif %}> Shareable in the client portal</label>
+          </form>
+          {% if doc.is_shareable %}<div class="field-hint">Visible to every portal visitor, including those without an account.</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Landing page</label>
+        <div>
+          <form method="post" action="/documents/{{ doc.id }}/landing-page" class="inline">
+            <label class="checkbox-row"><input type="checkbox" name="show_on_landing_page" onchange="this.form.submit()" {% if doc.show_on_landing_page %}checked{% endif %}> Show on landing page</label>
+          </form>
+          {% if body_kind %}
+          <div class="field-hint">Rendered {{ "as Markdown" if body_kind == "markdown" else "as plain text" }} on Home once checked{% if not doc.show_on_landing_page %} - not checked yet{% endif %}.</div>
+          {% else %}
+          <div class="field-hint">This document has no inline body (not a .txt/.md file) - checking this does nothing until it does.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
   </div>
 
   {% if body_kind %}

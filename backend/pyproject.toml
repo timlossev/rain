@@ -84,6 +84,19 @@ dependencies = [
     # this wraps it with the same API, refusing the dangerous constructs
     # outright rather than trying to sanitize them.
     "defusedxml>=0.7.1,<0.8",
+    # jq filter evaluation for the JSON export screens' optional transform
+    # step (rain.core.jq_transform) -- a compiled extension (wraps libjq),
+    # unlike most of this file's other deps, but ships musllinux wheels
+    # for cp312 (confirmed against PyPI's own file listing for this pin:
+    # jq-<version>-cp312-cp312-musllinux_1_2_{aarch64,x86_64}.whl), so it
+    # installs the same way on the alpine base image as any pure-Python
+    # dependency here -- no jq-dev/libjq apk package, no compiler, nothing
+    # added to the Dockerfile. The wheel vendors its own libjq build
+    # rather than linking the image's system copy, same story as
+    # cryptography's own vendored OpenSSL (see the versions-audited note
+    # near the top of this list) -- an `apk upgrade` doesn't patch it, a
+    # version bump of this pin does.
+    "jq>=1.12,<2",
 ]
 
 [project.optional-dependencies]

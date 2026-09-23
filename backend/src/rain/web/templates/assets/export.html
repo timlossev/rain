@@ -4,6 +4,7 @@
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 <div class="card">
+  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
   <div class="form-row">
     <form method="get" action="/assets/export" class="field" style="margin-bottom:0;">
       <label for="asset_type_id">Asset type (columns update to match)</label>
@@ -26,7 +27,7 @@
     </form>
   </div>
 
-  <form method="post" action="/assets/export">
+  <form method="post" action="/assets/export" enctype="multipart/form-data">
     <input type="hidden" name="asset_type_id" value="{{ selected_type or '' }}">
     <h3>Columns</h3>
     <table data-export-columns>
@@ -46,7 +47,7 @@
     <div class="form-row" style="margin-top:16px;">
       <div class="field field-w160">
         <label for="fmt">Format</label>
-        <select id="fmt" name="fmt">
+        <select id="fmt" name="fmt" data-action-type-select>
           <option value="csv" {% if selected_fmt == "csv" %}selected{% endif %}>CSV</option>
           <option value="json" {% if selected_fmt == "json" %}selected{% endif %}>JSON</option>
           <option value="xlsx" {% if selected_fmt == "xlsx" %}selected{% endif %}>Excel (.xlsx)</option>
@@ -57,6 +58,9 @@
         <input type="text" id="save_as" name="save_as" placeholder="e.g. Servers - quarterly audit">
       </div>
     </div>
+
+    {% include "_jq_transform_fields.html" %}
+
     <button class="btn btn-primary" type="submit">Export</button>
   </form>
 </div>

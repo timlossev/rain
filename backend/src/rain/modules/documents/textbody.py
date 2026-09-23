@@ -38,8 +38,11 @@ _ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
 #: Anything that just wants a plain textarea (no Markdown rendering) --
 #: XML/JSON included, since a config/manifest/API-response snapshot is
 #: exactly the kind of thing this repository is for and "plain text" is
-#: the right editing experience for it, not prose.
-TEXT_EXTENSIONS = {".txt", ".text", ".log", ".xml", ".json"}
+#: the right editing experience for it, not prose. .jq (a saved export
+#: transform ruleset -- rain.core.jq_transform) is the same idea: a
+#: short, structured, non-prose body someone edits directly, not a file
+#: meant to only ever be uploaded once and left alone.
+TEXT_EXTENSIONS = {".txt", ".text", ".log", ".xml", ".json", ".jq"}
 MARKDOWN_EXTENSIONS = {".md", ".markdown"}
 EDITABLE_EXTENSIONS = TEXT_EXTENSIONS | MARKDOWN_EXTENSIONS
 

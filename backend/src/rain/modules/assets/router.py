@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from starlette.convertors import Convertor, register_url_convertor
 
 from rain.core.export_columns import merge_profile_columns
+from rain.core.jq_transform import JqTransformError, apply_jq_filter
 from rain.core.pagination import paginate
 from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
@@ -20,6 +21,7 @@ from rain.db.tenant_models import Asset, AssetType, CustomField
 from rain.modules.assets import exporter, importer, service
 from rain.modules.assets.schemas import coerce_field_value
 from rain.modules.documents import service as document_service
+from rain.modules.documents import textbody
 from rain.modules.tickets import service as ticket_service
 from rain.web.nav import build_nav_context
 from rain.web.pdf import render_pdf
@@ -480,6 +482,45 @@ async def delete_field(
 # ------------------------------------------------------------- export ----
 
 
+async def _resolve_jq_filter_text(tenant_db: AsyncSession, form) -> str | None:
+    """See rain.modules.tickets.router's identical helper -- same two
+    fields, same precedence, same reasoning; kept as a sibling copy
+    rather than a shared cross-module function for the same reason this
+    file's own column-parsing loop above is its own copy rather than
+    calling into rain.modules.tickets.router for it."""
+    jq_document_id = str(form.get("jq_document_id") or "").strip()
+    if jq_document_id:
+        return await document_service.get_document_text_body(tenant_db, int(jq_document_id))
+    jq_file = form.get("jq_file")
+    if jq_file is not None and getattr(jq_file, "filename", ""):
+        return textbody.decode_body(await jq_file.read())
+    return None
+
+
+async def _export_form_context(
+    tenant_db: AsyncSession,
+    ctx: RequestContext,
+    *,
+    asset_type_id: int | None,
+    profile_id: int | None,
+    columns: list[dict],
+    fmt: str,
+    error: str | None = None,
+) -> dict:
+    nav = await build_nav_context(ctx)
+    return {
+        **nav,
+        "ctx": ctx,
+        "asset_types": await service.list_asset_types(tenant_db),
+        "columns": columns,
+        "profiles": await service.list_export_profiles(tenant_db),
+        "selected_type": asset_type_id,
+        "selected_profile_id": profile_id,
+        "selected_fmt": fmt,
+        "error": error,
+    }
+
+
 @router.get("/export", response_class=HTMLResponse)
 async def export_form(
     request: Request,
@@ -489,28 +530,21 @@ async def export_form(
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
-    nav = await build_nav_context(ctx)
-    asset_types = await service.list_asset_types(tenant_db)
     profiles = await service.list_export_profiles(tenant_db)
     selected_profile = next((p for p in profiles if p.id == profile_id), None) if profile_id else None
     if selected_profile is not None and asset_type_id is None:
         asset_type_id = selected_profile.asset_type_id
     available = await exporter.available_columns(tenant_db, asset_type_id)
     columns = merge_profile_columns(available, selected_profile.columns if selected_profile else None)
-    return templates.TemplateResponse(
-        request,
-        "assets/export.html",
-        {
-            **nav,
-            "ctx": ctx,
-            "asset_types": asset_types,
-            "columns": columns,
-            "profiles": profiles,
-            "selected_type": asset_type_id,
-            "selected_profile_id": profile_id,
-            "selected_fmt": selected_profile.format if selected_profile else "csv",
-        },
+    context = await _export_form_context(
+        tenant_db,
+        ctx,
+        asset_type_id=asset_type_id,
+        profile_id=profile_id,
+        columns=columns,
+        fmt=selected_profile.format if selected_profile else "csv",
     )
+    return templates.TemplateResponse(request, "assets/export.html", context)
 
 
 @router.post("/export")
@@ -542,7 +576,24 @@ async def export_run(
 
     headers = [c["header"] for c in columns]
     if fmt == "json":
-        body, media_type, filename = exporter.render_json(rows).encode("utf-8"), "application/json", "assets-export.json"
+        jq_filter_text = await _resolve_jq_filter_text(tenant_db, form)
+        if jq_filter_text:
+            try:
+                body = apply_jq_filter(rows, jq_filter_text).encode("utf-8")
+            except JqTransformError as exc:
+                context = await _export_form_context(
+                    tenant_db,
+                    ctx,
+                    asset_type_id=type_id,
+                    profile_id=None,
+                    columns=merge_profile_columns(await exporter.available_columns(tenant_db, type_id), columns),
+                    fmt=fmt,
+                    error=str(exc),
+                )
+                return templates.TemplateResponse(request, "assets/export.html", context, status_code=400)
+        else:
+            body = exporter.render_json(rows).encode("utf-8")
+        media_type, filename = "application/json", "assets-export.json"
     elif fmt == "xlsx":
         body = exporter.render_xlsx(rows, headers)
         media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

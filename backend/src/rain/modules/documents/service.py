@@ -236,6 +236,23 @@ async def get_document(db: AsyncSession, document_id: int) -> Document | None:
     return result.scalar_one_or_none()
 
 
+async def get_document_text_body(db: AsyncSession, document_id: int) -> str | None:
+    """None if the document doesn't exist -- a caller that needs its
+    contents as text (the Tickets/Assets export screens' own "use a
+    saved jq ruleset" picker, rain.modules.tickets/assets.router) reads
+    it this way rather than each reimplementing storage.get_storage().
+    read(doc.storage_key) + textbody.decode_body() inline. Deliberately
+    doesn't check body_kind()/EDITABLE_EXTENSIONS first -- any document's
+    bytes decode as UTF-8 text just fine (textbody.decode_body already
+    replaces anything that doesn't), so this works for a plain-text file
+    regardless of extension, not only the ones the inline editor itself
+    recognizes."""
+    doc = await get_document(db, document_id)
+    if doc is None:
+        return None
+    return textbody.decode_body(storage.get_storage().read(doc.storage_key))
+
+
 async def get_document_by_ref(db: AsyncSession, ref: str) -> Document | None:
     """`ref` is a doc_number ("DOC-000123", or the same with a short/
     unpadded number like "DOC-123") -- the URL scheme document detail

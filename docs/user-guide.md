@@ -251,6 +251,16 @@ field, editable header, order); custom fields appear alongside built-in
 columns. Save the layout under a name for reuse; saved profiles list
 below with a "Load" link.
 
+Picking JSON reveals a "JSON transform (optional)" section: run a
+[jq](https://jqlang.org/manual/) filter against the exported rows
+before download, to reshape RAIN's flat column output into whatever
+JSON shape a downstream consumer expects. Either search for a
+previously-saved ruleset (a `.jq` file already uploaded as a Document)
+or upload a one-off `.jq` file for just this export -- a saved ruleset
+wins if both are given. Leave both blank for the plain row list, same
+as before this existed. A filter that doesn't compile or fails at run
+time reloads this page with the error instead of downloading anything.
+
 ### Import (tickets)
 
 Records Authority > Import. Upload a CSV, JSON, or `.nessus` file, then
@@ -502,7 +512,9 @@ new), plus per-row errors.
 
 Assets > Export. Pick an asset type (or "All types" for built-in
 columns only), the same column table as every export screen, a format
-(CSV/JSON/Excel), and an optional saved-profile name.
+(CSV/JSON/Excel), and an optional saved-profile name. Picking JSON also
+reveals the same jq transform step tickets' own Export screen has --
+see that section for what it does.
 
 ## Documents
 
@@ -555,8 +567,9 @@ reverts with an error banner if it didn't go through.
 Labeled "Upload document" but offers two tabs:
 
 - Upload a file: up to 25MB.
-- Type new content: `.txt` or `.md`, typed directly -- for a
-  placeholder document with nothing to upload yet.
+- Type new content: `.txt`, `.md`, or `.jq` (a saved export transform
+  ruleset -- see Export above), typed directly -- for a placeholder
+  document with nothing to upload yet.
 
 Title (required), Description, Tags (comma-separated) apply to either
 tab. Arriving from another record's "link a document" action attaches
@@ -566,20 +579,24 @@ the new document automatically.
 
 Header: Download, Export to PDF, Delete. Tabs:
 
-- **Properties**: tags as editable badges. Owner (type-to-search,
-  independent of who uploaded it). Review due date -- past it, the
-  document shows the overdue icon and the list's overdue filter. An "I
-  have read this" button plus a per-person acknowledgment log. "Requires
-  acknowledgment from" (a group or person) makes acknowledgment
-  mandatory: everyone it resolves to gets emailed and shows up under
-  their own Pending Actions in the [Client Portal](#client-portal) until
-  they click "I have read this" -- clicking Request again re-opens it
-  for anyone who'd already acknowledged. "Shareable in the client
-  portal" exposes it on the [Client Portal](#client-portal)'s Shareable
-  documents tab to every visitor, including anonymous ones, regardless
-  of require-sign-in -- off by default. "Show on landing page" does the
-  same for [Home](#home). An Uploaded date pill. A Description
-  textarea, saved independently of the file.
+- **Properties**, grouped into four labeled sections:
+  - *Basics*: tags as editable badges, a Description textarea (saved
+    independently of the file), the Uploaded date.
+  - *Ownership & review*: Owner (type-to-search, independent of who
+    uploaded it); Review due date -- past it, the document shows the
+    overdue icon and the list's overdue filter.
+  - *Acknowledgment*: an "I have read this" button plus a per-person
+    acknowledgment log. "Requires acknowledgment from" (a group or
+    person) makes it mandatory instead of voluntary: everyone it
+    resolves to gets emailed and shows up under their own Pending
+    Actions in the [Client Portal](#client-portal) until they click "I
+    have read this" -- clicking Request again re-opens it for anyone
+    who'd already acknowledged.
+  - *Visibility*: "Shareable in the client portal" exposes it on the
+    [Client Portal](#client-portal)'s Shareable documents tab to every
+    visitor, including anonymous ones, regardless of require-sign-in --
+    off by default. "Show on landing page" does the same for
+    [Home](#home).
 - **Contents** (`.txt`/`.md` only): a "Last updated" label (last webhook
   refresh, or last manual save), then an inline editor. Markdown gets a
   Write/Preview tab using the same renderer as PDF export. Saving diffs

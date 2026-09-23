@@ -366,7 +366,7 @@ async def create_document(
         filename = file.filename or "file"
         mime_type = file.content_type
     elif body.strip():
-        ext = "md" if body_format == "md" else "txt"
+        ext = "md" if body_format == "md" else ("jq" if body_format == "jq" else "txt")
         filename = f"{_filename_slug(title)}.{ext}"
         mime_type = "text/markdown" if ext == "md" else "text/plain"
         data = body.encode("utf-8")
