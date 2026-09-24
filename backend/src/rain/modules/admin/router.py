@@ -1757,7 +1757,6 @@ async def webhooks_edit_form(
 async def webhooks_edit(
     webhook_id: int,
     name: str = Form(...),
-    kind: str = Form("generic"),
     url: str = Form(...),
     http_method: str = Form("POST"),
     headers_text: str = Form(""),
@@ -1777,9 +1776,17 @@ async def webhooks_edit(
             f"/admin/webhooks/{webhook_id}/edit?error={quote(f'URL rejected: {unsafe_reason}')}",
             status_code=status.HTTP_303_SEE_OTHER,
         )
-    kind = kind if kind in ("generic", "chat_completions") else "generic"
     webhook = await webhook_service.get_webhook(tenant_db, webhook_id)
     if webhook is not None:
+        # kind is immutable after creation (see webhook_form.html's own
+        # comment on why) -- the posted `kind` is whatever the disabled
+        # <select>'s hidden twin carried, which should already match, but
+        # this is the real enforcement point, not that form field. Always
+        # keying off the existing row rather than trusting the post means
+        # a handcrafted request can't flip kind and strand the other
+        # kind's now-orphaned fields (a payload_template, or a model/
+        # prompt/memory doc) no matter what it sends.
+        kind = webhook.kind
         await webhook_service.update_webhook(
             tenant_db,
             webhook,

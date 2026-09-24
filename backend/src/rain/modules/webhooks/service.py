@@ -114,10 +114,13 @@ async def call_webhook(config: WebhookConfig, placeholders: dict[str, str] | Non
         return WebhookResult(status_code=None, success=False, body="", error=str(exc))
 
 
-async def alert_webhook_failure(db: AsyncSession, webhook: WebhookConfig, result: WebhookResult, *, context: str) -> None:
-    """Called by a caller of call_webhook when result.success is False and
-    webhook.alert_on_failure is set -- synthesizes a SyslogEvent and runs
-    it through the same rule engine real syslog traffic goes through
+async def alert_webhook_failure(
+    db: AsyncSession, webhook: WebhookConfig, result: WebhookResult | ChatCompletionResult, *, context: str
+) -> None:
+    """Called by a caller of call_webhook *or* call_chat_completion when
+    result.success is False and webhook.alert_on_failure is set --
+    synthesizes a SyslogEvent and runs it through the same rule engine
+    real syslog traffic goes through
     (rain.modules.tickets.rules), same pattern as rain.modules.calendar.
     sweep's syslog bridge and Document's alert_on_change, so a webhook
     that's stopped responding can auto-file a ticket the same way any
@@ -231,6 +234,13 @@ async def call_chat_completion(db: AsyncSession, config: WebhookConfig, ticket: 
 
     try:
         reply = resp.json()["choices"][0]["message"]["content"]
+        # content is nullable in the Chat Completions response shape (a
+        # tool-call-only reply, or a content-filtered one, both return it
+        # as JSON null rather than omitting the key) -- a bare dict
+        # lookup doesn't raise for that, so it has to be checked
+        # explicitly rather than left for .strip() below to blow up on.
+        if not isinstance(reply, str):
+            raise TypeError(f"choices[0].message.content was {reply!r}, not a string")
     except (ValueError, KeyError, IndexError, TypeError) as exc:
         logger.warning("chat completions webhook '%s' returned an unparseable response -- %s", config.name, exc)
         return ChatCompletionResult(

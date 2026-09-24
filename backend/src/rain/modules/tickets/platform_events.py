@@ -100,6 +100,17 @@ ACTION_TYPES = [
     ("add_watcher", "Add a watcher"),
 ]
 
+# The two action types whose entire config is {"webhook_id": <WebhookConfig.
+# id>} -- everywhere that shape gets built, displayed, or bundle-exported/
+# imported treats them identically (only _run_action's own dispatch below
+# actually differs between them, since a "webhook" call and an "invoke_chat_
+# completion" call do different things with the same referenced row). One
+# tuple here instead of four call sites (tickets/router.py's config
+# builder and display-label builder, config_bundle.py's export and import)
+# each separately spelling out ("webhook", "invoke_chat_completion") --
+# a future third WebhookConfig-backed action type only needs adding here.
+WEBHOOK_BACKED_ACTIONS = ("webhook", "invoke_chat_completion")
+
 # One short sentence per action, shown under the "Add action" picker as
 # it's selected (rule_form.html's ml_algorithm dropdown already does
 # this for the same reason -- a value chosen from a name alone isn't

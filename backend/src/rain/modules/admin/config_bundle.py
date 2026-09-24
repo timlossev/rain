@@ -88,6 +88,7 @@ from rain.db.tenant_models import (
     WebhookConfig,
 )
 from rain.modules.auth import ldap_config, saml_config
+from rain.modules.tickets import platform_events
 from rain.web.uploads import read_local_branding_file, save_logo_bytes, save_portal_background_bytes
 
 PLATFORM_BUNDLE_TYPE = "rain_platform_config"
@@ -550,7 +551,7 @@ async def build_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, *, includ
                     warnings.append(f"Platform Response Rule '{rule.name}': action '{action.action_type}' -- channel no longer exists, skipped.")
                 else:
                     entry = {"action_type": action.action_type, "channel_name": channel_name}
-            elif action.action_type in ("webhook", "invoke_chat_completion"):
+            elif action.action_type in platform_events.WEBHOOK_BACKED_ACTIONS:
                 webhook_name = webhook_name_by_id.get(cfg.get("webhook_id"))
                 if webhook_name is None:
                     warnings.append(f"Platform Response Rule '{rule.name}': action '{action.action_type}' -- webhook no longer exists, skipped.")
@@ -955,7 +956,7 @@ async def apply_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, data: dic
                     )
                     continue
                 config = {"channel_id": channel_id}
-            elif action_type in ("webhook", "invoke_chat_completion"):
+            elif action_type in platform_events.WEBHOOK_BACKED_ACTIONS:
                 webhook_id = webhook_id_by_name.get(action.get("webhook_name"))
                 if webhook_id is None:
                     result.warnings.append(

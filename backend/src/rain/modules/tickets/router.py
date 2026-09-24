@@ -4,7 +4,7 @@ import io
 import re
 import secrets
 from datetime import datetime, timezone
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
@@ -1893,7 +1893,7 @@ async def platform_event_detail(
         cfg = dict(a.config or {})
         if a.action_type in ("notify_slack", "notify_email"):
             cfg["channel_label"] = channel_names.get(cfg.get("channel_id"), "")
-        elif a.action_type in ("webhook", "invoke_chat_completion"):
+        elif a.action_type in platform_events.WEBHOOK_BACKED_ACTIONS:
             cfg["webhook_label"] = webhook_names.get(cfg.get("webhook_id"), "")
         elif a.action_type == "attach_document":
             cfg["document_label"] = document_labels.get(cfg.get("document_id"), "")
@@ -1961,7 +1961,7 @@ def _build_action_config(action_type: str, form) -> dict:
     if action_type in ("notify_slack", "notify_email"):
         channel_id = form.get("channel_id")
         return {"channel_id": int(channel_id)} if channel_id else {}
-    if action_type in ("webhook", "invoke_chat_completion"):
+    if action_type in platform_events.WEBHOOK_BACKED_ACTIONS:
         webhook_id = form.get("webhook_config_id")
         return {"webhook_id": int(webhook_id)} if webhook_id else {}
     if action_type == "attach_document":
@@ -1980,6 +1980,27 @@ def _build_action_config(action_type: str, form) -> dict:
     return {}
 
 
+async def _action_config_error(tenant_db: AsyncSession, action_type: str, config: dict) -> str | None:
+    """None if `config` is fine to save for this action_type; otherwise a
+    human-readable reason it was rejected. Only invoke_chat_completion
+    needs this today: picking a kind="generic" webhook for it saved
+    successfully before this existed, then failed silently at fire time
+    (buried in that firing's own platform_event_triggers summary,
+    indistinguishable at a glance from a routine "ticket-only action
+    skipped for a document trigger" no-op) -- the same "fail fast with a
+    clear reason at save time" reasoning webhooks_create/webhooks_edit's
+    own check_outbound_url call already applies to a webhook's URL."""
+    if action_type != "invoke_chat_completion":
+        return None
+    webhook_id = config.get("webhook_id")
+    if not webhook_id:
+        return None
+    webhook = await tenant_db.get(WebhookConfig, webhook_id)
+    if webhook is not None and webhook.kind != "chat_completions":
+        return f"'{webhook.name}' is a Generic webhook, not a Chat Completions API one -- pick one of those, or create it under Admin > Webhooks first."
+    return None
+
+
 @router.post("/platform-events/{rule_id:int}/actions")
 async def platform_event_action_create(
     request: Request,
@@ -1990,6 +2011,11 @@ async def platform_event_action_create(
 ):
     form = await request.form()
     config = _build_action_config(action_type, form)
+    error = await _action_config_error(tenant_db, action_type, config)
+    if error is not None:
+        return RedirectResponse(
+            f"/tickets/platform-events/{rule_id}?error={quote(error)}", status_code=status.HTTP_303_SEE_OTHER
+        )
     tenant_db.add(PlatformEventAction(rule_id=rule_id, action_type=action_type, config=config))
     await tenant_db.commit()
     return RedirectResponse(f"/tickets/platform-events/{rule_id}", status_code=status.HTTP_303_SEE_OTHER)
@@ -2011,7 +2037,13 @@ async def platform_event_action_edit(
     action = await tenant_db.get(PlatformEventAction, action_id)
     if action is not None and action.rule_id == rule_id:
         form = await request.form()
-        action.config = _build_action_config(action.action_type, form)
+        config = _build_action_config(action.action_type, form)
+        error = await _action_config_error(tenant_db, action.action_type, config)
+        if error is not None:
+            return RedirectResponse(
+                f"/tickets/platform-events/{rule_id}?error={quote(error)}", status_code=status.HTTP_303_SEE_OTHER
+            )
+        action.config = config
         await tenant_db.commit()
     return RedirectResponse(f"/tickets/platform-events/{rule_id}", status_code=status.HTTP_303_SEE_OTHER)
 

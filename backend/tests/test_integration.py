@@ -515,6 +515,91 @@ async def test_invoke_chat_completion_action_posts_reply_as_first_comment(monkey
         assert len(comment_count) == 1  # the misconfigured rule's rejection never posted a second comment
 
 
+async def test_action_config_error_rejects_generic_webhook_for_chat_completion():
+    """rain.modules.tickets.router._action_config_error, the save-time
+    check behind the redirect the previous test's "Misconfigured triage"
+    rule relies on having already fired *before* that rule was ever
+    saved in a real admin session -- without this, picking the wrong
+    kind of webhook for "Invoke Chat Completions API" saved silently and
+    only surfaced per-firing, buried in a trigger-history summary
+    string."""
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import WebhookConfig
+    from rain.modules.tickets.router import _action_config_error
+
+    tenant = await provision_tenant(slug="iota", name="Iota LLC")
+
+    async with tenant_session(tenant.schema_name) as session:
+        chat_webhook = WebhookConfig(name="Triage assistant", kind="chat_completions", url="https://api.openai.com/v1/chat/completions")
+        generic_webhook = WebhookConfig(name="Ops relay", kind="generic", url="https://example.com/hook")
+        session.add_all([chat_webhook, generic_webhook])
+        await session.commit()
+        await session.refresh(chat_webhook)
+        await session.refresh(generic_webhook)
+
+        error = await _action_config_error(session, "invoke_chat_completion", {"webhook_id": generic_webhook.id})
+        assert error is not None
+        assert "Ops relay" in error
+        assert "Generic" in error
+
+        assert await _action_config_error(session, "invoke_chat_completion", {"webhook_id": chat_webhook.id}) is None
+        assert await _action_config_error(session, "invoke_chat_completion", {}) is None  # no webhook picked yet -- not this check's job
+        assert await _action_config_error(session, "webhook", {"webhook_id": generic_webhook.id}) is None  # plain "webhook" allows either kind
+
+
+async def test_call_chat_completion_treats_null_message_content_as_a_failure(monkeypatch):
+    """rain.modules.webhooks.service.call_chat_completion against a real
+    (monkeypatched-transport) httpx call: the Chat Completions response
+    shape allows "content": null (a tool-call-only or content-filtered
+    reply) -- a bare dict lookup doesn't raise for that, so this has to
+    be checked explicitly rather than left for a bare .strip() to raise
+    AttributeError on, taking down the synchronous ticket-creation
+    request that triggered it."""
+    import httpx
+
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import WebhookConfig
+    from rain.modules.tickets import service
+    from rain.modules.webhooks import service as webhook_service
+
+    tenant = await provision_tenant(slug="eta", name="Eta LLC")
+
+    class _FakeResponse:
+        status_code = 200
+        text = '{"choices": [{"message": {"content": null}}]}'
+
+        def json(self):
+            return {"choices": [{"message": {"content": None}}]}
+
+    class _FakeAsyncClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, *a, **kw):
+            return _FakeResponse()
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
+
+    async with tenant_session(tenant.schema_name) as session:
+        webhook = WebhookConfig(name="Null-content provider", kind="chat_completions", url="https://example.com/v1/chat/completions")
+        session.add(webhook)
+        ticket = await service.create_ticket(session, ticket_type="incident", title="test", description=None)
+        await session.commit()
+        await session.refresh(webhook)
+
+        result = await webhook_service.call_chat_completion(session, webhook, ticket)
+        assert result.success is False
+        assert "unparseable response" in result.error
+
+
 async def test_escalate_ticket_captures_webhook_response_as_comment(monkeypatch):
     """rain.modules.tickets.service.escalate_ticket: both log lines it's
     documented to produce (the terse field-change entry, unchanged from

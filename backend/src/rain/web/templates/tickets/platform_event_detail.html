@@ -3,6 +3,7 @@
 {% block title %}{{ rule.name }} - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Manage this Platform Response Rule's actions - notify Slack/email, call a webhook, invoke a Chat Completions API webhook and post its reply as a comment, attach a document or asset, mark the ticket problematic, analyze root cause, or add a watcher. Actions fire in order, top of the flow to bottom, when the rule's pattern matches - a ticket for every trigger except "When a document is pending your acknowledgment", where it matches a document instead and only the notify/webhook actions apply. Click a step in the flow to edit it, or "+ Add action" to add another.{% endblock %}
 {% block content %}
+{% if request.query_params.get('error') %}<div class="flash flash-error">{{ request.query_params.get('error') }}</div>{% endif %}
 <div class="panel-row" style="justify-content:flex-end;">
   <div>
     <a class="btn btn-sm" href="/tickets/platform-events">&larr; All rules</a>
