@@ -27,6 +27,10 @@ instance, in their own primers:
 - [`docs/fedramp-cr26-showcase.md`](docs/fedramp-cr26-showcase.md) --
   FedRAMP's 2026 Consolidated Rules (CR26) explained through a real
   Significant Change Notification example.
+- [`docs/ai-triage-showcase.md`](docs/ai-triage-showcase.md) -- a
+  Chat Completions API webhook doing Level 0 triage of an incoming
+  security alert against a shared playbook document, before a human
+  opens the ticket.
 
 ## Motivation
 
