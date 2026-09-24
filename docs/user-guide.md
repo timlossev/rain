@@ -289,7 +289,7 @@ custom field values refresh -- title/description/severity are never
 overwritten). A closed match is treated as a regression: reopened,
 flagged Problematic, commented with which import caused it. Leave it
 unmapped for a plain one-time import. See
-[`docs/drift-detection.md`](drift-detection.md) for the closest sibling
+[`docs/drift-detection-showcase.md`](drift-detection-showcase.md) for the closest sibling
 pattern, and `docs/compliance-templates/nessus-finding-fields.rain` for
 a ready-made field set.
 

@@ -25,7 +25,11 @@ Platform Response Rule action that invokes a Chat Completions API
 webhook (OpenAI, Gemini, ...) and posts the reply as a comment -- Level
 0 triage of a security alert against a shared playbook document, walked
 through end to end -- see
-[`../ai-triage-showcase.md`](../ai-triage-showcase.md).
+[`../ai-triage-showcase.md`](../ai-triage-showcase.md). For a document
+webhook, a calendar sweep, and an Event Promotion Policy composed into
+unattended infrastructure drift detection -- a real out-of-band change
+caught and ticketed automatically -- see
+[`../drift-detection-showcase.md`](../drift-detection-showcase.md).
 
 ## Assets, documents, calendar
 

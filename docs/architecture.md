@@ -1318,7 +1318,7 @@ above) for whatever else an admin has configured to react to it.
 
 **Infrastructure drift detection is an emergent capability, not a
 feature.** No code backs it directly (see
-[`docs/drift-detection.md`](drift-detection.md) for the setup steps)
+[`docs/drift-detection-showcase.md`](drift-detection-showcase.md) for the setup steps)
 -- it's three pieces that already existed for other reasons, composed: a webhook-populated document's own diff-on-refresh
 (`_apply_webhook_result`'s `_content_changed` check), a `CalendarEntry`
 with `policy_ref={"type": "refresh_document"}` giving that refresh a

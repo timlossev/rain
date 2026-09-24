@@ -267,7 +267,7 @@ lowers setup cost, it doesn't change a control's classification here.
   count, renewal date, status -- the licensing half CM-8 doesn't cover.
 - **CM-8(3) / SI-7** -- a document populated from a scheduled
   infrastructure-discovery run alerts on the first snapshot diff (see
-  [`docs/drift-detection.md`](drift-detection.md)). Detects the
+  [`docs/drift-detection-showcase.md`](drift-detection-showcase.md)). Detects the
   *undocumented* change: the verification half CM-2's baseline and
   CM-3's approval trail don't provide alone. `cloud-environment-register.rain`
   tracks the account/environment this applies to.
@@ -477,7 +477,7 @@ Japan, Singapore, and more). Annex A control mapping:
 | Document acknowledgment | 6.3 Awareness/Training; 5.10 Acceptable Use |
 | Vendor/cloud supplier register | 5.19-5.23 Supplier Relationships (5.23: cloud services) -- `subprocessor-register.rain` / `cloud-environment-register.rain` |
 | Encryption key/cert inventory | 8.24 Use of Cryptography -- `encryption-key-cert-register.rain` covers the inventory |
-| Configuration management / drift detection | 8.9 -- see [`docs/drift-detection.md`](drift-detection.md) |
+| Configuration management / drift detection | 8.9 -- see [`docs/drift-detection-showcase.md`](drift-detection-showcase.md) |
 | Data classification | 5.12/5.13 -- `data-inventory-register.rain` |
 | Vulnerability management | 8.8 -- `poam-tracking-fields.rain` adds remediation-deadline metadata |
 

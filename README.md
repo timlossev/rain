@@ -15,6 +15,8 @@ Alpine images with no Node/SPA toolchain in the browser.
 More screens -- Kanban, live syslog feed, automation rules, the client
 portal, and more -- in [`docs/screenshots/`](docs/screenshots/).
 
+## Sample uses
+
 A few features are walked through end to end, against a live
 instance, in their own primers:
 
@@ -31,6 +33,10 @@ instance, in their own primers:
   Chat Completions API webhook doing Level 0 triage of an incoming
   security alert against a shared playbook document, before a human
   opens the ticket.
+- [`docs/drift-detection-showcase.md`](docs/drift-detection-showcase.md)
+  -- three existing features composed into unattended infrastructure
+  drift detection (SI-7 / CM-8(3)), a real out-of-band change caught
+  and ticketed with no human watching for it.
 
 ## Motivation
 
