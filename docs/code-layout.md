@@ -31,7 +31,10 @@ docs/
   user-guide.md                  -- task-oriented, organized by the app's own sidebar
   itsm-controls-mapping.md        -- the compliance-control analysis behind the project
   eucs-compliance-assessment.md    -- scope-honest assessment of RAIN against EUCS
-  compliance-templates/             -- starter tenant-config-bundle JSON files (Risk Register, Subprocessor Register, PIV/CAC Card issuance, Software License, Cloud Environment, Encryption Key/Certificate, System Interconnection, Contractor Access, Data Inventory, POA&M tracking fields, Nessus finding fields, FedRAMP OCR fields)
+  compliance-templates/             -- starter tenant-config bundles, see its own README for the full list
+    bundles/                          -- .rain config bundles (Admin > Config Bundles import)
+    transforms/                       -- .jq export transforms (Tickets/Assets export's "JSON transform")
+    data/                             -- real register data (.csv, Assets > Import) plus the script that generates it
 ```
 
 ## Backend module map

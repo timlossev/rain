@@ -276,7 +276,7 @@ A `.nessus` file (the plain-XML scan export, not the proprietary
 Nessus DB format) arrives pre-mapped: Info-severity findings are
 dropped before becoming rows; everything else -- Type, Title,
 Description, Severity, Dedup key, and, if
-`docs/compliance-templates/nessus-finding-fields.rain` is imported, the
+`docs/compliance-templates/bundles/nessus-finding-fields.rain` is imported, the
 scanner metadata fields -- is filled in and still reviewable. The
 template is optional; the import creates real, deduped vulnerability
 tickets either way.
@@ -290,7 +290,7 @@ overwritten). A closed match is treated as a regression: reopened,
 flagged Problematic, commented with which import caused it. Leave it
 unmapped for a plain one-time import. See
 [`docs/drift-detection-showcase.md`](drift-detection-showcase.md) for the closest sibling
-pattern, and `docs/compliance-templates/nessus-finding-fields.rain` for
+pattern, and `docs/compliance-templates/bundles/nessus-finding-fields.rain` for
 a ready-made field set.
 
 ### Service Catalog

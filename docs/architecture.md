@@ -616,7 +616,7 @@ that fails to compile or raises at runtime re-renders the export form
 either crashing or silently falling back to the untransformed export.
 
 **OSCAL control-implementation export, as an application of the above.**
-`docs/compliance-templates/security-control-register.rain` (a Security
+`docs/compliance-templates/bundles/security-control-register.rain` (a Security
 Control asset type: Control ID, Statement ID, Control Question,
 Implementation Status, Narrative, Responsible Role, Parameters,
 Remarks) plus
@@ -916,7 +916,7 @@ on (`"nessus"` is just a third case, same as `"json"`). The one thing
 that trick buys beyond "one more accepted format": the parser controls
 its own column names, and it deliberately names them to exactly match
 this importer's own target labels ("Type", "Title", "Dedup key
-(optional)", ...) and nessus-finding-fields.json's own field labels --
+(optional)", ...) and nessus-finding-fields.rain's own field labels --
 so `import_preview`'s existing case-insensitive exact-match
 auto-suggestion (written for arbitrary CSV headers, no changes needed)
 wires up a fully pre-filled mapping screen on its own. A `.nessus`

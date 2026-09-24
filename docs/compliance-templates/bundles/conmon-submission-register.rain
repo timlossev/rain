@@ -1,0 +1,120 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-24T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "ConMon submission register starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "conmon_submission",
+      "name": "ConMon Submission",
+      "icon": null,
+      "description": "One row per monthly Continuous Monitoring package delivered to FedRAMP and authorized agency customers. Each Asset's own \"Name\" field is the submission period (e.g. \"2026-09\").",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "conmon_submission",
+      "field_key": "submitted_date",
+      "label": "Submitted date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "conmon_submission",
+      "field_key": "vulnerability_scan_summary",
+      "label": "Vulnerability scan summary",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "conmon_submission",
+      "field_key": "poam_status_summary",
+      "label": "POA&M status summary",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "conmon_submission",
+      "field_key": "new_findings_count",
+      "label": "New findings this period",
+      "field_type": "number",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "conmon_submission",
+      "field_key": "closed_findings_count",
+      "label": "Closed findings this period",
+      "field_type": "number",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "conmon_submission",
+      "field_key": "deviation_requests",
+      "label": "Deviation requests included",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "conmon_submission",
+      "field_key": "shared_with",
+      "label": "Shared with (agencies/stakeholders)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "conmon_submission",
+      "field_key": "evidence_package_url",
+      "label": "Evidence package location",
+      "field_type": "url",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "conmon_submission",
+      "field_key": "acknowledgment_received",
+      "label": "Acknowledgment received",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 8
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "conmon_submission",
+      "field_key": "status",
+      "label": "Status",
+      "field_type": "select",
+      "select_options": ["Draft", "Submitted", "Acknowledged", "Late"],
+      "is_required": true,
+      "sort_order": 9
+    }
+  ]
+}

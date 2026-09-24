@@ -43,7 +43,10 @@ asset register and exporting it as OSCAL, walked through end to end,
 see [`../oscal-ssp-showcase.md`](../oscal-ssp-showcase.md). For
 FedRAMP's 2026 Consolidated Rules (CR26) explained through a real
 Significant Change Notification on a Change ticket, see
-[`../fedramp-cr26-showcase.md`](../fedramp-cr26-showcase.md).
+[`../fedramp-cr26-showcase.md`](../fedramp-cr26-showcase.md). For
+three more CR26 review areas -- SBOM/software inventory, cryptographic
+module tracking, and Continuous Monitoring submissions -- against real
+data, see [`../cr26-coverage-showcase.md`](../cr26-coverage-showcase.md).
 
 ## Search, portal, admin
 

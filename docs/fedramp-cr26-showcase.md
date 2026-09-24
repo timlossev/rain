@@ -46,7 +46,7 @@ categorized that way, a description, the reason, customer impact, a
 plan and timeline (with milestones), which controls or Key Security
 Indicators the change touches, and a business/security impact
 analysis. That field list is exactly what
-`docs/compliance-templates/fedramp-scn-fields.rain` adds to RAIN's
+`docs/compliance-templates/bundles/fedramp-scn-fields.rain` adds to RAIN's
 Change tickets -- see `docs/compliance-templates/README.md`'s own
 "Significant Change Notification export" section for the mechanics.
 
@@ -69,17 +69,21 @@ different workflow from any other change; it required eleven more
 fields on the same ticket.
 
 Exporting Tickets (Type = change, format JSON, `fedramp-scn-
-export.jq` attached) alongside a second, mostly-blank change ticket
-(`CHG-000002`, to show an incomplete one doesn't break the batch)
-produced, for real, against this exact data:
+export.jq` attached, `certification_package_overview_uri` edited in
+once at the top of the file) alongside a second, mostly-blank change
+ticket (`CHG-000002`, to show an incomplete one doesn't break the
+batch) produced this, captured from the real downloaded file, nothing
+retyped or reconstructed:
 
 ```json
 [
   {
-    "changeDescription": "Bump base image"
+    "changeDescription": "Bump base image",
+    "certificationPackageOverviewUri": "https://acme-corp.example.com/fedramp/certification-package-overview"
   },
   {
     "changeDescription": "Rotated the API signing key pair ahead of scheduled expiry.",
+    "certificationPackageOverviewUri": "https://acme-corp.example.com/fedramp/certification-package-overview",
     "changeType": "Adaptive",
     "changeTypeExplanation": "No new components or trust boundaries introduced.",
     "reason": "Scheduled key rotation per policy.",
@@ -101,17 +105,20 @@ produced, for real, against this exact data:
 ]
 ```
 
-The first object -- `CHG-000002`, the minimal one -- is exactly what
-a change nobody's categorized yet looks like: still exportable,
-missing everything optional, `changeType` absent rather than the
-whole ticket vanishing from the batch (a real bug this transformer
-had until it was fixed and covered by a regression test -- see
-`docs/architecture.md`'s own note on it). The second, once
-`certificationPackageOverviewUri` is filled in (a per-CSP constant,
-edited once at the top of the `.jq` file rather than repeated per
-ticket), validates cleanly against FedRAMP's own published schema --
-checked with the real `jsonschema` library against the real schema
-file, not eyeballed.
+`certificationPackageOverviewUri` lands on *every* object, not just
+the filled-in one -- it's a per-CSP constant the transformer adds
+unconditionally once it's edited in, the same value regardless of
+which ticket it's attached to. The first object -- `CHG-000002`, the
+minimal one -- is exactly what a change nobody's categorized yet
+looks like: still exportable, missing everything optional,
+`changeType` absent rather than the whole ticket vanishing from the
+batch (a real bug this transformer had until it was fixed and covered
+by a regression test -- see `docs/architecture.md`'s own note on it).
+Checked against FedRAMP's own published schema with the real
+`jsonschema` library (fetched live from fedramp.gov, not a cached or
+hand-copied file) -- the first object correctly fails validation
+(`'changeType' is a required property`, exactly what "nobody's
+categorized this yet" should mean), the second validates cleanly.
 
 ## Where this maps and where it doesn't
 
@@ -135,10 +142,10 @@ process this export feeds, not replaces.
 ## Reproducing this
 
 1. Admin > Config Bundles > Tenant > Import:
-   `docs/compliance-templates/fedramp-scn-fields.rain`.
+   `docs/compliance-templates/bundles/fedramp-scn-fields.rain`.
 2. Records Authority > New ticket, type Change, fill in the SCN fields
    alongside the usual title/description/approval flow.
-3. Edit `docs/compliance-templates/fedramp-scn-export.jq`'s own
+3. Edit `docs/compliance-templates/transforms/fedramp-scn-export.jq`'s own
    `certification_package_overview_uri` constant once, then Records
    Authority > Export: Type change, format JSON, attach the edited
    file under "JSON transform (optional)".

@@ -32,11 +32,12 @@ for how far that argument extends to the EU Cybersecurity Certification
 Scheme for Cloud Services. Custom asset types and ticket fields let
 RAIN adapt to any framework's paperwork with no code --
 [`docs/compliance-templates/`](docs/compliance-templates/) ships
-seventeen ready-to-import `.rain` config bundles (a risk register, a
+nineteen ready-to-import `.rain` config bundles (a risk register, a
 Nessus finding-fields set, FedRAMP's 2026 quarterly reporting fields,
 a NIST 800-53 control register with an OSCAL export transformer, a
-Significant Change Notification export, and others) for registers most
-compliance teams would otherwise build by hand.
+Significant Change Notification export, an SBOM/software inventory
+register, a Continuous Monitoring submission register, and others) for
+registers most compliance teams would otherwise build by hand.
 
 Those tickets have to come from somewhere, so RAIN is deliberately
 "bring your own" for detection -- monitoring, SIEM, XDR, antivirus,
@@ -120,6 +121,9 @@ instance, in their own primers:
   -- three existing features composed into unattended infrastructure
   drift detection (SI-7 / CM-8(3)), a real out-of-band change caught
   and ticketed with no human watching for it.
+- [`docs/cr26-coverage-showcase.md`](docs/cr26-coverage-showcase.md) --
+  SBOM/software inventory, cryptographic module tracking, and
+  Continuous Monitoring submissions against real CR26 review areas.
 
 ## Quickstart
 

@@ -51,7 +51,7 @@ anything a ticketing/document/asset system addresses.
 | Business Continuity | Partial | Ticket/document history can evidence a BC exercise happened, including a review-due date on the BC plan itself. RAIN provides no backup, DR, or failover capability. |
 | Organisation of Information Security | Partial | Document repository holds and versions policy; review-due dates and staff acknowledgment are direct evidence of periodic review and attestation. Doesn't define or enforce a security organization. |
 | Risk Management | Partial | A starter Risk Register template (`docs/compliance-templates/`) seeds likelihood/impact/treatment/review-date fields. No dedicated risk-scoring engine. |
-| Cryptography and Key Management | None | RAIN uses TLS and standard at-rest protections for its own data; no key management or HSM integration for a CSP's service. |
+| Cryptography and Key Management | Partial | An Encryption Key/Certificate register (`docs/compliance-templates/`) tracks lifecycle, algorithm, FIPS validation status, and rotation ownership -- the inventory a review samples. RAIN doesn't generate, store, or manage key material, run an HSM, or enforce algorithm policy for a CSP's service; it uses TLS and standard at-rest protections for its own data only. |
 | Physical Security | None | A matter of the CSP's data center controls. |
 | Communication Security | None | RAIN doesn't operate or configure the CSP's network. |
 | Portability and Interoperability | None | Concerns the CSP's cloud service offering, not RAIN. |

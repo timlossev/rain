@@ -42,7 +42,7 @@ commented with which import row caused it.
 fmt="nessus" is the one format that isn't really "the user maps
 arbitrary columns" -- rain.modules.tickets.nessus_parser turns a
 `.nessus` file into rows pre-keyed by this importer's own target labels
-(and by docs/compliance-templates/nessus-finding-fields.json's own
+(and by docs/compliance-templates/bundles/nessus-finding-fields.rain's own
 field labels, if that template's installed), so the existing
 case-insensitive auto-suggestion in rain.modules.tickets.router.
 import_preview wires up a fully pre-filled mapping screen on its own --

@@ -139,7 +139,7 @@ the change by hand first.
 
 ## Starter template
 
-[`docs/compliance-templates/cloud-environment-register.rain`](compliance-templates/cloud-environment-register.rain)
+[`docs/compliance-templates/bundles/cloud-environment-register.rain`](compliance-templates/bundles/cloud-environment-register.rain)
 seeds a Cloud Environment asset type, for tracking which account or
 environment each monitor covers.
 

@@ -190,7 +190,7 @@ a dedicated mechanism instead of relying on judgment:
 - PL-2 (System Security Plan), supporting tier -- a document's
   review-due date is a dedicated field with an overdue flag and
   filter. A stronger claim on the same control: the Security Control
-  asset type (`docs/compliance-templates/security-control-register.rain`)
+  asset type (`docs/compliance-templates/bundles/security-control-register.rain`)
   tracks per-control implementation statements directly, and its own
   jq export transformer (`oscal-control-implementation.jq`) produces
   a machine-readable OSCAL `control-implementation` fragment from
@@ -273,8 +273,23 @@ lowers setup cost, it doesn't change a control's classification here.
   tracks the account/environment this applies to.
 - **SC-12 / SC-13** -- `encryption-key-cert-register.rain` tracks
   lifecycle (issued/expiration, algorithm, issuer, rotation owner,
-  status) of managed keys and certs. Holds no key material, just the
-  inventory a rotation/expiry review needs.
+  status) of managed keys and certs, plus (added 2026-09-24) FIPS
+  validation status, certificate number, and the specific crypto
+  module/library -- the artifact a "which of our crypto modules are
+  FIPS-validated" review actually asks for. Holds no key material,
+  just the inventory a rotation/expiry/validation review needs.
+- **CM-8, with a CR26 Inventory/SBOM assist** --
+  `software-inventory-register.rain` tracks component type, version,
+  source, license, and whether each is in the authorization boundary,
+  one row per in-scope Control Plane component/image/dependency --
+  more specific than the generic CMDB inventory above for a "produce
+  an SBOM" ask specifically.
+- **CA-7 (Continuous Monitoring)** --
+  `conmon-submission-register.rain` tracks one row per monthly ConMon
+  package: scan/POA&M summary, finding counts, who it was shared with,
+  acknowledgment status. Records that the monthly process happened and
+  what went out, same as everything else here; RAIN doesn't run the
+  scan or submit the package itself.
 - **CA-3 (System Interconnections)** --
   `system-interconnection-register.rain` tracks each connection, its
   authorization/review dates, and status; the ISA itself links in as a

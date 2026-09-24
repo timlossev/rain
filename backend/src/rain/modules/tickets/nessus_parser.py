@@ -7,7 +7,7 @@ importer.parse_rows` already returns for CSV/JSON -- one dict per
 `<ReportItem>` (a single finding on a single host/port), keyed exactly by
 this importer's own target labels ("Type", "Title", "Description",
 "Severity", "Dedup key (optional)") and by the field labels
-`docs/compliance-templates/nessus-finding-fields.json` ships ("Nessus
+`docs/compliance-templates/bundles/nessus-finding-fields.rain` ships ("Nessus
 plugin ID", "Scanned host", "Port", ...). That naming discipline is the
 whole trick: `rain.modules.tickets.router.import_preview`'s existing
 case-insensitive exact-label-match auto-suggestion wires every mapping

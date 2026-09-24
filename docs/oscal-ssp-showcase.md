@@ -15,10 +15,10 @@ export" note for how the transformer itself works.
 
 ## 1. Import the baseline as your control register
 
-`docs/compliance-templates/security-control-register.rain` seeds a
+`docs/compliance-templates/bundles/security-control-register.rain` seeds a
 Security Control asset type (Control ID, Statement ID, Control
 Question, Implementation Status, Narrative, Responsible Role,
-Parameters, Remarks). `docs/compliance-templates/nist-800-53-rev5-high.csv`
+Parameters, Remarks). `docs/compliance-templates/data/nist-800-53-rev5-high.csv`
 is the real FedRAMP Rev 5 High baseline, parsed directly from
 [oscal-compass/compliance-trestle-fedramp](https://github.com/oscal-compass/compliance-trestle-fedramp)'s
 own resolved OSCAL catalog XML -- 791 rows: one per FedRAMP
@@ -164,13 +164,13 @@ is exactly that hand-off format.
 ## Reproducing this
 
 1. Admin > Config Bundles > Tenant > Import:
-   `docs/compliance-templates/security-control-register.rain`.
+   `docs/compliance-templates/bundles/security-control-register.rain`.
 2. Assets > Import: asset type Security Control, format CSV,
-   `docs/compliance-templates/nist-800-53-rev5-high.csv` (or `-low`/
+   `docs/compliance-templates/data/nist-800-53-rev5-high.csv` (or `-low`/
    `-moderate` for a smaller baseline).
 3. Answer as many rows as you're ready to -- Assets > (filter to
    Security Control) > Edit each one.
 4. Assets > Export: format JSON, attach
-   `docs/compliance-templates/oscal-control-implementation.jq` as the
+   `docs/compliance-templates/transforms/oscal-control-implementation.jq` as the
    transform (upload it directly, or save it as a `.jq` Document first
    to reuse it on every future export).

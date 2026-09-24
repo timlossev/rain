@@ -79,14 +79,14 @@ def test_output_is_reindented_json_matching_render_json_style():
 
 
 def test_oscal_control_implementation_template():
-    """docs/compliance-templates/oscal-control-implementation.jq, run
+    """docs/compliance-templates/transforms/oscal-control-implementation.jq, run
     against a JSON export shaped like security-control-register.rain's
     own asset type (same column headers a real export produces by
     default) -- exercises the packaged file itself, not a copy of its
     logic, so an edit that breaks it fails CI instead of only being
     caught the next time someone runs it by hand against a live
     tenant."""
-    program = (COMPLIANCE_TEMPLATES_DIR / "oscal-control-implementation.jq").read_text()
+    program = (COMPLIANCE_TEMPLATES_DIR / "transforms" / "oscal-control-implementation.jq").read_text()
     rows = [
         {
             "CI Number": "CI-000042",
@@ -165,7 +165,7 @@ def _scn_row(**overrides):
 
 
 def test_fedramp_scn_template():
-    """docs/compliance-templates/fedramp-scn-export.jq, run against rows
+    """docs/compliance-templates/transforms/fedramp-scn-export.jq, run against rows
     shaped like a Tickets export with fedramp-scn-fields.rain's own
     columns selected. Covers the exact bug caught building this file:
     an optional column left entirely blank (the common case -- most of
@@ -177,7 +177,7 @@ def test_fedramp_scn_template():
     outputs for that *entire* object, not just a missing key -- same
     class of bug oscal-control-implementation.jq's own object
     construction had, independently, in this same session."""
-    program = (COMPLIANCE_TEMPLATES_DIR / "fedramp-scn-export.jq").read_text()
+    program = (COMPLIANCE_TEMPLATES_DIR / "transforms" / "fedramp-scn-export.jq").read_text()
 
     full = _scn_row(
         Description="Rotated the API signing key pair ahead of scheduled expiry.",
@@ -224,7 +224,7 @@ def test_fedramp_scn_certification_package_uri_is_a_constant_to_edit():
     packaged default), the key is omitted rather than emitted as ""
     or null, since an empty string wouldn't satisfy the schema's own
     format:"uri" requirement any better than omitting it would."""
-    program = (COMPLIANCE_TEMPLATES_DIR / "fedramp-scn-export.jq").read_text()
+    program = (COMPLIANCE_TEMPLATES_DIR / "transforms" / "fedramp-scn-export.jq").read_text()
     result = json.loads(apply_jq_filter([_scn_row()], program))
     assert "certificationPackageOverviewUri" not in result[0]
 

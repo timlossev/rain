@@ -1,7 +1,7 @@
 {
   "bundle_type": "rain_tenant_config",
   "bundle_version": 1,
-  "exported_at": "2026-09-02T00:00:00+00:00",
+  "exported_at": "2026-09-24T00:00:00+00:00",
   "source_tenant_slug": "template",
   "source_tenant_name": "Encryption key & certificate register starter template",
   "secrets_included": false,
@@ -105,6 +105,36 @@
       "select_options": ["Active", "Expiring soon", "Expired", "Revoked", "Rotated/retired"],
       "is_required": true,
       "sort_order": 8
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "crypto_asset",
+      "field_key": "fips_validated",
+      "label": "FIPS validation status",
+      "field_type": "select",
+      "select_options": ["Yes - FIPS 140-2", "Yes - FIPS 140-3", "No", "Pending validation", "Not applicable"],
+      "is_required": false,
+      "sort_order": 9
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "crypto_asset",
+      "field_key": "fips_certificate_number",
+      "label": "FIPS certificate number",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 10
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "crypto_asset",
+      "field_key": "crypto_module_name",
+      "label": "Crypto module / library",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 11
     }
   ]
 }

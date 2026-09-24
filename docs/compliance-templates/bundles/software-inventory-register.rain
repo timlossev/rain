@@ -1,0 +1,130 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-24T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "Software inventory (SBOM) register starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "software_component",
+      "name": "Software Component",
+      "icon": null,
+      "description": "One row per in-scope Control Plane software component, container image, package, or dependency -- a Software Bill of Materials (SBOM) register. Each Asset's own \"Name\" field is the component or package name. Distinct from the Software License Register (`software-license-register.rain`), which tracks vendor agreements and renewals, not what's actually running.",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "component_type",
+      "label": "Component type",
+      "field_type": "select",
+      "select_options": ["Application", "Library / dependency", "Container image", "Operating system package", "Firmware", "Other"],
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "version",
+      "label": "Version",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "vendor_or_source",
+      "label": "Vendor / source",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "source_repository_url",
+      "label": "Source repository",
+      "field_type": "url",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "digest_or_hash",
+      "label": "Digest / hash",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "license",
+      "label": "License",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "in_scope",
+      "label": "In authorization boundary",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "last_reviewed_date",
+      "label": "Last reviewed",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "known_vulnerabilities",
+      "label": "Known vulnerabilities (CVE list or reference)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 8
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "parent_component",
+      "label": "Parent component / dependency of",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 9
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "status",
+      "label": "Status",
+      "field_type": "select",
+      "select_options": ["Active", "Deprecated", "Removed", "Under review"],
+      "is_required": true,
+      "sort_order": 10
+    }
+  ]
+}
