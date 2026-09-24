@@ -445,6 +445,7 @@ async def build_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, *, includ
     for w in webhooks:
         entry = {
             "name": w.name,
+            "kind": w.kind,
             "url": w.url,
             "http_method": w.http_method,
             "headers": w.headers if include_secrets else {},
@@ -452,10 +453,19 @@ async def build_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, *, includ
             "timeout_seconds": w.timeout_seconds,
             "success_codes": w.success_codes,
             "alert_on_failure": w.alert_on_failure,
+            "chat_model": w.chat_model,
+            "chat_system_prompt": w.chat_system_prompt,
         }
         if not include_secrets and w.headers:
             entry["headers_redacted"] = True
             warnings.append(f"Webhook '{w.name}': headers redacted -- re-enter them in Admin > Webhooks if it needs one (e.g. Authorization).")
+        # chat_memory_document_id references a specific Document, same
+        # "data, not configuration" reasoning attach_document/attach_asset
+        # actions already skip on below -- not portable across tenants,
+        # so left out of the bundle entirely rather than exported as a
+        # raw id that would mean nothing (or the wrong thing) on import.
+        if w.chat_memory_document_id:
+            warnings.append(f"Webhook '{w.name}': its shared memory document isn't included -- re-pick it in Admin > Webhooks after import.")
         webhooks_out.append(entry)
 
     channels_out = []
@@ -540,12 +550,12 @@ async def build_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, *, includ
                     warnings.append(f"Platform Response Rule '{rule.name}': action '{action.action_type}' -- channel no longer exists, skipped.")
                 else:
                     entry = {"action_type": action.action_type, "channel_name": channel_name}
-            elif action.action_type == "webhook":
+            elif action.action_type in ("webhook", "invoke_chat_completion"):
                 webhook_name = webhook_name_by_id.get(cfg.get("webhook_id"))
                 if webhook_name is None:
-                    warnings.append(f"Platform Response Rule '{rule.name}': action 'webhook' -- webhook no longer exists, skipped.")
+                    warnings.append(f"Platform Response Rule '{rule.name}': action '{action.action_type}' -- webhook no longer exists, skipped.")
                 else:
-                    entry = {"action_type": "webhook", "webhook_name": webhook_name}
+                    entry = {"action_type": action.action_type, "webhook_name": webhook_name}
             elif action.action_type in ("attach_document", "attach_asset"):
                 what = "document" if action.action_type == "attach_document" else "asset"
                 warnings.append(
@@ -798,6 +808,7 @@ async def apply_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, data: dic
             "name",
             entry["name"],
             {
+                "kind": entry.get("kind", "generic"),
                 "url": entry.get("url", ""),
                 "http_method": entry.get("http_method", "POST"),
                 "headers": entry.get("headers") or {},
@@ -805,6 +816,8 @@ async def apply_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, data: dic
                 "timeout_seconds": entry.get("timeout_seconds", 10),
                 "success_codes": entry.get("success_codes", "200,201,202,204"),
                 "alert_on_failure": entry.get("alert_on_failure", False),
+                "chat_model": entry.get("chat_model"),
+                "chat_system_prompt": entry.get("chat_system_prompt"),
             },
         )
         webhook_id_by_name[entry["name"]] = row.id
@@ -942,11 +955,11 @@ async def apply_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, data: dic
                     )
                     continue
                 config = {"channel_id": channel_id}
-            elif action_type == "webhook":
+            elif action_type in ("webhook", "invoke_chat_completion"):
                 webhook_id = webhook_id_by_name.get(action.get("webhook_name"))
                 if webhook_id is None:
                     result.warnings.append(
-                        f"Platform Response Rule '{entry['name']}': action 'webhook' references webhook "
+                        f"Platform Response Rule '{entry['name']}': action '{action_type}' references webhook "
                         f"'{action.get('webhook_name')}', not found here -- skipped."
                     )
                     continue

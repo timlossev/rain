@@ -42,6 +42,7 @@ from rain.db.provisioning import InvalidSlugError, provision_tenant
 from rain.db.tenant_models import (
     ApprovalFlow,
     ApprovalFlowStep,
+    Document,
     Group,
     GroupMembership,
     NotificationChannel,
@@ -1675,6 +1676,7 @@ async def webhooks_new_form(
 @router.post("/webhooks")
 async def webhooks_create(
     name: str = Form(...),
+    kind: str = Form("generic"),
     url: str = Form(...),
     http_method: str = Form("POST"),
     headers_text: str = Form(""),
@@ -1682,6 +1684,9 @@ async def webhooks_create(
     timeout_seconds: int = Form(10),
     success_codes: str = Form("200,201,202,204"),
     alert_on_failure: bool = Form(False),
+    chat_model: str = Form(""),
+    chat_system_prompt: str = Form(""),
+    chat_memory_document_id: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
@@ -1696,16 +1701,25 @@ async def webhooks_create(
         return RedirectResponse(
             f"/admin/webhooks/new?error={quote(f'URL rejected: {unsafe_reason}')}", status_code=status.HTTP_303_SEE_OTHER
         )
+    kind = kind if kind in ("generic", "chat_completions") else "generic"
     await webhook_service.create_webhook(
         tenant_db,
         name=name.strip(),
+        kind=kind,
         url=url.strip(),
-        http_method=http_method,
+        # A Chat Completions API call is always a POST -- the form hides
+        # this field for that kind rather than asking, so whatever came
+        # through (unset, or a stale value from switching kinds client-
+        # side) is overridden here instead of trusted.
+        http_method="POST" if kind == "chat_completions" else http_method,
         headers=webhook_service.parse_headers_text(headers_text),
         payload_template=payload_template or "{}",
         timeout_seconds=max(1, timeout_seconds),
         success_codes=success_codes.strip() or "200,201,202,204",
         alert_on_failure=alert_on_failure,
+        chat_model=chat_model.strip() or None,
+        chat_system_prompt=chat_system_prompt.strip() or None,
+        chat_memory_document_id=int(chat_memory_document_id) if chat_memory_document_id else None,
         created_by=ctx.user.id,
     )
     return RedirectResponse("/admin/webhooks", status_code=status.HTTP_303_SEE_OTHER)
@@ -1723,10 +1737,19 @@ async def webhooks_edit_form(
     webhook = await webhook_service.get_webhook(tenant_db, webhook_id)
     if webhook is None:
         return RedirectResponse("/admin/webhooks", status_code=status.HTTP_303_SEE_OTHER)
+    memory_document = (
+        await tenant_db.get(Document, webhook.chat_memory_document_id) if webhook.chat_memory_document_id else None
+    )
     return templates.TemplateResponse(
         request,
         "admin/webhook_form.html",
-        {**nav, "ctx": ctx, "webhook": webhook, "headers_text": webhook_service.format_headers_text(webhook.headers)},
+        {
+            **nav,
+            "ctx": ctx,
+            "webhook": webhook,
+            "headers_text": webhook_service.format_headers_text(webhook.headers),
+            "memory_document_label": f"{memory_document.doc_number}: {memory_document.title}" if memory_document else "",
+        },
     )
 
 
@@ -1734,6 +1757,7 @@ async def webhooks_edit_form(
 async def webhooks_edit(
     webhook_id: int,
     name: str = Form(...),
+    kind: str = Form("generic"),
     url: str = Form(...),
     http_method: str = Form("POST"),
     headers_text: str = Form(""),
@@ -1741,6 +1765,9 @@ async def webhooks_edit(
     timeout_seconds: int = Form(10),
     success_codes: str = Form("200,201,202,204"),
     alert_on_failure: bool = Form(False),
+    chat_model: str = Form(""),
+    chat_system_prompt: str = Form(""),
+    chat_memory_document_id: str = Form(""),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
@@ -1750,19 +1777,24 @@ async def webhooks_edit(
             f"/admin/webhooks/{webhook_id}/edit?error={quote(f'URL rejected: {unsafe_reason}')}",
             status_code=status.HTTP_303_SEE_OTHER,
         )
+    kind = kind if kind in ("generic", "chat_completions") else "generic"
     webhook = await webhook_service.get_webhook(tenant_db, webhook_id)
     if webhook is not None:
         await webhook_service.update_webhook(
             tenant_db,
             webhook,
             name=name.strip(),
+            kind=kind,
             url=url.strip(),
-            http_method=http_method,
+            http_method="POST" if kind == "chat_completions" else http_method,
             headers=webhook_service.parse_headers_text(headers_text),
             payload_template=payload_template or "{}",
             timeout_seconds=max(1, timeout_seconds),
             success_codes=success_codes.strip() or "200,201,202,204",
             alert_on_failure=alert_on_failure,
+            chat_model=chat_model.strip() or None,
+            chat_system_prompt=chat_system_prompt.strip() or None,
+            chat_memory_document_id=int(chat_memory_document_id) if chat_memory_document_id else None,
         )
     return RedirectResponse("/admin/webhooks", status_code=status.HTTP_303_SEE_OTHER)
 

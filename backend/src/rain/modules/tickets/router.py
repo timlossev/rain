@@ -1893,7 +1893,7 @@ async def platform_event_detail(
         cfg = dict(a.config or {})
         if a.action_type in ("notify_slack", "notify_email"):
             cfg["channel_label"] = channel_names.get(cfg.get("channel_id"), "")
-        elif a.action_type == "webhook":
+        elif a.action_type in ("webhook", "invoke_chat_completion"):
             cfg["webhook_label"] = webhook_names.get(cfg.get("webhook_id"), "")
         elif a.action_type == "attach_document":
             cfg["document_label"] = document_labels.get(cfg.get("document_id"), "")
@@ -1961,7 +1961,7 @@ def _build_action_config(action_type: str, form) -> dict:
     if action_type in ("notify_slack", "notify_email"):
         channel_id = form.get("channel_id")
         return {"channel_id": int(channel_id)} if channel_id else {}
-    if action_type == "webhook":
+    if action_type in ("webhook", "invoke_chat_completion"):
         webhook_id = form.get("webhook_config_id")
         return {"webhook_id": int(webhook_id)} if webhook_id else {}
     if action_type == "attach_document":

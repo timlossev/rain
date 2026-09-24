@@ -442,6 +442,79 @@ async def test_platform_event_rule_fires_matching_actions_only():
         assert len(field_changes) == 1
 
 
+async def test_invoke_chat_completion_action_posts_reply_as_first_comment(monkeypatch):
+    """The "Invoke Chat Completions API" Platform Response Rule action end
+    to end: fired on incident_created (the trigger a real "initial triage"
+    rule would use), webhook_service.call_chat_completion monkeypatched
+    the same way call_webhook already is in test_escalate_ticket_captures_
+    webhook_response_as_comment -- this is exercising _run_action's own
+    dispatch and comment-posting, not the HTTP client or a real LLM.
+    Also covers the one validation this action has that plain "webhook"
+    doesn't: a config referencing a kind="generic" webhook is rejected,
+    not silently run against the wrong contract."""
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import PlatformEventAction, PlatformEventRule, PlatformEventTrigger, TicketComment, WebhookConfig
+    from rain.modules.tickets import service
+    from rain.modules.webhooks import service as webhook_service
+
+    tenant = await provision_tenant(slug="theta", name="Theta LLC")
+
+    async with tenant_session(tenant.schema_name) as session:
+        chat_webhook = WebhookConfig(
+            name="Triage assistant", kind="chat_completions", url="https://api.openai.com/v1/chat/completions",
+            chat_model="gpt-4o-mini", chat_system_prompt="Triage this incident in two sentences.",
+        )
+        generic_webhook = WebhookConfig(name="Ops relay", kind="generic", url="https://example.com/hook")
+        session.add_all([chat_webhook, generic_webhook])
+        await session.flush()
+
+        triage_rule = PlatformEventRule(name="AI triage", trigger_event="incident_created", match_field="title", pattern="outage")
+        triage_rule.actions.append(PlatformEventAction(action_type="invoke_chat_completion", config={"webhook_id": chat_webhook.id}))
+        session.add(triage_rule)
+
+        misconfigured_rule = PlatformEventRule(
+            name="Misconfigured triage", trigger_event="incident_created", match_field="title", pattern="outage", sort_order=1
+        )
+        misconfigured_rule.actions.append(
+            PlatformEventAction(action_type="invoke_chat_completion", config={"webhook_id": generic_webhook.id})
+        )
+        session.add(misconfigured_rule)
+        await session.commit()
+
+        async def fake_call_chat_completion(db, config, ticket):
+            assert config.id == chat_webhook.id  # never reached for the generic webhook -- rejected before calling this
+            return webhook_service.ChatCompletionResult(
+                status_code=200, success=True,
+                reply="Likely a regional network partition; on-call has been the fastest path to resolution before.",
+            )
+
+        monkeypatch.setattr(webhook_service, "call_chat_completion", fake_call_chat_completion)
+
+        ticket = await service.create_ticket(session, ticket_type="incident", title="us-east outage", description=None)
+
+        reloaded = await service.get_ticket(session, ticket.id)
+        assert reloaded is not None
+        assert len(reloaded.comments) == 1
+        comment = reloaded.comments[0]
+        assert comment.author_user_id is None  # a system comment, same as analyze_root_cause's own
+        assert comment.body == "Likely a regional network partition; on-call has been the fastest path to resolution before."
+
+        triggers = {
+            t.rule_name: t.summary
+            for t in (
+                await session.execute(select(PlatformEventTrigger).where(PlatformEventTrigger.ticket_id == ticket.id))
+            ).scalars()
+        }
+        assert "posted a comment via Triage assistant" in triggers["AI triage"]
+        assert "isn't a Chat Completions API webhook" in triggers["Misconfigured triage"]
+
+        comment_count = (
+            await session.execute(select(TicketComment).where(TicketComment.ticket_id == ticket.id))
+        ).scalars().all()
+        assert len(comment_count) == 1  # the misconfigured rule's rejection never posted a second comment
+
+
 async def test_escalate_ticket_captures_webhook_response_as_comment(monkeypatch):
     """rain.modules.tickets.service.escalate_ticket: both log lines it's
     documented to produce (the terse field-change entry, unchanged from

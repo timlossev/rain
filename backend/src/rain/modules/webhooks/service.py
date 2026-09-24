@@ -2,7 +2,16 @@
 WebhookConfig definition, called from anywhere that needs to fire a
 webhook -- Platform Response Rules' "webhook" action and a Document's
 "populate from webhook" setting are the two callers today -- instead of
-each place inlining its own URL/headers/payload/timeout handling."""
+each place inlining its own URL/headers/payload/timeout handling.
+
+call_chat_completion (kind="chat_completions" only) is a second,
+separate call path rather than a branch inside call_webhook -- the
+request/response shape isn't a user-authored template, it's the fixed
+{model, messages: [...]} -> {choices: [{message: {content}}]} contract
+every OpenAI-compatible Chat Completions API (OpenAI itself, Gemini's
+own compatibility endpoint, ...) already speaks, so there's nothing
+call_webhook's own payload_template/raw-body-passthrough logic would
+add here."""
 from __future__ import annotations
 
 import json
@@ -12,9 +21,10 @@ from dataclasses import dataclass
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from rain.core.url_safety import check_outbound_url
-from rain.db.tenant_models import SyslogEvent, WebhookConfig
+from rain.db.tenant_models import SyslogEvent, Ticket, TicketFieldValue, WebhookConfig
 from rain.modules.tickets import rules as ticket_rules
 
 logger = logging.getLogger("rain.webhooks")
@@ -126,6 +136,111 @@ async def alert_webhook_failure(db: AsyncSession, webhook: WebhookConfig, result
     await ticket_rules.evaluate_and_promote(db, event)
 
 
+@dataclass
+class ChatCompletionResult:
+    status_code: int | None
+    success: bool
+    reply: str
+    error: str | None = None
+
+
+def _ticket_payload_text(ticket: Ticket) -> str:
+    """The "user" message content for a chat-completions call -- plain
+    readable text (not JSON: this is going to a language model, which
+    reads prose at least as well as a data structure, and prose doesn't
+    need a schema the model has to guess isn't there) covering
+    everything about the ticket a human triaging it would look at
+    first: the fixed fields, its asset if linked, and every tenant
+    custom field value."""
+    lines = [
+        f"Ticket: {ticket.ticket_number}",
+        f"Type: {ticket.ticket_type}",
+        f"Title: {ticket.title}",
+        f"Severity: {ticket.severity}",
+        f"Status: {ticket.status}",
+    ]
+    if ticket.asset is not None:
+        lines.append(f"Asset: {ticket.asset.name}")
+    lines.append("")
+    lines.append("Description:")
+    lines.append(ticket.description or "(none)")
+    field_values = [fv for fv in ticket.field_values if fv.field is not None]
+    if field_values:
+        lines.append("")
+        lines.append("Custom fields:")
+        lines.extend(f"- {fv.field.label}: {fv.value}" for fv in field_values)
+    return "\n".join(lines)
+
+
+async def call_chat_completion(db: AsyncSession, config: WebhookConfig, ticket: Ticket) -> ChatCompletionResult:
+    """kind="chat_completions" only. Builds the system message from
+    chat_system_prompt and/or chat_memory_document_id's own text (the
+    "shared project memory / client-wide context" -- read the same way
+    the jq-transform ruleset picker already reads a Document, plain
+    text regardless of body_kind), the user message from the calling
+    ticket's own content, POSTs {model, messages} to config.url, and
+    pulls the reply out of the standard choices[0].message.content
+    shape every OpenAI-compatible provider returns it in. Never raises,
+    same contract as call_webhook -- a caller (a Platform Response Rule
+    action, today the only one) treats a failure as a logged/reported
+    outcome, not something to propagate."""
+    from rain.modules.documents import service as document_service  # deferred: documents.service imports this module
+
+    unsafe_reason = await check_outbound_url(config.url)
+    if unsafe_reason is not None:
+        logger.warning("chat completions webhook '%s' blocked -- %s", config.name, unsafe_reason)
+        return ChatCompletionResult(status_code=None, success=False, reply="", error=unsafe_reason)
+
+    stmt = (
+        select(Ticket)
+        .where(Ticket.id == ticket.id)
+        .options(selectinload(Ticket.asset), selectinload(Ticket.field_values).selectinload(TicketFieldValue.field))
+    )
+    full_ticket = (await db.execute(stmt)).scalar_one_or_none() or ticket
+
+    system_parts = [config.chat_system_prompt.strip()] if config.chat_system_prompt else []
+    if config.chat_memory_document_id:
+        memory_text = await document_service.get_document_text_body(db, config.chat_memory_document_id)
+        if memory_text:
+            system_parts.append(memory_text.strip())
+    system_content = "\n\n".join(system_parts) or "You are a helpful IT service management assistant."
+
+    body = {
+        "model": config.chat_model or "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": _ticket_payload_text(full_ticket)},
+        ],
+    }
+    headers = dict(config.headers or {})
+    headers.setdefault("Content-Type", "application/json")
+    success_codes = _parse_success_codes(config.success_codes)
+
+    try:
+        async with httpx.AsyncClient(timeout=config.timeout_seconds or 10) as client:
+            resp = await client.post(config.url, headers=headers, json=body)
+    except httpx.HTTPError as exc:
+        logger.warning("chat completions webhook '%s' call failed -- %s", config.name, exc)
+        return ChatCompletionResult(status_code=None, success=False, reply="", error=str(exc))
+
+    if resp.status_code not in success_codes:
+        logger.warning("chat completions webhook '%s' returned HTTP %s", config.name, resp.status_code)
+        return ChatCompletionResult(
+            status_code=resp.status_code, success=False, reply="", error=f"HTTP {resp.status_code}: {resp.text[:500]}"
+        )
+
+    try:
+        reply = resp.json()["choices"][0]["message"]["content"]
+    except (ValueError, KeyError, IndexError, TypeError) as exc:
+        logger.warning("chat completions webhook '%s' returned an unparseable response -- %s", config.name, exc)
+        return ChatCompletionResult(
+            status_code=resp.status_code, success=False, reply="", error=f"unparseable response: {exc}"
+        )
+
+    logger.info("chat completions webhook '%s' called -- HTTP %s", config.name, resp.status_code)
+    return ChatCompletionResult(status_code=resp.status_code, success=True, reply=reply.strip())
+
+
 async def get_webhook(db: AsyncSession, webhook_id: int) -> WebhookConfig | None:
     return await db.get(WebhookConfig, webhook_id)
 
@@ -150,6 +265,7 @@ async def create_webhook(
     db: AsyncSession,
     *,
     name: str,
+    kind: str = "generic",
     url: str,
     http_method: str,
     headers: dict,
@@ -157,10 +273,14 @@ async def create_webhook(
     timeout_seconds: int,
     success_codes: str,
     alert_on_failure: bool = False,
+    chat_model: str | None = None,
+    chat_system_prompt: str | None = None,
+    chat_memory_document_id: int | None = None,
     created_by: int | None,
 ) -> WebhookConfig:
     webhook = WebhookConfig(
         name=name,
+        kind=kind,
         url=url,
         http_method=http_method,
         headers=headers,
@@ -168,6 +288,9 @@ async def create_webhook(
         timeout_seconds=timeout_seconds,
         success_codes=success_codes,
         alert_on_failure=alert_on_failure,
+        chat_model=chat_model,
+        chat_system_prompt=chat_system_prompt,
+        chat_memory_document_id=chat_memory_document_id,
         created_by=created_by,
     )
     db.add(webhook)
@@ -180,6 +303,7 @@ async def update_webhook(
     webhook: WebhookConfig,
     *,
     name: str,
+    kind: str = "generic",
     url: str,
     http_method: str,
     headers: dict,
@@ -187,8 +311,12 @@ async def update_webhook(
     timeout_seconds: int,
     success_codes: str,
     alert_on_failure: bool = False,
+    chat_model: str | None = None,
+    chat_system_prompt: str | None = None,
+    chat_memory_document_id: int | None = None,
 ) -> None:
     webhook.name = name
+    webhook.kind = kind
     webhook.url = url
     webhook.http_method = http_method
     webhook.headers = headers
@@ -196,6 +324,9 @@ async def update_webhook(
     webhook.timeout_seconds = timeout_seconds
     webhook.success_codes = success_codes
     webhook.alert_on_failure = alert_on_failure
+    webhook.chat_model = chat_model
+    webhook.chat_system_prompt = chat_system_prompt
+    webhook.chat_memory_document_id = chat_memory_document_id
     await db.commit()
 
 

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_pagination.html" as pg with context %}
 {% block title %}Webhooks - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Centrally-configured outbound webhooks - one definition here, reused wherever a webhook call is needed: a Platform Response Rule's "webhook" action, or a Document's "populate from webhook" setting.{% endblock %}
+{% block help_text %}Centrally-configured outbound webhooks - one definition here, reused wherever a webhook call is needed: a Platform Response Rule's "webhook"/"Invoke Chat Completions API" action, or a Document's "populate from webhook" setting.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <a class="btn btn-primary" href="/admin/webhooks/new">+ New webhook</a>
@@ -9,12 +9,18 @@
 
 <div class="card">
   <table>
-    <thead><tr><th>Name</th><th>Method</th><th>URL</th><th>Timeout</th><th>Success codes</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Kind</th><th>URL</th><th>Timeout</th><th>Success codes</th><th></th></tr></thead>
     <tbody>
       {% for w in page.items %}
       <tr>
         <td>{{ w.name }}</td>
-        <td><span class="badge">{{ w.http_method }}</span></td>
+        <td>
+          {% if w.kind == "chat_completions" %}
+          <span class="badge badge-accent">Chat Completions{% if w.chat_model %}: {{ w.chat_model }}{% endif %}</span>
+          {% else %}
+          <span class="badge">{{ w.http_method }}</span>
+          {% endif %}
+        </td>
         <td class="muted" style="max-width:360px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ w.url }}</td>
         <td class="muted">{{ w.timeout_seconds }}s</td>
         <td class="muted">{{ w.success_codes }}</td>

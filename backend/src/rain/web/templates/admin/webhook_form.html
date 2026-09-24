@@ -1,19 +1,47 @@
 {% extends "base.html" %}
+{% import "_search_picker.html" as picker %}
 {% block title %}{{ "Edit" if webhook else "New" }} Webhook - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}{% raw %}Define an outbound webhook once, then reference it by name wherever a webhook call is needed. The payload template is ignored for GET (no body). Placeholders available depend on the caller: a Platform Response Rule's "Call a webhook"/"Notify Slack"/"Notify Email" action, and the ticket detail page's "Escalate" button, all fill in {{ticket_number}}, {{ticket_type}}, {{title}}, {{description}}, {{severity}}, and {{status}} from the ticket that triggered the call - double braces, JSON-escaped automatically. The one document-based Platform Response Rule trigger, "When a document is pending your acknowledgment", fills in {{doc_number}}, {{title}}, and {{description}} from the document instead. A document's "Refresh from webhook" (and the calendar's matching auto-update policy) calls with no placeholders at all, so a payload template used there should be static.{% endraw %}{% endblock %}
+{% block help_text %}{% raw %}Define an outbound webhook once, then reference it by name wherever a webhook call is needed. A "Generic" webhook posts a JSON payload template you write; the payload template is ignored for GET (no body). Placeholders available depend on the caller: a Platform Response Rule's "Call a webhook"/"Notify Slack"/"Notify Email" action, and the ticket detail page's "Escalate" button, all fill in {{ticket_number}}, {{ticket_type}}, {{title}}, {{description}}, {{severity}}, and {{status}} from the ticket that triggered the call - double braces, JSON-escaped automatically. The one document-based Platform Response Rule trigger, "When a document is pending your acknowledgment", fills in {{doc_number}}, {{title}}, and {{description}} from the document instead. A document's "Refresh from webhook" (and the calendar's matching auto-update policy) calls with no placeholders at all, so a payload template used there should be static. A "Chat Completions API" webhook is different: instead of a payload template, it calls an OpenAI-compatible endpoint (OpenAI itself, Gemini's own compatibility endpoint, or anything else speaking the same {model, messages} shape) with a system message built from your own prompt and/or a linked document's text, and a user message built from whichever ticket a Platform Response Rule's "Invoke Chat Completions API" action ran it against - the reply comes back as a new comment on that ticket.{% endraw %}{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <a class="btn btn-sm" href="/admin/webhooks">&larr; All webhooks</a>
 </div>
 
-<div class="card" style="max-width:720px;">
+<div class="card">
   <form method="post" action="{{ '/admin/webhooks/' ~ webhook.id ~ '/edit' if webhook else '/admin/webhooks' }}">
     <div class="form-row">
       <div class="field">
         <label for="name">Name</label>
         <input type="text" id="name" name="name" value="{{ webhook.name if webhook else '' }}" placeholder="Ops ticket relay" required autofocus>
       </div>
-      <div class="field field-w140">
+      <div class="field">
+        <label for="kind">Kind</label>
+        <select id="kind" name="kind" data-action-type-select {% if webhook %}disabled{% endif %}>
+          <option value="generic" {% if not webhook or webhook.kind == "generic" %}selected{% endif %}>Generic</option>
+          <option value="chat_completions" {% if webhook and webhook.kind == "chat_completions" %}selected{% endif %}>Chat Completions API (OpenAI, Gemini, ...)</option>
+        </select>
+        {% if webhook %}
+        {# A <select disabled> doesn't submit its value at all -- this
+           hidden twin carries it instead. Kind isn't editable in place
+           for the same reason a Platform Response Rule action's own
+           type isn't (see that page's own JS comment): switching it
+           would leave the other kind's now-irrelevant fields (a
+           payload_template, or a model/prompt/memory doc) stranded in
+           the row rather than cleared, silently wrong the next time
+           this webhook's actually called. Delete and recreate instead. #}
+        <input type="hidden" name="kind" value="{{ webhook.kind }}">
+        <div class="field-hint">Kind can't be changed after creation - delete and recreate this webhook to switch it.</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="field">
+      <label for="url">URL</label>
+      <input type="text" id="url" name="url" value="{{ webhook.url if webhook else '' }}" placeholder="https://example.com/hook" required>
+      <div class="field-hint" data-action-fields="generic">The hostname must resolve via DNS from this server before you can save - a name that doesn't exist yet (or a typo) is rejected with "URL rejected: could not resolve host ...". A private/internal address (10.x, 172.16-31.x, 192.168.x) is fine, RAIN is built to reach a tenant's own network; only loopback and link-local addresses (which would reach this app itself, or a cloud metadata endpoint) are ever blocked.</div>
+      <div class="field-hint" data-action-fields="chat_completions">The provider's Chat Completions endpoint, e.g. <code>https://api.openai.com/v1/chat/completions</code> or Gemini's own OpenAI-compatible <code>https://generativelanguage.googleapis.com/v1beta/openai/chat/completions</code>. Always called as a POST.</div>
+    </div>
+    <div class="form-row">
+      <div class="field field-w160" data-action-fields="generic">
         <label for="http_method">Method</label>
         <select id="http_method" name="http_method">
           {% for m in ["POST", "GET", "PUT", "PATCH"] %}
@@ -21,32 +49,42 @@
           {% endfor %}
         </select>
       </div>
-    </div>
-    <div class="field">
-      <label for="url">URL</label>
-      <input type="text" id="url" name="url" value="{{ webhook.url if webhook else '' }}" placeholder="https://example.com/hook" required>
-      <div class="field-hint">The hostname must resolve via DNS from this server before you can save - a name that doesn't exist yet (or a typo) is rejected with "URL rejected: could not resolve host ...". A private/internal address (10.x, 172.16-31.x, 192.168.x) is fine, RAIN is built to reach a tenant's own network; only loopback and link-local addresses (which would reach this app itself, or a cloud metadata endpoint) are ever blocked.</div>
-    </div>
-    <div class="form-row">
-      <div class="field field-w160">
-        <label for="timeout_seconds">Timeout (seconds)</label>
-        <input type="number" id="timeout_seconds" name="timeout_seconds" min="1" value="{{ webhook.timeout_seconds if webhook else 10 }}">
-      </div>
       <div class="field">
         <label for="success_codes">Success codes</label>
         <input type="text" id="success_codes" name="success_codes" value="{{ webhook.success_codes if webhook else '200,201,202,204' }}" placeholder="200,201,202,204">
         <div class="field-hint">Comma-separated HTTP status codes treated as success; anything else counts as a failed call.</div>
       </div>
+      <div class="field field-w160">
+        <label for="timeout_seconds">Timeout (seconds)</label>
+        <input type="number" id="timeout_seconds" name="timeout_seconds" min="1" value="{{ webhook.timeout_seconds if webhook else 10 }}">
+        <div class="field-hint" data-action-fields="chat_completions">Chat completions usually take longer than a typical webhook receiver.</div>
+      </div>
     </div>
     <div class="field">
       <label for="headers_text">Headers</label>
       <textarea id="headers_text" name="headers_text" rows="3" placeholder="Authorization: Bearer ...&#10;X-Custom-Header: value">{{ headers_text if webhook else '' }}</textarea>
-      <div class="field-hint">One per line, "Name: value".</div>
+      <div class="field-hint" data-action-fields="generic">One per line, "Name: value".</div>
+      <div class="field-hint" data-action-fields="chat_completions">One per line, "Name: value" - this is where the provider's own API key goes, e.g. <code>Authorization: Bearer sk-...</code>.</div>
     </div>
-    <div class="field">
+    <div class="field" data-action-fields="generic">
       <label for="payload_template">Payload template (JSON, ignored for GET)</label>
       <textarea id="payload_template" name="payload_template" rows="5" placeholder="{% raw %}{&quot;text&quot;: &quot;{{ticket_number}}: {{title}}&quot;}{% endraw %}">{{ webhook.payload_template if webhook else '{}' }}</textarea>
     </div>
+
+    <div data-action-fields="chat_completions">
+      <div class="field">
+        <label for="chat_model">Model</label>
+        <input type="text" id="chat_model" name="chat_model" value="{{ webhook.chat_model if webhook else '' }}" placeholder="gpt-4o-mini, gemini-1.5-flash, ...">
+      </div>
+      <div class="field">
+        <label for="chat_system_prompt">Custom prompt</label>
+        <textarea id="chat_system_prompt" name="chat_system_prompt" rows="5" placeholder="You are triaging incoming IT service tickets. Summarize the issue, suggest a likely cause, and flag anything that looks urgent.">{{ webhook.chat_system_prompt if webhook else '' }}</textarea>
+        <div class="field-hint">Sent as the system message, ahead of the ticket's own content. Optional if a shared memory document below already covers it - at least one of the two should be set.</div>
+      </div>
+      {{ picker.search_picker("chat_memory_document_id", "/documents/search", label="Shared project memory (optional)", initial_value=webhook.chat_memory_document_id if webhook else none, initial_label=memory_document_label|default(''), placeholder="Search documents...") }}
+      <div class="field-hint">A document's full text is read in and appended to the system message, alongside the custom prompt above - shared project memory or client-wide context every call to this webhook should have. Any document works, typed or uploaded; a plain text or Markdown one round-trips most legibly.</div>
+    </div>
+
     <div class="field">
       <label class="checkbox-row"><input type="checkbox" name="alert_on_failure" {% if webhook and webhook.alert_on_failure %}checked{% endif %}> Emit syslog alert when this webhook fails or times out</label>
       <div class="field-hint">Applies wherever this webhook is called from (Platform Response Rule action, document refresh). Off by default.</div>

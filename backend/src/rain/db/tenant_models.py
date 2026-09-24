@@ -851,12 +851,30 @@ class WebhookConfig(TenantBase):
     "populate from webhook" setting. payload_template uses the same
     double-brace ({{key}}) placeholder substitution either caller fills
     in with its own context (ticket fields, or nothing, for a document
-    refresh) -- it's ignored for GET, which has no body."""
+    refresh) -- it's ignored for GET, which has no body.
+
+    `kind` ("generic" | "chat_completions") switches what the rest of
+    this row means, rather than adding a second model -- url/headers/
+    timeout_seconds/success_codes/alert_on_failure stay meaningful
+    either way (an LLM chat-completions endpoint is still just an HTTP
+    POST with an Authorization header, using the exact same `headers`
+    JSONB this already had), only what goes in the *body* differs.
+    A "generic" webhook's body is payload_template, filled in by the
+    caller's own placeholders. A "chat_completions" webhook has no
+    user-authored JSON at all -- chat_model/chat_system_prompt/
+    chat_memory_document_id below are assembled into the {model,
+    messages: [...]} shape every OpenAI-compatible Chat Completions API
+    (OpenAI, Gemini's own compatibility endpoint, ...) expects, by
+    rain.modules.webhooks.service.call_chat_completion, with the
+    calling ticket's own content as the user message -- see that
+    function's docstring. payload_template is simply ignored for this
+    kind, same as it already is for a GET request on the generic kind."""
 
     __tablename__ = "webhook_configs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
+    kind: Mapped[str] = mapped_column(String(20), default="generic", server_default="generic")
     url: Mapped[str] = mapped_column(String(2048))
     http_method: Mapped[str] = mapped_column(String(10), default="POST", server_default="POST")
     headers: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
@@ -871,6 +889,21 @@ class WebhookConfig(TenantBase):
     # out, from either caller -- off by default so a webhook that's
     # expected to occasionally error doesn't become noisy on its own.
     alert_on_failure: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # kind="chat_completions" only, all optional (a bare call with just a
+    # model and no prompt/memory is still valid -- the ticket's own
+    # content is the one thing call_chat_completion always sends).
+    chat_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    chat_system_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The "shared project memory / client-wide context" document -- any
+    # Document, read as plain text the same way the jq-transform picker
+    # already reads one (rain.modules.documents.service.
+    # get_document_text_body), not restricted to a particular body_kind.
+    # SET NULL on delete rather than blocking it or cascading: a memory
+    # document going away shouldn't take the webhook config down with it,
+    # it should just fall back to chat_system_prompt alone next call.
+    chat_memory_document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+    )
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -1010,7 +1043,12 @@ class Document(TenantBase):
         embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
 
     links: Mapped[list["DocumentLink"]] = relationship(back_populates="document", cascade="all, delete-orphan")
-    webhook: Mapped["WebhookConfig | None"] = relationship()
+    # foreign_keys explicit since WebhookConfig.chat_memory_document_id
+    # added a second FK path between these two tables (the reverse
+    # direction -- a chat-completions webhook's own "shared memory"
+    # document) -- SQLAlchemy can no longer auto-detect which column
+    # this relationship means without it.
+    webhook: Mapped["WebhookConfig | None"] = relationship(foreign_keys=[webhook_id])
 
 
 class DocumentLink(TenantBase):
@@ -1176,13 +1214,15 @@ class PlatformEventAction(TenantBase):
     """One action a PlatformEventRule fires on match. `config` shape depends
     on action_type:
       notify_slack / notify_email -> {"channel_id": <NotificationChannel.id>}
-      webhook                     -> {"url": str, "payload_template": str}
+      webhook                     -> {"webhook_id": <WebhookConfig.id>}
+      invoke_chat_completion      -> {"webhook_id": <WebhookConfig.id, kind="chat_completions">}
       attach_document              -> {"document_id": int}
       attach_asset                 -> {"asset_id": int}
       mark_problematic              -> {} (no config)
       add_watcher                    -> {"email": str} or {"user_id": int} -- exactly one
-    Reuses NotificationChannel for the Slack/email actions rather than
-    storing a second copy of webhook URLs/recipient lists."""
+    Reuses NotificationChannel for the Slack/email actions and
+    WebhookConfig for webhook/invoke_chat_completion, rather than storing
+    a second copy of webhook URLs/recipient lists inline."""
 
     __tablename__ = "platform_event_actions"
 

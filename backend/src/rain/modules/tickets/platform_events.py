@@ -6,7 +6,8 @@ origin, auto-promoted or manually created -- to one of several
 lifecycle triggers (see TRIGGER_EVENTS: created, closed, or, change
 tickets only, fully approved), and every active, matching rule fires
 (not just the first), each running one or more actions: notify Slack,
-notify email, call a webhook, attach a document, attach an asset, mark
+notify email, call a webhook, invoke a Chat Completions API webhook and
+post its reply as a comment, attach a document, attach an asset, mark
 the ticket problematic, analyze root cause, or add a watcher (a system
 user or a bare email). Every firing is logged to platform_event_triggers
 and shown on the ticket detail page, regardless of whether the
@@ -30,8 +31,9 @@ document's "who must acknowledge this" requirement is (re)set, the
 document equivalent of a change ticket's approval starting. The
 generic pieces below (_evaluate_and_fire, _rule_matches, _fire_rule,
 _run_action) take either a Ticket or a Document (see TRIGGER_EVENTS for
-which trigger_event goes with which); the four ticket-only actions
-(attach_document, attach_asset, mark_problematic, add_watcher) simply
+which trigger_event goes with which); the ticket-only actions
+(invoke_chat_completion, attach_document, attach_asset, mark_problematic,
+analyze_root_cause, add_watcher -- see _TICKET_ONLY_ACTIONS) simply
 report themselves not applicable when the matched record is a document
 -- notify_slack/notify_email/webhook, the three that only ever needed a
 placeholder dict, work for either kind unchanged."""
@@ -90,6 +92,7 @@ ACTION_TYPES = [
     ("notify_slack", "Notify Slack"),
     ("notify_email", "Notify Email"),
     ("webhook", "Call a webhook"),
+    ("invoke_chat_completion", "Invoke Chat Completions API"),
     ("attach_document", "Attach a document"),
     ("attach_asset", "Attach an asset"),
     ("mark_problematic", "Mark problematic"),
@@ -108,6 +111,7 @@ ACTION_DESCRIPTIONS = {
     "notify_slack": "Send a message through a Slack notification channel.",
     "notify_email": "Send a message through an email notification channel.",
     "webhook": "Call one of this tenant's configured webhooks.",
+    "invoke_chat_completion": "Send the ticket to a Chat Completions API webhook (OpenAI, Gemini, ...) and post its reply as a comment -- initial triage, a summary, whatever the webhook's own prompt asks for.",
     "attach_document": "Link a specific document to the ticket.",
     "attach_asset": "Set a specific asset as the ticket's affected asset, if it doesn't already have one.",
     "mark_problematic": "Flag the ticket problematic -- same as the ticket detail page's own quick action.",
@@ -129,6 +133,7 @@ ACTION_ICONS = {
     "notify_slack": "bell",
     "notify_email": "mail",
     "webhook": "zap",
+    "invoke_chat_completion": "sparkles",
     "attach_document": "file",
     "attach_asset": "server",
     "mark_problematic": "repeat",
@@ -296,8 +301,14 @@ def _placeholders(record: Ticket | Document) -> dict[str, str]:
 
 # Ticket-only -- see this module's own docstring. Guarded upfront in
 # _run_action rather than duplicated into each branch's own isinstance
-# check below.
-_TICKET_ONLY_ACTIONS = {"attach_document", "attach_asset", "mark_problematic", "analyze_root_cause", "add_watcher"}
+# check below. invoke_chat_completion joins this set (unlike its sibling
+# "webhook", which works for either) because it always builds its user
+# message from a ticket's own fields (rain.modules.webhooks.service.
+# _ticket_payload_text) and always posts its reply back as a ticket
+# comment -- neither has a document equivalent.
+_TICKET_ONLY_ACTIONS = {
+    "invoke_chat_completion", "attach_document", "attach_asset", "mark_problematic", "analyze_root_cause", "add_watcher"
+}
 
 
 async def _run_action(db: AsyncSession, action: PlatformEventAction, record: Ticket | Document) -> str:
@@ -370,6 +381,32 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, record: Tic
     # above, already guarded) -- `record` is a Ticket for the rest of
     # this function.
     ticket = record
+
+    if action.action_type == "invoke_chat_completion":
+        webhook_id = config.get("webhook_id")
+        webhook = await db.get(WebhookConfig, webhook_id) if webhook_id else None
+        if webhook is None:
+            return f"{label}: webhook no longer exists"
+        if webhook.kind != "chat_completions":
+            return f"{label}: '{webhook.name}' isn't a Chat Completions API webhook"
+        result = await webhook_service.call_chat_completion(db, webhook, ticket)
+        if not result.success and webhook.alert_on_failure:
+            await webhook_service.alert_webhook_failure(
+                db, webhook, result, context=f"Platform Response Rule action on {_record_label(record)}"
+            )
+        if not result.success:
+            return f"{label}: {webhook.name} -> {result.error or f'HTTP {result.status_code}'}"
+        # Posted the same way analyze_root_cause posts its own analysis
+        # above -- a system comment (author_user_id=None), landing in the
+        # ticket's own activity feed. Firing this rule on a *_created
+        # trigger (the common case for "initial triage") means this
+        # comment goes up right after the ticket itself does, before a
+        # human's had the chance to comment at all -- which is what makes
+        # it read as the ticket's first update rather than something
+        # bolted on afterward; nothing here enforces an ordinal position,
+        # the trigger you pick is what makes it "first" in practice.
+        await ticket_service.add_comment(db, ticket.id, author_user_id=None, body=result.reply)
+        return f"{label}: posted a comment via {webhook.name}"
 
     if action.action_type == "attach_document":
         document_id = config.get("document_id")
