@@ -10,7 +10,7 @@ no telemetry, no license server. It's multi-tenant, configures itself
 through an in-app setup wizard and Admin console, and ships as minimal
 Alpine images with no Node/SPA toolchain in the browser.
 
-![RAIN screenshot](RAIN%20screenshot.png)
+![RAIN screenshot](rain-screenshot.png)
 
 More screens -- Kanban, live syslog feed, automation rules, the client
 portal, and more -- in [`docs/screenshots/`](docs/screenshots/).
@@ -24,7 +24,7 @@ instance, in their own primers:
 - [`docs/oscal-ssp-showcase.md`](docs/oscal-ssp-showcase.md) --
   importing the real FedRAMP High baseline as a control register and
   exporting it as OSCAL.
-- [`docs/fedramp-cr26-primer.md`](docs/fedramp-cr26-primer.md) --
+- [`docs/fedramp-cr26-showcase.md`](docs/fedramp-cr26-showcase.md) --
   FedRAMP's 2026 Consolidated Rules (CR26) explained through a real
   Significant Change Notification example.
 
