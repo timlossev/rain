@@ -27,6 +27,7 @@ Three subfolders, by what you do with the file:
 | `bundles/data-inventory-register.rain` | Data Asset type | RA-2, ISO 27001 5.12/5.13 |
 | `bundles/software-inventory-register.rain` | Software Component asset type | CR26 Inventory/SBOM -- one row per in-scope component, container image, package, or dependency. Distinct from the Software License Register above, which tracks the vendor agreement, not the running software itself. |
 | `bundles/conmon-submission-register.rain` | ConMon Submission asset type | CR26 Collaborative Continuous Monitoring -- one row per monthly package delivered to FedRAMP and authorized agency customers |
+| `bundles/six-sigma-infraction-register.rain` | Six Sigma Infraction asset type | ISO 9001:2015 Clause 10.2 (Nonconformity and Corrective Action) -- one row per process defect or out-of-control condition, tracked with DMAIC phase, Ishikawa root-cause category, DPMO/sigma-level impact, cost of poor quality, and corrective/preventive action. A quality-management register, not a security/privacy one -- the one template here that isn't FedRAMP/NIST/PCI/ISO 27001-driven. |
 | `bundles/poam-tracking-fields.rain` | *Ticket* fields | CA-5 (POA&M) |
 | `bundles/nessus-finding-fields.rain` | *Ticket* fields | RA-5/RA-7 -- optional; Tickets > Import reads a `.nessus` file natively either way |
 | `bundles/fedramp-ocr-fields.rain` | *Ticket* fields | FedRAMP CR26's Ongoing Certification Report -- additive alongside the POA&M template, not a replacement for it (see `docs/itsm-controls-mapping.md`'s CA-5 entry) |

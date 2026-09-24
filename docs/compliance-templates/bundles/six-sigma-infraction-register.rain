@@ -1,0 +1,190 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-09-24T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "Six Sigma infraction register starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "six_sigma_infraction",
+      "name": "Six Sigma Infraction",
+      "icon": null,
+      "description": "One row per identified process infraction -- a defect, nonconformance, or out-of-control condition -- tracked using Six Sigma DMAIC methodology and Ishikawa (fishbone) root-cause categories. Each Asset's own \"Name\" field is a short infraction title or ID.",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "process_or_area",
+      "label": "Process / area affected",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "defect_type",
+      "label": "Defect type",
+      "field_type": "select",
+      "select_options": ["Defect (nonconforming unit)", "Process variation / out-of-control", "Customer complaint", "Audit finding", "Near-miss", "Other"],
+      "is_required": true,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "dmaic_phase_identified",
+      "label": "DMAIC phase identified",
+      "field_type": "select",
+      "select_options": ["Define", "Measure", "Analyze", "Improve", "Control", "Production / steady-state"],
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "root_cause_category",
+      "label": "Root cause category (Ishikawa)",
+      "field_type": "select",
+      "select_options": ["Man (people)", "Machine (equipment)", "Method (process)", "Material", "Measurement", "Environment", "Not yet determined"],
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "root_cause_description",
+      "label": "Root cause description",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "severity",
+      "label": "Severity",
+      "field_type": "select",
+      "select_options": ["Critical", "Major", "Minor"],
+      "is_required": true,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "sigma_level_impact",
+      "label": "Process sigma level at detection",
+      "field_type": "number",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "dpmo_contribution",
+      "label": "DPMO contribution",
+      "field_type": "number",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "cost_of_poor_quality",
+      "label": "Cost of poor quality (COPQ)",
+      "field_type": "number",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 8
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "corrective_action",
+      "label": "Corrective action",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 9
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "preventive_action",
+      "label": "Preventive action",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 10
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "owner",
+      "label": "Owner / responsible team",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 11
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "date_identified",
+      "label": "Date identified",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 12
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "date_resolved",
+      "label": "Date resolved",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 13
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "is_recurring",
+      "label": "Recurring infraction",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 14
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "control_plan_reference",
+      "label": "Control plan reference",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 15
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "six_sigma_infraction",
+      "field_key": "status",
+      "label": "Status",
+      "field_type": "select",
+      "select_options": ["Open", "Under investigation", "Corrective action in progress", "Closed - verified effective", "Closed - not verified"],
+      "is_required": true,
+      "sort_order": 16
+    }
+  ]
+}

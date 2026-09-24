@@ -32,7 +32,7 @@ for how far that argument extends to the EU Cybersecurity Certification
 Scheme for Cloud Services. Custom asset types and ticket fields let
 RAIN adapt to any framework's paperwork with no code --
 [`docs/compliance-templates/`](docs/compliance-templates/) ships
-nineteen ready-to-import `.rain` config bundles (a risk register, a
+twenty ready-to-import `.rain` config bundles (a risk register, a
 Nessus finding-fields set, FedRAMP's 2026 quarterly reporting fields,
 a NIST 800-53 control register with an OSCAL export transformer, a
 Significant Change Notification export, an SBOM/software inventory
