@@ -8,11 +8,11 @@ tickets only, fully approved), and every active, matching rule fires
 (not just the first), each running one or more actions: notify Slack,
 notify email, call a webhook, invoke a Chat Completions API webhook and
 post its reply as a comment, attach a document, attach an asset, mark
-the ticket problematic, analyze root cause, or add a watcher (a system
-user or a bare email). Every firing is logged to platform_event_triggers
-and shown on the ticket detail page, regardless of whether the
-individual actions succeeded -- a failed Slack post shouldn't hide the
-fact the rule matched.
+the ticket problematic, analyze root cause (optionally AI-narrated, see
+below), or add a watcher (a system user or a bare email). Every firing
+is logged to platform_event_triggers and shown on the ticket detail
+page, regardless of whether the individual actions succeeded -- a
+failed Slack post shouldn't hide the fact the rule matched.
 
 analyze_root_cause (rain.modules.tickets.rootcause.analyze) used to be
 a single tenant-wide "auto-analyze on every closed ticket" checkbox
@@ -23,6 +23,22 @@ so short of turning it on for every closed ticket tenant-wide. As an
 action it gets the same match_field/pattern targeting every other
 action already has for free, on whichever "<type> is closed"
 trigger(s) a rule author actually wants it for.
+
+analyze_root_cause's config is optionally {"webhook_id": <a kind=
+"chat_completions" WebhookConfig>} -- rootcause.analyze's two signals
+(repeat-occurrence pattern, similar closed tickets) are deliberately
+not causal reasoning on their own (see that module's own docstring for
+why), but they're exactly the evidence a human would start from when
+actually reasoning about a cause. With no webhook picked, this action
+posts rootcause.analyze's plain comment unchanged -- a tenant that
+doesn't want a GenAI connection at all loses nothing. With one picked,
+those same two signals are handed to it as context (webhook_service.
+call_chat_completion's extra_user_context) instead of/alongside the
+ticket alone, and its reply -- an actual hypothesis, not just a
+restatement of the data -- is posted as the comment, with the raw
+signals still appended underneath so nothing's a black box. A failed
+call falls back to the plain deterministic comment rather than posting
+nothing.
 
 Since migration 0049 this same engine also reacts to one document
 lifecycle trigger, document_pending_acknowledgment -- fired by
@@ -100,16 +116,20 @@ ACTION_TYPES = [
     ("add_watcher", "Add a watcher"),
 ]
 
-# The two action types whose entire config is {"webhook_id": <WebhookConfig.
+# The action types whose entire config is {"webhook_id": <WebhookConfig.
 # id>} -- everywhere that shape gets built, displayed, or bundle-exported/
 # imported treats them identically (only _run_action's own dispatch below
-# actually differs between them, since a "webhook" call and an "invoke_chat_
-# completion" call do different things with the same referenced row). One
-# tuple here instead of four call sites (tickets/router.py's config
-# builder and display-label builder, config_bundle.py's export and import)
-# each separately spelling out ("webhook", "invoke_chat_completion") --
-# a future third WebhookConfig-backed action type only needs adding here.
-WEBHOOK_BACKED_ACTIONS = ("webhook", "invoke_chat_completion")
+# actually differs between them, since a "webhook" call, an "invoke_chat_
+# completion" call, and analyze_root_cause's optional AI narration do
+# different things with the same referenced row). One tuple here instead
+# of four call sites (tickets/router.py's config builder and display-label
+# builder, config_bundle.py's export and import) each separately spelling
+# out the list. analyze_root_cause differs from the other two in one way
+# worth remembering: webhook_id is optional for it (no webhook picked ->
+# rootcause.analyze's plain deterministic comment, same as always), while
+# a "webhook"/"invoke_chat_completion" action with no webhook picked just
+# fails at fire time -- see _run_action's own handling of each.
+WEBHOOK_BACKED_ACTIONS = ("webhook", "invoke_chat_completion", "analyze_root_cause")
 
 # One short sentence per action, shown under the "Add action" picker as
 # it's selected (rule_form.html's ml_algorithm dropdown already does
@@ -126,7 +146,7 @@ ACTION_DESCRIPTIONS = {
     "attach_document": "Link a specific document to the ticket.",
     "attach_asset": "Set a specific asset as the ticket's affected asset, if it doesn't already have one.",
     "mark_problematic": "Flag the ticket problematic -- same as the ticket detail page's own quick action.",
-    "analyze_root_cause": "Post the same repeat-occurrence and similar-past-ticket analysis the ticket detail page's own \"Analyze root cause\" button computes, as a comment.",
+    "analyze_root_cause": "Post the same repeat-occurrence and similar-past-ticket analysis the ticket detail page's own \"Analyze root cause\" button computes, as a comment -- optionally, pick a Chat Completions API webhook to have it narrate those same signals into an actual causal hypothesis instead of just reciting them.",
     "add_watcher": "Add a system user or a bare email as a watcher -- they start getting emailed on the ticket's activity.",
 }
 
@@ -455,12 +475,42 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, record: Tic
         # computes -- see rootcause's own docstring. None means neither
         # signal turned anything up, same "skip rather than post a
         # content-free comment" rule the button's own preview step
-        # follows.
-        analysis = await rootcause.analyze(db, ticket)
-        if not analysis:
+        # follows. Computed before touching the optional webhook below
+        # so a rule with no webhook configured (the common case) never
+        # pays for a lookup it doesn't need.
+        deterministic = await rootcause.analyze(db, ticket)
+        if not deterministic:
             return f"{label}: nothing to add"
+
+        webhook_id = config.get("webhook_id")
+        webhook = await db.get(WebhookConfig, webhook_id) if webhook_id else None
+        if webhook_id and webhook is None:
+            return f"{label}: webhook no longer exists"
+        if webhook is not None and webhook.kind != "chat_completions":
+            return f"{label}: '{webhook.name}' isn't a Chat Completions API webhook"
+
+        if webhook is None:
+            await ticket_service.add_comment(db, ticket.id, author_user_id=None, body=deterministic)
+            return f"{label}: posted a comment"
+
+        result = await webhook_service.call_chat_completion(db, webhook, ticket, extra_user_context=deterministic)
+        if not result.success:
+            if webhook.alert_on_failure:
+                await webhook_service.alert_webhook_failure(
+                    db, webhook, result, context=f"Platform Response Rule action on {_record_label(record)}"
+                )
+            # The deterministic signals are still real and still useful
+            # even though narrating them into a hypothesis failed --
+            # post them rather than posting nothing.
+            await ticket_service.add_comment(db, ticket.id, author_user_id=None, body=deterministic)
+            return f"{label}: AI narration via {webhook.name} failed ({result.error}) -- posted the deterministic comment instead"
+
+        analysis = (
+            f"Root cause assistance (AI-narrated via {webhook.name}) - hypothesis based on the "
+            f"signals below, not a determined cause:\n\n{result.reply}\n\n---\nSignals used:\n{deterministic}"
+        )
         await ticket_service.add_comment(db, ticket.id, author_user_id=None, body=analysis)
-        return f"{label}: posted a comment"
+        return f"{label}: posted an AI-narrated comment via {webhook.name}"
 
     if action.action_type == "add_watcher":
         email = (config.get("email") or "").strip()

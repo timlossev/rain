@@ -1219,10 +1219,15 @@ class PlatformEventAction(TenantBase):
       attach_document              -> {"document_id": int}
       attach_asset                 -> {"asset_id": int}
       mark_problematic              -> {} (no config)
+      analyze_root_cause             -> {} or {"webhook_id": <WebhookConfig.id, kind="chat_completions">}
+                                         -- optional; {} means rootcause.analyze's plain deterministic
+                                         comment, a webhook means that same analysis is handed to it as
+                                         AI-narration context instead of posted verbatim
       add_watcher                    -> {"email": str} or {"user_id": int} -- exactly one
     Reuses NotificationChannel for the Slack/email actions and
-    WebhookConfig for webhook/invoke_chat_completion, rather than storing
-    a second copy of webhook URLs/recipient lists inline."""
+    WebhookConfig for webhook/invoke_chat_completion/analyze_root_cause,
+    rather than storing a second copy of webhook URLs/recipient lists
+    inline."""
 
     __tablename__ = "platform_event_actions"
 

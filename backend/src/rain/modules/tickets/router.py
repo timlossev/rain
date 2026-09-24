@@ -1982,15 +1982,19 @@ def _build_action_config(action_type: str, form) -> dict:
 
 async def _action_config_error(tenant_db: AsyncSession, action_type: str, config: dict) -> str | None:
     """None if `config` is fine to save for this action_type; otherwise a
-    human-readable reason it was rejected. Only invoke_chat_completion
-    needs this today: picking a kind="generic" webhook for it saved
-    successfully before this existed, then failed silently at fire time
-    (buried in that firing's own platform_event_triggers summary,
-    indistinguishable at a glance from a routine "ticket-only action
-    skipped for a document trigger" no-op) -- the same "fail fast with a
-    clear reason at save time" reasoning webhooks_create/webhooks_edit's
-    own check_outbound_url call already applies to a webhook's URL."""
-    if action_type != "invoke_chat_completion":
+    human-readable reason it was rejected. invoke_chat_completion and
+    analyze_root_cause are the two that need this: picking a kind=
+    "generic" webhook for either saved successfully before this existed,
+    then failed silently at fire time (buried in that firing's own
+    platform_event_triggers summary, indistinguishable at a glance from
+    a routine "ticket-only action skipped for a document trigger"
+    no-op) -- the same "fail fast with a clear reason at save time"
+    reasoning webhooks_create/webhooks_edit's own check_outbound_url
+    call already applies to a webhook's URL. Unlike invoke_chat_
+    completion, analyze_root_cause's webhook is optional (no webhook_id
+    at all is a valid, deliberate "deterministic only" choice) -- only a
+    *picked* webhook of the wrong kind is an error for either."""
+    if action_type not in ("invoke_chat_completion", "analyze_root_cause"):
         return None
     webhook_id = config.get("webhook_id")
     if not webhook_id:

@@ -600,6 +600,139 @@ async def test_call_chat_completion_treats_null_message_content_as_a_failure(mon
         assert "unparseable response" in result.error
 
 
+async def test_analyze_root_cause_action_optionally_narrates_with_ai(monkeypatch):
+    """The "Analyze root cause" action's optional webhook_id: unset, it's
+    exactly the pre-existing deterministic comment (rootcause.analyze,
+    unchanged); pointed at a Chat Completions webhook, that same
+    deterministic text is handed in as extra_user_context and the
+    model's reply is posted instead, with the deterministic text still
+    appended underneath so nothing's a black box; pointed at a Generic
+    webhook, rejected the same way invoke_chat_completion already is;
+    and if the model call itself fails, falls back to posting the
+    deterministic comment rather than nothing. All four fire off one
+    real ticket close, same "several rules react to the same event"
+    shape as test_invoke_chat_completion_action_posts_reply_as_first_
+    comment above."""
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import PlatformEventAction, PlatformEventRule, PlatformEventTrigger, TicketComment, WebhookConfig
+    from rain.modules.tickets import service
+    from rain.modules.webhooks import service as webhook_service
+
+    tenant = await provision_tenant(slug="zeta", name="Zeta LLC")
+
+    async with tenant_session(tenant.schema_name) as session:
+        # An earlier, already-closed, similarly-titled ticket -- this is
+        # what gives rootcause.find_similar_closed_tickets something to
+        # find once the new ticket below closes, so rootcause.analyze
+        # returns real, non-None text without needing promoted syslog
+        # events (the chronic-pattern signal) just to exercise this.
+        older = await service.create_ticket(
+            session, ticket_type="incident", title="Database connection pool exhausted", description=None
+        )
+        await service.update_status(session, older, "closed")
+
+        chat_webhook = WebhookConfig(
+            name="RCA assistant", kind="chat_completions", url="https://api.openai.com/v1/chat/completions"
+        )
+        flaky_webhook = WebhookConfig(
+            name="Flaky assistant", kind="chat_completions", url="https://api.openai.com/v1/chat/completions"
+        )
+        generic_webhook = WebhookConfig(name="Ops relay", kind="generic", url="https://example.com/hook")
+        session.add_all([chat_webhook, flaky_webhook, generic_webhook])
+        await session.flush()
+
+        ai_rule = PlatformEventRule(name="AI-narrated RCA", trigger_event="incident_closed", match_field="title", pattern="Database")
+        ai_rule.actions.append(PlatformEventAction(action_type="analyze_root_cause", config={"webhook_id": chat_webhook.id}))
+        session.add(ai_rule)
+
+        deterministic_rule = PlatformEventRule(
+            name="Deterministic RCA", trigger_event="incident_closed", match_field="title", pattern="Database", sort_order=1
+        )
+        deterministic_rule.actions.append(PlatformEventAction(action_type="analyze_root_cause", config={}))
+        session.add(deterministic_rule)
+
+        misconfigured_rule = PlatformEventRule(
+            name="Misconfigured RCA", trigger_event="incident_closed", match_field="title", pattern="Database", sort_order=2
+        )
+        misconfigured_rule.actions.append(
+            PlatformEventAction(action_type="analyze_root_cause", config={"webhook_id": generic_webhook.id})
+        )
+        session.add(misconfigured_rule)
+
+        failing_rule = PlatformEventRule(
+            name="Failing RCA", trigger_event="incident_closed", match_field="title", pattern="Database", sort_order=3
+        )
+        failing_rule.actions.append(PlatformEventAction(action_type="analyze_root_cause", config={"webhook_id": flaky_webhook.id}))
+        session.add(failing_rule)
+        await session.commit()
+
+        captured_context = {}
+
+        async def fake_call_chat_completion(db, config, ticket, *, extra_user_context=None):
+            if config.id == flaky_webhook.id:
+                return webhook_service.ChatCompletionResult(status_code=500, success=False, reply="", error="HTTP 500")
+            assert config.id == chat_webhook.id  # never reached for the generic webhook -- rejected before calling this
+            captured_context["value"] = extra_user_context
+            return webhook_service.ChatCompletionResult(
+                status_code=200, success=True,
+                reply="Likely the same exhaustion pattern as the earlier incident -- check for a leaked connection, not a capacity issue.",
+            )
+
+        monkeypatch.setattr(webhook_service, "call_chat_completion", fake_call_chat_completion)
+
+        newer = await service.create_ticket(
+            session, ticket_type="incident", title="Database connection pool exhausted again", description=None
+        )
+        await service.update_status(session, newer, "closed")
+
+        # The deterministic signals actually reached the model as context,
+        # not just the ticket -- the whole point of this feature.
+        assert "Similar past incidents" in captured_context["value"]
+        assert older.ticket_number in captured_context["value"]
+
+        reloaded = await service.get_ticket(session, newer.id)
+        assert reloaded is not None
+        bodies = [c.body for c in reloaded.comments]
+        # AI-narrated RCA (1) + Deterministic RCA (1) + Failing RCA's own
+        # fallback-to-deterministic (1) -- Misconfigured RCA is rejected
+        # before ever calling the webhook, so it posts nothing.
+        assert len(bodies) == 3
+
+        ai_comments = [b for b in bodies if b.startswith("Root cause assistance (AI-narrated")]
+        assert len(ai_comments) == 1
+        ai_comment = ai_comments[0]
+        assert "Likely the same exhaustion pattern" in ai_comment
+        assert "Signals used:" in ai_comment
+        assert "Similar past incidents" in ai_comment  # the deterministic text, still visible underneath
+
+        # Deterministic RCA's own comment and Failing RCA's fallback are
+        # word-for-word identical -- both are rootcause.analyze's plain
+        # text, unchanged, one because no webhook was picked and one
+        # because the picked webhook's call failed.
+        deterministic_comments = [b for b in bodies if b.startswith("Root cause assistance (automated)")]
+        assert len(deterministic_comments) == 2
+        assert deterministic_comments[0] == deterministic_comments[1]
+        assert "AI-narrated" not in deterministic_comments[0]
+        assert "Similar past incidents" in deterministic_comments[0]
+
+        triggers = {
+            t.rule_name: t.summary
+            for t in (
+                await session.execute(select(PlatformEventTrigger).where(PlatformEventTrigger.ticket_id == newer.id))
+            ).scalars()
+        }
+        assert "posted an AI-narrated comment via RCA assistant" in triggers["AI-narrated RCA"]
+        assert "posted a comment" in triggers["Deterministic RCA"]
+        assert "isn't a Chat Completions API webhook" in triggers["Misconfigured RCA"]
+        assert "AI narration via Flaky assistant failed" in triggers["Failing RCA"]
+
+        comment_count = (
+            await session.execute(select(TicketComment).where(TicketComment.ticket_id == newer.id))
+        ).scalars().all()
+        assert len(comment_count) == 3
+
+
 async def test_escalate_ticket_captures_webhook_response_as_comment(monkeypatch):
     """rain.modules.tickets.service.escalate_ticket: both log lines it's
     documented to produce (the terse field-change entry, unchanged from

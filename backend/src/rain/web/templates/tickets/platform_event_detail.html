@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_search_picker.html" as picker %}
 {% block title %}{{ rule.name }} - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Manage this Platform Response Rule's actions - notify Slack/email, call a webhook, invoke a Chat Completions API webhook and post its reply as a comment, attach a document or asset, mark the ticket problematic, analyze root cause, or add a watcher. Actions fire in order, top of the flow to bottom, when the rule's pattern matches - a ticket for every trigger except "When a document is pending your acknowledgment", where it matches a document instead and only the notify/webhook actions apply. Click a step in the flow to edit it, or "+ Add action" to add another.{% endblock %}
+{% block help_text %}Manage this Platform Response Rule's actions - notify Slack/email, call a webhook, invoke a Chat Completions API webhook and post its reply as a comment, attach a document or asset, mark the ticket problematic, analyze root cause (optionally AI-narrated via a Chat Completions webhook), or add a watcher. Actions fire in order, top of the flow to bottom, when the rule's pattern matches - a ticket for every trigger except "When a document is pending your acknowledgment", where it matches a document instead and only the notify/webhook actions apply. Click a step in the flow to edit it, or "+ Add action" to add another.{% endblock %}
 {% block content %}
 {% if request.query_params.get('error') %}<div class="flash flash-error">{{ request.query_params.get('error') }}</div>{% endif %}
 <div class="panel-row" style="justify-content:flex-end;">
@@ -87,7 +87,7 @@
       {% if not channels %}<div class="field-hint">No channels yet - create one under <a href="/admin/notification-channels">Admin &gt; Notification Channels</a>.</div>{% endif %}
     </div>
 
-    <div class="field" data-action-fields="webhook,invoke_chat_completion">
+    <div class="field" data-action-fields="webhook,invoke_chat_completion,analyze_root_cause">
       <label for="webhook_config_id">Webhook</label>
       <select id="webhook_config_id" name="webhook_config_id">
         <option value="">-</option>
@@ -95,6 +95,7 @@
       </select>
       {% if not webhooks %}<div class="field-hint">No webhooks yet - create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.</div>{% endif %}
       <div class="field-hint" data-action-fields="invoke_chat_completion">Pick a Chat Completions API webhook - a Generic one will be rejected when this action actually fires.</div>
+      <div class="field-hint" data-action-fields="analyze_root_cause">Optional. Leave unset for the plain statistical/historical comment, no GenAI connection required. Pick a Chat Completions API webhook to have it narrate those same signals into an actual causal hypothesis instead - a Generic one will be rejected when this action actually fires.</div>
     </div>
 
     <div data-action-fields="attach_document">

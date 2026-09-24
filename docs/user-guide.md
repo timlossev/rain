@@ -400,6 +400,11 @@ description as you pick it:
 - Notify Slack / Notify Email: pick a notification channel -- delivery
   actually follows the channel's own type, not the action label.
 - Call a webhook: pick a webhook definition.
+- Invoke Chat Completions API: pick a Chat Completions kind webhook --
+  sends it the ticket, posts its reply as a comment (initial triage, a
+  summary, whatever that webhook's own prompt asks for). See
+  [`docs/ai-triage-showcase.md`](ai-triage-showcase.md) for this walked
+  through end to end.
 - Attach a document / Attach an asset (as the ticket's affected asset).
 - Mark problematic.
 - Analyze root cause: posts the same repeat-occurrence and similar-
@@ -408,10 +413,15 @@ description as you pick it:
   "<type> is closed" trigger, with whatever pattern makes sense
   (or none, to run on every ticket of that type) -- there's no
   separate tenant-wide switch for this anymore, it's an action like
-  any other.
+  any other. Optionally pick a Chat Completions webhook here too: when
+  one's set, those same signals are handed to it as context instead of
+  posted verbatim, and its reply -- an actual causal hypothesis, not
+  just a restatement -- is posted with the raw signals still appended
+  underneath. Leave it unset for the plain statistical comment, no
+  GenAI connection required; a failed call falls back to it too.
 - Add a watcher: an email address, or a system user (not both).
 
-The last five apply only to tickets -- on a document-acknowledgment
+The last six apply only to tickets -- on a document-acknowledgment
 rule they're skipped, harmless if attached by habit. Notify/webhook
 actions work either way, filling in `{{doc_number}}`, `{{title}}`,
 `{{description}}` for a document trigger.

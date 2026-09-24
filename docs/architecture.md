@@ -376,9 +376,23 @@ distribution and time span across every `SyslogEvent` promoted into the
 ticket via `promoted_ticket_id`) and similar past *closed* tickets (the
 same `websearch_to_tsquery`/`ts_rank` full-text search the global
 search bar uses, scoped to `is_closed` statuses). Deliberately not
-framed as "AI root cause analysis" -- nothing here, or in `river`, does
-causal reasoning; both signals are things a human would otherwise do by
-hand scrolling the timeline or searching past tickets, just automated.
+framed as "AI root cause analysis" by default -- nothing in this module,
+or in `river`, does causal reasoning; both signals are things a human
+would otherwise do by hand scrolling the timeline or searching past
+tickets, just automated. Offline stays the default: a tenant with no
+GenAI connection loses nothing, since this stays the entire comment.
+
+The `analyze_root_cause` action's config can optionally add a `kind=
+"chat_completions"` `WebhookConfig` (`{"webhook_id": ...}`, same shape
+`invoke_chat_completion` uses) -- when one's picked, `rootcause.analyze`'s
+own two signals are handed to `webhook_service.call_chat_completion` as
+`extra_user_context` alongside the ticket itself, and the model's reply
+(an actual hypothesis, not just a restatement) is posted as the comment
+with those same signals still appended underneath, so nothing's a black
+box. A failed call falls back to the plain deterministic comment rather
+than posting nothing. This only exists on the Platform Response Rule
+action, not the on-demand button -- see `platform_events`'s own
+docstring for the full config shape and fallback behavior.
 
 `analyze_root_cause` used to be a separate, tenant-wide
 `auto_root_cause_on_close` checkbox on the Platform Response Rules

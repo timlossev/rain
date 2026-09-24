@@ -175,7 +175,9 @@ def _ticket_payload_text(ticket: Ticket) -> str:
     return "\n".join(lines)
 
 
-async def call_chat_completion(db: AsyncSession, config: WebhookConfig, ticket: Ticket) -> ChatCompletionResult:
+async def call_chat_completion(
+    db: AsyncSession, config: WebhookConfig, ticket: Ticket, *, extra_user_context: str | None = None
+) -> ChatCompletionResult:
     """kind="chat_completions" only. Builds the system message from
     chat_system_prompt and/or chat_memory_document_id's own text (the
     "shared project memory / client-wide context" -- read the same way
@@ -185,8 +187,15 @@ async def call_chat_completion(db: AsyncSession, config: WebhookConfig, ticket: 
     pulls the reply out of the standard choices[0].message.content
     shape every OpenAI-compatible provider returns it in. Never raises,
     same contract as call_webhook -- a caller (a Platform Response Rule
-    action, today the only one) treats a failure as a logged/reported
-    outcome, not something to propagate."""
+    action) treats a failure as a logged/reported outcome, not something
+    to propagate.
+
+    extra_user_context, when given, is appended to the user message
+    after the ticket payload -- e.g. the Platform Response Rule
+    "Analyze root cause" action's optional AI-narrated mode hands in
+    rootcause.analyze's own deterministic signals (repeat-occurrence
+    pattern, similar closed tickets) here, so the model reasons over
+    real data already on hand instead of just the ticket text alone."""
     from rain.modules.documents import service as document_service  # deferred: documents.service imports this module
 
     unsafe_reason = await check_outbound_url(config.url)
@@ -208,11 +217,15 @@ async def call_chat_completion(db: AsyncSession, config: WebhookConfig, ticket: 
             system_parts.append(memory_text.strip())
     system_content = "\n\n".join(system_parts) or "You are a helpful IT service management assistant."
 
+    user_content = _ticket_payload_text(full_ticket)
+    if extra_user_context:
+        user_content += "\n\n" + extra_user_context
+
     body = {
         "model": config.chat_model or "gpt-4o-mini",
         "messages": [
             {"role": "system", "content": system_content},
-            {"role": "user", "content": _ticket_payload_text(full_ticket)},
+            {"role": "user", "content": user_content},
         ],
     }
     headers = dict(config.headers or {})
