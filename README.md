@@ -15,29 +15,6 @@ Alpine images with no Node/SPA toolchain in the browser.
 More screens -- Kanban, live syslog feed, automation rules, the client
 portal, and more -- in [`docs/screenshots/`](docs/screenshots/).
 
-## Sample uses
-
-A few features are walked through end to end, against a live
-instance, in their own primers:
-
-- [`docs/correlation-showcase.md`](docs/correlation-showcase.md) --
-  repetition folding and ML anomaly detection against real syslog
-  events.
-- [`docs/oscal-ssp-showcase.md`](docs/oscal-ssp-showcase.md) --
-  importing the real FedRAMP High baseline as a control register and
-  exporting it as OSCAL.
-- [`docs/fedramp-cr26-showcase.md`](docs/fedramp-cr26-showcase.md) --
-  FedRAMP's 2026 Consolidated Rules (CR26) explained through a real
-  Significant Change Notification example.
-- [`docs/ai-triage-showcase.md`](docs/ai-triage-showcase.md) -- a
-  Chat Completions API webhook doing Level 0 triage of an incoming
-  security alert against a shared playbook document, before a human
-  opens the ticket.
-- [`docs/drift-detection-showcase.md`](docs/drift-detection-showcase.md)
-  -- three existing features composed into unattended infrastructure
-  drift detection (SI-7 / CM-8(3)), a real out-of-band change caught
-  and ticketed with no human watching for it.
-
 ## Motivation
 
 Compliance frameworks -- FedRAMP, ISO 27001, PCI-DSS, SOX, and their
@@ -74,18 +51,27 @@ get started.
 
 - Landing page shows a welcome message, or a flagged document
 - Incident, vulnerability, and change tickets, one shared record shape
+- Multi-step change approval flows, assigned by group or individual,
+  with optional auto-notify on approval
 - Drag-and-drop Kanban board, same tickets and filters as the list,
   groupable by status or by assignee workload
 - Built-in syslog listener, auto-parses plain text, CEF, JSON, key=value
-- Event Promotion Policies turn matching syslog events into tickets
-- Optional ML anomaly detection, no manual tuning required
-- Root cause assistance surfaces repeat patterns and similar past tickets
-- Platform Response Rules react to ticket lifecycle events, or a
-  document pending acknowledgment, automatically
+- Event Promotion Policies correlate syslog events into tickets --
+  single-event, repetition folding, or unsupervised ML anomaly
+  detection, no manual tuning required
+- Root cause assistance surfaces repeat patterns and similar past
+  tickets
+- Platform Response Rules automate reactions to ticket lifecycle events
+  (or a document pending acknowledgment): Slack/email/webhook
+  notifications, a Chat Completions API (OpenAI, Gemini, ...) action for
+  AI-assisted triage and summarization, document/asset attachment, root
+  cause analysis, and more
 - No-code asset types and custom fields, define your own
-- Document repository with tags, webhook auto-population, and PDF
-  export, plus its own Kanban board grouped by tag or by owner; optional
-  review-due tracking and assignable, notified read acknowledgment
+- Document repository with tags and webhook auto-population, plus its
+  own Kanban board grouped by tag or by owner; optional review-due
+  tracking and assignable, notified read acknowledgment
+- Custom jq export transforms for framework-specific machine-readable
+  output (OSCAL, Significant Change Notifications, ...)
 - Per-tenant calendar with recurring entries and a syslog bridge
 - Tenant-defined Service Catalog forms that produce tickets on submission
 - Public client portal for external incident reporting and requests
@@ -111,6 +97,29 @@ technical design and deployment lessons; [`docs/database-schema.md`](docs/databa
 for every table and how it relates to the rest; and
 [`docs/code-layout.md`](docs/code-layout.md) for where things live in
 the codebase and how to add to it.
+
+## Sample uses
+
+A few features are walked through end to end, against a live
+instance, in their own primers:
+
+- [`docs/correlation-showcase.md`](docs/correlation-showcase.md) --
+  repetition folding and ML anomaly detection against real syslog
+  events.
+- [`docs/oscal-ssp-showcase.md`](docs/oscal-ssp-showcase.md) --
+  importing the real FedRAMP High baseline as a control register and
+  exporting it as OSCAL.
+- [`docs/fedramp-cr26-showcase.md`](docs/fedramp-cr26-showcase.md) --
+  FedRAMP's 2026 Consolidated Rules (CR26) explained through a real
+  Significant Change Notification example.
+- [`docs/ai-triage-showcase.md`](docs/ai-triage-showcase.md) -- a
+  Chat Completions API webhook doing Level 0 triage of an incoming
+  security alert against a shared playbook document, before a human
+  opens the ticket.
+- [`docs/drift-detection-showcase.md`](docs/drift-detection-showcase.md)
+  -- three existing features composed into unattended infrastructure
+  drift detection (SI-7 / CM-8(3)), a real out-of-band change caught
+  and ticketed with no human watching for it.
 
 ## Quickstart
 
