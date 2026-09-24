@@ -117,6 +117,98 @@ by the triggering event's full text -- an assessor (or an on-call
 engineer at 3am) doesn't have to trust the score, they can see the
 input it was computed from.
 
+## 3. Layering policies to cut ticket volume
+
+Both parts above show one policy firing once. In practice a tenant runs
+several policies together, ordered by `sort_order`, and that ordering is
+what turns a noisy event feed into a small, actionable ticket queue
+instead of a 1:1 mirror of it. A SOC watching 500 raw syslog events a
+day is a realistic starting point -- failed-login noise, routine
+firewall allow lines, health-check chatter, the occasional real
+incident -- and it's not unusual for a handful of well-placed policies
+to take that down to 10-20% as tickets: 50-100 records instead of 500,
+each one worth a human looking at.
+
+**How the reduction actually happens**, mechanically:
+
+- **Repetition folds the bulk of it.** The four-line brute-force example
+  above is the pattern at small scale -- in a real feed, a noisy source
+  might produce dozens or hundreds of matching lines a day. A single
+  Repetition policy with a title template like `Repeated failed SSH
+  logins on {host}` turns all of them, per host, into one ticket with N
+  "Repeat occurrence" comments, not N tickets. This is where most of the
+  volume goes: a handful of known-noisy patterns, each covered by one
+  policy, each collapsing many events into one still-open ticket instead
+  of a fresh one every time.
+- **ML anomaly stays quiet by design.** An `ml_anomaly` policy (or a
+  Repetition policy's own `ml_sidecar_enabled`) doesn't produce a ticket
+  per event it sees -- it scores every matching event against a learned
+  baseline and only fires once the score clears `ml_score_threshold`,
+  and only after `ml_warmup_count` events have taught it what "normal"
+  looks like for that `group_by` key. In part 2 above, ten baseline
+  events scored 0.0 and produced nothing; only the eleventh, genuinely
+  different one fired. At scale that ratio holds: routine traffic trains
+  the model and produces no tickets, only the outliers do.
+- **Single-event policies are the deliberate exception.** A "Single
+  event" policy (the third promotion type, not walked through above)
+  tickets every match, no folding -- appropriate for patterns rare
+  enough, or serious enough, that each occurrence deserves its own
+  record regardless of whether an identical one already exists. Used
+  narrowly (a specific alert signature, not a broad catch-all), it adds
+  a small, intentional number of tickets on top of the two mechanisms
+  above rather than undoing their reduction.
+- **Everything unmatched costs nothing.** An event that doesn't match
+  any active policy's `match_field`/`pattern` just sits in the live
+  Events feed -- visible, searchable, never promoted. Routine
+  health-check and cron noise a team has no policy for isn't "10% of a
+  ticket," it's zero.
+
+**The controls that shape this, per policy:**
+
+| Control | Applies to | What it does |
+|---|---|---|
+| `match_field` / `pattern` | all | Which events this policy even looks at -- the regex a real event either matches or doesn't. |
+| `sort_order` | single, repetition | Evaluation order for the first-match-wins pass -- see "sandwiching" below. |
+| `title_template` | single, repetition | What makes two events "the same" for repetition folding -- two events computing the same title against a still-open ticket of that type fold together; different titles never do, however similar the raw text. |
+| `ml_sidecar_enabled` | repetition | Runs the same anomaly scoring below on a repetition rule's own events, so a stream of otherwise-routine repeats can still surface the one that's statistically unusual, with no second policy needed. |
+| `group_by` (none / host / program) | ml_anomaly | A separate learned model per group-key value, so "unusual for `fw-edge-01`" and "unusual for `fw-edge-02`" aren't judged against the same baseline. |
+| `ml_algorithm` | ml_anomaly | Half-Space Trees (fast, low-memory, best at point anomalies -- the default), Local Outlier Factor (density-based, better at contextual anomalies, meaningful sooner on small samples), or One-Class SVM (boundary-based, best when "normal" is stable and anomalies are moderate deviations rather than spikes). |
+| `ml_warmup_count` | ml_anomaly | Events a group's model must see before it's allowed to fire at all -- keeps a brand-new policy's own cold start from reading as one big anomaly. |
+| `ml_score_threshold` | ml_anomaly | The 0-1 score (higher = more unusual) a scored event has to clear to fire. |
+| `window_minutes` | ml_anomaly | Re-arm cooldown after a fire, per group -- not a scoring window, a "don't fire again on this group for N minutes" throttle. |
+
+**Sandwiching**: because single/repetition policies evaluate in
+`sort_order` and the first match wins, a tenant can stack narrow,
+specific policies ahead of broad ones -- a handful of Repetition
+policies for the loudest known-noisy patterns first (each one folding
+its own flood into a single ticket), a Single-event catch-all last with
+a broad pattern (or none at all) to still ticket anything genuinely new
+that slipped past every narrower policy above it. ML anomaly policies
+don't need a slot in that ordering at all -- every active one scores
+every matching event independently, alongside whatever the
+single/repetition pass decided, so a tenant can layer "fold the known
+noise, catch anything new, and separately flag anything statistically
+weird" without those three concerns competing for the same event.
+
+**Routing onward**: none of the above is the end of the pipeline. A
+policy promoting or folding an event only decides whether and how a
+*ticket* gets created -- what happens next is a second, independent
+layer: **Platform Response Rules** (same Records Authority section,
+`rain.modules.tickets.platform_events`) react to that ticket's lifecycle
+(created, closed, a change fully approved) regardless of whether a
+policy promoted it automatically or a human opened it by hand, and
+every active matching rule fires, not just the first. Its actions cover
+notification (Slack, email), integration (a generic webhook, or the
+newer **Invoke Chat Completions API** action -- see
+[`ai-triage-showcase.md`](ai-triage-showcase.md) for that one walked
+through end to end), and ticket handling (attach a document or asset,
+mark problematic, analyze root cause, add a watcher). So the full
+picture for one event is: Event Promotion Policies decide *if and how*
+it becomes a ticket (new, folded, or flagged anomalous), then Platform
+Response Rules decide *what happens to that ticket* -- who's notified,
+what gets attached, whether an AI triage comment lands before anyone
+opens it.
+
 ## Reproducing this
 
 1. Admin > Syslog Listener: add a routing rule (`host` matches `.*`,
