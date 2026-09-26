@@ -1574,6 +1574,21 @@ td.actions { text-align: right; white-space: nowrap; }
 .ticket-meta td { line-height: 26px; }
 .ticket-meta input[type=text] { height: 26px; padding: 0 8px; }
 .ticket-meta .btn-sm { height: 26px; }
+/* A plain horizontal rule between two stacked sections sharing one card
+   (ticket detail's Linked Documents / Assignee boundary today) -- reset
+   from the browser's own <hr> (a 2px inset/outset groove by default) to
+   one thin line matching every other border in the app. */
+.section-divider { border: none; border-top: 1px solid var(--border); margin: 4px 0 18px; }
+/* ticket-meta's own last row would otherwise keep the same border-bottom
+   every other row gets (th, td's shared rule) -- fine as a row separator,
+   but read as a dangling, purposeless line once nothing follows it in
+   the card anymore (Linked Documents moved above the table, see
+   tickets/detail.html's own comment on ticket-meta-embedded). Scoped to
+   this one placement, not plain .ticket-meta -- the live-event preview
+   modal and the client portal's own timeline reuse that class without
+   this same "something moved above it" history. */
+.ticket-meta-embedded tbody tr:last-child th,
+.ticket-meta-embedded tbody tr:last-child td { border-bottom: none; }
 
 /* ---------- problematic flag (manually-set "recurring problem" marker) ---------- */
 .ticket-title-cell { display: flex; align-items: center; gap: 6px; }

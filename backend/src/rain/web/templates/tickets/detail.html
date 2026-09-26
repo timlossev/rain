@@ -106,7 +106,16 @@
   {% include "documents/_links_fragment.html" %}
   {% endwith %}
 
-  <table class="ticket-meta">
+  {# The boundary between Linked Documents and Assignee/Asset/etc below
+     -- ticket-meta's own last row used to be this section's own trailing
+     edge (Linked Documents rendered after the table, so its own default
+     row-bottom border read as the divider between them); now that Linked
+     Documents moved above it, that same row needs its border back
+     (ticket-meta-embedded, scoped to this one placement -- .ticket-meta
+     is also reused by the live-event preview modal and the client
+     portal's own timeline, neither of which has this section above it). #}
+  <hr class="section-divider">
+  <table class="ticket-meta ticket-meta-embedded">
     <tbody>
       <tr><th>Assignee</th><td>
         <form method="post" action="/tickets/{{ ticket.id }}/assign" class="form-row" style="margin:0; align-items:center;" {% if approval_will_reset %}data-confirm="{{ approval_reset_warning }}"{% endif %}>
