@@ -2,6 +2,7 @@
 {% import "_search_picker.html" as picker %}
 {% block title %}{{ "Edit" if entry else "New" }} calendar entry - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}One-time or recurring entries. Optionally emit a syslog event on each occurrence (Event Promotion Policies can react to it), or tie the entry to a document.{% endblock %}
+{% block content_class %}content-full{% endblock %}
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
@@ -9,48 +10,40 @@
   <form method="post" action="{{ '/calendar/' ~ entry.id if entry else '/calendar' }}">
     <input type="hidden" name="redirect" value="{{ redirect_to }}">
 
-    <div class="form-section">
-      <div class="form-row">
-        <div class="field"><label for="title">Title</label><input type="text" id="title" name="title" value="{{ entry.title if entry else '' }}" required autofocus></div>
-        <div class="field" style="flex:0 0 170px;"><label for="start_date">Date</label><input type="date" id="start_date" name="start_date" value="{{ prefill_date }}" required></div>
+    <div class="form-row">
+      <div class="field"><label for="title">Title</label><input type="text" id="title" name="title" value="{{ entry.title if entry else '' }}" required autofocus></div>
+      <div class="field" style="flex:0 0 170px;"><label for="start_date">Date</label><input type="date" id="start_date" name="start_date" value="{{ prefill_date }}" required></div>
+    </div>
+    <div class="field"><label for="description">Description (optional)</label><textarea id="description" name="description" rows="4">{{ entry.description if entry else "" }}</textarea></div>
+
+    <div class="form-row">
+      <div class="field">
+        <label for="recurrence">Repeats</label>
+        <select id="recurrence" name="recurrence">
+          {% for value, label in recurrence_presets %}
+          <option value="{{ value }}" {% if entry and entry.recurrence == value or (not entry and not value) %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
       </div>
-      <div class="field"><label for="description">Description (optional)</label><textarea id="description" name="description" rows="2">{{ entry.description if entry else "" }}</textarea></div>
+      <div class="field"><label for="recurrence_end">Repeat until (optional)</label><input type="date" id="recurrence_end" name="recurrence_end" value="{{ entry.recurrence_end.isoformat() if entry and entry.recurrence_end else '' }}"></div>
+      {% if entry %}
+      <div class="field field-w100"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="is_active" {% if entry.is_active %}checked{% endif %}> Active</label></div>
+      {% endif %}
     </div>
 
-    <div class="form-section">
-      <div class="form-row">
-        <div class="field">
-          <label for="recurrence">Repeats</label>
-          <select id="recurrence" name="recurrence">
-            {% for value, label in recurrence_presets %}
-            <option value="{{ value }}" {% if entry and entry.recurrence == value or (not entry and not value) %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="field"><label for="recurrence_end">Repeat until (optional)</label><input type="date" id="recurrence_end" name="recurrence_end" value="{{ entry.recurrence_end.isoformat() if entry and entry.recurrence_end else '' }}"></div>
-        {% if entry %}
-        <div class="field field-w100"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="is_active" {% if entry.is_active %}checked{% endif %}> Active</label></div>
-        {% endif %}
-      </div>
+    <h3>Syslog bridge</h3>
+    <div class="form-row">
+      <div class="field"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="emit_syslog_event" {% if entry and entry.emit_syslog_event %}checked{% endif %}> Emit syslog event on occurrence</label></div>
+      <div class="field"><label for="event_program">Event "program" value (optional)</label><input type="text" id="event_program" name="event_program" value="{{ entry.event_program if entry and entry.event_program else '' }}" placeholder="Defaults to the title"></div>
     </div>
+    <div class="field-hint" style="margin-bottom:20px;">Lets <a href="/tickets/rules/all">Event Promotion Policies</a> react to this occurrence, same as real syslog traffic.</div>
 
-    <div class="form-section">
-      <div class="form-section-title">Syslog bridge</div>
-      <div class="form-row">
-        <div class="field" style="flex:0 0 260px;"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="emit_syslog_event" {% if entry and entry.emit_syslog_event %}checked{% endif %}> Emit syslog event on occurrence</label></div>
-        <div class="field" style="flex:0 0 360px;"><label for="event_program">Event "program" value (optional)</label><input type="text" id="event_program" name="event_program" value="{{ entry.event_program if entry and entry.event_program else '' }}" placeholder="Defaults to the title"></div>
-      </div>
-      <div class="field-hint">Lets <a href="/tickets/rules/all">Event Promotion Policies</a> react to this occurrence, same as real syslog traffic.</div>
+    <h3>Related document</h3>
+    <div class="form-row">
+      {{ picker.search_picker("document_id", "/documents/search", label="Document (optional)", initial_value=selected_document_id, initial_label=selected_document_label, placeholder="Search documents...") }}
+      <div class="field"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="auto_refresh" {% if auto_refresh %}checked{% endif %}> Also auto-refresh from its webhook</label></div>
     </div>
-
-    <div class="form-section">
-      <div class="form-section-title">Related document</div>
-      <div class="form-row">
-        {{ picker.search_picker("document_id", "/documents/search", label="Document (optional)", initial_value=selected_document_id, initial_label=selected_document_label, placeholder="Search documents...") }}
-        <div class="field"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="auto_refresh" {% if auto_refresh %}checked{% endif %}> Also auto-refresh from its webhook</label></div>
-      </div>
-      <div class="field-hint">Shows up on the document's own Calendar tab (e.g. "due for revision every quarter"). Auto-refresh only takes effect for a document with a webhook configured.</div>
-    </div>
+    <div class="field-hint">Shows up on the document's own Calendar tab (e.g. "due for revision every quarter"). Auto-refresh only takes effect for a document with a webhook configured.</div>
 
     <div style="display:flex; align-items:center;">
       <button class="btn btn-primary" type="submit">{{ "Save changes" if entry else "Create entry" }}</button>
