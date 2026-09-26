@@ -469,6 +469,32 @@ async def create_field(
     return RedirectResponse("/assets/fields", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.post("/fields/{field_id:int}/edit")
+async def edit_field(
+    field_id: int,
+    asset_type_id: str = Form(""),
+    label: str = Form(...),
+    field_type: str = Form("text"),
+    select_options: str = Form(""),
+    is_required: bool = Form(False),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """field_key (and scope) are immutable once created -- see tickets/
+    router.py's own edit_field docstring for why (same reasoning, same
+    scope=="asset" guard as delete_field below)."""
+    field = await tenant_db.get(CustomField, field_id)
+    if field is not None and field.scope == "asset":
+        options = [o.strip() for o in select_options.split(",") if o.strip()] if field_type == "select" else None
+        field.asset_type_id = int(asset_type_id) if asset_type_id else None
+        field.label = label.strip()
+        field.field_type = field_type
+        field.select_options = options
+        field.is_required = is_required
+        await tenant_db.commit()
+    return RedirectResponse("/assets/fields", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.post("/fields/{field_id:int}/delete")
 async def delete_field(
     field_id: int,
