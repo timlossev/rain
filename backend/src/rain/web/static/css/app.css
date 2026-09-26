@@ -1410,6 +1410,13 @@ td.actions { text-align: right; white-space: nowrap; }
   color: var(--pill-color, #667072);
   background: color-mix(in srgb, var(--pill-color, #667072) 14%, white);
   border: 1px solid color-mix(in srgb, var(--pill-color, #667072) 32%, white);
+  /* A multi-word label ("In Progress") otherwise wraps once its column
+     gets squeezed by other columns competing for space, splitting the
+     pill across two lines -- nowrap plus the Status <th>'s own
+     .col-narrow (shrink-to-fit) together size the column to whatever
+     the longest status label actually is, tenant-configurable labels
+     included, rather than a guessed fixed width. */
+  white-space: nowrap;
 }
 .status-stepper { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .status-stepper form { display: inline-flex; }
