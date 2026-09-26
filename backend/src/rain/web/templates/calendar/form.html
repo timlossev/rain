@@ -38,7 +38,7 @@
       <div class="form-section-title">Syslog bridge</div>
       <div class="form-row">
         <div class="field" style="flex:0 0 260px;"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="emit_syslog_event" {% if entry and entry.emit_syslog_event %}checked{% endif %}> Emit syslog event on occurrence</label></div>
-        <div class="field"><label for="event_program">Event "program" value (optional)</label><input type="text" id="event_program" name="event_program" value="{{ entry.event_program if entry and entry.event_program else '' }}" placeholder="Defaults to the title"></div>
+        <div class="field" style="flex:0 0 360px;"><label for="event_program">Event "program" value (optional)</label><input type="text" id="event_program" name="event_program" value="{{ entry.event_program if entry and entry.event_program else '' }}" placeholder="Defaults to the title"></div>
       </div>
       <div class="field-hint">Lets <a href="/tickets/rules/all">Event Promotion Policies</a> react to this occurrence, same as real syslog traffic.</div>
     </div>
@@ -52,18 +52,16 @@
       <div class="field-hint">Shows up on the document's own Calendar tab (e.g. "due for revision every quarter"). Auto-refresh only takes effect for a document with a webhook configured.</div>
     </div>
 
-    <button class="btn btn-primary" type="submit">{{ "Save changes" if entry else "Create entry" }}</button>
-    <a class="btn" href="{{ redirect_to }}">Cancel</a>
+    <div style="display:flex; align-items:center;">
+      <button class="btn btn-primary" type="submit">{{ "Save changes" if entry else "Create entry" }}</button>
+      <a class="btn" href="{{ redirect_to }}" style="margin-left:8px;">Cancel</a>
+      {% if entry %}
+      <form method="post" action="/calendar/{{ entry.id }}/delete" class="inline" style="margin-left:auto;" data-confirm="Delete calendar entry '{{ entry.title }}'?">
+        <input type="hidden" name="redirect" value="{{ redirect_to }}">
+        <button class="btn btn-danger" type="submit">Delete entry</button>
+      </form>
+      {% endif %}
+    </div>
   </form>
 </div>
-
-{% if entry %}
-<div class="card" style="max-width:640px;">
-  <div class="card-title">Delete</div>
-  <form method="post" action="/calendar/{{ entry.id }}/delete" data-confirm="Delete calendar entry '{{ entry.title }}'?">
-    <input type="hidden" name="redirect" value="{{ redirect_to }}">
-    <button class="btn btn-danger" type="submit">Delete entry</button>
-  </form>
-</div>
-{% endif %}
 {% endblock %}
