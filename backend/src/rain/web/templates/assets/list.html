@@ -29,7 +29,7 @@
 
 <div class="panel-row" style="margin-bottom: 0;">
   <div class="filter-bar">
-    <a class="btn btn-primary" href="/assets/new" style="flex-shrink:0;">+ New asset</a>
+    <a class="btn btn-primary" href="/assets/new{% if selected_type %}?asset_type_id={{ selected_type }}{% endif %}" style="flex-shrink:0;">+ New asset</a>
 
     <form method="get" action="/assets" class="filter-bar-controls">
       {% if selected_sort %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
@@ -93,7 +93,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted">{% if selected_q %}No assets match &ldquo;{{ selected_q }}&rdquo;.{% else %}No assets yet. <a href="/assets/new">Add the first one</a>.{% endif %}</td></tr>
+      <tr><td colspan="6" class="muted">{% if selected_q %}No assets match &ldquo;{{ selected_q }}&rdquo;.{% else %}No assets yet. <a href="/assets/new{% if selected_type %}?asset_type_id={{ selected_type }}{% endif %}">Add the first one</a>.{% endif %}</td></tr>
       {% endfor %}
     </tbody>
   </table>

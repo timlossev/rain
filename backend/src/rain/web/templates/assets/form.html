@@ -25,7 +25,7 @@
         <label for="asset_type_id">Asset type</label>
         <select id="asset_type_id" name="asset_type_id" data-asset-type-select>
           {% for t in asset_types %}
-          <option value="{{ t.id }}" {% if asset and asset.asset_type_id == t.id or (not asset and loop.first) %}selected{% endif %}>{{ t.name }}</option>
+          <option value="{{ t.id }}" {% if asset and asset.asset_type_id == t.id or (not asset and t.id == (default_asset_type_id if default_asset_type_id is defined else none)) %}selected{% endif %}>{{ t.name }}</option>
           {% endfor %}
         </select>
       </div>

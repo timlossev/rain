@@ -140,13 +140,19 @@ async def repair_statuses(
 @router.get("/new", response_class=HTMLResponse)
 async def new_asset_form(
     request: Request,
+    asset_type_id: int | None = None,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     nav = await build_nav_context(ctx)
     asset_types = await service.list_asset_types(tenant_db, active_only=True)
-    fields = await service.fields_for_type(tenant_db, asset_types[0].id) if asset_types else []
+    # asset_type_id arrives from the assets list's own type filter (e.g.
+    # "New asset" clicked while /assets?asset_type_id=13 is active) -- fall
+    # back to the first type, same as with no filter active, if it doesn't
+    # match any active type (stale link, type since deactivated).
+    default_type_id = asset_type_id if any(t.id == asset_type_id for t in asset_types) else (asset_types[0].id if asset_types else None)
+    fields = await service.fields_for_type(tenant_db, default_type_id) if default_type_id else []
     return templates.TemplateResponse(
         request,
         "assets/form.html",
@@ -155,6 +161,7 @@ async def new_asset_form(
             "ctx": ctx,
             "asset": None,
             "asset_types": asset_types,
+            "default_asset_type_id": default_type_id,
             "asset_statuses": service.ASSET_STATUSES,
             "fields": fields,
             "values": {},
