@@ -183,12 +183,13 @@ async def call_chat_completion(
     "shared project memory / client-wide context" -- read the same way
     the jq-transform ruleset picker already reads a Document, plain
     text regardless of body_kind), the user message from the calling
-    ticket's own content, POSTs {model, messages} to config.url, and
-    pulls the reply out of the standard choices[0].message.content
-    shape every OpenAI-compatible provider returns it in. Never raises,
-    same contract as call_webhook -- a caller (a Platform Response Rule
-    action) treats a failure as a logged/reported outcome, not something
-    to propagate.
+    ticket's own content plus the full text of every document linked to
+    it (same Links tab a human triaging the ticket would open), POSTs
+    {model, messages} to config.url, and pulls the reply out of the
+    standard choices[0].message.content shape every OpenAI-compatible
+    provider returns it in. Never raises, same contract as call_webhook
+    -- a caller (a Platform Response Rule action) treats a failure as a
+    logged/reported outcome, not something to propagate.
 
     extra_user_context, when given, is appended to the user message
     after the ticket payload -- e.g. the Platform Response Rule
@@ -218,6 +219,18 @@ async def call_chat_completion(
     system_content = "\n\n".join(system_parts) or "You are a helpful IT service management assistant."
 
     user_content = _ticket_payload_text(full_ticket)
+    # Linked documents (runbooks, inventory exports, past incident write-
+    # ups -- whatever's been attached to this ticket) go in the user
+    # message too, same "prose, not a caller-authored schema" reasoning
+    # _ticket_payload_text's own docstring gives for the ticket fields
+    # themselves -- the model gets the same context a human triaging this
+    # ticket would open the Links tab to read, not just the ticket text
+    # alone.
+    links = await document_service.links_for(db, "ticket", full_ticket.id)
+    for link in links:
+        doc_text = await document_service.get_document_text_body(db, link.document_id)
+        if doc_text and doc_text.strip():
+            user_content += f"\n\nLinked document {link.document.doc_number} ({link.document.title}):\n{doc_text.strip()}"
     if extra_user_context:
         user_content += "\n\n" + extra_user_context
 

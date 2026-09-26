@@ -680,6 +680,84 @@ async def test_call_chat_completion_treats_null_message_content_as_a_failure(mon
         assert "unparseable response" in result.error
 
 
+async def test_call_chat_completion_includes_linked_document_text(monkeypatch, tmp_path):
+    """call_chat_completion's user message now includes the full text of
+    every document linked to the ticket (see that function's own
+    docstring), not just the ticket's own fields -- a human triaging the
+    ticket would open the Links tab and read those too. Captures the
+    actual request body the fake transport receives rather than asserting
+    on ChatCompletionResult, since that's the only place the assembled
+    user message is observable from outside the function."""
+    import httpx
+
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import WebhookConfig
+    from rain.modules.documents import service as document_service
+    from rain.modules.documents import storage
+    from rain.modules.tickets import service
+    from rain.modules.webhooks import service as webhook_service
+
+    tenant = await provision_tenant(slug="docrootcause", name="DocRootCause LLC")
+
+    captured_bodies = []
+
+    class _FakeResponse:
+        status_code = 200
+        text = '{"choices": [{"message": {"content": "ok"}}]}'
+
+        def json(self):
+            return {"choices": [{"message": {"content": "ok"}}]}
+
+    class _FakeAsyncClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, *, headers, json):
+            captured_bodies.append(json)
+            return _FakeResponse()
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
+    # get_document_text_body reads through storage.get_storage(), which
+    # defaults to /data/uploads (a real, writable path only inside the
+    # app's own container) -- redirected to a scratch dir so this test
+    # doesn't depend on running inside that container.
+    monkeypatch.setattr(storage, "get_storage", lambda: storage.LocalStorageBackend(tmp_path))
+
+    async with tenant_session(tenant.schema_name) as session:
+        storage.get_storage().save(f"{tenant.schema_name}/runbook.txt", b"Restart the ingest worker, then page on-call.")
+        doc = await document_service.create_document(
+            session,
+            title="Ingest outage runbook",
+            description=None,
+            filename="runbook.txt",
+            storage_key=f"{tenant.schema_name}/runbook.txt",
+            mime_type="text/plain",
+            size_bytes=45,
+            uploaded_by=None,
+        )
+        webhook = WebhookConfig(name="Triage assistant", kind="chat_completions", url="https://example.com/v1/chat/completions")
+        session.add(webhook)
+        ticket = await service.create_ticket(session, ticket_type="incident", title="Ingest pipeline down", description=None)
+        await session.commit()
+        await session.refresh(webhook)
+
+        await document_service.add_link(session, doc.id, "ticket", ticket.id, None)
+
+        result = await webhook_service.call_chat_completion(session, webhook, ticket)
+        assert result.success is True
+        user_message = captured_bodies[0]["messages"][1]["content"]
+        assert doc.doc_number in user_message
+        assert "Ingest outage runbook" in user_message
+        assert "Restart the ingest worker, then page on-call." in user_message
+
+
 async def test_analyze_root_cause_action_optionally_narrates_with_ai(monkeypatch):
     """The "Analyze root cause" action's optional webhook_id: unset, it's
     exactly the pre-existing deterministic comment (rootcause.analyze,
