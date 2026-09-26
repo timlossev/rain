@@ -9,6 +9,7 @@ from dataclasses import dataclass, field as dc_field
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from rain.db.tenant_models import Asset
@@ -53,85 +54,102 @@ async def commit_import(
 
     for i, row in enumerate(rows, start=1):
         try:
-            name_col = mapping.get("name")
-            name = str(row.get(name_col, "")).strip() if name_col else ""
-            if not name:
-                result.errors.append(f"row {i}: missing name")
-                continue
+            # A savepoint per row, not just a bare try/except: external_id
+            # is unique tenant-wide, not per asset type (see Asset's own
+            # uq_assets_external_id), so a source file reusing an id another
+            # asset type already claimed hits a real IntegrityError on
+            # flush. Postgres poisons the whole transaction once that
+            # happens -- without a savepoint to roll back to, every row
+            # after the first collision fails too (a second, unrelated
+            # "current transaction is aborted" error each time), and the
+            # final commit() crashes the entire import with a 500 instead
+            # of reporting the one bad row and continuing (confirmed live).
+            async with db.begin_nested():
+                name_col = mapping.get("name")
+                name = str(row.get(name_col, "")).strip() if name_col else ""
+                if not name:
+                    result.errors.append(f"row {i}: missing name")
+                    continue
 
-            ext_col = mapping.get("external_id")
-            external_id = str(row.get(ext_col, "")).strip() or None if ext_col else None
+                ext_col = mapping.get("external_id")
+                external_id = str(row.get(ext_col, "")).strip() or None if ext_col else None
 
-            asset = None
-            if external_id:
-                existing = await db.execute(
-                    select(Asset).where(Asset.external_id == external_id, Asset.asset_type_id == asset_type_id)
-                )
-                asset = existing.scalar_one_or_none()
-
-            if asset is None:
-                asset = Asset(
-                    ci_number=await service.next_ci_number(db),
-                    asset_type_id=asset_type_id,
-                    name=name,
-                    external_id=external_id,
-                    created_by=actor_id,
-                    updated_by=actor_id,
-                )
-                db.add(asset)
-                await db.flush()
-                result.created += 1
-            else:
-                asset.name = name
-                asset.updated_by = actor_id
-                result.updated += 1
-
-            status_col = mapping.get("status")
-            if status_col and row.get(status_col):
-                # Normalized (casefolded, whitespace/hyphens collapsed to
-                # "_") against service.ASSET_STATUSES rather than written
-                # verbatim -- a source system's own export vocabulary
-                # ("Active", "In Service", "1", ...) previously landed in
-                # the DB unchanged, which the manual edit form's <select>
-                # can never produce and which the nav sidebar's "active"
-                # count (an exact-string match) silently didn't count at
-                # all.
-                raw_status = str(row[status_col]).strip()
-                normalized = raw_status.lower().replace("-", "_").replace(" ", "_")
-                if normalized in service.ASSET_STATUSES:
-                    asset.status = normalized
-                elif asset.status not in service.ASSET_STATUSES:
-                    previous = asset.status
-                    # Only overwrite when the asset's *current* status is
-                    # itself already invalid (e.g. written by an import
-                    # before this normalization existed) -- falls back to
-                    # "active" instead of leaving it broken forever, which
-                    # is what silently kept re-imported legacy rows stuck
-                    # off the nav sidebar's count even after this fix
-                    # shipped (confirmed live: re-importing an existing
-                    # row whose stored status was already "In Service"
-                    # left it as "In Service" verbatim). A row that
-                    # already carries a *valid* status (set by hand, or by
-                    # a clean prior import) is left alone -- an unmapped
-                    # or garbled value in *this* file shouldn't clobber a
-                    # legitimately-set status.
-                    asset.status = "active"
-                    result.warnings.append(
-                        f"row {i}: unrecognized status '{raw_status}' -- reset to 'active' (was invalid: '{previous}')"
+                asset = None
+                if external_id:
+                    existing = await db.execute(
+                        select(Asset).where(Asset.external_id == external_id, Asset.asset_type_id == asset_type_id)
                     )
+                    asset = existing.scalar_one_or_none()
+
+                if asset is None:
+                    asset = Asset(
+                        ci_number=await service.next_ci_number(db),
+                        asset_type_id=asset_type_id,
+                        name=name,
+                        external_id=external_id,
+                        created_by=actor_id,
+                        updated_by=actor_id,
+                    )
+                    db.add(asset)
+                    await db.flush()
+                    result.created += 1
                 else:
-                    result.warnings.append(
-                        f"row {i}: unrecognized status '{raw_status}' -- kept existing '{asset.status}'"
-                    )
+                    asset.name = name
+                    asset.updated_by = actor_id
+                    result.updated += 1
 
-            values: dict[int, Any] = {}
-            for field_id, field_def in fields_by_id.items():
-                col = mapping.get(f"field_{field_id}")
-                if col and col in row:
-                    values[field_id] = coerce_field_value(field_def.field_type, row.get(col))
-            if values:
-                await service.set_field_values(db, asset, values)
+                status_col = mapping.get("status")
+                if status_col and row.get(status_col):
+                    # Normalized (casefolded, whitespace/hyphens collapsed to
+                    # "_") against service.ASSET_STATUSES rather than written
+                    # verbatim -- a source system's own export vocabulary
+                    # ("Active", "In Service", "1", ...) previously landed in
+                    # the DB unchanged, which the manual edit form's <select>
+                    # can never produce and which the nav sidebar's "active"
+                    # count (an exact-string match) silently didn't count at
+                    # all.
+                    raw_status = str(row[status_col]).strip()
+                    normalized = raw_status.lower().replace("-", "_").replace(" ", "_")
+                    if normalized in service.ASSET_STATUSES:
+                        asset.status = normalized
+                    elif asset.status not in service.ASSET_STATUSES:
+                        previous = asset.status
+                        # Only overwrite when the asset's *current* status is
+                        # itself already invalid (e.g. written by an import
+                        # before this normalization existed) -- falls back to
+                        # "active" instead of leaving it broken forever, which
+                        # is what silently kept re-imported legacy rows stuck
+                        # off the nav sidebar's count even after this fix
+                        # shipped (confirmed live: re-importing an existing
+                        # row whose stored status was already "In Service"
+                        # left it as "In Service" verbatim). A row that
+                        # already carries a *valid* status (set by hand, or by
+                        # a clean prior import) is left alone -- an unmapped
+                        # or garbled value in *this* file shouldn't clobber a
+                        # legitimately-set status.
+                        asset.status = "active"
+                        result.warnings.append(
+                            f"row {i}: unrecognized status '{raw_status}' -- reset to 'active' (was invalid: '{previous}')"
+                        )
+                    else:
+                        result.warnings.append(
+                            f"row {i}: unrecognized status '{raw_status}' -- kept existing '{asset.status}'"
+                        )
 
+                values: dict[int, Any] = {}
+                for field_id, field_def in fields_by_id.items():
+                    col = mapping.get(f"field_{field_id}")
+                    if col and col in row:
+                        values[field_id] = coerce_field_value(field_def.field_type, row.get(col))
+                if values:
+                    await service.set_field_values(db, asset, values)
+
+        except IntegrityError as exc:
+            # Most commonly a source file's external_id colliding with
+            # another asset (any type -- see the comment above), surfaced
+            # here instead of as this row's raw asyncpg detail text.
+            reason = "duplicate external ID" if "external_id" in str(exc.orig) else str(exc.orig)
+            result.errors.append(f"row {i}: {reason}")
         except Exception as exc:  # one bad row shouldn't abort the whole import
             result.errors.append(f"row {i}: {exc}")
 
