@@ -225,18 +225,22 @@ retention window regardless.
 
 ### Custom Fields (tickets)
 
-Records Authority > Custom Fields. None defined by default. Unlike an
-asset custom field, a ticket field always applies tenant-wide across
-all three types -- no per-type scoping, no Required option (several
-automated paths -- Event Promotion Policies, the client portal, Service
-Catalog -- create tickets without knowing about custom fields, so a
-required one would silently break those). A table lists every field
-(key, label, type). "+ New custom field":
+Records Authority > Custom Fields. None defined by default. A ticket
+field applies tenant-wide by default, same as before, but can also be
+scoped to just one of the three types (e.g. a field that only makes
+sense on a Change) -- leave it on "All types" for the old behavior. No
+Required option regardless of scope (several automated paths -- Event
+Promotion Policies, the client portal, Service Catalog -- create
+tickets without knowing about custom fields, so a required one would
+silently break those). A table lists every field (key, label, type,
+ticket type). "+ New custom field":
 
 - Key: internal, lowercase identifier.
 - Label: shown on forms.
 - Field type: Text, Number, Yes/No, Date, URL, Email, Select.
 - Select options (comma-separated), for Select only.
+- Ticket type: "All types" (default), or Incident/Vulnerability/Change
+  to hide it everywhere else.
 
 Once defined, a field is capturable on the New ticket form, editable on
 the detail page, and importable/exportable alongside built-in columns.
@@ -624,7 +628,9 @@ Header: Download, Export to PDF, Delete. Tabs:
   from webhook" appears once a webhook is set, with the last-refresh
   timestamp; each refresh diffs against what's stored.
 - **Links**: every linked ticket/asset, with Unlink, and an "Add link"
-  control (pill selector, then a ticket number or asset ID).
+  control (pill selector, then a type-to-search picker by title/name --
+  same predictive-search field every other ticket/asset reference in
+  the app uses, not a raw number typed from memory).
 - **Calendar**: every tied calendar entry (Title, Date, Repeats, an
   auto-refresh badge), with Edit/Delete and "+ New reminder".
 
@@ -902,11 +908,12 @@ carry across -- without it, a matching-email account is recognized but
 a new one has no password. Importing upserts by name/key; a local user
 is never overwritten once it exists.
 
-The same Import expects any tenant bundle, including the seventeen
+The same Import expects any tenant bundle, including the twenty
 starter compliance-register templates under
-`docs/compliance-templates/` --
+`docs/compliance-templates/bundles/` --
 import one for a usable register in a few clicks instead of building
-the asset type by hand. All but the three ticket-scoped templates
-(POA&M, Nessus, FedRAMP OCR) are an asset type plus its custom fields;
+the asset type by hand. All but the four ticket-scoped templates
+(POA&M, Nessus, FedRAMP OCR, FedRAMP SCN) are an asset type plus its
+custom fields;
 see [`docs/compliance-templates/README.md`](compliance-templates/README.md)
 for what each one seeds.

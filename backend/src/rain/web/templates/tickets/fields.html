@@ -2,7 +2,7 @@
 {% import "_pagination.html" as pg with context %}
 {% import "_modal.html" as modal %}
 {% block title %}Custom Fields - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Define extra fields on tickets - tenant-wide, applying to every ticket type - with a type and select options where applicable.{% endblock %}
+{% block help_text %}Define extra fields on tickets - tenant-wide by default, or scoped to just one ticket type (e.g. fields that only make sense on a Change) - with a type and select options where applicable.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
   <a class="btn btn-sm" href="/tickets/fields/import-pack">Import field pack</a>
@@ -11,13 +11,14 @@
 
 <div class="card">
   <table>
-    <thead><tr><th>Key</th><th>Label</th><th>Type</th><th></th></tr></thead>
+    <thead><tr><th>Key</th><th>Label</th><th>Type</th><th>Ticket type</th><th></th></tr></thead>
     <tbody>
       {% for f in page.items %}
       <tr>
         <td class="muted">{{ f.field_key }}</td>
         <td>{{ f.label }}</td>
         <td><span class="badge">{{ f.field_type }}</span></td>
+        <td>{% if f.ticket_type %}<span class="badge">{{ f.ticket_type | capitalize }}</span>{% else %}<span class="muted">All types</span>{% endif %}</td>
         <td class="actions">
           <form class="inline" method="post" action="/tickets/fields/{{ f.id }}/delete" data-confirm="Delete field '{{ f.label }}'?">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
@@ -25,7 +26,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="4" class="muted">No custom fields yet.</td></tr>
+      <tr><td colspan="5" class="muted">No custom fields yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -55,6 +56,16 @@
         <label for="select_options">Select options (comma-separated, if type = Select)</label>
         <input type="text" id="select_options" name="select_options" placeholder="low, medium, high">
       </div>
+    </div>
+    <div class="field">
+      <label for="ticket_type">Ticket type</label>
+      <select id="ticket_type" name="ticket_type">
+        <option value="">All types</option>
+        {% for t in ticket_types %}
+        <option value="{{ t }}">{{ t | capitalize }}</option>
+        {% endfor %}
+      </select>
+      <div class="field-hint">Leave "All types" for a field that makes sense everywhere; pick one to hide it from the other two.</div>
     </div>
     <button class="btn btn-primary" type="submit">Add field</button>
   </form>

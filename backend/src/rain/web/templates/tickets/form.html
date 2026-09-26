@@ -15,7 +15,7 @@
     <div class="form-row">
       <div class="field">
         <label for="ticket_type">Type</label>
-        <select id="ticket_type" name="ticket_type">
+        <select id="ticket_type" name="ticket_type" data-action-type-select>
           {% for t in ticket_types %}
           <option value="{{ t }}" {% if selected_type == t %}selected{% endif %}>{{ t }}</option>
           {% endfor %}
@@ -61,7 +61,7 @@
 
     {% if fields %}
     <h3>Custom fields</h3>
-    <div class="custom-fields-grid" data-fields-container>
+    <div class="custom-fields-list" data-fields-container>
       {% include "tickets/_fields_fragment.html" %}
     </div>
     {% endif %}

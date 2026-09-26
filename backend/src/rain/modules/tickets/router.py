@@ -491,12 +491,14 @@ async def create_ticket(
     if ticket_type == "change":
         await service.start_approval(tenant_db, ticket, int(approval_flow_id) if approval_flow_id else None)
 
-    # Custom field capture: tenant-wide (rain.modules.tickets.service.
-    # ticket_fields, not filtered by ticket_type), same "read the field
-    # list, then only trust field_<id> keys it names" pattern as
-    # rain.modules.assets.router.create_asset -- never trusts arbitrary
-    # form keys directly.
-    fields = await service.ticket_fields(tenant_db)
+    # Custom field capture: only the fields that apply to the type just
+    # created (rain.modules.tickets.service.ticket_fields' own
+    # ticket_type filter), same "read the field list, then only trust
+    # field_<id> keys it names" pattern as rain.modules.assets.router.
+    # create_asset -- never trusts arbitrary form keys directly. Filtering
+    # here (not just hiding the field client-side) means a raw POST can't
+    # smuggle in a value for a field that isn't meant for this ticket type.
+    fields = await service.ticket_fields(tenant_db, ticket_type=ticket_type)
     if fields:
         form = await request.form()
         values = {}
@@ -582,6 +584,31 @@ async def assign_ticket(
             changed_by_user_id=ctx.user.id,
         )
     return RedirectResponse(f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/search")
+async def search_tickets_route(
+    q: str = "",
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Backs a predictive-search field for picking a ticket by title or
+    number (e.g. the document detail page's Links tab -- picking a
+    ticket to link used to require already knowing its exact number,
+    the one reference picker in the app that wasn't type-to-search).
+    Same shape as search_tickets_assets below, one query over Ticket
+    instead of Asset."""
+    q = q.strip()
+    if len(q) < 2:
+        return []
+    stmt = (
+        select(Ticket)
+        .where(Ticket.title.ilike(f"%{q}%") | Ticket.ticket_number.ilike(f"%{q}%"))
+        .order_by(Ticket.created_at.desc())
+        .limit(8)
+    )
+    result = await tenant_db.execute(stmt)
+    return [{"id": t.id, "label": f"{t.ticket_number}: {t.title}"} for t in result.scalars()]
 
 
 @router.get("/assets/search")
@@ -733,7 +760,7 @@ async def ticket_detail(
     is_watching = await service.is_watching(tenant_db, ticket.id, ctx.user.id)
     escalation_settings = await get_tenant_configs(tenant_db, ["escalation_webhook_id", "escalate_button_label"])
 
-    fields = await service.ticket_fields(tenant_db)
+    fields = await service.ticket_fields(tenant_db, ticket_type=ticket.ticket_type)
     field_values = {fv.field_id: fv.value for fv in ticket.field_values}
 
     return templates.TemplateResponse(
@@ -785,7 +812,7 @@ async def ticket_pdf(
         | ({d.decided_by_user_id for d in ticket.approval.decisions} if ticket.approval else set())
     )
     asset_names = await service.asset_names(tenant_db, {ticket.asset_id} | service.asset_change_ids(ticket))
-    fields = await service.ticket_fields(tenant_db)
+    fields = await service.ticket_fields(tenant_db, ticket_type=ticket.ticket_type)
     values = {fv.field_id: fv.value for fv in ticket.field_values}
     pdf_bytes = render_pdf(
         "pdf/ticket.html",
@@ -837,7 +864,7 @@ async def save_fields(
     ticket = await tenant_db.get(Ticket, ticket_id)
     if ticket is not None:
         form = await request.form()
-        fields = await service.ticket_fields(tenant_db)
+        fields = await service.ticket_fields(tenant_db, ticket_type=ticket.ticket_type)
         values = {}
         for f in fields:
             raw = form.get(f"field_{f.id}")
@@ -1093,7 +1120,7 @@ async def fields_list(
     page_size = await get_tenant_config(tenant_db, "default_page_size")
     field_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     return templates.TemplateResponse(
-        request, "tickets/fields.html", {**nav, "ctx": ctx, "page": field_page, "error": None}
+        request, "tickets/fields.html", {**nav, "ctx": ctx, "page": field_page, "error": None, "ticket_types": TICKET_TYPES}
     )
 
 
@@ -1103,6 +1130,7 @@ async def create_field(
     label: str = Form(...),
     field_type: str = Form("text"),
     select_options: str = Form(""),
+    ticket_type: str = Form(""),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
@@ -1110,12 +1138,16 @@ async def create_field(
     # 0037 migration's docstring) and no is_required (see rain.modules.
     # tickets.schemas' note on why a required ticket-scoped field isn't
     # supported) -- both deliberate differences from the asset-scoped
-    # twin of this route.
+    # twin of this route. ticket_type is asset_type_id's ticket-scoped
+    # counterpart instead (migration 0052): "" from the form's own "All
+    # types" option becomes None, same "blank means every type" meaning
+    # asset_type_id already gives a blank asset-type pick.
     options = [o.strip() for o in select_options.split(",") if o.strip()] if field_type == "select" else None
     tenant_db.add(
         CustomField(
             scope="ticket",
             asset_type_id=None,
+            ticket_type=ticket_type.strip() or None,
             field_key=field_key.strip().lower(),
             label=label.strip(),
             field_type=field_type,

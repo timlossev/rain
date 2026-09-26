@@ -1126,17 +1126,31 @@ async def save_export_profile(
     return profile
 
 
-async def ticket_fields(db: AsyncSession) -> list[CustomField]:
+async def ticket_fields(db: AsyncSession, ticket_type: str | None = None) -> list[CustomField]:
     """Ticket-scoped half of the shared custom_fields table -- see that
     model's own docstring for why assets and tickets share one table
-    (scope) instead of two. Unlike rain.modules.assets.service.
-    fields_for_type, there's no asset_type_id to filter by: a ticket-scoped
-    CustomField is always tenant-wide (asset_type_id is always NULL for
-    these rows -- see the 0037 migration's docstring), so every field here
-    applies to every ticket type."""
-    result = await db.execute(
-        select(CustomField).where(CustomField.scope == "ticket").order_by(CustomField.sort_order, CustomField.label)
-    )
+    (scope) instead of two. There's no asset_type_id to filter by (a
+    ticket-scoped CustomField's asset_type_id is always NULL -- see the
+    0037 migration's docstring), but a ticket-scoped field can still be
+    scoped to one ticket_type (added alongside FedRAMP SCN fields, which
+    are meaningful on a Change ticket and nowhere else) -- NULL there
+    means "every ticket type," same convention asset_type_id already
+    uses for "every asset type."
+
+    ticket_type=None (the default) returns every ticket-scoped field
+    regardless of its own ticket_type -- callers that aren't rendering
+    one specific ticket instance (export/import column lists, the
+    Custom Fields admin screen, the field-key uniqueness check) want the
+    full set. Callers rendering or saving one actual ticket's fields
+    (the New Ticket form's initial fetch, ticket creation, the detail
+    page, its own field-save endpoint, PDF export) pass the ticket's own
+    type and get back only fields that apply to it: ticket_type IS NULL
+    or matches exactly."""
+    stmt = select(CustomField).where(CustomField.scope == "ticket")
+    if ticket_type is not None:
+        stmt = stmt.where(CustomField.ticket_type.is_(None) | (CustomField.ticket_type == ticket_type))
+    stmt = stmt.order_by(CustomField.sort_order, CustomField.label)
+    result = await db.execute(stmt)
     return list(result.scalars())
 
 

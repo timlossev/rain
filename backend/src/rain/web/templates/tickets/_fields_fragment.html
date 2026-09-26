@@ -1,6 +1,6 @@
 {% for f in fields %}
 {% set val = values.get(f.id) %}
-<div class="field">
+<div class="field" data-action-fields="{{ f.ticket_type or 'incident,vulnerability,change' }}">
   <label for="field_{{ f.id }}">{{ f.label }}</label>
   {% if f.field_type == "boolean" %}
     <label class="checkbox-row"><input type="checkbox" id="field_{{ f.id }}" name="field_{{ f.id }}" {% if val %}checked{% endif %}> Yes</label>

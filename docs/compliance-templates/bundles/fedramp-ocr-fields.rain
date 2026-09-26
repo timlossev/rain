@@ -1,7 +1,7 @@
 {
   "bundle_type": "rain_tenant_config",
   "bundle_version": 1,
-  "exported_at": "2026-09-05T00:00:00+00:00",
+  "exported_at": "2026-09-25T00:00:00+00:00",
   "source_tenant_slug": "template",
   "source_tenant_name": "FedRAMP Ongoing Certification Report (OCR) fields starter template",
   "secrets_included": false,
@@ -9,6 +9,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "vulnerability",
       "field_key": "accepted_vulnerability",
       "label": "Accepted vulnerability (OCR)",
       "field_type": "boolean",
@@ -19,6 +20,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "vulnerability",
       "field_key": "acceptance_justification",
       "label": "Acceptance justification",
       "field_type": "text",
@@ -29,6 +31,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "vulnerability",
       "field_key": "accepted_by",
       "label": "Accepted by",
       "field_type": "text",
@@ -39,6 +42,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "vulnerability",
       "field_key": "acceptance_date",
       "label": "Acceptance date",
       "field_type": "date",
@@ -49,6 +53,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "vulnerability",
       "field_key": "next_ocr_period",
       "label": "Next OCR reporting period",
       "field_type": "date",
@@ -59,6 +64,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "incident",
       "field_key": "fedramp_reportable_incident",
       "label": "FedRAMP reportable incident",
       "field_type": "boolean",
@@ -69,6 +75,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "transformative_change",
       "label": "Transformative change",
       "field_type": "boolean",

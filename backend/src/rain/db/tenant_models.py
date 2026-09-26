@@ -92,20 +92,33 @@ class CustomField(TenantBase):
     ExportProfile.scope). `asset_type_id` only ever applies to an
     asset-scoped row (NULL there means "every asset type in this
     tenant"); a ticket-scoped row always carries NULL, since tickets
-    don't have per-tenant *types* the way assets do -- a ticket-scoped
-    field applies tenant-wide, across all three ticket types, not to one
-    of them. See rain.modules.tickets.schemas' own field-value module
-    docstring for why a ticket-scoped field also never honors
-    is_required, unlike an asset-scoped one."""
+    don't have per-tenant *types* the way assets do. See
+    rain.modules.tickets.schemas' own field-value module docstring for
+    why a ticket-scoped field also never honors is_required, unlike an
+    asset-scoped one.
+
+    `ticket_type` (migration 0052) is asset_type_id's ticket-scoped
+    counterpart: only ever set on a ticket-scoped row, NULL there means
+    "every ticket type" (the only behavior before this column existed,
+    and still the default for a field created with no type picked) --
+    one of "incident"/"vulnerability"/"change" scopes it to just that
+    type instead. Added because FedRAMP SCN fields (meaningful on a
+    Change ticket and nowhere else) rendering on every incident and
+    vulnerability too, unfilled, was confusing enough to ask about --
+    rain.modules.tickets.service.ticket_fields' own ticket_type param is
+    what actually filters by it."""
 
     __tablename__ = "custom_fields"
     __table_args__ = (
-        UniqueConstraint("scope", "asset_type_id", "field_key", name="uq_custom_fields_scope_type_key"),
+        UniqueConstraint(
+            "scope", "asset_type_id", "ticket_type", "field_key", name="uq_custom_fields_scope_type_key"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     scope: Mapped[str] = mapped_column(String(10), default="asset", server_default="asset")
     asset_type_id: Mapped[int | None] = mapped_column(ForeignKey("asset_types.id", ondelete="CASCADE"), nullable=True)
+    ticket_type: Mapped[str | None] = mapped_column(String(15), nullable=True)
     field_key: Mapped[str] = mapped_column(String(63))
     label: Mapped[str] = mapped_column(String(255))
     # text | number | boolean | date | url | email | select -- validated at

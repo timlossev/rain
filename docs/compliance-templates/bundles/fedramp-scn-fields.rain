@@ -1,7 +1,7 @@
 {
   "bundle_type": "rain_tenant_config",
   "bundle_version": 1,
-  "exported_at": "2026-09-23T00:00:00+00:00",
+  "exported_at": "2026-09-25T00:00:00+00:00",
   "source_tenant_slug": "template",
   "source_tenant_name": "FedRAMP Significant Change Notification (SCN) fields starter template",
   "secrets_included": false,
@@ -9,16 +9,21 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "scn_change_type",
       "label": "SCN change type",
       "field_type": "select",
-      "select_options": ["Adaptive", "Transformative"],
+      "select_options": [
+        "Adaptive",
+        "Transformative"
+      ],
       "is_required": false,
       "sort_order": 0
     },
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "scn_change_type_explanation",
       "label": "SCN categorization explanation",
       "field_type": "text",
@@ -29,6 +34,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "scn_reason",
       "label": "SCN reason for change",
       "field_type": "text",
@@ -39,6 +45,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "scn_customer_impact",
       "label": "SCN customer impact",
       "field_type": "text",
@@ -49,6 +56,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "scn_assessor_name",
       "label": "SCN assessor name",
       "field_type": "text",
@@ -59,6 +67,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "scn_related_vulnerability",
       "label": "SCN related vulnerability",
       "field_type": "text",
@@ -69,6 +78,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "scn_plan_summary",
       "label": "SCN plan and timeline summary",
       "field_type": "text",
@@ -79,6 +89,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "scn_planned_start",
       "label": "SCN planned start",
       "field_type": "date",
@@ -89,6 +100,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "scn_planned_completion",
       "label": "SCN planned completion",
       "field_type": "date",
@@ -99,6 +111,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "scn_milestones",
       "label": "SCN milestones (semicolon-separated: description | YYYY-MM-DD; description | YYYY-MM-DD)",
       "field_type": "text",
@@ -109,6 +122,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "scn_impacted_controls",
       "label": "SCN impacted KSIs or Rev5 controls (comma-separated)",
       "field_type": "text",
@@ -119,6 +133,7 @@
     {
       "scope": "ticket",
       "asset_type_key": null,
+      "ticket_type": "change",
       "field_key": "scn_impact_analysis",
       "label": "SCN business or security impact analysis",
       "field_type": "text",

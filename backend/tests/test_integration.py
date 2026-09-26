@@ -317,6 +317,86 @@ async def test_ticket_custom_fields_scope_isolation_and_import_export():
         assert len(change_result.errors) == 1
 
 
+async def test_ticket_fields_scoped_to_one_ticket_type():
+    """CustomField.ticket_type (migration 0052): a field with one set is
+    invisible to service.ticket_fields for any other type, still visible
+    with no filter at all (the Custom Fields admin list's own view), and
+    still applies everywhere with ticket_type left unset -- the same
+    "NULL means every type" convention asset_type_id already has for
+    asset-scoped fields. Also covers config_bundle's import path
+    upgrading an existing ticket_type=None field (the only kind that
+    could exist before this migration) to a specific type on re-import,
+    rather than treating it as a second, separate field."""
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.db.tenant_models import CustomField
+    from rain.modules.admin import config_bundle
+    from rain.modules.tickets import service
+
+    tenant = await provision_tenant(slug="fieldscope", name="Fieldscope Inc")
+
+    async with tenant_session(tenant.schema_name) as session:
+        change_only = CustomField(scope="ticket", asset_type_id=None, ticket_type="change", field_key="cab_ref", label="CAB Reference", field_type="text")
+        every_type = CustomField(scope="ticket", asset_type_id=None, ticket_type=None, field_key="notes", label="Notes", field_type="text")
+        session.add_all([change_only, every_type])
+        await session.commit()
+
+        # No filter (the admin fields list, export column picker, ...)
+        # still sees both, unchanged from before this column existed.
+        unfiltered = await service.ticket_fields(session)
+        assert {f.field_key for f in unfiltered} == {"cab_ref", "notes"}
+
+        # An incident sees only the tenant-wide field.
+        incident_fields = await service.ticket_fields(session, ticket_type="incident")
+        assert {f.field_key for f in incident_fields} == {"notes"}
+
+        # A change sees both -- its own scoped field, plus the tenant-wide one.
+        change_fields = await service.ticket_fields(session, ticket_type="change")
+        assert {f.field_key for f in change_fields} == {"cab_ref", "notes"}
+
+        # config_bundle import: re-importing cab_ref (still looked up by
+        # scope+asset_type_id+field_key, not ticket_type) with an explicit
+        # ticket_type upgrades the existing row in place.
+        generic_ref = CustomField(scope="ticket", asset_type_id=None, ticket_type=None, field_key="poc", label="Point of contact", field_type="text")
+        session.add(generic_ref)
+        await session.commit()
+
+        result = await config_bundle.apply_tenant_bundle(
+            session,
+            tenant,
+            {
+                "bundle_type": "rain_tenant_config",
+                "bundle_version": 1,
+                "custom_fields": [
+                    {
+                        "scope": "ticket",
+                        "asset_type_key": None,
+                        "ticket_type": "vulnerability",
+                        "field_key": "poc",
+                        "label": "Point of contact",
+                        "field_type": "text",
+                        "select_options": None,
+                        "is_required": False,
+                        "sort_order": 0,
+                    }
+                ],
+            },
+            updated_by=None,
+        )
+        assert result.warnings == []
+
+        reloaded_poc = (
+            await session.execute(select(CustomField).where(CustomField.field_key == "poc"))
+        ).scalar_one()
+        assert reloaded_poc.id == generic_ref.id  # updated in place, not duplicated
+        assert reloaded_poc.ticket_type == "vulnerability"
+
+        vuln_fields = await service.ticket_fields(session, ticket_type="vulnerability")
+        assert {f.field_key for f in vuln_fields} == {"notes", "poc"}
+        incident_fields_after = await service.ticket_fields(session, ticket_type="incident")
+        assert {f.field_key for f in incident_fields_after} == {"notes"}  # poc no longer shows here
+
+
 async def test_document_tags_search_and_calendar_link():
     """Covers migration 0039's IMMUTABLE-function workaround for folding
     an array into a GENERATED tsvector (a search on a tag with nothing

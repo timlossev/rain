@@ -393,6 +393,7 @@ async def build_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, *, includ
         {
             "scope": f.scope,
             "asset_type_key": asset_type_key_by_id.get(f.asset_type_id) if f.asset_type_id else None,
+            "ticket_type": f.ticket_type,
             "field_key": f.field_key,
             "label": f.label,
             "field_type": f.field_type,
@@ -702,6 +703,13 @@ async def apply_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, data: dic
         existing.select_options = entry.get("select_options")
         existing.is_required = entry.get("is_required", False)
         existing.sort_order = entry.get("sort_order", 0)
+        # Not part of the lookup above on purpose: an existing field
+        # imported before ticket_type existed (or before a template
+        # added it) has ticket_type=None -- re-importing should scope it
+        # to what the template now says, not leave it stranded as a
+        # separate never-matched row.
+        if entry["scope"] == "ticket":
+            existing.ticket_type = entry.get("ticket_type") or None
     await tenant_db.flush()
 
     for entry in data.get("ticket_statuses", []):
