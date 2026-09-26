@@ -166,7 +166,6 @@
         {{ picker.search_picker("ack_user_id", "/documents/users/search", label="or an individual person", placeholder="Search by name or email...") }}
         <button class="btn btn-sm" type="submit">{{ "Re-request" if doc.ack_requested_at else "Request" }}</button>
       </form>
-      <div class="field-hint">Emails whoever's picked, and re-opens acknowledgment for anyone already acknowledged if you request again later. Shows up under this tenant's own "Pending Actions" in the client portal for whoever's required.</div>
     </div>
   </div>
 
@@ -187,9 +186,7 @@
         <form method="post" action="/documents/{{ doc.id }}/landing-page" class="inline">
           <label class="checkbox-row"><input type="checkbox" name="show_on_landing_page" onchange="this.form.submit()" {% if doc.show_on_landing_page %}checked{% endif %}> Show on landing page</label>
         </form>
-        {% if body_kind %}
-        <div class="field-hint">Rendered {{ "as Markdown" if body_kind == "markdown" else "as plain text" }} on Home once checked{% if not doc.show_on_landing_page %} - not checked yet{% endif %}.</div>
-        {% else %}
+        {% if not body_kind %}
         <div class="field-hint">This document has no inline body (not a .txt/.md file) - checking this does nothing until it does.</div>
         {% endif %}
       </div>
@@ -221,12 +218,12 @@
       </div>
       <div class="field">
         <label class="checkbox-row"><input type="checkbox" name="webhook_response_is_json" {% if doc.webhook_response_is_json %}checked{% endif %}> Interpret response as JSON</label>
-        <div class="field-hint">Parses the webhook's response body as a JSON object before saving it. Invalid JSON is never treated as an error - it just falls back to saving the raw response verbatim, same as leaving this off.</div>
+        <div class="field-hint">Invalid JSON falls back to saving the raw response.</div>
       </div>
       <div class="field">
         <label for="webhook_json_path">Extract payload from JSONPath</label>
         <input type="text" id="webhook_json_path" name="webhook_json_path" value="{{ doc.webhook_json_path or '' }}" placeholder="$.data.body (optional)">
-        <div class="field-hint">Only applies when "Interpret response as JSON" is on. Pulls one value out of the parsed object to save as the document's content; left blank, the whole object is saved, pretty-printed.</div>
+        <div class="field-hint">Pulls one value from the parsed response; blank saves the whole object.</div>
       </div>
     </form>
 
@@ -237,7 +234,7 @@
           <label class="checkbox-row"><input type="checkbox" name="refresh_on_view" onchange="this.form.submit()" {% if doc.refresh_on_view %}checked{% endif %}> Refresh when rendering</label>
         </form>
         {% if doc.webhook_id %}
-        <div class="field-hint">Calls the webhook above every time this document's content is actually displayed - opening this page, or (if also flagged "Show on landing page" under Properties) every load of Home. A successful call shows the new content (and saves it, same as clicking "Refresh from webhook" below); a failed call quietly falls back to the last saved version - this page shows a small notice when that happens, Home shows nothing and just falls back silently.</div>
+        <div class="field-hint">Calls the webhook and saves its response every time this document is displayed. Falls back to the last saved version if the call fails.</div>
         {% else %}
         <div class="field-hint">No webhook configured yet - pick one above, or checking this does nothing.</div>
         {% endif %}
@@ -308,7 +305,7 @@
       <div style="flex:0 0 320px;" data-action-fields="asset" hidden>
         {{ picker.search_picker("asset_id", "/tickets/assets/search", label="Asset", placeholder="Search assets...") }}
       </div>
-      <button class="btn btn-primary btn-sm" type="submit" style="flex:0 0 auto;">Add link</button>
+      <button class="btn btn-primary" type="submit" style="flex:0 0 auto;">Add link</button>
     </form>
   </div>
 
