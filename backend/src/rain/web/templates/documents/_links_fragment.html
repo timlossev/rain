@@ -8,7 +8,13 @@
 {% set _wrap = wrap_card if wrap_card is defined else true %}
 {% set _link_modal_id = "link-doc-" ~ linked_type ~ "-" ~ linked_id %}
 {% if _wrap %}<div class="card">{% endif %}
-  <div class="card-title"{% if not _wrap %} style="margin-top:18px;"{% endif %}>Linked Documents{% if links %} ({{ links | length }}){% endif %}</div>
+  <div class="doc-link-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+    <div class="card-title"{% if not _wrap %} style="margin-top:18px;"{% endif %}>Linked Documents{% if links %} ({{ links | length }}){% endif %}</div>
+    <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0;">
+      <a class="btn btn-sm" href="/documents/new?linked_type={{ linked_type }}&linked_id={{ linked_id }}" title="Create a new document, linked here automatically"><span class="nav-icon">{{ nav_icon("plus") }}</span> Create a new document</a>
+      <button type="button" class="btn btn-sm" data-modal-open="modal-{{ _link_modal_id }}"><span class="nav-icon">{{ nav_icon("link") }}</span> Link an existing document</button>
+    </div>
+  </div>
   <div class="doc-link-list">
     {% for link in links %}
     <div class="doc-link-row">
@@ -28,10 +34,6 @@
     {% else %}
     <p class="muted">No documents linked yet.</p>
     {% endfor %}
-  </div>
-  <div style="margin-top:10px; display:flex; gap:8px;">
-    <a class="btn btn-sm" href="/documents/new?linked_type={{ linked_type }}&linked_id={{ linked_id }}" title="Create a brand-new document, linked here automatically">+ Create &amp; link new document</a>
-    {{ modal.trigger_button(_link_modal_id, "+ Link an existing document", variant="btn-sm") }}
   </div>
   {% call modal.modal(_link_modal_id, "Link an existing document") %}
     <form method="post" action="/documents/link">

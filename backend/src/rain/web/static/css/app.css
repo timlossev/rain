@@ -244,6 +244,11 @@ p { margin: 0 0 1em; }
 }
 .row-menu-btn:hover, .row-menu-btn[aria-expanded="true"] { color: var(--text); background: var(--surface-sunken); border-color: var(--border); }
 .row-menu-btn .nav-icon { width: 16px; height: 16px; color: inherit; }
+/* .nav-icon's own default (17px, --sidebar-text-dim) assumes the dark
+   sidebar it was designed for -- wrong color and a touch large once a
+   nav_icon is used inside an ordinary light-background .btn (e.g. the
+   Linked Documents section's own Create/Link buttons). */
+.btn .nav-icon { width: 15px; height: 15px; color: inherit; }
 .row-menu-panel { min-width: 180px; padding: 6px; }
 .row-menu-item {
   all: unset;
