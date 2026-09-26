@@ -11,7 +11,19 @@
 <a class="sort-th" href="/tickets?{{ filters.qs("/tickets", sort=key, dir=next_dir) }}">{{ label }}{% if selected_sort == key %}<span class="sort-arrow" aria-hidden="true">{{ "&uarr;" | safe if selected_dir == "asc" else "&darr;" | safe }}</span>{% endif %}</a>
 {% endmacro %}
 
-{{ filters.render_filter_bar("/tickets", statuses) }}
+{% call filters.render_filter_bar("/tickets", statuses) %}
+{# Row spacing, not record count -- purely a client-side CSS toggle
+   (app.js's [data-density-toggle], persisted in localStorage) on the
+   table below, same "remembered per browser" treatment the sidebar's
+   own collapse state already gets. Doesn't touch how many tickets are
+   fetched; see the per-page-size tenant setting for that. Lives in the
+   filter bar itself (not above the table) so it reads as one of the
+   bar's own view options rather than a second, separate control strip. #}
+<div class="density-toggle" data-density-toggle role="group" aria-label="Row spacing">
+  <button type="button" class="btn btn-sm" data-density="normal">Normal</button>
+  <button type="button" class="btn btn-sm" data-density="condensed">Condensed</button>
+</div>
+{% endcall %}
 
 <form id="tickets-bulk-close-form" method="post" action="/tickets/bulk-close" data-confirm="">
   <input type="hidden" name="ticket_ids" data-bulk-select-ids>
@@ -19,21 +31,10 @@
 </form>
 
 <div class="card">
-  <div class="panel-row" style="justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
-    {# Row spacing, not record count -- purely a client-side CSS toggle
-       (app.js's [data-density-toggle], persisted in localStorage) on the
-       table below, same "remembered per browser" treatment the sidebar's
-       own collapse state already gets. Doesn't touch how many tickets are
-       fetched; see the per-page-size tenant setting for that. #}
-    <div class="density-toggle" data-density-toggle role="group" aria-label="Row spacing">
-      <button type="button" class="btn btn-sm" data-density="normal">Normal</button>
-      <button type="button" class="btn btn-sm" data-density="condensed">Condensed</button>
-    </div>
-    {# Hidden until >=1 row is checked (app.js's [data-bulk-select]). #}
-    <div class="bulk-actions-bar" data-bulk-select-bar data-bulk-select-verb="closed" hidden style="display:flex; align-items:center; gap:12px;">
-      <span class="muted" data-bulk-select-count>0 selected</span>
-      <button type="submit" form="tickets-bulk-close-form" class="btn btn-sm btn-primary">Mass close</button>
-    </div>
+  {# Hidden until >=1 row is checked (app.js's [data-bulk-select]). #}
+  <div class="bulk-actions-bar" data-bulk-select-bar data-bulk-select-verb="closed" hidden style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+    <span class="muted" data-bulk-select-count>0 selected</span>
+    <button type="submit" form="tickets-bulk-close-form" class="btn btn-sm btn-primary">Mass close</button>
   </div>
   <table class="tickets-table" data-bulk-select data-density-target>
     <thead>

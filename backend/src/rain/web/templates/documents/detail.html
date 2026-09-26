@@ -292,8 +292,8 @@
       </tbody>
     </table>
 
-    <form method="post" action="/documents/{{ doc.id }}/link" class="form-row" style="margin-top:12px; align-items:end;">
-      <div class="field" style="margin-bottom:0;">
+    <form method="post" action="/documents/{{ doc.id }}/link" class="form-row" style="margin-top:12px; align-items:end; flex-wrap:wrap;">
+      <div class="field" style="flex:0 0 auto; margin-bottom:0;">
         <label>Link to</label>
         <div class="pill-radio-group" data-pill-select>
           {% for t in linked_types %}
@@ -304,15 +304,13 @@
           {% endfor %}
         </div>
       </div>
-      <div class="field" style="margin-bottom:0;" data-action-fields="ticket">
-        <label for="ticket_ref">Ticket number</label>
-        <input type="text" id="ticket_ref" name="ticket_ref" placeholder="INC-000001" style="width:160px;">
+      <div style="flex:0 0 320px;" data-action-fields="ticket">
+        {{ picker.search_picker("ticket_id", "/tickets/search", label="Ticket", placeholder="Search tickets...") }}
       </div>
-      <div class="field" style="margin-bottom:0;" data-action-fields="asset" hidden>
-        <label for="asset_ref">Asset number</label>
-        <input type="text" id="asset_ref" name="asset_ref" placeholder="CI-000001" style="width:160px;">
+      <div style="flex:0 0 320px;" data-action-fields="asset" hidden>
+        {{ picker.search_picker("asset_id", "/tickets/assets/search", label="Asset", placeholder="Search assets...") }}
       </div>
-      <button class="btn btn-sm" type="submit">Add link</button>
+      <button class="btn btn-primary btn-sm" type="submit" style="flex:0 0 auto;">Add link</button>
     </form>
   </div>
 

@@ -27,32 +27,19 @@
 <a class="sort-th" href="/assets?{{ qs(sort=key, dir=next_dir) }}">{{ label }}{% if selected_sort == key %}<span class="sort-arrow" aria-hidden="true">{{ "&uarr;" | safe if selected_dir == "asc" else "&darr;" | safe }}</span>{% endif %}</a>
 {% endmacro %}
 
-<div class="panel-row" style="justify-content:flex-end; gap:8px;">
-  {% if invalid_status_count and ctx.user.role_key in ("internal_admin", "client_admin") %}
-  <form method="post" action="/assets/repair-statuses" data-confirm="Reset {{ invalid_status_count }} asset(s) with an unrecognized status to 'active'? This is what an import written before status normalization existed can leave behind - see the Import page's warnings for which rows.">
-    <button type="submit" class="btn" title="{{ invalid_status_count }} asset(s) have a status outside active/in_repair/retired/decommissioned - not counted on the sidebar until fixed">Fix {{ invalid_status_count }} imported status{{ "es" if invalid_status_count != 1 else "" }}</button>
-  </form>
-  {% endif %}
-  <a class="btn btn-primary" href="/assets/new">+ New asset</a>
-</div>
-{% if request.query_params.get("statuses_fixed") %}
-<p class="muted">Fixed {{ request.query_params.get("statuses_fixed") }} asset status value(s).</p>
-{% endif %}
+<div class="panel-row" style="margin-bottom: 0;">
+  <div class="filter-bar">
+    <a class="btn btn-primary" href="/assets/new" style="flex-shrink:0;">+ New asset</a>
 
-<div class="card">
-  <div class="panel-row">
-    <form method="get" action="/assets" class="form-row" style="align-items:end;">
-      <div class="field" style="margin-bottom:0;">
-        <label for="asset_type_id">Filter by type</label>
-        <select id="asset_type_id" name="asset_type_id" onchange="this.form.submit()">
-          <option value="">All types</option>
-          {% for t in asset_types %}
-          <option value="{{ t.id }}" {% if selected_type == t.id %}selected{% endif %}>{{ t.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
+    <form method="get" action="/assets" class="filter-bar-controls">
       {% if selected_sort %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
       {% if selected_dir != "asc" %}<input type="hidden" name="dir" value="{{ selected_dir }}">{% endif %}
+      <select id="asset_type_id" name="asset_type_id" class="filter-bar-select" onchange="this.form.submit()" aria-label="Filter by type" title="Filter by type">
+        <option value="">All types</option>
+        {% for t in asset_types %}
+        <option value="{{ t.id }}" {% if selected_type == t.id %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
 
       {# [data-asset-search]: live dropdown suggestions (app.js), fetching
          /assets/search-suggest as you type and jumping straight to a
@@ -62,15 +49,25 @@
          against name/external_id/ci_number/custom field values
          (rain.modules.assets.service.asset_search_filter). #}
       <div class="field asset-search" style="margin-bottom:0; position:relative;" data-asset-search data-asset-search-endpoint="/assets/search-suggest">
-        <label for="asset_q">Search</label>
-        <input type="text" id="asset_q" name="q" value="{{ selected_q }}" placeholder="Name, external ID, CI number, or a custom field value" autocomplete="off" data-asset-search-input>
+        <input type="text" id="asset_q" name="q" value="{{ selected_q }}" placeholder="Name, external ID, CI number, or a custom field value" autocomplete="off" data-asset-search-input aria-label="Search" style="width:320px;">
         <div class="asset-search-results" hidden data-asset-search-results></div>
       </div>
       <button type="submit" class="btn">Search</button>
       {% if selected_q %}<a class="btn" href="/assets?{{ qs(q='') }}">Clear</a>{% endif %}
     </form>
-  </div>
 
+    {% if invalid_status_count and ctx.user.role_key in ("internal_admin", "client_admin") %}
+    <form method="post" action="/assets/repair-statuses" data-confirm="Reset {{ invalid_status_count }} asset(s) with an unrecognized status to 'active'? This is what an import written before status normalization existed can leave behind - see the Import page's warnings for which rows.">
+      <button type="submit" class="btn btn-sm" title="{{ invalid_status_count }} asset(s) have a status outside active/in_repair/retired/decommissioned - not counted on the sidebar until fixed">Fix {{ invalid_status_count }} imported status{{ "es" if invalid_status_count != 1 else "" }}</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% if request.query_params.get("statuses_fixed") %}
+<p class="muted">Fixed {{ request.query_params.get("statuses_fixed") }} asset status value(s).</p>
+{% endif %}
+
+<div class="card">
   <table>
     <thead><tr>
       <th>{{ sort_link("ci_number", "Number") }}</th>

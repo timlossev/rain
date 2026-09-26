@@ -97,6 +97,15 @@
     <p class="ticket-description clamped" data-clamp-target>{{ ticket.description or "No description." }}</p>
     <button type="button" class="btn btn-sm ticket-description-toggle" data-clamp-toggle hidden>Show more</button>
   </div>
+
+  {# Linked Documents lives here, above Assignee/Asset/etc, rather than
+     at the bottom of the metadata table below -- it's often the reason
+     someone opened the ticket at all (a runbook, an SCN, the playbook
+     an AI triage comment cited), not an afterthought. #}
+  {% with links = document_links, linked_type = "ticket", linked_id = ticket.id, wrap_card = false %}
+  {% include "documents/_links_fragment.html" %}
+  {% endwith %}
+
   <table class="ticket-meta">
     <tbody>
       <tr><th>Assignee</th><td>
@@ -132,10 +141,6 @@
       {% endif %}
     </tbody>
   </table>
-
-  {% with links = document_links, linked_type = "ticket", linked_id = ticket.id, wrap_card = false %}
-  {% include "documents/_links_fragment.html" %}
-  {% endwith %}
 </div>
 
 {% if ticket.ticket_type == "change" or ticket.approval %}
@@ -193,7 +198,7 @@
 <div class="card">
   <div class="card-title">Custom fields</div>
   <form method="post" action="/tickets/{{ ticket.id }}/fields">
-    <div class="custom-fields-grid" data-fields-container>
+    <div class="custom-fields-list" data-fields-container>
       {% with values = field_values %}
       {% include "tickets/_fields_fragment.html" %}
       {% endwith %}

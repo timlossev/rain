@@ -904,23 +904,23 @@ async def link_existing_document(
 async def link_document(
     document_id: int,
     linked_type: str = Form(...),
-    ticket_ref: str = Form(""),
-    asset_ref: str = Form(""),
+    ticket_id: int | None = Form(None),
+    asset_id: int | None = Form(None),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     doc = await service.get_document(tenant_db, document_id)
-    # Tickets and assets are both picked by their pretty number
-    # (INC-000123 / CI-000123) here, not a raw database id -- matches how
-    # every other reference in the UI works post-pretty-URLs.
+    # Ticket/asset ids come straight off the same type-to-search pickers
+    # (_search_picker.html) every other ticket/asset reference in the app
+    # already uses -- picking one used to mean typing its exact pretty
+    # number (INC-000123 / CI-000123) from memory, the one reference
+    # field in the app that wasn't search-driven.
     resolved_id: int | None = None
     if linked_type == "ticket":
-        ticket = await ticket_service.get_ticket_by_ref(tenant_db, ticket_ref.strip()) if ticket_ref.strip() else None
-        resolved_id = ticket.id if ticket is not None else None
+        resolved_id = ticket_id
     elif linked_type == "asset":
-        asset = await asset_service.get_asset_by_ref(tenant_db, asset_ref.strip()) if asset_ref.strip() else None
-        resolved_id = asset.id if asset is not None else None
+        resolved_id = asset_id
 
     if linked_type in LINKED_TYPES and resolved_id is not None:
         await service.add_link(tenant_db, document_id, linked_type, resolved_id, ctx.user.id)

@@ -152,6 +152,16 @@
       <a class="btn btn-sm {% if selected_problematic %}active{% endif %}" href="{{ base_url }}?{{ qs(base_url, problematic='' if selected_problematic else '1', include_sort=include_sort) }}">Problematic</a>
       <a class="btn btn-sm {% if selected_prioritized %}active{% endif %}" href="{{ base_url }}?{{ qs(base_url, prioritized='' if selected_prioritized else '1', include_sort=include_sort) }}" title="The two highest severities">Prioritized</a>
     </div>
+
+    {# Lets one caller (list.html's own Normal/Condensed row-spacing
+       toggle -- a display option, not a filter, so it doesn't belong in
+       qs()/the chips above it) add its own trailing segment without
+       kanban.html's plain expression-call invocation gaining it too --
+       {% call %}-ed content is optional, {{ }}-called content has none. #}
+    {% if caller is defined %}
+    <div class="filter-bar-divider"></div>
+    {{ caller() }}
+    {% endif %}
   </div>
 </div>
 {% endmacro %}
