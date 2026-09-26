@@ -27,7 +27,7 @@
         {% for day in week %}
         <td class="calendar-day{% if day.month != month %} outside-month{% endif %}{% if day == today %} today{% endif %}">
           <div class="calendar-day-head">
-            <span class="calendar-day-num">{{ day.day }}</span>
+            <a class="calendar-day-num" href="/calendar/day?date={{ day.isoformat() }}">{{ day.day }}</a>
             <a class="calendar-day-add" href="/calendar/new?date={{ day.isoformat() }}" title="New entry on {{ day.isoformat() }}">+</a>
           </div>
           {% for entry in by_date.get(day, []) %}

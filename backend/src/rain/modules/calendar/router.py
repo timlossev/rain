@@ -97,6 +97,38 @@ async def month_view(
     )
 
 
+@router.get("/day", response_class=HTMLResponse)
+async def day_view(
+    request: Request,
+    date: str | None = None,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db=Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    nav = await build_nav_context(ctx)
+    today = dt.date.today()
+    day = dt.date.fromisoformat(date) if date else today
+
+    entries = await service.list_entries(tenant_db, active_only=True)
+    day_entries = [entry for entry in entries if day in recurrence.occurrences_in_range(entry, day, day)]
+    changes = await service.list_changes_in_range(tenant_db, day, day)
+
+    return templates.TemplateResponse(
+        request,
+        "calendar/day.html",
+        {
+            **nav,
+            "ctx": ctx,
+            "day": day,
+            "today": today,
+            "day_entries": day_entries,
+            "changes": changes,
+            "prev_day": day - dt.timedelta(days=1),
+            "next_day": day + dt.timedelta(days=1),
+        },
+    )
+
+
 def _has_auto_refresh(entry) -> bool:
     policy = entry.policy_ref or {} if entry else {}
     return policy.get("type") == "refresh_document"

@@ -15,7 +15,8 @@ nav_registry.register(
             # itself (see calendar/month.html) instead of cluttering the
             # sidebar with two more entries.
             NavNode(key="calendar-view", label="Month View", href="/calendar", order=1),
-            NavNode(key="calendar-new", label="New Entry", href="/calendar/new", order=2),
+            NavNode(key="calendar-day", label="Day View", href="/calendar/day", order=2),
+            NavNode(key="calendar-new", label="New Entry", href="/calendar/new", order=3),
         ],
     )
 )
