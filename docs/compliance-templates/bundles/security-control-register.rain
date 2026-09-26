@@ -1,7 +1,7 @@
 {
   "bundle_type": "rain_tenant_config",
   "bundle_version": 1,
-  "exported_at": "2026-09-23T00:00:00+00:00",
+  "exported_at": "2026-09-26T00:00:00+00:00",
   "source_tenant_slug": "template",
   "source_tenant_name": "Security Control Register starter template",
   "secrets_included": false,
@@ -10,7 +10,7 @@
       "key": "security_control",
       "name": "Security Control",
       "icon": null,
-      "description": "One row per control implementation statement -- a NIST 800-53 (or other catalog) control, how it's implemented, and by whom. Each Asset's own \"Name\" field identifies the control (and part, if tracked at that level), e.g. \"AC-2(a) Account Management\". Populate by hand, or bulk-import one of the FedRAMP rev5 baseline question lists (nist-800-53-rev5-low/moderate/high.csv, same directory) to start from the real, currently-applicable control set instead of a blank register. Pairs with the oscal-control-implementation.jq transformer (see docs/compliance-templates/README.md) to export this register as an OSCAL control-implementation fragment.",
+      "description": "One row per control implementation statement -- a NIST 800-53 (or other catalog) control, how it's implemented, and by whom. Each Asset's own \"Name\" field identifies the control (and part, if tracked at that level), e.g. \"AC-2(a) Account Management\". Populate by hand, or bulk-import one of the FedRAMP rev5 baseline question lists (nist-800-53-rev5-low/moderate/high.csv, same directory) or the ISO/IEC 27001:2022 Annex A control list (iso-27001-2022-annex-a-controls.csv) to start from a real, currently-applicable control set instead of a blank register. Pairs with the oscal-control-implementation.jq transformer (see docs/compliance-templates/README.md) to export this register as an OSCAL control-implementation fragment.",
       "is_active": true,
       "sort_order": 0
     }
