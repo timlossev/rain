@@ -1,0 +1,61 @@
+Name,External ID,Control ID,Statement ID,Control Question
+CC1.1 Code of conduct and ethical values communicated to all personnel,CC1.1,CC1.1,,Code of conduct and ethical values communicated to all personnel
+"CC1.2 Security roles, responsibilities, and accountability defined",CC1.2,CC1.2,,"Security roles, responsibilities, and accountability defined"
+CC1.3 Hiring and background checks for staff in sensitive roles,CC1.3,CC1.3,,Hiring and background checks for staff in sensitive roles
+CC1.4 Security awareness training for all employees,CC1.4,CC1.4,,Security awareness training for all employees
+CC1.5 Board or leadership oversight of security program,CC1.5,CC1.5,,Board or leadership oversight of security program
+CC2.1 Internal communication of security policies and updates,CC2.1,CC2.1,,Internal communication of security policies and updates
+CC2.2 External security contact and vulnerability reporting channel,CC2.2,CC2.2,,External security contact and vulnerability reporting channel
+CC2.3 Maintain documentation as part of internal control responsibilities,CC2.3,CC2.3,,Maintain documentation as part of internal control responsibilities
+CC3.1 Formal risk register identifying threats to service commitments,CC3.1,CC3.1,,Formal risk register identifying threats to service commitments
+CC3.2 Management review and approval of risk assessment results,CC3.2,CC3.2,,Management review and approval of risk assessment results
+CC3.3 Fraud and change-related risks considered in assessment,CC3.3,CC3.3,,Fraud and change-related risks considered in assessment
+CC4.1 Ongoing monitoring of control operating effectiveness,CC4.1,CC4.1,,Ongoing monitoring of control operating effectiveness
+CC4.2 Deficiencies tracked and remediated with accountability,CC4.2,CC4.2,,Deficiencies tracked and remediated with accountability
+CC5.1 Information security policies documented and approved,CC5.1,CC5.1,,Information security policies documented and approved
+CC5.2 Policies reviewed and updated at least annually,CC5.2,CC5.2,,Policies reviewed and updated at least annually
+CC6.1 Multi-factor authentication enforced for sensitive systems,CC6.1,CC6.1,,Multi-factor authentication enforced for sensitive systems
+CC6.2 Role-based access permissions (least privilege),CC6.2,CC6.2,,Role-based access permissions (least privilege)
+CC6.3 Access provisioning requires documented approval,CC6.3,CC6.3,,Access provisioning requires documented approval
+CC6.4 Periodic user access reviews and recertification,CC6.4,CC6.4,,Periodic user access reviews and recertification
+CC6.5 Timely access removal upon termination or role change,CC6.5,CC6.5,,Timely access removal upon termination or role change
+CC6.6 Physical safeguards for server rooms and sensitive facilities,CC6.6,CC6.6,,Physical safeguards for server rooms and sensitive facilities
+CC6.7 Web application firewalls or equivalent edge protection,CC6.7,CC6.7,,Web application firewalls or equivalent edge protection
+CC7.1 Detection and monitoring procedures for unauthorized activity,CC7.1,CC7.1,,Detection and monitoring procedures for unauthorized activity
+CC7.2 Security logging with defined retention periods,CC7.2,CC7.2,,Security logging with defined retention periods
+CC7.3 Vulnerability identification and remediation process,CC7.3,CC7.3,,Vulnerability identification and remediation process
+CC7.4 Incident response plan documented and tested,CC7.4,CC7.4,,Incident response plan documented and tested
+CC8.1 Production changes require approval before deployment,CC8.1,CC8.1,,Production changes require approval before deployment
+CC8.2 Peer review required for code and configuration changes,CC8.2,CC8.2,,Peer review required for code and configuration changes
+CC8.3 Changes tested in non-production before release,CC8.3,CC8.3,,Changes tested in non-production before release
+CC9.1 Critical vendor inventory maintained and reviewed,CC9.1,CC9.1,,Critical vendor inventory maintained and reviewed
+CC9.2 Vendor SOC 2 or equivalent due diligence on file,CC9.2,CC9.2,,Vendor SOC 2 or equivalent due diligence on file
+CC9.3 Business continuity and disaster recovery plans tested,CC9.3,CC9.3,,Business continuity and disaster recovery plans tested
+SEC-01 Multi-factor authentication,SEC-01,SEC-01,,Multi-factor authentication
+SEC-02 Web application firewalls,SEC-02,SEC-02,,Web application firewalls
+SEC-03 Detection and monitoring procedures for unauthorized activity,SEC-03,SEC-03,,Detection and monitoring procedures for unauthorized activity
+SEC-04 Physical safeguards for server rooms,SEC-04,SEC-04,,Physical safeguards for server rooms
+SEC-05 Hiring and background checks for staff in sensitive roles,SEC-05,SEC-05,,Hiring and background checks for staff in sensitive roles
+SEC-06 Security awareness training for all employees,SEC-06,SEC-06,,Security awareness training for all employees
+PRIV-01 Obtain consent before collecting personal data,PRIV-01,PRIV-01,,Obtain consent before collecting personal data
+PRIV-02 Limit data collection to what is necessary,PRIV-02,PRIV-02,,Limit data collection to what is necessary
+PRIV-03 Collect data through lawful methods,PRIV-03,PRIV-03,,Collect data through lawful methods
+PRIV-04 Use data only for the purpose stated,PRIV-04,PRIV-04,,Use data only for the purpose stated
+PRIV-05 Dispose of data once no longer needed per internal compliance process,PRIV-05,PRIV-05,,Dispose of data once no longer needed per internal compliance process
+PRIV-06 Maintain documentation as part of internal control responsibilities,PRIV-06,PRIV-06,,Maintain documentation as part of internal control responsibilities
+CONF-01 Data classification policies,CONF-01,CONF-01,,Data classification policies
+CONF-02 Role-based access permissions,CONF-02,CONF-02,,Role-based access permissions
+CONF-03 Use of encryption at rest and in transit,CONF-03,CONF-03,,Use of encryption at rest and in transit
+CONF-04 Secure disposal processes for confidential information,CONF-04,CONF-04,,Secure disposal processes for confidential information
+CONF-05 Retention schedules for confidential data,CONF-05,CONF-05,,Retention schedules for confidential data
+AVAIL-01 Secure backup procedures,AVAIL-01,AVAIL-01,,Secure backup procedures
+AVAIL-02 Disaster recovery plans,AVAIL-02,AVAIL-02,,Disaster recovery plans
+AVAIL-03 Business continuity plans,AVAIL-03,AVAIL-03,,Business continuity plans
+AVAIL-04 Environmental risk management assessments,AVAIL-04,AVAIL-04,,Environmental risk management assessments
+AVAIL-05 Predictive capacity planning as part of formal readiness assessment,AVAIL-05,AVAIL-05,,Predictive capacity planning as part of formal readiness assessment
+PI-01 Timely error detection and correction during high processing demand,PI-01,PI-01,,Timely error detection and correction during high processing demand
+PI-02 Input validation and sanity checks,PI-02,PI-02,,Input validation and sanity checks
+PI-03 Monitoring data pipelines to verify inputs and outputs match expected results,PI-03,PI-03,,Monitoring data pipelines to verify inputs and outputs match expected results
+PI-04 Reconciling processed data through automated checks and reporting,PI-04,PI-04,,Reconciling processed data through automated checks and reporting
+PI-05 Controls that prevent unauthorized system components' logic changes,PI-05,PI-05,,Controls that prevent unauthorized system components' logic changes
+PI-06 Automated alerts for processing failures,PI-06,PI-06,,Automated alerts for processing failures
