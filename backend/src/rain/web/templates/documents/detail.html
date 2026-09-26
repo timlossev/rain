@@ -48,8 +48,11 @@
        the body; last_refreshed_at moves on a no-op refresh too), but a
        reasonable "how current is this" at a glance. #}
     {% set last_updated = doc.last_refreshed_at or doc.updated_at or doc.created_at %}
-    {% if last_updated %}
-    <div class="doc-last-updated"><span class="badge timestamp-pill">Last updated {{ last_updated.strftime("%Y-%m-%d %H:%M") }}</span></div>
+    {% if last_updated or doc.created_at %}
+    <div class="doc-last-updated">
+      {% if doc.created_at %}<span class="badge timestamp-pill">Created {{ doc.created_at.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
+      {% if last_updated %}<span class="badge timestamp-pill">Last updated {{ last_updated.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
+    </div>
     {% endif %}
     <form method="post" action="/documents/{{ doc.id }}/body" data-md-editor>
       {% if body_kind == "markdown" %}
@@ -101,11 +104,6 @@
       </div>
       <button class="btn btn-primary" type="submit">Save</button>
     </form>
-
-    <div class="field field-inline-row">
-      <label>Uploaded</label>
-      <span class="badge timestamp-pill">{{ doc.created_at.strftime("%Y-%m-%d %H:%M") if doc.created_at else "-" }}</span>
-    </div>
   </div>
 
   <div class="tab-panel" data-tab-panel="ownership">

@@ -925,7 +925,7 @@ form.inline[hidden] { display: none; } /* same [hidden]-losing-the-cascade fix a
    (below) is the same generic pill Home's per-document freshness label,
    a document's own "Uploaded" pill, and a ticket's "Created" pill all
    share. */
-.doc-last-updated { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.doc-last-updated { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 8px; }
 /* A pill showing a sentence-shaped date/time ("Version from ...",
    "Created ..."), not a short status word -- .badge's own uppercase/
    letter-spacing/bold suits "HIGH"/"INCIDENT", not that, so this
@@ -1231,7 +1231,7 @@ td.actions { text-align: right; white-space: nowrap; }
    compact-view toggle affects. Header cells (thead th) are deliberately
    untouched -- Number/Title/etc. stay legible regardless of how tight
    the data rows themselves are. */
-.tickets-table.density-condensed td { padding: 3px 10px; font-size: 0.82rem; }
+.tickets-table.density-condensed td { padding: 3px 10px; font-size: 0.82rem; border-bottom: none; }
 
 /* ---------- /tickets/kanban ---------- */
 /* Columns lay out side by side and scroll horizontally as a set (as many
