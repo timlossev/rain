@@ -14,14 +14,15 @@
 {% import "_search_picker.html" as picker %}
 <div class="form-section" data-action-fields="json">
   <div class="form-section-title">JSON transform (optional)</div>
-  <p class="field-hint">
-    Reshape the exported rows with a <a href="https://jqlang.org/manual/" target="_blank" rel="noopener">jq</a>
-    filter before download. Leave both fields below blank to export the plain row list.
+  <p class="field-hint" style="margin-top:-6px; margin-bottom:16px;">
+    Reshape rows with a <a href="https://jqlang.org/manual/" target="_blank" rel="noopener">jq</a> filter before download.
   </p>
-  {{ picker.search_picker("jq_document_id", "/documents/search", label="Use a saved ruleset", placeholder="Search documents...") }}
+  <div style="margin-bottom:16px;">
+    {{ picker.search_picker("jq_document_id", "/documents/search", label="Use a saved ruleset", initial_value=selected_jq_document_id, initial_label=selected_jq_document_label, placeholder="Search documents...") }}
+  </div>
   <div class="field">
-    <label for="jq_file">...or upload a one-off .jq file for this export</label>
+    <label for="jq_file">...or upload a one-off .jq file</label>
     <input type="file" id="jq_file" name="jq_file" accept=".jq,text/plain">
-    <div class="field-hint">A saved ruleset wins if both are given. Save a .jq file as a Document to reuse it across exports.</div>
+    <div class="field-hint">A saved ruleset wins if both are given.</div>
   </div>
 </div>

@@ -53,13 +53,15 @@
           <option value="xlsx" {% if selected_fmt == "xlsx" %}selected{% endif %}>Excel (.xlsx)</option>
         </select>
       </div>
-      <div class="field">
-        <label for="save_as">Save as a reusable profile (optional)</label>
-        <input type="text" id="save_as" name="save_as" placeholder="e.g. Servers - quarterly audit">
-      </div>
     </div>
 
     {% include "_jq_transform_fields.html" %}
+
+    <div class="field" style="max-width:360px;">
+      <label for="save_as">Save as profile</label>
+      <input type="text" id="save_as" name="save_as" placeholder="e.g. Servers - quarterly audit">
+      <div class="field-hint">Optional - reuse this column layout next time instead of rebuilding it.</div>
+    </div>
 
     <button class="btn btn-primary" type="submit">Export</button>
   </form>

@@ -241,9 +241,16 @@ async def save_export_profile(
     fmt: str,
     columns: list[dict],
     actor_id: int,
+    jq_document_id: int | None = None,
 ) -> ExportProfile:
     profile = ExportProfile(
-        name=name, scope="asset", asset_type_id=asset_type_id, format=fmt, columns=columns, created_by=actor_id
+        name=name,
+        scope="asset",
+        asset_type_id=asset_type_id,
+        format=fmt,
+        columns=columns,
+        created_by=actor_id,
+        jq_document_id=jq_document_id,
     )
     db.add(profile)
     await db.commit()

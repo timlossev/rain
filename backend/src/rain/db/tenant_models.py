@@ -193,6 +193,11 @@ class ExportProfile(TenantBase):
     asset_type_id: Mapped[int | None] = mapped_column(ForeignKey("asset_types.id", ondelete="CASCADE"), nullable=True)
     format: Mapped[str] = mapped_column(String(15), default="csv", server_default="csv")
     columns: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    # The JSON-transform ruleset picked alongside the columns above (see
+    # _jq_transform_fields.html's "Use a saved ruleset" picker) -- only
+    # ever meaningful for format="json", but stored regardless so
+    # switching a saved profile's format back to JSON later still has it.
+    jq_document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

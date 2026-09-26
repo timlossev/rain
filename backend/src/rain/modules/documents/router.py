@@ -340,7 +340,7 @@ async def create_document(
     description: str = Form(""),
     tags: str = Form(""),
     body: str = Form(""),
-    body_format: str = Form("txt"),
+    body_format: str = Form("md"),
     linked_type: str = Form(""),
     linked_id: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
@@ -667,26 +667,34 @@ async def update_document_body(
 async def update_document_sharing(
     document_id: int,
     is_shareable: bool = Form(False),
+    redirect_tab: str = Form(""),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     doc = await service.get_document(tenant_db, document_id)
     if doc is not None:
         await service.update_sharing(tenant_db, doc, is_shareable)
-    return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+    tab_suffix = f"&tab={redirect_tab}" if redirect_tab else ""
+    return RedirectResponse(
+        f"/documents/{doc.doc_number if doc else document_id}?ok=1{tab_suffix}", status_code=status.HTTP_303_SEE_OTHER
+    )
 
 
 @router.post("/{document_id:int}/landing-page")
 async def update_document_landing_page(
     document_id: int,
     show_on_landing_page: bool = Form(False),
+    redirect_tab: str = Form(""),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     doc = await service.get_document(tenant_db, document_id)
     if doc is not None:
         await service.update_landing_page_flag(tenant_db, doc, show_on_landing_page)
-    return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+    tab_suffix = f"&tab={redirect_tab}" if redirect_tab else ""
+    return RedirectResponse(
+        f"/documents/{doc.doc_number if doc else document_id}?ok=1{tab_suffix}", status_code=status.HTTP_303_SEE_OTHER
+    )
 
 
 @router.post("/{document_id:int}/refresh-on-view")

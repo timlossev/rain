@@ -686,6 +686,13 @@ select, textarea {
   color: var(--text);
   font-size: 0.9rem;
   font-family: inherit;
+  /* Same reason .type-pill sets this explicitly (see its own comment
+     above): without it, a single-line input inherits body's 1.5
+     line-height and ends up a couple px taller than a same-padding
+     .btn/.type-pill sitting next to it in a bottom-aligned row (e.g.
+     documents/detail.html's Links tab: the ticket/asset search-picker
+     input next to the Ticket/Asset pill-radio buttons). */
+  line-height: 1.3;
 }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 input[type=color] { padding: 3px; height: 38px; width: 64px; }
@@ -984,6 +991,17 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
   .calendar-entry-chip { font-size: 0.65rem; }
 }
 
+/* ---------- /calendar/day ---------- */
+/* Plain visual half-hour grid (CalendarEntry has no time-of-day, so
+   nothing is ever placed on it) -- gives the day view the shape of a
+   real day-planner instead of just a bare list. */
+.day-timegrid { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.day-timegrid-row { display: flex; border-bottom: 1px solid var(--border); min-height: 26px; }
+.day-timegrid-row-half { border-bottom: 1px dashed var(--border); }
+.day-timegrid-row:last-child { border-bottom: none; }
+.day-timegrid-label { width: 56px; flex-shrink: 0; padding: 3px 8px; font-size: 0.72rem; color: var(--text-muted); border-right: 1px solid var(--border); }
+.day-timegrid-slot { flex: 1; }
+
 /* ---------- document body editor (txt/md inline editing) ---------- */
 .doc-body-editor {
   width: 100%;
@@ -1233,6 +1251,7 @@ td.actions { text-align: right; white-space: nowrap; }
    untouched -- Number/Title/etc. stay legible regardless of how tight
    the data rows themselves are. */
 .tickets-table.density-condensed td { padding: 3px 10px; font-size: 0.82rem; border-bottom: none; }
+.assets-table.density-condensed td { padding: 3px 10px; font-size: 0.82rem; border-bottom: none; }
 
 /* ---------- /tickets/kanban ---------- */
 /* Columns lay out side by side and scroll horizontally as a set (as many

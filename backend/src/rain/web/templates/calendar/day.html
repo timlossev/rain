@@ -12,27 +12,40 @@
 <div class="card">
   <div class="panel-row" style="margin-bottom:14px;">
     <a class="btn btn-sm" href="/calendar/day?date={{ prev_day.isoformat() }}">&larr; Prev</a>
-    <h2 style="margin:0;">{{ day.strftime("%A, %B %d, %Y") }}{% if day == today %} <span class="muted" style="font-weight:400; font-size:0.8rem;">(today)</span>{% endif %}</h2>
+    <h2 style="margin:0;">{{ day.strftime("%A, %B %d, %Y") }}</h2>
     <a class="btn btn-sm" href="/calendar/day?date={{ next_day.isoformat() }}">Next &rarr;</a>
   </div>
 
-  {% if not day_entries and not changes %}
-  <p class="muted">Nothing on the calendar for this day.</p>
+  {% if day_entries or changes %}
+  <div style="margin-bottom:16px;">
+    {% for entry in day_entries %}
+    <div style="border-left:3px solid var(--accent); padding:8px 10px; margin-bottom:8px;">
+      <a href="/calendar/{{ entry.id }}/edit?redirect={{ ('/calendar/day?date=' ~ day.isoformat()) | urlencode }}" style="font-weight:600;">
+        {% if entry.recurrence %}<span aria-hidden="true">&orarr;</span> {% endif %}{{ entry.title }}
+      </a>
+      {% if entry.description %}<div class="muted" style="font-size:0.85rem; margin-top:2px;">{{ entry.description }}</div>{% endif %}
+    </div>
+    {% endfor %}
+
+    {% for change in changes %}
+    <div style="border-left:3px solid var(--accent); padding:8px 10px; margin-bottom:8px;">
+      <a href="/tickets/{{ change.ticket_number }}" style="font-weight:600;">{{ change.ticket_number }}: {{ change.title }}</a>
+    </div>
+    {% endfor %}
+  </div>
   {% endif %}
 
-  {% for entry in day_entries %}
-  <div style="border-left:3px solid var(--accent); padding:8px 10px; margin-bottom:8px;">
-    <a href="/calendar/{{ entry.id }}/edit?redirect={{ ('/calendar/day?date=' ~ day.isoformat()) | urlencode }}" style="font-weight:600;">
-      {% if entry.recurrence %}<span aria-hidden="true">&orarr;</span> {% endif %}{{ entry.title }}
-    </a>
-    {% if entry.description %}<div class="muted" style="font-size:0.85rem; margin-top:2px;">{{ entry.description }}</div>{% endif %}
+  <div class="day-timegrid">
+    {% for hour_label in hours %}
+    <div class="day-timegrid-row">
+      <div class="day-timegrid-label">{{ hour_label }}</div>
+      <div class="day-timegrid-slot"></div>
+    </div>
+    <div class="day-timegrid-row day-timegrid-row-half">
+      <div class="day-timegrid-label"></div>
+      <div class="day-timegrid-slot"></div>
+    </div>
+    {% endfor %}
   </div>
-  {% endfor %}
-
-  {% for change in changes %}
-  <div style="border-left:3px solid var(--accent); padding:8px 10px; margin-bottom:8px;">
-    <a href="/tickets/{{ change.ticket_number }}" style="font-weight:600;">{{ change.ticket_number }}: {{ change.title }}</a>
-  </div>
-  {% endfor %}
 </div>
 {% endblock %}

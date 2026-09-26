@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}By Type - Assets - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Browse assets grouped by type. Each active asset type shows up here as its own entry once one exists.{% endblock %}
+{% block content %}
+<div class="card" style="max-width:560px;">
+  <p class="muted">No asset types are defined yet. <a href="/assets/types">Create one</a> under Admin &gt; Tenant Administration to get started.</p>
+</div>
+{% endblock %}

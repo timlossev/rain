@@ -1118,9 +1118,17 @@ async def list_export_profiles(db: AsyncSession) -> list[ExportProfile]:
 
 
 async def save_export_profile(
-    db: AsyncSession, *, name: str, fmt: str, columns: list[dict], actor_id: int
+    db: AsyncSession, *, name: str, fmt: str, columns: list[dict], actor_id: int, jq_document_id: int | None = None
 ) -> ExportProfile:
-    profile = ExportProfile(name=name, scope="ticket", asset_type_id=None, format=fmt, columns=columns, created_by=actor_id)
+    profile = ExportProfile(
+        name=name,
+        scope="ticket",
+        asset_type_id=None,
+        format=fmt,
+        columns=columns,
+        created_by=actor_id,
+        jq_document_id=jq_document_id,
+    )
     db.add(profile)
     await db.commit()
     return profile

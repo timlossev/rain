@@ -32,20 +32,38 @@
 # This derives a stable, schema-shaped one from each row's own RAIN CI
 # Number (already unique per tenant) rather than generating a random
 # one -- deterministic on purpose, so re-exporting the same control
-# later produces the same uuid instead of a new one every time. It's
-# not RFC 4122 random (the tail is just the CI Number's own digits,
-# zero-padded), but nothing in the OSCAL schema requires randomness,
-# only the "8-4-4-4-12 hex" shape, which this always produces. num_uuid
-# takes a one-character salt so an implemented-requirement and the
-# first row in its own "statements" array -- which, for a multi-row
-# control, is the very CI Number this same $first came from -- don't
-# collide just because they're derived from the same row.
+# later produces the same uuid instead of a new one every time. Not
+# RFC 4122 random (jq has no crypto/hash builtin to draw on), but a
+# small djb2-style string hash run five times with different salts
+# spreads the CI Number across every group instead of leaving most of
+# it a fixed "00000000-0000-...-<padded number>" -- version/variant
+# nibbles are still forced (4.../8-b...) so it's shaped like a real v4
+# UUID. num_uuid's own salt argument keeps an implemented-requirement
+# and the first row in its own "statements" array -- which, for a
+# multi-row control, is the very CI Number this same $first came from
+# -- from colliding just because they're derived from the same row.
+
+def dhash(seed):
+  explode | reduce .[] as $c (seed; (. * 131 + $c) % 2147483648);
+
+def hex(n; width):
+  reduce range(width) as $i ({n: n, s: ""};
+    {n: (.n / 16 | floor), s: ("0123456789abcdef"[(.n % 16 | floor):(.n % 16 | floor) + 1] + .s)}
+  ) | .s;
 
 def num_uuid(salt):
-  (capture("(?<n>[0-9]+)$")?.n // "0") as $n
-  | (salt + $n) as $salted
-  | ($salted | if length > 12 then .[-12:] else ("000000000000"[length:] + .) end) as $tail
-  | "00000000-0000-4000-8000-" + $tail;
+  (. // "CI-0") as $key
+  | ((salt + "1:" + $key) | dhash(5381)) as $h1
+  | ((salt + "2:" + $key) | dhash(5381)) as $h2
+  | ((salt + "3:" + $key) | dhash(5381)) as $h3
+  | ((salt + "4:" + $key) | dhash(5381)) as $h4
+  | ((salt + "5:" + $key) | dhash(5381)) as $h5
+  | (hex($h1; 8)) as $g1
+  | (hex($h2; 4)) as $g2
+  | ("4" + hex($h3; 3)) as $g3
+  | (("89ab"[($h4 % 4):($h4 % 4) + 1]) + hex($h4; 3)) as $g4
+  | (hex($h5; 8) + hex($h1; 4)) as $g5
+  | "\($g1)-\($g2)-\($g3)-\($g4)-\($g5)";
 
 def kebab: ascii_downcase | gsub(" +"; "-");
 def present: . != null and . != "";

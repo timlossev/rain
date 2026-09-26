@@ -39,7 +39,7 @@ nav_registry.register(
         count_provider=_active_asset_count,
         children=[
             NavNode(key="assets-all", label="All Assets", href="/assets", order=1),
-            NavNode(key="assets-by-type", label="By Type", order=2, children_provider=_asset_type_children),
+            NavNode(key="assets-by-type", label="By Type", href="/assets/by-type", order=2, children_provider=_asset_type_children),
             NavNode(key="assets-fields", label="Custom Fields", href="/assets/fields", order=3),
             NavNode(key="assets-export", label="Export", href="/assets/export", order=4),
             NavNode(key="assets-import", label="Import", href="/assets/import", order=5),

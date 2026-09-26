@@ -61,6 +61,15 @@
       <button type="submit" class="btn btn-sm" title="{{ invalid_status_count }} asset(s) have a status outside active/in_repair/retired/decommissioned - not counted on the sidebar until fixed">Fix {{ invalid_status_count }} imported status{{ "es" if invalid_status_count != 1 else "" }}</button>
     </form>
     {% endif %}
+
+    <a class="btn" href="/assets/export{% if selected_type %}?asset_type_id={{ selected_type }}{% endif %}" style="margin-left:auto;">Export</a>
+
+    {# Row spacing -- same client-side CSS toggle as tickets/list.html
+       (app.js's [data-density-toggle], persisted in localStorage). #}
+    <div class="density-toggle" data-density-toggle role="group" aria-label="Row spacing">
+      <button type="button" class="btn btn-sm" data-density="normal" title="Normal row spacing" aria-label="Normal row spacing"><span class="nav-icon">{{ nav_icon("density-normal") }}</span></button>
+      <button type="button" class="btn btn-sm" data-density="condensed" title="Condensed row spacing" aria-label="Condensed row spacing"><span class="nav-icon">{{ nav_icon("density-condensed") }}</span></button>
+    </div>
   </div>
 </div>
 {% if request.query_params.get("statuses_fixed") %}
@@ -68,7 +77,7 @@
 {% endif %}
 
 <div class="card">
-  <table>
+  <table class="assets-table" data-density-target>
     <thead><tr>
       <th>{{ sort_link("ci_number", "Number") }}</th>
       <th>{{ sort_link("name", "Name") }}</th>

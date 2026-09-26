@@ -120,11 +120,15 @@ async def day_view(
             **nav,
             "ctx": ctx,
             "day": day,
-            "today": today,
             "day_entries": day_entries,
             "changes": changes,
             "prev_day": day - dt.timedelta(days=1),
             "next_day": day + dt.timedelta(days=1),
+            # No time-of-day on CalendarEntry (date-only) -- this is a plain
+            # visual half-hour grid, not a real per-time schedule; entries/
+            # changes list above it as "all day" items instead of trying to
+            # place them on it.
+            "hours": [dt.time(hour=h).strftime("%H:00") for h in range(24)],
         },
     )
 

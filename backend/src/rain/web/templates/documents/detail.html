@@ -22,24 +22,29 @@
 <div class="flash flash-error">Couldn't refresh from webhook just now ({{ webhook_refresh_error }}) - showing the last saved version instead.</div>
 {% endif %}
 
+{# Which tab starts active -- a mutation made from within a tab (e.g.
+   Visibility's own checkboxes just below) redirects back here with
+   ?tab=<name> so a full-page reload lands back on the tab it came from
+   instead of always resetting to Contents/Basics. #}
+{% set active_tab = request.query_params.get('tab') or ('contents' if body_kind else 'basics') %}
 <div class="card" data-tabs>
   <div class="tab-buttons">
     {% if body_kind %}
-    <button type="button" class="tab-btn active" data-tab-btn="contents">Contents</button>
+    <button type="button" class="tab-btn{{ ' active' if active_tab == 'contents' }}" data-tab-btn="contents">Contents</button>
     {% endif %}
-    <button type="button" class="tab-btn{{ '' if body_kind else ' active' }}" data-tab-btn="basics">Basics</button>
-    <button type="button" class="tab-btn" data-tab-btn="ownership">Ownership</button>
-    <button type="button" class="tab-btn" data-tab-btn="acknowledgment">Acknowledgment</button>
-    <button type="button" class="tab-btn" data-tab-btn="visibility">Visibility</button>
+    <button type="button" class="tab-btn{{ ' active' if active_tab == 'basics' }}" data-tab-btn="basics">Basics</button>
+    <button type="button" class="tab-btn{{ ' active' if active_tab == 'ownership' }}" data-tab-btn="ownership">Ownership</button>
+    <button type="button" class="tab-btn{{ ' active' if active_tab == 'acknowledgment' }}" data-tab-btn="acknowledgment">Acknowledgment</button>
+    <button type="button" class="tab-btn{{ ' active' if active_tab == 'visibility' }}" data-tab-btn="visibility">Visibility</button>
     {% if body_kind %}
-    <button type="button" class="tab-btn" data-tab-btn="auto-update">Auto-update</button>
+    <button type="button" class="tab-btn{{ ' active' if active_tab == 'auto-update' }}" data-tab-btn="auto-update">Auto-update</button>
     {% endif %}
-    <button type="button" class="tab-btn" data-tab-btn="links">Links ({{ doc.links | length }})</button>
-    <button type="button" class="tab-btn" data-tab-btn="calendar">Calendar ({{ calendar_entries | length }})</button>
+    <button type="button" class="tab-btn{{ ' active' if active_tab == 'links' }}" data-tab-btn="links">Links ({{ doc.links | length }})</button>
+    <button type="button" class="tab-btn{{ ' active' if active_tab == 'calendar' }}" data-tab-btn="calendar">Calendar ({{ calendar_entries | length }})</button>
   </div>
 
   {% if body_kind %}
-  <div class="tab-panel active" data-tab-panel="contents">
+  <div class="tab-panel{{ ' active' if active_tab == 'contents' }}" data-tab-panel="contents">
     {# Best-known freshness signal for what's about to render below:
        last_refreshed_at (set on every successful webhook call, "Refresh
        when rendering" included) if this document has ever had one,
@@ -79,7 +84,7 @@
   </div>
   {% endif %}
 
-  <div class="tab-panel{{ '' if body_kind else ' active' }}" data-tab-panel="basics">
+  <div class="tab-panel{{ ' active' if active_tab == 'basics' }}" data-tab-panel="basics">
     <div class="field">
       <label>Tags</label>
       <span class="doc-tags-edit" data-inline-edit>
@@ -106,7 +111,7 @@
     </form>
   </div>
 
-  <div class="tab-panel" data-tab-panel="ownership">
+  <div class="tab-panel{{ ' active' if active_tab == 'ownership' }}" data-tab-panel="ownership">
     <div class="field">
       <label>Owner</label>
       <form method="post" action="/documents/{{ doc.id }}/owner" class="form-row" style="margin:0; align-items:center;">
@@ -127,7 +132,7 @@
     </div>
   </div>
 
-  <div class="tab-panel" data-tab-panel="acknowledgment">
+  <div class="tab-panel{{ ' active' if active_tab == 'acknowledgment' }}" data-tab-panel="acknowledgment">
     <div class="field">
       <label>Read receipt</label>
       <div>
@@ -169,11 +174,12 @@
     </div>
   </div>
 
-  <div class="tab-panel" data-tab-panel="visibility">
+  <div class="tab-panel{{ ' active' if active_tab == 'visibility' }}" data-tab-panel="visibility">
     <div class="field">
       <label>Sharing</label>
       <div>
         <form method="post" action="/documents/{{ doc.id }}/sharing" class="inline">
+          <input type="hidden" name="redirect_tab" value="visibility">
           <label class="checkbox-row"><input type="checkbox" name="is_shareable" onchange="this.form.submit()" {% if doc.is_shareable %}checked{% endif %}> Shareable in the client portal</label>
         </form>
         {% if doc.is_shareable %}<div class="field-hint">Visible to every portal visitor, including those without an account.</div>{% endif %}
@@ -184,6 +190,7 @@
       <label>Landing page</label>
       <div>
         <form method="post" action="/documents/{{ doc.id }}/landing-page" class="inline">
+          <input type="hidden" name="redirect_tab" value="visibility">
           <label class="checkbox-row"><input type="checkbox" name="show_on_landing_page" onchange="this.form.submit()" {% if doc.show_on_landing_page %}checked{% endif %}> Show on landing page</label>
         </form>
         {% if not body_kind %}
@@ -194,7 +201,7 @@
   </div>
 
   {% if body_kind %}
-  <div class="tab-panel" data-tab-panel="auto-update">
+  <div class="tab-panel{{ ' active' if active_tab == 'auto-update' }}" data-tab-panel="auto-update">
     {% if request.query_params.get('refreshed') == '1' %}<div class="flash flash-ok">Refreshed - content changed.</div>{% endif %}
     {% if request.query_params.get('refreshed') == '0' %}<div class="flash flash-ok">Refreshed - no change from webhook response.</div>{% endif %}
     {% if request.query_params.get('json_note') %}<div class="flash flash-ok">{{ request.query_params.get('json_note') }}</div>{% endif %}
@@ -259,7 +266,7 @@
   </div>
   {% endif %}
 
-  <div class="tab-panel" data-tab-panel="links">
+  <div class="tab-panel{{ ' active' if active_tab == 'links' }}" data-tab-panel="links">
     <table>
       <thead><tr><th>Type</th><th>ID</th><th></th></tr></thead>
       <tbody>
@@ -309,7 +316,7 @@
     </form>
   </div>
 
-  <div class="tab-panel" data-tab-panel="calendar">
+  <div class="tab-panel{{ ' active' if active_tab == 'calendar' }}" data-tab-panel="calendar">
     <p class="field-hint">Calendar entries tied to this document - e.g. "due for revision every quarter." Manual reminders unless one also has auto-refresh turned on (shown below).</p>
     <table>
       <thead><tr><th>Title</th><th>Date</th><th>Repeats</th><th></th><th></th><th></th></tr></thead>

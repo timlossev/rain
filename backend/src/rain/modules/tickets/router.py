@@ -1335,9 +1335,11 @@ async def _export_form_context(
     profile_id: int | None,
     columns: list[dict],
     fmt: str,
+    jq_document_id: int | None = None,
     error: str | None = None,
 ) -> dict:
     nav = await build_nav_context(ctx)
+    jq_document = await document_service.get_document(tenant_db, jq_document_id) if jq_document_id else None
     return {
         **nav,
         "ctx": ctx,
@@ -1347,6 +1349,8 @@ async def _export_form_context(
         "profiles": await service.list_export_profiles(tenant_db),
         "selected_profile_id": profile_id,
         "selected_fmt": fmt,
+        "selected_jq_document_id": jq_document_id,
+        "selected_jq_document_label": f"{jq_document.doc_number}: {jq_document.title}" if jq_document else "",
         "error": error,
     }
 
@@ -1370,6 +1374,7 @@ async def export_form(
         profile_id=profile_id,
         columns=columns,
         fmt=selected_profile.format if selected_profile else "csv",
+        jq_document_id=selected_profile.jq_document_id if selected_profile else None,
     )
     return templates.TemplateResponse(request, "tickets/export.html", context)
 
@@ -1396,9 +1401,12 @@ async def export_run(
     if not columns:
         columns = [{"source": s, "header": h} for s, h in await exporter.available_columns(tenant_db)]
 
+    jq_document_id_raw = str(form.get("jq_document_id") or "").strip()
+    jq_document_id = int(jq_document_id_raw) if jq_document_id_raw else None
+
     if save_as.strip():
         await service.save_export_profile(
-            tenant_db, name=save_as.strip(), fmt=fmt, columns=columns, actor_id=ctx.user.id
+            tenant_db, name=save_as.strip(), fmt=fmt, columns=columns, actor_id=ctx.user.id, jq_document_id=jq_document_id
         )
 
     rows = await exporter.build_rows(
@@ -1418,6 +1426,7 @@ async def export_run(
                     profile_id=None,
                     columns=merge_profile_columns(await exporter.available_columns(tenant_db), columns),
                     fmt=fmt,
+                    jq_document_id=jq_document_id,
                     error=str(exc),
                 )
                 return templates.TemplateResponse(request, "tickets/export.html", context, status_code=400)

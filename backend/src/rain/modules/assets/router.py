@@ -96,6 +96,27 @@ async def list_assets(
     )
 
 
+@router.get("/by-type", response_class=HTMLResponse)
+async def by_type(
+    request: Request,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Fallback destination for the sidebar's "By Type" nav node -- normally
+    an expandable flyout listing each active asset type (see
+    rain.modules.assets.nav._asset_type_children), which only renders as a
+    real link at all (render_nav's own {% else %} branch in base.html) when
+    there are zero active types to expand into. Without this route, that
+    link had no href of its own and fell through to a raw 404/500 instead
+    of explaining why the flyout was empty."""
+    nav = await build_nav_context(ctx)
+    asset_types = await service.list_asset_types(tenant_db, active_only=True)
+    if asset_types:
+        return RedirectResponse("/assets", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(request, "assets/by_type_empty.html", {**nav, "ctx": ctx})
+
+
 @router.get("/search-suggest")
 async def search_suggest(
     q: str = "",
@@ -548,9 +569,11 @@ async def _export_form_context(
     profile_id: int | None,
     columns: list[dict],
     fmt: str,
+    jq_document_id: int | None = None,
     error: str | None = None,
 ) -> dict:
     nav = await build_nav_context(ctx)
+    jq_document = await document_service.get_document(tenant_db, jq_document_id) if jq_document_id else None
     return {
         **nav,
         "ctx": ctx,
@@ -560,6 +583,8 @@ async def _export_form_context(
         "selected_type": asset_type_id,
         "selected_profile_id": profile_id,
         "selected_fmt": fmt,
+        "selected_jq_document_id": jq_document_id,
+        "selected_jq_document_label": f"{jq_document.doc_number}: {jq_document.title}" if jq_document else "",
         "error": error,
     }
 
@@ -586,6 +611,7 @@ async def export_form(
         profile_id=profile_id,
         columns=columns,
         fmt=selected_profile.format if selected_profile else "csv",
+        jq_document_id=selected_profile.jq_document_id if selected_profile else None,
     )
     return templates.TemplateResponse(request, "assets/export.html", context)
 
@@ -612,9 +638,18 @@ async def export_run(
     type_id = int(asset_type_id) if asset_type_id else None
     rows = await exporter.build_rows(tenant_db, asset_type_id=type_id, columns=columns)
 
+    jq_document_id_raw = str(form.get("jq_document_id") or "").strip()
+    jq_document_id = int(jq_document_id_raw) if jq_document_id_raw else None
+
     if save_as.strip():
         await service.save_export_profile(
-            tenant_db, name=save_as.strip(), asset_type_id=type_id, fmt=fmt, columns=columns, actor_id=ctx.user.id
+            tenant_db,
+            name=save_as.strip(),
+            asset_type_id=type_id,
+            fmt=fmt,
+            columns=columns,
+            actor_id=ctx.user.id,
+            jq_document_id=jq_document_id,
         )
 
     headers = [c["header"] for c in columns]
@@ -631,6 +666,7 @@ async def export_run(
                     profile_id=None,
                     columns=merge_profile_columns(await exporter.available_columns(tenant_db, type_id), columns),
                     fmt=fmt,
+                    jq_document_id=jq_document_id,
                     error=str(exc),
                 )
                 return templates.TemplateResponse(request, "assets/export.html", context, status_code=400)
