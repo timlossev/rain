@@ -22,10 +22,10 @@
       <p class="field-hint">Every match becomes its own new ticket.</p>
     </div>
     <div class="tab-panel {% if rule.promotion_type == 'repetition' %}active{% endif %}" data-tab-panel="repetition">
-      <p class="field-hint">If a match's computed title (below) equals an already-open ticket of this type, the event is added to that ticket as a "last occurred on ..." comment and the ticket is flagged Problematic, instead of creating a new ticket. No open match &rarr; a new ticket is created as usual.</p>
+      <p class="field-hint">A match with the same computed title as an already-open ticket is folded into it (flagged Problematic) instead of creating a new one.</p>
       <div class="field">
         <label class="checkbox-row"><input type="checkbox" id="ml_sidecar_enabled" name="ml_sidecar_enabled" {% if rule.ml_sidecar_enabled %}checked{% endif %} onchange="document.getElementById('ml_algorithm_field').hidden=!this.checked;"> Also flag statistically unusual occurrences (recommended)</label>
-        <div class="field-hint">Learns what's typical for these repeated events (severity, length, time of day) and adds a note to the ticket when one stands out - using the standard settings below, no extra tuning needed. Leave this checked unless you'd rather skip it.</div>
+        <div class="field-hint">Learns what's typical for these events and notes when one stands out, using the defaults below.</div>
       </div>
     </div>
     <div class="tab-panel {% if rule.promotion_type == 'ml_anomaly' %}active{% endif %}" data-tab-panel="ml">
@@ -49,7 +49,7 @@
           <input type="number" id="ml_warmup_count" name="ml_warmup_count" value="{{ rule.ml_warmup_count }}" min="1">
         </div>
       </div>
-      <div class="field-hint">Learns what's normal from each matching event's severity, length, and time of day - no threshold count to tune by hand. Score is 0-1 (higher = more unusual); it stays quiet until it's seen the warm-up count of events, so a brand new policy doesn't flag its own cold start. Runs alongside single/repetition policies, not instead of them - it never "wins" an event away from them.</div>
+      <div class="field-hint" style="margin-bottom:16px;">Learns what's normal for matching events. Score is 0-1 (higher = more unusual); stays quiet until it clears the warm-up count. Runs alongside single/repetition policies, not instead of them.</div>
     </div>
   </div>
 

@@ -6,7 +6,7 @@
   <a class="btn btn-sm" href="/tickets/rules/all">&larr; All policies</a>
 </div>
 
-<div class="card" style="max-width:720px;">
+<div class="card">
   <form method="post" action="/tickets/rules/{{ rule.id }}/edit">
     <div class="form-section">
       <div class="form-section-title">Basic info</div>
@@ -71,7 +71,7 @@
       {% else %}
       <p class="muted">No events scored yet.</p>
       {% endif %}
-      <div class="field-hint">"Training" means still building its baseline (fewer events seen than Warm-up events, above) - it won't fire, or flag anything unusual, until it clears that count. "Live" means it has, and is actively scoring.</div>
+      <div class="field-hint">Training = still building its baseline. Live = past warm-up and actively scoring.</div>
     </div>
     {% endif %}
 
@@ -93,7 +93,7 @@
         </div>
         <div class="field">
           <label class="checkbox-row field-align-checkbox"><input type="checkbox" name="is_active" {% if rule.is_active %}checked{% endif %}> Active</label>
-          <div class="field-hint">Inactive policies are skipped entirely - fall through to the next policy.</div>
+          <div class="field-hint">Inactive policies are skipped entirely.</div>
         </div>
       </div>
       <div class="field">
@@ -102,7 +102,7 @@
           <option value="">Don't attach a flow (unprotected change)</option>
           {% for f in approval_flows %}<option value="{{ f.id }}" {% if f.id == rule.approval_flow_id %}selected{% endif %}>{{ f.name }}</option>{% endfor %}
         </select>
-        <div class="field-hint">Ignored unless Ticket type above is Change. The resulting ticket also defaults its implementation window to "starts now, 24h turnaround."</div>
+        <div class="field-hint">Change tickets only. Defaults the implementation window to "starts now, 24h turnaround."</div>
       </div>
     </div>
 
