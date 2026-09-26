@@ -3,10 +3,11 @@ from __future__ import annotations
 import io
 import secrets
 from datetime import datetime
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.convertors import Convertor, register_url_convertor
@@ -410,8 +411,17 @@ async def delete_type(
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_admin),
 ):
+    """Asset.asset_type_id is ondelete="RESTRICT" (unlike CustomField's own
+    asset_type_id, which cascades) -- a type with live assets can't be
+    deleted at the DB level at all, so this checks first and redirects
+    with a friendly explanation instead of letting Postgres reject the
+    delete as an unhandled IntegrityError/500."""
     asset_type = await tenant_db.get(AssetType, asset_type_id)
     if asset_type is not None:
+        asset_count = await tenant_db.scalar(select(func.count(Asset.id)).where(Asset.asset_type_id == asset_type_id))
+        if asset_count:
+            error = f"Can't delete '{asset_type.name}' - {asset_count} asset{'s' if asset_count != 1 else ''} still use it. Reassign or delete them first."
+            return RedirectResponse(f"/assets/types?error={quote(error)}", status_code=status.HTTP_303_SEE_OTHER)
         await tenant_db.delete(asset_type)
         await tenant_db.commit()
     return RedirectResponse("/assets/types", status_code=status.HTTP_303_SEE_OTHER)
