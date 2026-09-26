@@ -72,7 +72,7 @@
           </div>
         </td>
         <td><span class="badge severity-{{ t.severity }}">{{ t.severity }}</span></td>
-        <td><span class="status-pill" style="--pill-color: {{ status_colors.get(t.status, '#6b7280') }};">{{ t.status }}</span></td>
+        <td><span class="status-pill" style="--pill-color: {{ status_colors.get(t.status, '#6b7280') }};">{{ status_labels.get(t.status, t.status) }}</span></td>
         <td class="muted">{{ user_names.get(t.assignee_user_id, "Unassigned") }}</td>
         <td class="muted">{% if t.asset %}<a href="/assets/{{ t.asset.ci_number }}/edit">{{ t.asset.name }}</a>{% else %}-{% endif %}</td>
         <td class="muted">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "-" }}</td>

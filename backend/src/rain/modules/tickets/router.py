@@ -137,6 +137,7 @@ async def list_tickets(
     ticket_page = await paginate(tenant_db, stmt, page=page, page_size=page_size)
     statuses = await service.list_statuses(tenant_db)
     status_colors = {s.key: s.color for s in statuses}
+    status_labels = {s.key: s.label for s in statuses}
     user_names = await resolve_user_names({t.assignee_user_id for t in ticket_page.items})
     selected_asset = await asset_service.get_asset(tenant_db, asset_id) if asset_id else None
     # The same two conditions the ticket detail page's own top-right
@@ -156,6 +157,7 @@ async def list_tickets(
             "ticket_types": TICKET_TYPES,
             "statuses": statuses,
             "status_colors": status_colors,
+            "status_labels": status_labels,
             "selected_type": ticket_type,
             "selected_status": ticket_status,
             "selected_asset_id": asset_id,
