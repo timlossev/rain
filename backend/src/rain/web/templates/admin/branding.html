@@ -1,126 +1,133 @@
 {% extends "base.html" %}
 {% block title %}Branding - {{ branding.instance_name }}{% endblock %}
 {% block help_text %}Instance-wide look & feel, the public incident portal's per-tenant behavior, and tenant-wide defaults (record-list page size, and custom JS for the main app and/or the portal - e.g. analytics or a chat widget). Instance name/color/logo/font apply immediately across every tenant; the portal settings and tenant defaults apply only to whichever tenant is currently active.{% endblock %}
+{% block content_class %}content-full{% endblock %}
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+{% set first_tab = "instance" if ctx.user.is_internal_admin else "portal" %}
 
-<div class="two-col-cards">
-{% if ctx.user.is_internal_admin %}
-<div class="card">
-  <div class="card-title">Instance branding</div>
-  <form method="post" action="/admin/branding" enctype="multipart/form-data">
-    <div class="form-row">
+<div class="card" data-tabs>
+  <div class="tab-buttons">
+    {% if ctx.user.is_internal_admin %}
+    <button type="button" class="tab-btn{{ ' active' if first_tab == 'instance' }}" data-tab-btn="instance">Instance branding</button>
+    {% endif %}
+    <button type="button" class="tab-btn{{ ' active' if first_tab == 'portal' }}" data-tab-btn="portal">Public incident portal</button>
+    <button type="button" class="tab-btn" data-tab-btn="defaults">Tenant defaults</button>
+  </div>
+
+  {% if ctx.user.is_internal_admin %}
+  <div class="tab-panel{{ ' active' if first_tab == 'instance' }}" data-tab-panel="instance">
+    <form method="post" action="/admin/branding" enctype="multipart/form-data">
+      <div class="form-row">
+        <div class="field">
+          <label for="instance_name">Instance name</label>
+          <input type="text" id="instance_name" name="instance_name" value="{{ branding.instance_name }}" required>
+        </div>
+        <div class="field field-w100">
+          <label for="accent_color">Accent color</label>
+          <input type="color" id="accent_color" name="accent_color" value="{{ branding.accent_color }}">
+        </div>
+      </div>
       <div class="field">
-        <label for="instance_name">Instance name</label>
-        <input type="text" id="instance_name" name="instance_name" value="{{ branding.instance_name }}" required>
+        <label for="font_family">Font</label>
+        <select id="font_family" name="font_family" style="font-family: var(--preview-font, inherit);" onchange="this.style.setProperty('--preview-font', this.value)">
+          {% for label, css_value in font_choices %}
+          <option value="{{ css_value }}" {% if branding.font_family == css_value %}selected{% endif %} style="font-family: {{ css_value }};">{{ label }}</option>
+          {% endfor %}
+        </select>
+        <div class="field-hint">System/web-safe fonts only - nothing downloaded from a CDN.</div>
       </div>
+      <div class="field">
+        <label for="button_radius">Button style</label>
+        <select id="button_radius" name="button_radius">
+          {% for label, css_value in button_style_choices %}
+          <option value="{{ css_value }}" {% if branding.button_radius == css_value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <div class="field-hint">Square is the default look across the app; Rounded gives every button a fully pill-shaped corner instead (modeled on teneo.ai's own buttons).</div>
+      </div>
+      <div class="field">
+        <label for="logo">Product logo</label>
+        {% if branding.logo_path %}<p><img src="{{ branding.logo_path }}" alt="" style="height:36px;"></p>{% endif %}
+        <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
+        <div class="field-hint">PNG, JPEG, SVG or WebP, up to 5MB. Leave empty to keep the current logo.</div>
+      </div>
+      <div class="field">
+        <label for="portal_background">Client portal background image</label>
+        {% if branding.portal_background_path %}<p><img src="{{ branding.portal_background_path }}" alt="" style="height:60px; border-radius:var(--radius-sm);"></p>{% endif %}
+        <input type="file" id="portal_background" name="portal_background" accept="image/png,image/jpeg,image/webp">
+        <div class="field-hint">Optional - shown full-page behind the public incident portal (<code>/portal/&lt;tenant&gt;</code>) for any tenant with "Show instance branding" on below. PNG, JPEG or WebP, up to 10MB. Leave empty to keep the current one (or the portal's plain default background, if none has been set yet).</div>
+      </div>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="tab-panel{{ ' active' if first_tab == 'portal' }}" data-tab-panel="portal">
+    {% if not portal_tenant %}
+    <p class="muted">Select a tenant (Admin &gt; Tenants &gt; Switch to) to configure its portal.</p>
+    {% else %}
+    <p class="field-hint" style="margin-top:0;">For <strong>{{ portal_tenant.name }}</strong>. A bare-bones page anyone with the link can use to file an incident, with no other navigation: <code>/portal/{{ portal_tenant.slug }}</code>.</p>
+    <form method="post" action="/admin/branding/portal">
+      <div class="field">
+        <label class="checkbox-row"><input type="checkbox" name="portal_require_auth" {% if portal_require_auth %}checked{% endif %}> Require sign-in</label>
+        <div class="field-hint">On: only signed-in users of this tenant can file through the portal. Off: anyone with the link can, and the ticket records "an unauthenticated user" as the reporter.</div>
+      </div>
+      <div class="field">
+        <label class="checkbox-row"><input type="checkbox" name="portal_branded" {% if portal_branded %}checked{% endif %}> Show instance branding</label>
+        <div class="field-hint">On: the portal shows this instance's logo, name, and accent color, same as every signed-in page. Off: a plain, unaccented page showing only "{{ portal_tenant.name }}" - for a portal shared outside your own organization.</div>
+      </div>
+      <div class="field">
+        <label for="escalation_webhook_id">Escalation webhook</label>
+        <select id="escalation_webhook_id" name="escalation_webhook_id">
+          <option value="">Don't show an "{{ escalate_button_label }}" button</option>
+          {% for w in webhooks %}<option value="{{ w.id }}" {% if escalation_webhook_id == w.id %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
+        </select>
+        <div class="field-hint">Called by the "{{ escalate_button_label }}" button on this tenant's tickets - on the ticket detail page, the tickets list and Kanban board's own row menus, and next to a signed-in visitor's own tickets in the portal. {% if not webhooks %}No webhooks yet - create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.{% endif %}</div>
+      </div>
+      <div class="field">
+        <label for="escalate_button_label">Escalation button label</label>
+        <input type="text" id="escalate_button_label" name="escalate_button_label" value="{{ escalate_button_label }}" placeholder="Escalate">
+        <div class="field-hint">What that button/menu item is actually labeled, wherever it appears - rename it to whatever fits what the webhook above actually does, e.g. "Page On-Call" or "Notify Ops".</div>
+      </div>
+      <div class="field">
+        <label for="portal_shareable_documents_label">Shareable documents tab name</label>
+        <input type="text" id="portal_shareable_documents_label" name="portal_shareable_documents_label" value="{{ portal_shareable_documents_label }}" placeholder="Shareable documents">
+        <div class="field-hint">Shown on the portal whenever a document is marked "Shareable in the client portal" (from the document's own page) - visible to every visitor, including one with no account, regardless of "Require sign-in" above. Rename it to whatever fits, e.g. "Trust Center".</div>
+      </div>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="tab-panel" data-tab-panel="defaults">
+    {% if not portal_tenant %}
+    <p class="muted">Select a tenant (Admin &gt; Tenants &gt; Switch to) to configure its defaults.</p>
+    {% else %}
+    <p class="field-hint" style="margin-top:0;">For <strong>{{ portal_tenant.name }}</strong>.</p>
+    <form method="post" action="/admin/branding/defaults">
       <div class="field field-w100">
-        <label for="accent_color">Accent color</label>
-        <input type="color" id="accent_color" name="accent_color" value="{{ branding.accent_color }}">
+        <label for="default_page_size">Record list page size</label>
+        <select id="default_page_size" name="default_page_size">
+          {% for choice in page_size_choices %}
+          <option value="{{ choice }}" {% if default_page_size == choice %}selected{% endif %}>{{ choice }}</option>
+          {% endfor %}
+        </select>
+        <div class="field-hint">How many rows/cards a page shows on this tenant's own record lists - Tickets, Assets, Documents, and this tenant's admin config lists (Ticket Statuses, Webhooks, Groups, ...). Doesn't affect the platform-level Tenants or Users lists, which aren't this tenant's records.</div>
       </div>
-    </div>
-    <div class="field">
-      <label for="font_family">Font</label>
-      <select id="font_family" name="font_family" style="font-family: var(--preview-font, inherit);" onchange="this.style.setProperty('--preview-font', this.value)">
-        {% for label, css_value in font_choices %}
-        <option value="{{ css_value }}" {% if branding.font_family == css_value %}selected{% endif %} style="font-family: {{ css_value }};">{{ label }}</option>
-        {% endfor %}
-      </select>
-      <div class="field-hint">System/web-safe fonts only - nothing downloaded from a CDN.</div>
-    </div>
-    <div class="field">
-      <label for="button_radius">Button style</label>
-      <select id="button_radius" name="button_radius">
-        {% for label, css_value in button_style_choices %}
-        <option value="{{ css_value }}" {% if branding.button_radius == css_value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-      <div class="field-hint">Square is the default look across the app; Rounded gives every button a fully pill-shaped corner instead (modeled on teneo.ai's own buttons).</div>
-    </div>
-    <div class="field">
-      <label for="logo">Product logo</label>
-      {% if branding.logo_path %}<p><img src="{{ branding.logo_path }}" alt="" style="height:36px;"></p>{% endif %}
-      <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
-      <div class="field-hint">PNG, JPEG, SVG or WebP, up to 5MB. Leave empty to keep the current logo.</div>
-    </div>
-    <div class="field">
-      <label for="portal_background">Client portal background image</label>
-      {% if branding.portal_background_path %}<p><img src="{{ branding.portal_background_path }}" alt="" style="height:60px; border-radius:var(--radius-sm);"></p>{% endif %}
-      <input type="file" id="portal_background" name="portal_background" accept="image/png,image/jpeg,image/webp">
-      <div class="field-hint">Optional - shown full-page behind the public incident portal (<code>/portal/&lt;tenant&gt;</code>) for any tenant with "Show instance branding" on below. PNG, JPEG or WebP, up to 10MB. Leave empty to keep the current one (or the portal's plain default background, if none has been set yet).</div>
-    </div>
-    <button class="btn btn-primary" type="submit">Save</button>
-  </form>
-</div>
-{% endif %}
-
-<div class="card">
-  <div class="card-title">Public incident portal</div>
-  {% if not portal_tenant %}
-  <p class="muted">Select a tenant (Admin &gt; Tenants &gt; Switch to) to configure its portal.</p>
-  {% else %}
-  <p class="field-hint" style="margin-top:0;">For <strong>{{ portal_tenant.name }}</strong>. A bare-bones page anyone with the link can use to file an incident, with no other navigation: <code>/portal/{{ portal_tenant.slug }}</code>.</p>
-  <form method="post" action="/admin/branding/portal">
-    <div class="field">
-      <label class="checkbox-row"><input type="checkbox" name="portal_require_auth" {% if portal_require_auth %}checked{% endif %}> Require sign-in</label>
-      <div class="field-hint">On: only signed-in users of this tenant can file through the portal. Off: anyone with the link can, and the ticket records "an unauthenticated user" as the reporter.</div>
-    </div>
-    <div class="field">
-      <label class="checkbox-row"><input type="checkbox" name="portal_branded" {% if portal_branded %}checked{% endif %}> Show instance branding</label>
-      <div class="field-hint">On: the portal shows this instance's logo, name, and accent color, same as every signed-in page. Off: a plain, unaccented page showing only "{{ portal_tenant.name }}" - for a portal shared outside your own organization.</div>
-    </div>
-    <div class="field">
-      <label for="escalation_webhook_id">Escalation webhook</label>
-      <select id="escalation_webhook_id" name="escalation_webhook_id">
-        <option value="">Don't show an "{{ escalate_button_label }}" button</option>
-        {% for w in webhooks %}<option value="{{ w.id }}" {% if escalation_webhook_id == w.id %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
-      </select>
-      <div class="field-hint">Called by the "{{ escalate_button_label }}" button on this tenant's tickets - on the ticket detail page, the tickets list and Kanban board's own row menus, and next to a signed-in visitor's own tickets in the portal. {% if not webhooks %}No webhooks yet - create one under <a href="/admin/webhooks">Admin &gt; Webhooks</a>.{% endif %}</div>
-    </div>
-    <div class="field">
-      <label for="escalate_button_label">Escalation button label</label>
-      <input type="text" id="escalate_button_label" name="escalate_button_label" value="{{ escalate_button_label }}" placeholder="Escalate">
-      <div class="field-hint">What that button/menu item is actually labeled, wherever it appears - rename it to whatever fits what the webhook above actually does, e.g. "Page On-Call" or "Notify Ops".</div>
-    </div>
-    <div class="field">
-      <label for="portal_shareable_documents_label">Shareable documents tab name</label>
-      <input type="text" id="portal_shareable_documents_label" name="portal_shareable_documents_label" value="{{ portal_shareable_documents_label }}" placeholder="Shareable documents">
-      <div class="field-hint">Shown on the portal whenever a document is marked "Shareable in the client portal" (from the document's own page) - visible to every visitor, including one with no account, regardless of "Require sign-in" above. Rename it to whatever fits, e.g. "Trust Center".</div>
-    </div>
-    <button class="btn btn-primary" type="submit">Save</button>
-  </form>
-  {% endif %}
-</div>
-
-<div class="card">
-  <div class="card-title">Tenant defaults</div>
-  {% if not portal_tenant %}
-  <p class="muted">Select a tenant (Admin &gt; Tenants &gt; Switch to) to configure its defaults.</p>
-  {% else %}
-  <p class="field-hint" style="margin-top:0;">For <strong>{{ portal_tenant.name }}</strong>.</p>
-  <form method="post" action="/admin/branding/defaults">
-    <div class="field field-w100">
-      <label for="default_page_size">Record list page size</label>
-      <select id="default_page_size" name="default_page_size">
-        {% for choice in page_size_choices %}
-        <option value="{{ choice }}" {% if default_page_size == choice %}selected{% endif %}>{{ choice }}</option>
-        {% endfor %}
-      </select>
-      <div class="field-hint">How many rows/cards a page shows on this tenant's own record lists - Tickets, Assets, Documents, and this tenant's admin config lists (Ticket Statuses, Webhooks, Groups, ...). Doesn't affect the platform-level Tenants or Users lists, which aren't this tenant's records.</div>
-    </div>
-    <div class="field">
-      <label for="app_custom_js">Custom JS - main app</label>
-      <textarea id="app_custom_js" name="app_custom_js" rows="4" class="doc-body-editor" placeholder="<script>...</script>">{{ app_custom_js }}</textarea>
-      <div class="field-hint">Raw HTML/JS, added just before <code>&lt;/body&gt;</code> on every signed-in page of the main app for this tenant - analytics, a chat widget, anything that ships as a <code>&lt;script&gt;</code> tag. Runs with full access to the page, and to whatever a signed-in user does on it, for as long as they're using the app - only paste snippets from a source you'd trust as much as a new admin user. Leave blank for none.</div>
-    </div>
-    <div class="field">
-      <label for="portal_custom_js">Custom JS - client portal</label>
-      <textarea id="portal_custom_js" name="portal_custom_js" rows="4" class="doc-body-editor" placeholder="<script>...</script>">{{ portal_custom_js }}</textarea>
-      <div class="field-hint">Same idea, for this tenant's public incident portal (<code>/portal/{{ portal_tenant.slug }}</code>) instead - reachable by anyone with the link, signed in or not, separate from the main-app snippet above (a tenant may only want one of the two, or neither). Leave blank for none.</div>
-    </div>
-    <button class="btn btn-primary" type="submit">Save</button>
-  </form>
-  {% endif %}
-</div>
+      <div class="field">
+        <label for="app_custom_js">Custom JS - main app</label>
+        <textarea id="app_custom_js" name="app_custom_js" rows="4" class="doc-body-editor" placeholder="<script>...</script>">{{ app_custom_js }}</textarea>
+        <div class="field-hint">Raw HTML/JS, added just before <code>&lt;/body&gt;</code> on every signed-in page of the main app for this tenant - analytics, a chat widget, anything that ships as a <code>&lt;script&gt;</code> tag. Runs with full access to the page, and to whatever a signed-in user does on it, for as long as they're using the app - only paste snippets from a source you'd trust as much as a new admin user. Leave blank for none.</div>
+      </div>
+      <div class="field">
+        <label for="portal_custom_js">Custom JS - client portal</label>
+        <textarea id="portal_custom_js" name="portal_custom_js" rows="4" class="doc-body-editor" placeholder="<script>...</script>">{{ portal_custom_js }}</textarea>
+        <div class="field-hint">Same idea, for this tenant's public incident portal (<code>/portal/{{ portal_tenant.slug }}</code>) instead - reachable by anyone with the link, signed in or not, separate from the main-app snippet above (a tenant may only want one of the two, or neither). Leave blank for none.</div>
+      </div>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </form>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}
