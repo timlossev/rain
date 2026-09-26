@@ -933,12 +933,18 @@ async def link_document(
 async def unlink_document(
     document_id: int,
     link_id: int,
+    redirect: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
+    """redirect (optional, defaults to this document's own page) is how
+    the Linked Documents section embedded on a ticket or asset page sends
+    the visitor back there instead of out to the document -- same pattern
+    as acknowledge_document below."""
     link = await service.remove_link(tenant_db, link_id)
     if link is not None and link.linked_type == "ticket":
         await _log_ticket_link_activity(tenant_db, linked=False, document=link.document, ticket_id=link.linked_id, user_id=ctx.user.id)
     doc_ref = link.document.doc_number if link is not None else document_id
-    return RedirectResponse(f"/documents/{doc_ref}", status_code=status.HTTP_303_SEE_OTHER)
+    default = f"/documents/{doc_ref}"
+    return RedirectResponse(safe_relative_path(redirect, default=default) if redirect else default, status_code=status.HTTP_303_SEE_OTHER)
