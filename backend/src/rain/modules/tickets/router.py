@@ -1165,6 +1165,33 @@ async def create_field(
     return RedirectResponse("/tickets/fields", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.post("/fields/{field_id:int}/edit")
+async def edit_field(
+    field_id: int,
+    label: str = Form(...),
+    field_type: str = Form("text"),
+    select_options: str = Form(""),
+    ticket_type: str = Form(""),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """field_key (and scope) are immutable once created -- config_bundle's
+    own import/export upsert matches a field by scope+asset_type_id+
+    ticket_type+field_key, and TicketFieldValue.field_id is a real FK
+    anyway, so nothing here actually depends on the key not changing;
+    it's left alone purely so re-importing an already-exported bundle
+    keeps matching this row rather than creating a duplicate."""
+    field = await tenant_db.get(CustomField, field_id)
+    if field is not None and field.scope == "ticket":
+        options = [o.strip() for o in select_options.split(",") if o.strip()] if field_type == "select" else None
+        field.label = label.strip()
+        field.field_type = field_type
+        field.select_options = options
+        field.ticket_type = ticket_type.strip() or None
+        await tenant_db.commit()
+    return RedirectResponse("/tickets/fields", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.post("/fields/{field_id:int}/delete")
 async def delete_field(
     field_id: int,

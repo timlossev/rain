@@ -20,6 +20,7 @@
         <td><span class="badge">{{ f.field_type }}</span></td>
         <td>{% if f.ticket_type %}<span class="badge">{{ f.ticket_type | capitalize }}</span>{% else %}<span class="muted">All types</span>{% endif %}</td>
         <td class="actions">
+          {{ modal.trigger_button("custom-field-edit-" ~ f.id, "Edit", variant="btn-sm") }}
           <form class="inline" method="post" action="/tickets/fields/{{ f.id }}/delete" data-confirm="Delete field '{{ f.label }}'?">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
@@ -32,6 +33,46 @@
   </table>
   {{ pg.render_pagination(page) }}
 </div>
+
+{# One modal per field, same reason assets/types.html's own per-row edit
+   modals live outside the table: a <div> can't legally live inside
+   <tbody>. field_key isn't editable here -- see edit_field's own
+   docstring for why. #}
+{% for f in page.items %}
+{% call modal.modal("custom-field-edit-" ~ f.id, "Edit custom field") %}
+  <form method="post" action="/tickets/fields/{{ f.id }}/edit">
+    <div class="form-row">
+      <div class="field"><label>Key</label><input type="text" value="{{ f.field_key }}" disabled></div>
+      <div class="field"><label for="label-{{ f.id }}">Label</label><input type="text" id="label-{{ f.id }}" name="label" value="{{ f.label }}" required></div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label for="field_type-{{ f.id }}">Field type</label>
+        <select id="field_type-{{ f.id }}" name="field_type">
+          {% for value, opt_label in [("text", "Text"), ("number", "Number"), ("boolean", "Yes / No"), ("date", "Date"), ("url", "URL"), ("email", "Email"), ("select", "Select")] %}
+          <option value="{{ value }}" {% if f.field_type == value %}selected{% endif %}>{{ opt_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="select_options-{{ f.id }}">Select options (comma-separated, if type = Select)</label>
+        <input type="text" id="select_options-{{ f.id }}" name="select_options" value="{{ f.select_options | join(', ') if f.select_options else '' }}" placeholder="low, medium, high">
+      </div>
+    </div>
+    <div class="field">
+      <label for="ticket_type-{{ f.id }}">Ticket type</label>
+      <select id="ticket_type-{{ f.id }}" name="ticket_type">
+        <option value="" {% if not f.ticket_type %}selected{% endif %}>All types</option>
+        {% for t in ticket_types %}
+        <option value="{{ t }}" {% if f.ticket_type == t %}selected{% endif %}>{{ t | capitalize }}</option>
+        {% endfor %}
+      </select>
+      <div class="field-hint">Leave "All types" for a field that makes sense everywhere; pick one to hide it from the other two.</div>
+    </div>
+    <button class="btn btn-primary" type="submit">Save changes</button>
+  </form>
+{% endcall %}
+{% endfor %}
 
 {% call modal.modal("custom-field", "New custom field") %}
   <form method="post" action="/tickets/fields">
