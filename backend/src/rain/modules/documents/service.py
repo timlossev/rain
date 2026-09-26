@@ -724,11 +724,33 @@ async def delete_document(db: AsyncSession, document: Document) -> None:
     await db.commit()
 
 
-async def add_link(db: AsyncSession, document_id: int, linked_type: str, linked_id: int, created_by: int | None) -> DocumentLink:
+async def add_link(
+    db: AsyncSession, document_id: int, linked_type: str, linked_id: int, created_by: int | None
+) -> tuple[DocumentLink, bool]:
+    """Idempotent -- (document_id, linked_type, linked_id) is uniquely
+    constrained (uq_document_links), and linking the same pair twice is a
+    perfectly reachable double-click/double-submit, not a real error, so
+    this checks first and returns the existing row rather than letting
+    that constraint reject the insert as an unhandled 500. The bool says
+    whether a new row was actually created -- callers that log a "linked"
+    activity entry alongside this should skip it on a no-op, or re-
+    linking an already-linked document would spam a duplicate entry
+    every time instead of silently succeeding."""
+    existing = (
+        await db.execute(
+            select(DocumentLink).where(
+                DocumentLink.document_id == document_id,
+                DocumentLink.linked_type == linked_type,
+                DocumentLink.linked_id == linked_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing, False
     link = DocumentLink(document_id=document_id, linked_type=linked_type, linked_id=linked_id, created_by=created_by)
     db.add(link)
     await db.commit()
-    return link
+    return link, True
 
 
 async def remove_link(db: AsyncSession, link_id: int) -> DocumentLink | None:

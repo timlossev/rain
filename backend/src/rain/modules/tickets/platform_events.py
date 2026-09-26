@@ -444,13 +444,15 @@ async def _run_action(db: AsyncSession, action: PlatformEventAction, record: Tic
         document = await db.get(Document, document_id) if document_id else None
         if document is None:
             return f"{label}: document no longer exists"
-        await document_service.add_link(db, document.id, "ticket", ticket.id, created_by=None)
-        # Also on the Activity feed, not just this rule-trigger log --
-        # a link is a change to the ticket regardless of what caused it.
-        await ticket_service.log_field_change(
-            db, ticket.id, "document", None, f"{document.doc_number}: {document.title}"
-        )
-        return f"{label}: linked {document.doc_number}"
+        _, created = await document_service.add_link(db, document.id, "ticket", ticket.id, created_by=None)
+        if created:
+            # Also on the Activity feed, not just this rule-trigger log --
+            # a link is a change to the ticket regardless of what caused it.
+            await ticket_service.log_field_change(
+                db, ticket.id, "document", None, f"{document.doc_number}: {document.title}"
+            )
+            return f"{label}: linked {document.doc_number}"
+        return f"{label}: {document.doc_number} already linked"
 
     if action.action_type == "attach_asset":
         asset_id = config.get("asset_id")

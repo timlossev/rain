@@ -395,10 +395,11 @@ async def create_document(
     )
 
     if linked_type in LINKED_TYPES and linked_id:
-        await service.add_link(tenant_db, doc.id, linked_type, int(linked_id), ctx.user.id)
+        _, created = await service.add_link(tenant_db, doc.id, linked_type, int(linked_id), ctx.user.id)
         if linked_type == "asset":
             return RedirectResponse(f"/assets/{linked_id}/edit", status_code=status.HTTP_303_SEE_OTHER)
-        await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=int(linked_id), user_id=ctx.user.id)
+        if created:
+            await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=int(linked_id), user_id=ctx.user.id)
         return RedirectResponse(f"/tickets/{linked_id}", status_code=status.HTTP_303_SEE_OTHER)
 
     return RedirectResponse(f"/documents/{doc.doc_number}", status_code=status.HTTP_303_SEE_OTHER)
@@ -884,8 +885,8 @@ async def link_existing_document(
     "Link existing") and picks a document, so it returns to that page
     instead of the document's."""
     if linked_type in LINKED_TYPES:
-        await service.add_link(tenant_db, document_id, linked_type, linked_id, ctx.user.id)
-        if linked_type == "ticket":
+        _, created = await service.add_link(tenant_db, document_id, linked_type, linked_id, ctx.user.id)
+        if linked_type == "ticket" and created:
             doc = await service.get_document(tenant_db, document_id)
             if doc is not None:
                 await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=linked_id, user_id=ctx.user.id)
@@ -923,8 +924,8 @@ async def link_document(
         resolved_id = asset_id
 
     if linked_type in LINKED_TYPES and resolved_id is not None:
-        await service.add_link(tenant_db, document_id, linked_type, resolved_id, ctx.user.id)
-        if linked_type == "ticket" and doc is not None:
+        _, created = await service.add_link(tenant_db, document_id, linked_type, resolved_id, ctx.user.id)
+        if linked_type == "ticket" and doc is not None and created:
             await _log_ticket_link_activity(tenant_db, linked=True, document=doc, ticket_id=resolved_id, user_id=ctx.user.id)
     return RedirectResponse(f"/documents/{doc.doc_number if doc else document_id}", status_code=status.HTTP_303_SEE_OTHER)
 
