@@ -1284,6 +1284,11 @@ td.actions { text-align: right; white-space: nowrap; }
    gap while the buttons independently span both rows on the right. */
 .doc-link-section { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "title buttons" "list buttons"; column-gap: 12px; row-gap: 14px; }
 .doc-link-section > .card-title { grid-area: title; margin-bottom: 0; }
+/* Once at least one document is linked, the rows themselves make the
+   section's purpose obvious -- the "Linked Documents (N)" title is
+   dropped (see _links_fragment.html) and the grid collapses to a single
+   row so the list doesn't leave a blank title row behind. */
+.doc-link-section--flat { grid-template-areas: "list buttons"; }
 .doc-link-buttons { grid-area: buttons; display: flex; flex-direction: column; gap: 6px; align-self: start; }
 /* flex rows instead of a table -- a table's fixed columns are exactly
    what overflowed in a narrow container (confirmed live); flex rows can
