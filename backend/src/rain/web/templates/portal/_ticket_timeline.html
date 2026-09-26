@@ -39,5 +39,17 @@
 </div>
 
 <div class="timeline-footer">
+  {% if is_approver %}
+  <form class="inline" method="post" action="/tickets/{{ ticket.id }}/approval/decide">
+    <input type="hidden" name="decision" value="rejected">
+    <input type="hidden" name="redirect" value="/portal/{{ tenant.slug }}">
+    <button class="btn btn-danger" type="submit">Reject</button>
+  </form>
+  <form class="inline" method="post" action="/tickets/{{ ticket.id }}/approval/decide">
+    <input type="hidden" name="decision" value="approved">
+    <input type="hidden" name="redirect" value="/portal/{{ tenant.slug }}">
+    <button class="btn btn-primary" type="submit">Approve</button>
+  </form>
+  {% endif %}
   <a class="btn btn-primary" href="/tickets/{{ ticket.ticket_number }}">Edit ticket</a>
 </div>

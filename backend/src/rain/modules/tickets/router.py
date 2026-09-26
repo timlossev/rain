@@ -675,13 +675,19 @@ async def decide_approval(
     ticket_id: int,
     decision: str = Form(...),
     comment: str = Form(""),
+    redirect: str = Form(""),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
-    if decision not in ("approved", "rejected"):
-        return RedirectResponse(f"/tickets/{ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+    """redirect (optional, defaults to this ticket's own detail page) is
+    how the client portal's own Pending Actions tab sends an approver
+    back to the portal instead of out to the full app -- same pattern as
+    documents.router's acknowledge_document."""
     ticket = await service.get_ticket(tenant_db, ticket_id)
+    default = f"/tickets/{ticket.ticket_number if ticket else ticket_id}"
+    if decision not in ("approved", "rejected"):
+        return RedirectResponse(safe_relative_path(redirect, default=default) if redirect else default, status_code=status.HTTP_303_SEE_OTHER)
     if ticket is not None and ticket.approval is not None and ticket.approval.overall_status == "pending":
         step = await service.current_approval_step(tenant_db, ticket.approval)
         if step is not None and await service.is_eligible_approver(tenant_db, step, ctx.user.id):
@@ -693,7 +699,7 @@ async def decide_approval(
                 decided_by_user_id=ctx.user.id,
                 comment=comment.strip(),
             )
-    return RedirectResponse(f"/tickets/{ticket.ticket_number if ticket else ticket_id}", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(safe_relative_path(redirect, default=default) if redirect else default, status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/{ticket_ref:ticket_ref}", response_class=HTMLResponse)

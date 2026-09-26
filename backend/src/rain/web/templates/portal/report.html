@@ -281,17 +281,29 @@
         <div class="portal-section-title">Approvals</div>
         <div class="table-scroll">
         <table>
-          <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th></tr></thead>
+          <thead><tr><th>Number</th><th>Title</th><th>Severity</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {% for t in pending_approval %}
             <tr>
-              <td><a href="/tickets/{{ t.ticket_number }}">{{ t.ticket_number }}</a></td>
+              <td><a href="/tickets/{{ t.ticket_number }}" data-ticket-timeline="{{ t.ticket_number }}">{{ t.ticket_number }}</a></td>
               <td>{{ t.title }}</td>
               <td><span class="badge severity-{{ t.severity }}">{{ t.severity }}</span></td>
               <td class="muted">{{ t.status }}</td>
+              <td class="actions">
+                <form class="inline" method="post" action="/tickets/{{ t.id }}/approval/decide">
+                  <input type="hidden" name="decision" value="rejected">
+                  <input type="hidden" name="redirect" value="/portal/{{ tenant.slug }}">
+                  <button class="btn btn-sm btn-danger" type="submit">Reject</button>
+                </form>
+                <form class="inline" method="post" action="/tickets/{{ t.id }}/approval/decide">
+                  <input type="hidden" name="decision" value="approved">
+                  <input type="hidden" name="redirect" value="/portal/{{ tenant.slug }}">
+                  <button class="btn btn-sm btn-primary" type="submit">Approve</button>
+                </form>
+              </td>
             </tr>
             {% else %}
-            <tr><td colspan="4" class="muted">Nothing waiting on your approval.</td></tr>
+            <tr><td colspan="5" class="muted">Nothing waiting on your approval.</td></tr>
             {% endfor %}
           </tbody>
         </table>

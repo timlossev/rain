@@ -481,8 +481,11 @@ async def portal_ticket_timeline(
     changes nothing.
 
     Signed-in-only, and only for a ticket this visitor reported
-    themselves -- same reporter_user_id == user.id scope as the "Tickets
-    reported by me" table this is opened from, tighter than what a
+    themselves (same reporter_user_id == user.id scope as the "Tickets
+    reported by me" table this is opened from) *or* is currently sitting
+    on an approval step this visitor is eligible to decide (the "Pending
+    Actions" tab's own Approvals table, opened from the same modal
+    rather than out to the full ticket page) -- tighter than what a
     client/client_admin could actually reach via the full app (any
     ticket in their tenant), since the portal's whole ethos is a
     deliberately narrow, self-service surface. A 404 either way (never
@@ -498,7 +501,12 @@ async def portal_ticket_timeline(
 
     async with tenant_session(tenant.schema_name) as tenant_db:
         ticket = await ticket_service.get_ticket_by_ref(tenant_db, ticket_ref)
-        if ticket is None or ticket.reporter_user_id != user.id:
+        is_approver = False
+        if ticket is not None and ticket.approval is not None and ticket.approval.overall_status == "pending":
+            step = await ticket_service.current_approval_step(tenant_db, ticket.approval)
+            if step is not None:
+                is_approver = await ticket_service.is_eligible_approver(tenant_db, step, user.id)
+        if ticket is None or (ticket.reporter_user_id != user.id and not is_approver):
             return templates.TemplateResponse(request, "errors/404.html", {}, status_code=404)
 
         status_labels = {s.key: s.label for s in await ticket_service.list_statuses(tenant_db)}
@@ -526,6 +534,7 @@ async def portal_ticket_timeline(
             "user_names": user_names,
             "asset_names": asset_names,
             "status_labels": status_labels,
+            "is_approver": is_approver,
         },
     )
 
