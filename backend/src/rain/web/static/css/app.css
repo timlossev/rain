@@ -1311,9 +1311,13 @@ td.actions { text-align: right; white-space: nowrap; }
   border-radius: var(--radius-sm);
 }
 .doc-link-info { display: flex; flex-direction: column; min-width: 140px; flex: 1 1 140px; }
-.doc-link-preview-btn { all: unset; cursor: pointer; font-weight: 600; color: var(--accent); align-self: flex-start; }
+/* align-self: stretch (not flex-start, its default before this held the
+   short doc-number instead of the title) -- the title is the longer of
+   the two lines now, so it needs the row's full width to truncate
+   against rather than shrinking to its own content first. */
+.doc-link-preview-btn { all: unset; display: block; cursor: pointer; font-weight: 600; color: var(--accent); align-self: stretch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-link-preview-btn:hover { text-decoration: underline; }
-.doc-link-title { font-size: 0.82rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-link-number { font-size: 0.82rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-link-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex-shrink: 0; }
 .doc-edit-btn { padding: 6px; }
 .doc-edit-btn svg { width: 15px; height: 15px; }

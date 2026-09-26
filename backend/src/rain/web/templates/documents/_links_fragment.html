@@ -18,8 +18,8 @@
     {% for link in links %}
     <div class="doc-link-row">
       <div class="doc-link-info">
-        <button type="button" class="doc-link-preview-btn" data-doc-preview="{{ link.document.id }}" data-doc-filename="{{ link.document.filename }}" data-doc-title="{{ link.document.doc_number }}: {{ link.document.title }}" title="Preview">{{ link.document.doc_number }}</button>
-        <span class="doc-link-title">{{ link.document.title }}</span>
+        <button type="button" class="doc-link-preview-btn" data-doc-preview="{{ link.document.id }}" data-doc-filename="{{ link.document.filename }}" data-doc-title="{{ link.document.doc_number }}: {{ link.document.title }}" title="Preview">{{ link.document.title }}</button>
+        <span class="doc-link-number">{{ link.document.doc_number }}</span>
       </div>
       <div class="doc-link-actions">
         <a class="btn btn-sm doc-edit-btn" href="/documents/{{ link.document.doc_number }}" title="Open document" aria-label="Open document">
