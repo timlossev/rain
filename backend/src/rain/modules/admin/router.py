@@ -1870,7 +1870,6 @@ async def config_bundle_platform_import(
     ctx: RequestContext = Depends(get_request_context),
     user: CurrentUser = Depends(require_internal_admin),
 ):
-    nav = await build_nav_context(ctx)
     error = None
     platform_result = None
     try:
@@ -1878,6 +1877,13 @@ async def config_bundle_platform_import(
         platform_result = await config_bundle.apply_platform_bundle(data, updated_by=user.id)
     except Exception as exc:
         error = f"Could not import platform configuration bundle: {exc}"
+    # Built after the import above (not before) -- a bundle can add
+    # things the sidebar itself reflects (an asset type, for the tenant
+    # import right below this one; less so here, but same shape kept
+    # for both), and this response renders the page directly rather
+    # than redirecting to a fresh GET, so a nav snapshot taken before
+    # the import ran would otherwise ship stale to the browser.
+    nav = await build_nav_context(ctx)
     return templates.TemplateResponse(
         request,
         "admin/config_bundle.html",
@@ -1909,7 +1915,6 @@ async def config_bundle_tenant_import(
     tenant_db: AsyncSession = Depends(get_tenant_db),
     user: CurrentUser = Depends(require_admin),
 ):
-    nav = await build_nav_context(ctx)
     error = None
     tenant_result = None
     try:
@@ -1917,6 +1922,14 @@ async def config_bundle_tenant_import(
         tenant_result = await config_bundle.apply_tenant_bundle(tenant_db, ctx.active_tenant, data, updated_by=user.id)
     except Exception as exc:
         error = f"Could not import tenant configuration bundle: {exc}"
+    # Built after the import above (not before) -- a tenant bundle can
+    # add a new asset type, and the sidebar's "By Type" flyout resolves
+    # its children from the DB fresh per request, so a nav snapshot
+    # taken before the import ran would ship stale to the browser. This
+    # response renders the page directly rather than redirecting to a
+    # fresh GET (see config_bundle_platform_import above), so nothing
+    # else would pick up the change either.
+    nav = await build_nav_context(ctx)
     return templates.TemplateResponse(
         request,
         "admin/config_bundle.html",
