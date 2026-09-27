@@ -914,7 +914,7 @@ starter compliance-register templates under
 `docs/compliance-templates/bundles/` --
 import one for a usable register in a few clicks instead of building
 the asset type by hand. All but the four ticket-scoped templates
-(POA&M, Nessus, FedRAMP OCR, FedRAMP SCN) are an asset type plus its
-custom fields;
+(POA&M, Nessus/OpenVAS, FedRAMP OCR, FedRAMP SCN) are an asset type plus
+its custom fields;
 see [`docs/compliance-templates/README.md`](compliance-templates/README.md)
 for what each one seeds.
