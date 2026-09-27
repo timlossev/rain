@@ -7,13 +7,17 @@ importer.parse_rows` already returns for CSV/JSON -- one dict per
 `<ReportItem>` (a single finding on a single host/port), keyed exactly by
 this importer's own target labels ("Type", "Title", "Description",
 "Severity", "Dedup key (optional)") and by the field labels
-`docs/compliance-templates/bundles/nessus-finding-fields.rain` ships ("Nessus
-plugin ID", "Scanned host", "Port", ...). That naming discipline is the
-whole trick: `rain.modules.tickets.router.import_preview`'s existing
-case-insensitive exact-label-match auto-suggestion wires every mapping
-up on its own, with zero new matching code -- upload a `.nessus` file
-and land on a fully pre-filled mapping screen, still reviewable and
-editable there like any other import, rather than a silent bypass of it.
+`docs/compliance-templates/bundles/vulnerability-scan-finding-fields.rain`
+ships ("Scanner check ID", "Scanned host", "Port", ...) -- see
+rain.modules.tickets.vuln_scan_columns for why those are vendor-neutral
+rather than Nessus-specific (rain.modules.tickets.openvas_parser produces
+the exact same columns from a different scanner's XML). That naming
+discipline is the whole trick: `rain.modules.tickets.router.
+import_preview`'s existing case-insensitive exact-label-match auto-
+suggestion wires every mapping up on its own, with zero new matching
+code -- upload a `.nessus` file and land on a fully pre-filled mapping
+screen, still reviewable and editable there like any other import,
+rather than a silent bypass of it.
 
 Severity-0 (Info) findings are dropped before they ever become a row --
 they dominate a raw scan's finding count and aren't things anyone wants
@@ -30,33 +34,15 @@ from typing import Any
 
 from defusedxml import ElementTree
 
+from rain.modules.tickets.vuln_scan_columns import SCAN_COLUMNS
+
 _SEVERITY_BY_NESSUS_LEVEL = {"1": "low", "2": "medium", "3": "high", "4": "critical"}
 
-#: The fixed column set parse_nessus_rows always produces, in order --
-#: also used by rain.modules.tickets.importer.sniff_headers so the
-#: mapping screen has something to show without re-parsing the file a
-#: second time just for its header list (parse_rows() re-reads the
-#: stash separately at commit time regardless, same two-pass shape
-#: CSV/JSON already have). Single source of truth for these labels --
-#: each row below is built from this same tuple via _row() rather than
-#: repeating the 14 strings a second time as literal dict keys, so
-#: adding/renaming a column can't make the two lists disagree.
-NESSUS_COLUMNS = [
-    "Type",
-    "Title",
-    "Description",
-    "Severity",
-    "Dedup key (optional)",
-    "Nessus plugin ID",
-    "Plugin name",
-    "Plugin family",
-    "Scanned host",
-    "Port",
-    "Protocol",
-    "CVSS base score",
-    "Risk factor (scanner-assigned)",
-    "Last seen in scan",
-]
+#: Kept as a re-export -- callers (rain.modules.tickets.importer) import
+#: this name specifically, and "NESSUS_COLUMNS" still reads correctly
+#: even though the list itself now lives in vuln_scan_columns, shared
+#: with openvas_parser's own OPENVAS_COLUMNS re-export.
+NESSUS_COLUMNS = SCAN_COLUMNS
 
 
 def _row(*values: Any) -> dict[str, Any]:

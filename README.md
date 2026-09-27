@@ -33,7 +33,8 @@ Scheme for Cloud Services. Custom asset types and ticket fields let
 RAIN adapt to any framework's paperwork with no code --
 [`docs/compliance-templates/`](docs/compliance-templates/) ships
 twenty ready-to-import `.rain` config bundles (a risk register, a
-Nessus finding-fields set, FedRAMP's 2026 quarterly reporting fields,
+vulnerability scan finding-fields set for Nessus and OpenVAS/GVM alike,
+FedRAMP's 2026 quarterly reporting fields,
 a NIST 800-53 control register with an OSCAL export transformer, a
 Significant Change Notification export, an SBOM/software inventory
 register, a Continuous Monitoring submission register, and others) for

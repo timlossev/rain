@@ -244,13 +244,16 @@ lowers setup cost, it doesn't change a control's classification here.
   template, since it's the same vendor register either way.
 - **RA-5 / RA-7 (Vulnerability Scanning / Risk Response)** -- RAIN is
   the remediation-tracking half, not the scanner. Tickets > Import
-  accepts a `.nessus` scan export directly, turning every non-Info
-  finding into a vulnerability ticket with no manual mapping. The
-  `nessus-finding-fields.rain` template adds scanner metadata (plugin
-  ID, CVSS, port/protocol, risk factor) as filterable fields. The
-  importer's "Dedup key" (`Ticket.external_finding_key`) makes a
-  recurring re-scan safe to re-import: an open match is left alone, a
-  closed match is reopened and flagged recurring instead of duplicated.
+  accepts a Nessus `.nessus` export or an OpenVAS/GVM XML export
+  directly, from either scanner, turning every non-Info finding into a
+  vulnerability ticket with no manual mapping. The
+  `vulnerability-scan-finding-fields.rain` template adds scanner
+  metadata (check ID, CVSS, port/protocol, risk factor) as filterable
+  fields, under vendor-neutral labels so the same fields cover a Nessus
+  plugin or an OpenVAS/GVM NVT either way. The importer's "Dedup key"
+  (`Ticket.external_finding_key`) makes a recurring re-scan safe to
+  re-import: an open match is left alone, a closed match is reopened
+  and flagged recurring instead of duplicated.
 - **RA-3 (Risk Assessment)** -- `risk-register.rain` turns this into a
   five-minute import instead of a from-scratch asset type.
 - **CP-4, PE-3/PE-6, SR-2/SR-6, MP-6** (Contingency Testing, Physical/

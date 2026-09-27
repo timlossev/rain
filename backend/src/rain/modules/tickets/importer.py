@@ -39,16 +39,18 @@ doesn't exist, left closed with a warning rather than guessed at),
 flagged is_problematic (this is by definition no longer a one-off), and
 commented with which import row caused it.
 
-fmt="nessus" is the one format that isn't really "the user maps
-arbitrary columns" -- rain.modules.tickets.nessus_parser turns a
-`.nessus` file into rows pre-keyed by this importer's own target labels
-(and by docs/compliance-templates/bundles/nessus-finding-fields.rain's own
-field labels, if that template's installed), so the existing
+fmt="nessus"/fmt="openvas" aren't really "the user maps arbitrary
+columns" -- rain.modules.tickets.nessus_parser/.openvas_parser each turn
+their own scanner's XML export into rows pre-keyed by the same shared,
+vendor-neutral target labels (rain.modules.tickets.vuln_scan_columns;
+also docs/compliance-templates/bundles/vulnerability-scan-finding-fields.
+rain's own field labels, if that template's installed), so the existing
 case-insensitive auto-suggestion in rain.modules.tickets.router.
 import_preview wires up a fully pre-filled mapping screen on its own --
 still reviewable there like any other import, just nothing to actually
-type. See that module's own docstring for the .nessus-vs-Nessus-DB
-distinction and the severity-0 filtering.
+type. See each parser's own docstring for its file-format specifics
+(the .nessus-vs-Nessus-DB distinction, GVM's report XML shape) and its
+own Info-equivalent severity filtering.
 
 Row creation batches into one commit at the very end (see
 commit_import's own comment) rather than one commit per row -- fine for
@@ -83,12 +85,15 @@ from rain.db.tenant_models import Ticket
 from rain.modules.assets.schemas import coerce_field_value
 from rain.modules.tickets import service
 from rain.modules.tickets.nessus_parser import NESSUS_COLUMNS, parse_nessus_rows
+from rain.modules.tickets.openvas_parser import OPENVAS_COLUMNS, parse_openvas_rows
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPES
 
 
 def sniff_headers(raw: bytes, fmt: str) -> list[str]:
     if fmt == "nessus":
         return list(NESSUS_COLUMNS)
+    if fmt == "openvas":
+        return list(OPENVAS_COLUMNS)
     if fmt == "json":
         data = json.loads(raw.decode("utf-8"))
         return list(data[0].keys()) if data else []
@@ -99,6 +104,8 @@ def sniff_headers(raw: bytes, fmt: str) -> list[str]:
 def parse_rows(raw: bytes, fmt: str) -> list[dict[str, Any]]:
     if fmt == "nessus":
         return parse_nessus_rows(raw)
+    if fmt == "openvas":
+        return parse_openvas_rows(raw)
     if fmt == "json":
         return json.loads(raw.decode("utf-8"))
     text = raw.decode("utf-8-sig")

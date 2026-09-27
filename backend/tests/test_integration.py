@@ -1646,11 +1646,13 @@ async def test_nessus_import_parses_maps_and_dedups_end_to_end():
     Tickets > Import's "Nessus scan export (.nessus)" format uses --
     covers the Info-severity (0) finding being dropped before it's even
     a row, and that the parser's own column names (chosen to match this
-    importer's target labels and nessus-finding-fields.json's field
-    labels exactly) work as a real mapping dict, not just documentation.
-    Re-running the same file is what actually proves the two features
-    compose: the second pass matches by Dedup key and leaves the ticket
-    alone rather than creating a duplicate."""
+    importer's target labels and vulnerability-scan-finding-fields.
+    json's field labels exactly -- shared with the OpenVAS/GVM parser,
+    see rain.modules.tickets.vuln_scan_columns) work as a real mapping
+    dict, not just documentation. Re-running the same file is what
+    actually proves the two features compose: the second pass matches
+    by Dedup key and leaves the ticket alone rather than creating a
+    duplicate."""
     from rain.db.tenant_models import CustomField, Ticket
     from rain.db.base import tenant_session
     from rain.db.provisioning import provision_tenant
@@ -1660,7 +1662,7 @@ async def test_nessus_import_parses_maps_and_dedups_end_to_end():
     tenant = await provision_tenant(slug="omega", name="Omega Labs")
 
     async with tenant_session(tenant.schema_name) as session:
-        plugin_field = CustomField(scope="ticket", field_key="nessus_plugin_id", label="Nessus plugin ID", field_type="text")
+        plugin_field = CustomField(scope="ticket", field_key="scanner_check_id", label="Scanner check ID", field_type="text")
         session.add(plugin_field)
         await session.commit()
 
@@ -1673,7 +1675,7 @@ async def test_nessus_import_parses_maps_and_dedups_end_to_end():
             "description": "Description",
             "severity": "Severity",
             "upsert_key": "Dedup key (optional)",
-            f"field_{plugin_field.id}": "Nessus plugin ID",
+            f"field_{plugin_field.id}": "Scanner check ID",
         }
         first = await importer.commit_import(session, rows=rows, mapping=mapping, actor_id=None)
         assert (first.created, first.reopened, first.unchanged, first.errors) == (1, 0, 0, [])
@@ -1692,6 +1694,102 @@ async def test_nessus_import_parses_maps_and_dedups_end_to_end():
         # Re-importing the identical file: same finding, same key,
         # left unchanged rather than duplicated.
         second = await importer.commit_import(session, rows=parse_nessus_rows(_SAMPLE_NESSUS_XML), mapping=mapping, actor_id=None)
+        assert (second.created, second.unchanged) == (0, 1)
+        assert len(await service.list_tickets(session, ticket_type="vulnerability")) == 1
+
+
+_SAMPLE_OPENVAS_XML = b"""<?xml version="1.0" ?>
+<report id="envelope">
+<report id="inner">
+<results>
+<result id="r1">
+<name>SSL/TLS: Certificate Signed Using A Weak Signature Algorithm</name>
+<host>10.0.0.5</host>
+<port>443/tcp</port>
+<nvt oid="1.3.6.1.4.1.25623.1.0.105880">
+<name>SSL/TLS: Certificate Signed Using A Weak Signature Algorithm</name>
+<family>General</family>
+<cvss_base>6.4</cvss_base>
+<cve>NOCVE</cve>
+<tags>summary=The certificate chain uses a weak signature algorithm.|solution=Reissue the certificate using SHA-256 or better.|solution_type=Mitigation</tags>
+</nvt>
+<threat>Medium</threat>
+<severity>6.4</severity>
+<description>The certificate chain uses a weak signature algorithm.</description>
+</result>
+<result id="r2">
+<name>Log Summary</name>
+<host>10.0.0.5</host>
+<port>general/tcp</port>
+<nvt oid="1.3.6.1.4.1.25623.1.0.900001">
+<name>Log Summary</name>
+<family>Settings</family>
+<cvss_base>0.0</cvss_base>
+</nvt>
+<threat>Log</threat>
+<severity>0.0</severity>
+<description>Scan details.</description>
+</result>
+</results>
+</report>
+</report>
+"""
+
+
+async def test_openvas_import_parses_maps_and_dedups_end_to_end():
+    """rain.modules.tickets.openvas_parser.parse_openvas_rows feeding
+    rain.modules.tickets.importer.commit_import, the same pipeline
+    Tickets > Import's "OpenVAS / GVM scan export (.xml)" format uses --
+    covers the Log-level (OpenVAS's own Info-equivalent) finding being
+    dropped before it's even a row, the <nvt><tags> pipe-string being
+    parsed for its solution text, and that the parser's own column names
+    (the exact same vendor-neutral SCAN_COLUMNS the Nessus parser uses --
+    rain.modules.tickets.vuln_scan_columns) work as a real mapping dict
+    against the same custom field a Nessus import would target. Mirrors
+    test_nessus_import_parses_maps_and_dedups_end_to_end's own shape
+    (parse -> map -> commit -> re-import for the dedup check) against
+    the other scanner's XML instead."""
+    from rain.db.tenant_models import CustomField, Ticket
+    from rain.db.base import tenant_session
+    from rain.db.provisioning import provision_tenant
+    from rain.modules.tickets import importer, service
+    from rain.modules.tickets.openvas_parser import parse_openvas_rows
+
+    tenant = await provision_tenant(slug="upsilon2", name="Upsilon2 Labs")
+
+    async with tenant_session(tenant.schema_name) as session:
+        check_field = CustomField(scope="ticket", field_key="scanner_check_id", label="Scanner check ID", field_type="text")
+        session.add(check_field)
+        await session.commit()
+
+        rows = parse_openvas_rows(_SAMPLE_OPENVAS_XML)
+        assert len(rows) == 1  # the Log-threat row never became one
+
+        mapping = {
+            "ticket_type": "Type",
+            "title": "Title",
+            "description": "Description",
+            "severity": "Severity",
+            "upsert_key": "Dedup key (optional)",
+            f"field_{check_field.id}": "Scanner check ID",
+        }
+        first = await importer.commit_import(session, rows=rows, mapping=mapping, actor_id=None)
+        assert (first.created, first.reopened, first.unchanged, first.errors) == (1, 0, 0, [])
+
+        tickets = await service.list_tickets(session, ticket_type="vulnerability")
+        ticket = next(t for t in tickets if "Weak Signature Algorithm" in t.title)
+        assert ticket.severity == "medium"
+        assert ticket.external_finding_key == "openvas:10.0.0.5:443:tcp:1.3.6.1.4.1.25623.1.0.105880"
+        assert "Reissue the certificate" in ticket.description
+        assert {fv.field_id: fv.value for fv in ticket.field_values} == {
+            check_field.id: "1.3.6.1.4.1.25623.1.0.105880"
+        }
+
+        assert await session.get(Ticket, ticket.id, populate_existing=True) is not None
+
+        # Re-importing the identical file: same finding, same key, left
+        # unchanged rather than duplicated.
+        second = await importer.commit_import(session, rows=parse_openvas_rows(_SAMPLE_OPENVAS_XML), mapping=mapping, actor_id=None)
         assert (second.created, second.unchanged) == (0, 1)
         assert len(await service.list_tickets(session, ticket_type="vulnerability")) == 1
 
