@@ -288,3 +288,71 @@ sections are filled in by hand.
    to see all of them), format JSON, select Number/Title/Description
    and the three flag fields (plus the richer incident/VER fields if
    installed), pick the ruleset, Export.
+
+## Certification Package Overview export
+
+Three transformers for this one document, matching the three asset
+types that already mirror its sections (above):
+`transforms/fedramp-package-overview-export.jq` (serviceIdentification/
+serviceProperties/assessor), `transforms/fedramp-package-contacts-export.jq`
+(the `contactInformation` array), and
+`transforms/fedramp-package-repositories-export.jq` (`trustCenter`/
+`secureConfigurationGuidance`/`additionalRepositories`, split out of one
+register by which "Repository type(s)" each row names -- see that
+file's own header). Three separate Assets exports (one per asset type)
+feeding three separate transformers, then hand-assembled into one
+document -- an Assets export can't join across asset types, so this
+can't be one step the way the single-asset-type exports elsewhere in
+this file are.
+
+1. Import `bundles/fedramp-certification-package.rain`,
+   `bundles/fedramp-package-contacts.rain`, and
+   `bundles/fedramp-package-repositories.rain` (above); populate one row
+   on the first (most tenants only need one), and one row per contact/
+   repository on the other two.
+2. Assets > Export, asset type "FedRAMP Certification Package", format
+   JSON, select every custom field column plus "Name" (default
+   headers), pick `fedramp-package-overview-export.jq`, Export.
+3. Assets > Export, asset type "FedRAMP Package Contact", format JSON,
+   select every column, pick `fedramp-package-contacts-export.jq`,
+   Export.
+4. Assets > Export, asset type "FedRAMP Package Repository", format
+   JSON, select every column, pick
+   `fedramp-package-repositories-export.jq`, Export.
+5. Paste step 3's array as step 2's `contactInformation` value, and
+   step 4's three keys into step 2's `serviceProperties` object
+   alongside what's already there.
+
+The result is valid against
+`fedramp-certification-package-overview-schema-2026-06-24.json` once
+step 3 includes at least one `"contactType": "Security"` and one
+`"contactType": "Sales"` entry -- the schema requires both; nothing
+here enforces it across separate asset rows (see
+`fedramp-package-contacts.rain`'s own docstring).
+
+## Security Decision Record export
+
+`transforms/fedramp-security-decision-record-export.jq` exports
+`bundles/security-control-register.rain` (the same register
+`oscal-control-implementation.jq` already exports as OSCAL) as the
+`securityControls[]` section of a FedRAMP Security Decision Record. It's
+a fragment, not a complete one -- `fedRampRequirements`,
+`keySecurityIndicators`, and `portsAndProtocols` are sections nothing in
+this repo tracks yet (each needs its own asset type with a shape RAIN's
+flat custom fields don't naturally hold -- implementation/validation/
+assessment as three separate narrative arrays per item, plus a
+structured evidence array for KSIs); they come out as empty
+placeholders. See the file's own header for exactly what's covered,
+what's deliberately left out (parameter values, specifically), and the
+one enum mismatch worth knowing about (`controlImplementationStatus`'s
+three allowed values here are narrower than the register's own five).
+
+1. Import `bundles/security-control-register.rain` (above) if you
+   haven't already, and populate it -- see the OSCAL section above for
+   starting from a real baseline instead of a blank register.
+2. **Edit the transformer once before using it**: the three constants
+   at the top (certification package URI, a version string, an update
+   source) -- `lastUpdated` is computed automatically.
+3. Assets > Export, asset type Security Control, format JSON, select
+   at least Control ID/Implementation Status/Narrative (default
+   headers), pick the ruleset, Export.

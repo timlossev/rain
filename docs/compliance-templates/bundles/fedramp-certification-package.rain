@@ -1,7 +1,7 @@
 {
   "bundle_type": "rain_tenant_config",
   "bundle_version": 1,
-  "exported_at": "2026-09-14T00:00:00+00:00",
+  "exported_at": "2026-10-09T00:00:00+00:00",
   "source_tenant_slug": "template",
   "source_tenant_name": "FedRAMP Certification Package starter template",
   "secrets_included": false,
@@ -145,6 +145,16 @@
       "select_options": null,
       "is_required": false,
       "sort_order": 12
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "logo_url",
+      "label": "Logo URL (png/jpeg/gif/svg/webp/ico/bmp/tiff)",
+      "field_type": "url",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 13
     }
   ]
 }
