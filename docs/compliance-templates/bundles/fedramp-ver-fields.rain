@@ -1,0 +1,153 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-10-08T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "FedRAMP Vulnerability Evaluation and Reporting (VER) fields starter template",
+  "secrets_included": false,
+  "custom_fields": [
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "detection_source",
+      "label": "Detection source",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 0
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "current_n_rating",
+      "label": "Current Potential Agency Impact (N-rating)",
+      "field_type": "select",
+      "select_options": ["1", "2", "3", "4", "5"],
+      "is_required": false,
+      "sort_order": 1
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "is_internet_reachable",
+      "label": "Is internet-reachable (IRV)",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "is_likely_exploitable",
+      "label": "Is likely exploitable (LEV)",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "evaluation_completed_at",
+      "label": "Evaluation completed at",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "potential_agency_impact",
+      "label": "Potential agency impact",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "projected_reduction_date",
+      "label": "Projected next PAIN reduction date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "projected_reduction_target_rating",
+      "label": "Projected next PAIN reduction target rating",
+      "field_type": "select",
+      "select_options": ["1", "2", "3", "4", "5"],
+      "is_required": false,
+      "sort_order": 7
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "is_overdue",
+      "label": "Is overdue (VER-TFR)",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 8
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "overdue_explanation",
+      "label": "Overdue explanation",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 9
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "supplementary_risk_information",
+      "label": "Supplementary risk information",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 10
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "pain_reduction_events",
+      "label": "PAIN reduction events (semicolon-separated: YYYY-MM-DD | rating; YYYY-MM-DD | rating)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 11
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "vulnerability",
+      "field_key": "final_disposition",
+      "label": "Final disposition",
+      "field_type": "select",
+      "select_options": ["Fully Mitigated", "Partially Mitigated", "Remediated", "False Positive"],
+      "is_required": false,
+      "sort_order": 12
+    }
+  ]
+}

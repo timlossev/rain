@@ -31,6 +31,8 @@ Three subfolders, by what you do with the file:
 | `bundles/poam-tracking-fields.rain` | *Ticket* fields | CA-5 (POA&M) |
 | `bundles/vulnerability-scan-finding-fields.rain` | *Ticket* fields | RA-5/RA-7 -- optional; Tickets > Import reads a Nessus `.nessus` file or an OpenVAS/GVM XML export natively either way, from either scanner, with the same vendor-neutral field labels (Scanner check ID/Check name/Check family cover a Nessus plugin or an OpenVAS/GVM NVT either way) |
 | `bundles/fedramp-ocr-fields.rain` | *Ticket* fields | FedRAMP CR26's Ongoing Certification Report -- additive alongside the POA&M template, not a replacement for it (see `docs/itsm-controls-mapping.md`'s CA-5 entry) |
+| `bundles/fedramp-ver-fields.rain` | *Ticket* fields | FedRAMP's Vulnerability Evaluation and Reporting activity (VER-RPT-VDT/VER-RPT-AVI/VER-TFR-MRH) -- N-rating, IRV/LEV classification, PAIN reduction history, and final disposition on Vulnerability tickets. Pairs with `fedramp-ocr-fields.rain`'s own "Accepted vulnerability (OCR)" flag (reused here, not duplicated) to split a vulnerability between the two report shapes. |
+| `bundles/fedramp-incident-report-fields.rain` | *Ticket* fields | FedRAMP's unified Incident Report (IEC-CSO-IIR/OIR/FIR) on Incident tickets -- one set of fields covers all three report types in the lifecycle, "FedRAMP report type" names which one a given export represents. |
 | `bundles/fedramp-certification-package.rain` | FedRAMP Certification Package asset type | Mirrors fedramp.gov's Certification Package Overview schema (2026-06-24) -- CSP/service-identity metadata, only relevant to a tenant that's itself a FedRAMP-certified CSP, not a general-purpose register |
 | `bundles/fedramp-package-contacts.rain` | FedRAMP Package Contact asset type | The same schema's repeating `contactInformation` array -- pairs with `fedramp-certification-package.rain` |
 | `bundles/fedramp-package-repositories.rain` | FedRAMP Package Repository asset type | The same schema's `trustCenter`/`secureConfigurationGuidance`/`additionalRepositories` -- pairs with `fedramp-certification-package.rain` |
@@ -197,3 +199,92 @@ semicolon- (not newline-) separated on that one field
 custom field of type "text" renders as a single-line input, with no
 textarea variant, so a value typed with embedded newlines silently
 loses them.
+
+## Vulnerability Evaluation and Reporting (VER) exports
+
+Three more packaged transformers, all for the *Tickets* JSON export,
+Type "vulnerability": `transforms/fedramp-vdt-export.jq` (VER-RPT-VDT,
+non-accepted findings with activity in a period),
+`transforms/fedramp-avi-export.jq` (VER-RPT-AVI, accepted findings with
+activity in a period), and `transforms/fedramp-historical-ver-export.jq`
+(VER-TFR-MRH, every current finding, active and accepted alike, no
+period). All three share the same per-finding shape
+(`vulnerabilityDetail` in FedRAMP's own common-definitions schema), so
+they share `bundles/fedramp-ver-fields.rain`'s fields; which transformer
+a row lands in is decided by `fedramp-ocr-fields.rain`'s own "Accepted
+vulnerability (OCR)" flag, not a separate field.
+
+1. Import `bundles/fedramp-ver-fields.rain` and `bundles/fedramp-ocr-fields.rain`
+   (above) -- the accepted-vulnerability flag and its justification
+   field live on the OCR template since `fedramp-ocr-export.jq` below
+   needs the same flag; VER doesn't duplicate it.
+2. **Edit the transformer once before using it**: VDT/AVI each start
+   with `certification_package_overview_uri`/`report_period_from`/
+   `report_period_to` constants (same reasoning as the SCN transformer
+   above); Historical only needs the URI, since it has no period --
+   `generatedAt` is computed automatically. Save the edited file as a
+   `.jq` Document to reuse each reporting period.
+3. Tickets > Export, Type "vulnerability", format JSON, select the
+   Number/Title/Description/Created columns and the VER + "Accepted
+   vulnerability (OCR)"/"Acceptance justification" fields (default
+   headers), pick the ruleset, Export.
+
+Each result is independently valid against its own
+`fedramp-*-schema-2026-06-24.json` once the per-CSP constants are
+filled in. A boolean field (Is internet-reachable, Is overdue, ...)
+left blank on a ticket is simply omitted from that finding's object,
+not written as `false` -- the schema doesn't require any of them.
+
+## Incident Report export
+
+`transforms/fedramp-incident-report-export.jq` turns a Tickets JSON
+export (Type "incident") into FedRAMP Incident Reports, valid against
+`fedramp-incident-report-schema-2026-06-24.json`. One schema covers all
+three report types in the IEC-CSO lifecycle (Initial/Ongoing/Final) --
+`bundles/fedramp-incident-report-fields.rain`'s own "FedRAMP report
+type" field names which one a given export represents, flipped by hand
+as a real incident progresses from first detection through resolution.
+
+1. Import `bundles/fedramp-incident-report-fields.rain` (above).
+2. **Edit the transformer once before using it**: same
+   `certification_package_overview_uri` constant, same reasoning.
+3. Tickets > Export, Type "incident", format JSON, select the
+   Number/Title/Description columns and the incident-report fields
+   (default headers), pick the ruleset, Export. A Final report needs
+   "Resolved at" filled in on the ticket (the schema requires it when
+   reportType is Final) -- not enforced by the transformer itself, same
+   "omit rather than invent" rule as everywhere else in this directory.
+
+## Ongoing Certification Report export
+
+`transforms/fedramp-ocr-export.jq` is the odd one out in this
+directory: an Ongoing Certification Report is mostly *narrative*, not
+ticket data. Four of its nine required top-level fields
+(`certificationDataChanges`, `plannedCertificationDataChanges`,
+`updatedRecommendations`, `activeAgencies`) are quarterly summaries
+nothing in a ticket tracker produces on its own. The transformer fills
+in what tickets *do* know -- accepted vulnerabilities (from
+`fedramp-ver-fields.rain`'s flag), transformative changes (from
+`fedramp-ocr-fields.rain`'s own flag), and reportable incidents (from
+`fedramp-incident-report-fields.rain`, if installed) -- and leaves the
+rest as present-but-empty placeholders: a required array with nothing
+to put in it is still valid as `[]` (an empty `incidents` list already
+means "none occurred" per the schema's own wording), so the result is
+schema-shaped either way, just not finished until the narrative
+sections are filled in by hand.
+
+1. Import `bundles/fedramp-ocr-fields.rain` (above), plus
+   `bundles/fedramp-incident-report-fields.rain` and
+   `bundles/fedramp-ver-fields.rain` if you want richer incident/
+   vulnerability detail than the bare OCR flags provide.
+2. **Edit the transformer once before using it**: per-CSP/per-quarter
+   constants at the top -- the certification package URI, the report
+   period, the planning horizon, and semicolon-/comma-separated
+   narrative constants for the four sections above. Re-edit those
+   narrative constants each quarter; everything else about the
+   transformer stays the same.
+3. Tickets > Export with **no Type filter** (vulnerability, incident,
+   and change tickets all need to be in the same export for this one
+   to see all of them), format JSON, select Number/Title/Description
+   and the three flag fields (plus the richer incident/VER fields if
+   installed), pick the ruleset, Export.
