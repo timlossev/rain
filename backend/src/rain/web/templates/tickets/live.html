@@ -16,6 +16,9 @@
   <div class="live-controls">
     <span id="live-status" class="badge">connecting&hellip;</span>
     <button type="button" class="btn btn-sm" id="live-pause">Pause</button>
+    <form method="post" action="/tickets/live/purge" class="inline" data-confirm="Purge all pending events now? This erases everything not yet promoted to a ticket, without waiting for the retention cleanup.">
+      <button type="submit" class="btn btn-sm">Purge all now</button>
+    </form>
   </div>
   {# Hidden until >=1 row is checked (live.js). Same [data-menu] dropdown
      the tickets-list row menu uses, acting on the checked rows instead of

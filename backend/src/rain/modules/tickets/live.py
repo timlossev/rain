@@ -152,6 +152,25 @@ async def live_bulk_discard(
     return RedirectResponse("/admin/syslog-sources", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.post("/live/purge")
+async def live_purge(
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    """Backs the live-feed "Purge all now" button -- deletes every
+    pending (not yet promoted) event for this tenant immediately,
+    instead of waiting for the periodic retention sweep
+    (rain.modules.tickets.listener.run_retention_sweep) to age them out.
+    Mainly for cleaning up after a web-app/vuln scan sprays the syslog
+    listener with thousands of synthetic lines (each one promoted into
+    an event here, same as real traffic) -- same require_login gate as
+    this page itself and bulk-promote, not require_internal_admin like
+    bulk-discard, since this only clears this tenant's own already-
+    ephemeral data and changes no cross-tenant routing config."""
+    await service.purge_pending_events(tenant_db)
+    return RedirectResponse("/tickets/live", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.websocket("/live/ws")
 async def live_ws(websocket: WebSocket) -> None:
     token = websocket.cookies.get(SESSION_COOKIE_NAME)

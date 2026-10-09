@@ -1,0 +1,19 @@
+{#
+  Shared by the public incident portal's "New ticket" and catalog-
+  request forms (rain.core.captcha) -- a trivial, stateless math
+  puzzle, just enough friction to stop a generic web-app scanner from
+  filing real tickets while it fuzzes a reachable host. Not shown
+  anywhere a session already exists (nothing else in the app needs
+  this).
+
+  Usage: {% include "_captcha_fields.html" %} inside a <form>, needs
+  captcha_a/captcha_b/captcha_token in the template context (see
+  rain.core.captcha.new_challenge).
+#}
+<div class="field field-w140">
+  <label for="captcha_answer">What is {{ captcha_a }} + {{ captcha_b }}?</label>
+  <input type="text" id="captcha_answer" name="captcha_answer" inputmode="numeric" autocomplete="off" required>
+  <input type="hidden" name="captcha_a" value="{{ captcha_a }}">
+  <input type="hidden" name="captcha_b" value="{{ captcha_b }}">
+  <input type="hidden" name="captcha_token" value="{{ captcha_token }}">
+</div>

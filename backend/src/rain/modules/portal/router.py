@@ -40,6 +40,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy import select
 
+from rain.core import captcha
 from rain.core.pagination import paginate
 from rain.core.tenancy import CurrentUser, get_current_user_optional
 from rain.core.tenant_config import get_tenant_config, get_tenant_configs
@@ -79,6 +80,7 @@ PORTAL_INTERACTIONS: list[tuple[str, str]] = [
 _PORTAL_ERRORS: dict[str, str] = {
     "unknown_interaction": "Unknown request type.",
     "title_required": "Title is required.",
+    "captcha_failed": "That wasn't quite right -- please try the new sum below.",
 }
 
 # What a genuine "Submitted as ..." confirmation looks like -- the
@@ -308,12 +310,16 @@ async def portal_form(
             else {"escalation_webhook_id": None, "escalate_button_label": "Escalate"}
         )
 
+    captcha_a, captcha_b, captcha_token = captcha.new_challenge()
     return templates.TemplateResponse(
         request,
         "portal/report.html",
         {
             "tenant": tenant,
             "user": user,
+            "captcha_a": captcha_a,
+            "captcha_b": captcha_b,
+            "captcha_token": captcha_token,
             "branded": flags["portal_branded"],
             "portal_custom_js": flags["portal_custom_js"],
             "anonymous_shared_only": anonymous_shared_only,
@@ -347,6 +353,10 @@ async def portal_create_ticket(
     title: str = Form(...),
     description: str = Form(""),
     severity: str = Form("medium"),
+    captcha_a: str = Form(""),
+    captcha_b: str = Form(""),
+    captcha_token: str = Form(""),
+    captcha_answer: str = Form(""),
     user: CurrentUser | None = Depends(get_current_user_optional),
 ):
     access = await _resolve_portal_access(request, tenant_slug, user)
@@ -359,6 +369,8 @@ async def portal_create_ticket(
         return RedirectResponse(f"/portal/{tenant_slug}?error=unknown_interaction", status_code=status.HTTP_303_SEE_OTHER)
     if not title.strip():
         return RedirectResponse(f"/portal/{tenant_slug}?error=title_required", status_code=status.HTTP_303_SEE_OTHER)
+    if not captcha.verify(captcha_a, captcha_b, captcha_token, captcha_answer):
+        return RedirectResponse(f"/portal/{tenant_slug}?error=captcha_failed", status_code=status.HTTP_303_SEE_OTHER)
     if severity not in SEVERITIES:
         severity = "medium"
 
@@ -401,6 +413,7 @@ async def portal_catalog_form(
             return RedirectResponse(f"/portal/{tenant_slug}", status_code=status.HTTP_303_SEE_OTHER)
         rendered = await catalog_service.render_fields(tenant_db, item)
 
+    captcha_a, captcha_b, captcha_token = captcha.new_challenge()
     return templates.TemplateResponse(
         request,
         "portal/catalog_form.html",
@@ -413,6 +426,9 @@ async def portal_catalog_form(
             "rendered_fields": rendered,
             "submitted": {},
             "errors": [],
+            "captcha_a": captcha_a,
+            "captcha_b": captcha_b,
+            "captcha_token": captcha_token,
         },
     )
 
@@ -435,6 +451,34 @@ async def portal_catalog_submit(
             return RedirectResponse(f"/portal/{tenant_slug}", status_code=status.HTTP_303_SEE_OTHER)
 
         form = await request.form()
+
+        if not captcha.verify(
+            str(form.get("captcha_a", "")),
+            str(form.get("captcha_b", "")),
+            str(form.get("captcha_token", "")),
+            str(form.get("captcha_answer", "")),
+        ):
+            rendered = await catalog_service.render_fields(tenant_db, item)
+            submitted = {f.field_key: form.get(f"answer_{f.field_key}", "") for f in item.fields}
+            captcha_a, captcha_b, captcha_token = captcha.new_challenge()
+            return templates.TemplateResponse(
+                request,
+                "portal/catalog_form.html",
+                {
+                    "tenant": tenant,
+                    "user": user,
+                    "branded": flags["portal_branded"],
+                    "portal_custom_js": flags["portal_custom_js"],
+                    "item": item,
+                    "rendered_fields": rendered,
+                    "submitted": submitted,
+                    "errors": ["That wasn't quite right -- please try the new sum below."],
+                    "captcha_a": captcha_a,
+                    "captcha_b": captcha_b,
+                    "captcha_token": captcha_token,
+                },
+            )
+
         # Same attribution rule as portal_create_ticket just above: a
         # signed-in visitor's answer to reporter_user_id, an anonymous
         # one's to reported_anonymously (submit_catalog_item passes that
@@ -445,6 +489,7 @@ async def portal_catalog_submit(
         if result.errors:
             rendered = await catalog_service.render_fields(tenant_db, item)
             submitted = {f.field_key: form.get(f"answer_{f.field_key}", "") for f in item.fields}
+            captcha_a, captcha_b, captcha_token = captcha.new_challenge()
             return templates.TemplateResponse(
                 request,
                 "portal/catalog_form.html",
@@ -457,6 +502,9 @@ async def portal_catalog_submit(
                     "rendered_fields": rendered,
                     "submitted": submitted,
                     "errors": result.errors,
+                    "captcha_a": captcha_a,
+                    "captcha_b": captcha_b,
+                    "captcha_token": captcha_token,
                 },
             )
 

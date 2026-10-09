@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import Sequence, func, select
+from sqlalchemy import Sequence, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -1105,6 +1105,20 @@ async def get_event(db: AsyncSession, event_id: int) -> SyslogEvent | None:
 async def recent_events(db: AsyncSession, *, limit: int = 50) -> list[SyslogEvent]:
     result = await db.execute(select(SyslogEvent).order_by(SyslogEvent.id.desc()).limit(limit))
     return list(reversed(result.scalars().all()))
+
+
+async def purge_pending_events(db: AsyncSession) -> int:
+    """The live feed's "Purge all now" -- immediately deletes every
+    untreated event (promoted_ticket_id IS NULL) for this tenant, same
+    scope as the periodic retention sweep (rain.modules.tickets.
+    listener.run_retention_sweep) but with no cutoff at all, run
+    on-demand against just the active tenant instead of waiting out
+    event_retention_hours across every tenant. Never touches a row
+    that's already been promoted into a ticket -- that ticket's
+    source_event_id would otherwise dangle."""
+    result = await db.execute(delete(SyslogEvent).where(SyslogEvent.promoted_ticket_id.is_(None)))
+    await db.commit()
+    return result.rowcount or 0
 
 
 async def list_export_profiles(db: AsyncSession) -> list[ExportProfile]:
