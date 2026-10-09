@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import Sequence, delete, func, select
+from sqlalchemy import Sequence, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -1103,7 +1103,25 @@ async def get_event(db: AsyncSession, event_id: int) -> SyslogEvent | None:
 
 
 async def recent_events(db: AsyncSession, *, limit: int = 50) -> list[SyslogEvent]:
-    result = await db.execute(select(SyslogEvent).order_by(SyslogEvent.id.desc()).limit(limit))
+    """Backs the live feed's initial backfill: pending (not yet
+    promoted) events, plus promoted ones whose ticket is still open --
+    never a promoted event sitting on a *closed* ticket. A promoted
+    event is kept forever regardless (its ticket's source_event_id
+    stays valid, so it's never a candidate for purge/retention -- see
+    purge_pending_events below), which otherwise left it cluttering
+    this view permanently with no way to clear it short of deleting
+    the ticket itself. Once that ticket is closed there's nothing left
+    to triage here; while it's still open (actively being worked), the
+    event stays visible alongside it same as any untriaged one."""
+    closed_keys = select(TicketStatus.key).where(TicketStatus.is_closed.is_(True))
+    stmt = (
+        select(SyslogEvent)
+        .outerjoin(Ticket, Ticket.id == SyslogEvent.promoted_ticket_id)
+        .where(or_(SyslogEvent.promoted_ticket_id.is_(None), Ticket.status.not_in(closed_keys)))
+        .order_by(SyslogEvent.id.desc())
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
     return list(reversed(result.scalars().all()))
 
 
