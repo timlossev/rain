@@ -28,6 +28,14 @@ DEFAULTS: dict[str, Any] = {
     # branding, not the other way around.
     "portal_require_auth": True,
     "portal_branded": True,
+    # A prominent "Client Portal" button on the main /login screen,
+    # linking straight to /portal/<slug> -- only ever shown there when
+    # this instance has exactly one active tenant (rain.modules.auth.
+    # router.login_form), since a bare login page has no tenant context
+    # yet and a multi-tenant instance has no way to know which one a
+    # visitor wants. Off by default, same opt-in posture as the other
+    # portal flags above.
+    "portal_login_link_enabled": False,
     # rain.modules.portal's "Shareable documents" tab -- reachable by
     # every visitor (even anonymous, even with portal_require_auth on)
     # whenever the tenant has at least one Document.is_shareable row. Free

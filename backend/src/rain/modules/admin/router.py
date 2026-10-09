@@ -91,6 +91,7 @@ async def _portal_settings(ctx: RequestContext) -> dict:
         return {
             "portal_require_auth": True,
             "portal_branded": True,
+            "portal_login_link_enabled": False,
             "escalation_webhook_id": None,
             "portal_shareable_documents_label": "Shareable documents",
             "escalate_button_label": "Escalate",
@@ -103,6 +104,7 @@ async def _portal_settings(ctx: RequestContext) -> dict:
             [
                 "portal_require_auth",
                 "portal_branded",
+                "portal_login_link_enabled",
                 "escalation_webhook_id",
                 "portal_shareable_documents_label",
                 "escalate_button_label",
@@ -222,6 +224,7 @@ async def branding_submit(
 async def branding_portal_submit(
     portal_require_auth: bool = Form(False),
     portal_branded: bool = Form(False),
+    portal_login_link_enabled: bool = Form(False),
     escalation_webhook_id: str = Form(""),
     portal_shareable_documents_label: str = Form("Shareable documents"),
     escalate_button_label: str = Form("Escalate"),
@@ -241,6 +244,7 @@ async def branding_portal_submit(
                 {
                     "portal_require_auth": portal_require_auth,
                     "portal_branded": portal_branded,
+                    "portal_login_link_enabled": portal_login_link_enabled,
                     "escalation_webhook_id": int(escalation_webhook_id) if escalation_webhook_id else None,
                     "portal_shareable_documents_label": portal_shareable_documents_label.strip() or "Shareable documents",
                     "escalate_button_label": escalate_button_label.strip() or "Escalate",

@@ -8,6 +8,10 @@
   </div>
   {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
   {% if reset %}<div class="flash flash-ok">Your password was reset. Sign in with your new password.</div>{% endif %}
+  {% if portal_slug %}
+  <a class="btn btn-primary" style="width:100%; justify-content:center;" href="/portal/{{ portal_slug }}">Open the Client Portal &rarr;</a>
+  <div class="auth-divider"><span>or sign in</span></div>
+  {% endif %}
   <form method="post" action="/login">
     <input type="hidden" name="next" value="{{ next }}">
     <div class="field">

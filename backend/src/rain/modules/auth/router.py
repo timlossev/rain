@@ -21,7 +21,8 @@ from rain.core.security import (
     new_session_token,
 )
 from rain.core.tenancy import CurrentUser, get_current_user_optional
-from rain.db.base import control_session
+from rain.core.tenant_config import get_tenant_config
+from rain.db.base import control_session, tenant_session
 from rain.db.control_models import PasswordResetToken, Session as SessionRow, Tenant, User
 from rain.modules.auth.provider import authenticate_user
 from rain.modules.auth.saml_config import get_saml_config
@@ -122,12 +123,33 @@ async def _issue_session(
     return response
 
 
+async def _portal_login_tenant() -> Tenant | None:
+    """The one tenant whose /portal/<slug> the bare sign-in screen can
+    safely link to, or None if there's nothing to show -- a login page
+    reached with no session yet has no tenant context at all (see
+    login_form below), so this is only unambiguous when the instance
+    has exactly one active tenant AND that tenant opted into
+    portal_login_link_enabled (Admin > Branding > Public incident
+    portal). A genuinely multi-tenant instance stays silent here rather
+    than guessing which tenant's portal a visitor wants."""
+    async with control_session() as session:
+        result = await session.execute(select(Tenant).where(Tenant.is_active.is_(True)))
+        tenants = list(result.scalars())
+    if len(tenants) != 1:
+        return None
+    tenant = tenants[0]
+    async with tenant_session(tenant.schema_name) as tenant_db:
+        enabled = await get_tenant_config(tenant_db, "portal_login_link_enabled", False)
+    return tenant if enabled else None
+
+
 @router.get("/login", response_class=HTMLResponse)
 async def login_form(request: Request, user: CurrentUser | None = Depends(get_current_user_optional)):
     if user is not None:
         return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
     async with control_session() as session:
         saml_enabled = await get_saml_config(session) is not None
+    portal_tenant = await _portal_login_tenant()
     return templates.TemplateResponse(
         request,
         "login.html",
@@ -137,6 +159,7 @@ async def login_form(request: Request, user: CurrentUser | None = Depends(get_cu
             "saml_enabled": saml_enabled,
             "smtp_configured": bool(config_store.get("smtp_host")),
             "reset": request.query_params.get("reset"),
+            "portal_slug": portal_tenant.slug if portal_tenant else None,
         },
     )
 
