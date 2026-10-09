@@ -570,10 +570,17 @@ async def _export_form_context(
     columns: list[dict],
     fmt: str,
     jq_document_id: int | None = None,
+    save_to_document: bool = False,
+    destination_document_id: int | None = None,
+    destination_title: str = "",
+    destination_is_shareable: bool = False,
     error: str | None = None,
 ) -> dict:
     nav = await build_nav_context(ctx)
     jq_document = await document_service.get_document(tenant_db, jq_document_id) if jq_document_id else None
+    destination_document = (
+        await document_service.get_document(tenant_db, destination_document_id) if destination_document_id else None
+    )
     return {
         **nav,
         "ctx": ctx,
@@ -585,6 +592,13 @@ async def _export_form_context(
         "selected_fmt": fmt,
         "selected_jq_document_id": jq_document_id,
         "selected_jq_document_label": f"{jq_document.doc_number}: {jq_document.title}" if jq_document else "",
+        "selected_save_to_document": save_to_document,
+        "selected_destination_document_id": destination_document_id,
+        "selected_destination_document_label": (
+            f"{destination_document.doc_number}: {destination_document.title}" if destination_document else ""
+        ),
+        "selected_destination_title": destination_title,
+        "selected_destination_is_shareable": destination_is_shareable,
         "error": error,
     }
 
@@ -612,6 +626,10 @@ async def export_form(
         columns=columns,
         fmt=selected_profile.format if selected_profile else "csv",
         jq_document_id=selected_profile.jq_document_id if selected_profile else None,
+        save_to_document=selected_profile.save_to_document if selected_profile else False,
+        destination_document_id=selected_profile.destination_document_id if selected_profile else None,
+        destination_title=(selected_profile.destination_title or "") if selected_profile else "",
+        destination_is_shareable=selected_profile.destination_is_shareable if selected_profile else False,
     )
     return templates.TemplateResponse(request, "assets/export.html", context)
 
@@ -622,10 +640,18 @@ async def export_run(
     asset_type_id: str = Form(""),
     fmt: str = Form("csv"),
     save_as: str = Form(""),
+    destination_mode: str = Form("download"),
+    destination_document_id: str = Form(""),
+    destination_title: str = Form(""),
+    destination_is_shareable: bool = Form(False),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
+    # destination_mode is a pill-radio ("download" | "save_to_document",
+    # data-pill-select -- see export.html), not a checkbox, so every
+    # submission carries an explicit value either way.
+    save_to_document = destination_mode == "save_to_document"
     form = await request.form()
     columns = []
     for key in form.keys():
@@ -636,10 +662,29 @@ async def export_run(
     columns.sort(key=lambda c: c["order"])
 
     type_id = int(asset_type_id) if asset_type_id else None
-    rows = await exporter.build_rows(tenant_db, asset_type_id=type_id, columns=columns)
-
     jq_document_id_raw = str(form.get("jq_document_id") or "").strip()
     jq_document_id = int(jq_document_id_raw) if jq_document_id_raw else None
+    destination_document_id_val = int(destination_document_id) if destination_document_id.strip() else None
+
+    # xlsx is binary -- see tickets/router.py's export_run, same reasoning.
+    if save_to_document and fmt == "xlsx":
+        context = await _export_form_context(
+            tenant_db,
+            ctx,
+            asset_type_id=type_id,
+            profile_id=None,
+            columns=merge_profile_columns(await exporter.available_columns(tenant_db, type_id), columns),
+            fmt=fmt,
+            jq_document_id=jq_document_id,
+            save_to_document=save_to_document,
+            destination_document_id=destination_document_id_val,
+            destination_title=destination_title,
+            destination_is_shareable=destination_is_shareable,
+            error="Save to Document only supports CSV/JSON, not Excel.",
+        )
+        return templates.TemplateResponse(request, "assets/export.html", context, status_code=400)
+
+    rows = await exporter.build_rows(tenant_db, asset_type_id=type_id, columns=columns)
 
     if save_as.strip():
         await service.save_export_profile(
@@ -650,6 +695,10 @@ async def export_run(
             columns=columns,
             actor_id=ctx.user.id,
             jq_document_id=jq_document_id,
+            save_to_document=save_to_document,
+            destination_document_id=destination_document_id_val,
+            destination_title=destination_title.strip() or None,
+            destination_is_shareable=destination_is_shareable,
         )
 
     headers = [c["header"] for c in columns]
@@ -679,6 +728,40 @@ async def export_run(
         filename = "assets-export.xlsx"
     else:
         body, media_type, filename = exporter.render_csv(rows, headers).encode("utf-8"), "text/csv", "assets-export.csv"
+
+    if save_to_document:
+        text = body.decode("utf-8")
+        if destination_document_id_val:
+            doc = await document_service.get_document(tenant_db, destination_document_id_val)
+            if doc is None:
+                context = await _export_form_context(
+                    tenant_db,
+                    ctx,
+                    asset_type_id=type_id,
+                    profile_id=None,
+                    columns=merge_profile_columns(await exporter.available_columns(tenant_db, type_id), columns),
+                    fmt=fmt,
+                    jq_document_id=jq_document_id,
+                    save_to_document=save_to_document,
+                    destination_title=destination_title,
+                    destination_is_shareable=destination_is_shareable,
+                    error="The document picked to overwrite no longer exists.",
+                )
+                return templates.TemplateResponse(request, "assets/export.html", context, status_code=400)
+            await document_service.update_body(tenant_db, doc, text)
+        else:
+            doc = await document_service.create_document_from_bytes(
+                tenant_db,
+                tenant_schema=ctx.active_tenant.schema_name,
+                title=destination_title.strip() or "Assets export",
+                filename=filename,
+                mime_type=media_type,
+                data=body,
+                actor_id=ctx.user.id,
+            )
+        if destination_is_shareable:
+            await document_service.update_sharing(tenant_db, doc, True)
+        return RedirectResponse(f"/documents/{doc.doc_number}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
     return StreamingResponse(
         io.BytesIO(body),

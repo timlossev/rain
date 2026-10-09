@@ -171,6 +171,36 @@ async def create_document(
     return doc
 
 
+async def create_document_from_bytes(
+    db: AsyncSession,
+    *,
+    tenant_schema: str,
+    title: str,
+    filename: str,
+    mime_type: str | None,
+    data: bytes,
+    actor_id: int | None,
+) -> Document:
+    """The same two-step storage.save-then-create_document a document
+    upload already does (see rain.modules.documents.router's own create
+    route), just starting from bytes already in memory instead of an
+    UploadFile -- for a tickets/assets export saved straight into a new
+    Document rather than downloaded (rain.modules.tickets.router/
+    rain.modules.assets.router's export_run)."""
+    key = storage.make_storage_key(tenant_schema, filename)
+    storage.get_storage().save(key, data)
+    return await create_document(
+        db,
+        title=title,
+        description=None,
+        filename=filename,
+        storage_key=key,
+        mime_type=mime_type,
+        size_bytes=len(data),
+        uploaded_by=actor_id,
+    )
+
+
 def document_list_stmt(
     *, search: str | None = None, tag: str | None = None, owner_user_id: int | None = None, overdue_only: bool = False
 ):

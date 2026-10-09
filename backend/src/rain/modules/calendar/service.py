@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from rain.db.tenant_models import CalendarEntry, Ticket
+from rain.db.tenant_models import CalendarEntry, ExportProfile, Ticket
 from rain.modules.calendar.recurrence import is_due_on
 
 
@@ -46,6 +46,21 @@ async def document_ids_with_calendar_entries(db: AsyncSession) -> set[int]:
     stmt = select(CalendarEntry.document_id).where(CalendarEntry.document_id.is_not(None)).distinct()
     result = await db.execute(stmt)
     return set(result.scalars())
+
+
+async def list_schedulable_export_profiles(db: AsyncSession) -> list[ExportProfile]:
+    """Export profiles a calendar entry can trigger -- scoped to ones
+    already set up to save into a *specific, pre-picked* document (see
+    the "no auto-remember" design note on ExportProfile/export_run):
+    a profile that only downloads or that would create a new document
+    has nothing for a calendar-triggered run to overwrite."""
+    stmt = (
+        select(ExportProfile)
+        .where(ExportProfile.save_to_document.is_(True), ExportProfile.destination_document_id.is_not(None))
+        .order_by(ExportProfile.name)
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars())
 
 
 async def create_entry(db: AsyncSession, **fields: Any) -> CalendarEntry:

@@ -198,6 +198,19 @@ class ExportProfile(TenantBase):
     # ever meaningful for format="json", but stored regardless so
     # switching a saved profile's format back to JSON later still has it.
     jq_document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
+    # Destination: false (the default, and every pre-migration row)
+    # means export still just downloads, unchanged. True + a document
+    # picked means "overwrite that document instead" (what Calendar's
+    # own run_export_profile trigger -- rain.modules.calendar.sweep --
+    # requires); true + no document means "create a new one," offered
+    # only as an interactive one-off from the export screen itself, not
+    # from a schedule -- see destination_document_id's own ON DELETE.
+    save_to_document: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    destination_document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+    )
+    destination_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    destination_is_shareable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

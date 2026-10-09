@@ -1,0 +1,46 @@
+{#
+  Shared by tickets/export.html and assets/export.html -- where an
+  export's output goes: a browser download (today's only option) or
+  written straight into a Document (optionally flagged Trust Center),
+  so a recurring report can also be scheduled from Calendar (see
+  rain.modules.calendar.sweep's own "run a saved export profile"
+  trigger, which requires save_to_document plus a document already
+  picked here -- a scheduled run never creates one unattended).
+
+  Reuses the same [data-pill-select]/[data-action-fields] show-hide
+  convention documents/detail.html's own "Link to" ticket/asset picker
+  already established (app.js) -- no new JS. xlsx is a dead end here:
+  Save to a Document only works for CSV/JSON (binary content doesn't
+  fit the document text-diff/alert pipeline), enforced server-side.
+
+  Usage: {% include "_export_destination_fields.html" %} inside a
+  <form>, after the Format select.
+#}
+{% import "_search_picker.html" as picker %}
+<div class="field">
+  <label>Destination</label>
+  <div class="pill-radio-group" data-pill-select>
+    <label class="type-pill pill-radio">
+      <input type="radio" name="destination_mode" value="download" {% if not selected_save_to_document %}checked{% endif %}>
+      Download file
+    </label>
+    <label class="type-pill pill-radio">
+      <input type="radio" name="destination_mode" value="save_to_document" {% if selected_save_to_document %}checked{% endif %}>
+      Save to a Document
+    </label>
+  </div>
+  <div class="field-hint">Save to a Document only supports CSV/JSON, not Excel.</div>
+</div>
+
+<div class="form-section" data-action-fields="save_to_document">
+  <div class="form-section-title">Document destination</div>
+  {{ picker.search_picker("destination_document_id", "/documents/search", label="Overwrite an existing document", initial_value=selected_destination_document_id, initial_label=selected_destination_document_label, placeholder="Search documents...") }}
+  <div class="field">
+    <label for="destination_title">...or title for a new one (if no document is picked above)</label>
+    <input type="text" id="destination_title" name="destination_title" value="{{ selected_destination_title }}" placeholder="e.g. FedRAMP Ongoing Certification Report">
+  </div>
+  <div class="field">
+    <label class="checkbox-row"><input type="checkbox" name="destination_is_shareable" {% if selected_destination_is_shareable %}checked{% endif %}> Flag as Trust Center (public)</label>
+    <div class="field-hint">A saved profile used from Calendar needs a document picked above, not just a title -- a scheduled run always overwrites, it never creates one unattended.</div>
+  </div>
+</div>

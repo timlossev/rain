@@ -14,9 +14,16 @@ things can happen per occurrence, each opt-in on the entry itself:
   rain.modules.documents.service.refresh_from_webhook for the referenced
   document, the same "call its webhook, diff, save, optionally alert"
   logic the document's own "Refresh from webhook" button uses.
+- `policy_ref` of type "run_export_profile": re-runs a saved
+  rain.db.tenant_models.ExportProfile (rain.modules.calendar.
+  export_runner.run_saved_export_profile) and overwrites its
+  destination_document_id document with the fresh output, applying
+  destination_is_shareable the same way the interactive export screen
+  does. Mutually exclusive with "refresh_document" -- an entry does one
+  or the other, never both.
 
-Both are independent (an entry can do either, both, or neither), but
-share the same due-occurrence check and last_fired_date dedup marker."""
+All three are independent (an entry can do any mix of them), but share
+the same due-occurrence check and last_fired_date dedup marker."""
 from __future__ import annotations
 
 import asyncio
@@ -27,9 +34,10 @@ from sqlalchemy import select
 
 from rain.db.base import control_session, tenant_session
 from rain.db.control_models import Tenant
-from rain.db.tenant_models import SyslogEvent
+from rain.db.tenant_models import ExportProfile, SyslogEvent
 from rain.modules.calendar import recurrence
 from rain.modules.calendar import service as calendar_service
+from rain.modules.calendar.export_runner import run_saved_export_profile
 from rain.modules.documents import service as document_service
 from rain.modules.tickets import rules
 
@@ -47,6 +55,13 @@ def _refresh_document_id(entry) -> int | None:
     return None
 
 
+def _export_profile_id(entry) -> int | None:
+    policy = entry.policy_ref or {}
+    if policy.get("type") == "run_export_profile":
+        return policy.get("export_profile_id")
+    return None
+
+
 async def run_calendar_sweep() -> None:
     today = dt.date.today()
     async with control_session() as control_db:
@@ -59,7 +74,10 @@ async def run_calendar_sweep() -> None:
                 entries = await calendar_service.list_entries(db, active_only=True)
                 for entry in entries:
                     document_id = _refresh_document_id(entry)
-                    if entry.last_fired_date == today or (not entry.emit_syslog_event and document_id is None):
+                    export_profile_id = _export_profile_id(entry)
+                    if entry.last_fired_date == today or (
+                        not entry.emit_syslog_event and document_id is None and export_profile_id is None
+                    ):
                         continue
                     if not recurrence.is_due_on(entry, today):
                         continue
@@ -93,6 +111,35 @@ async def run_calendar_sweep() -> None:
                                     doc.doc_number,
                                     outcome.error,
                                 )
+
+                    if export_profile_id is not None:
+                        profile = await db.get(ExportProfile, export_profile_id)
+                        if profile is None or profile.destination_document_id is None:
+                            logger.warning(
+                                "calendar entry #%s refers to export profile #%s with no destination document",
+                                entry.id,
+                                export_profile_id,
+                            )
+                        else:
+                            doc = await document_service.get_document(db, profile.destination_document_id)
+                            if doc is None:
+                                logger.warning(
+                                    "calendar entry #%s: export profile #%s's destination document #%s is gone",
+                                    entry.id,
+                                    export_profile_id,
+                                    profile.destination_document_id,
+                                )
+                            else:
+                                try:
+                                    text = await run_saved_export_profile(db, profile)
+                                except Exception as exc:
+                                    logger.warning(
+                                        "calendar entry #%s: export profile #%s failed: %s", entry.id, export_profile_id, exc
+                                    )
+                                else:
+                                    await document_service.update_body(db, doc, text)
+                                    if profile.destination_is_shareable:
+                                        await document_service.update_sharing(db, doc, True)
 
                     await calendar_service.mark_fired(db, entry, today)
         except Exception:

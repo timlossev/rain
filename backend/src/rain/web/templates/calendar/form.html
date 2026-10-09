@@ -45,6 +45,22 @@
     </div>
     <div class="field-hint">Shows up on the document's own Calendar tab (e.g. "due for revision every quarter"). Auto-refresh only takes effect for a document with a webhook configured.</div>
 
+    {% if export_profiles %}
+    <h3>Or run a saved export profile</h3>
+    <div class="form-row">
+      <div class="field">
+        <label for="export_profile_id">Export profile (optional)</label>
+        <select id="export_profile_id" name="export_profile_id">
+          <option value="">None</option>
+          {% for p in export_profiles %}
+          <option value="{{ p.id }}" {% if selected_export_profile_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field-hint">Re-runs the export and overwrites its destination document on each occurrence -- takes precedence over "Related document" above if both are set. Only profiles already set up to save into a specific document show up here.</div>
+    {% endif %}
+
     <div style="display:flex; align-items:center;">
       <button class="btn btn-primary" type="submit">{{ "Save changes" if entry else "Create entry" }}</button>
       <a class="btn" href="{{ redirect_to }}" style="margin-left:8px;">Cancel</a>

@@ -242,6 +242,10 @@ async def save_export_profile(
     columns: list[dict],
     actor_id: int,
     jq_document_id: int | None = None,
+    save_to_document: bool = False,
+    destination_document_id: int | None = None,
+    destination_title: str | None = None,
+    destination_is_shareable: bool = False,
 ) -> ExportProfile:
     profile = ExportProfile(
         name=name,
@@ -251,6 +255,10 @@ async def save_export_profile(
         columns=columns,
         created_by=actor_id,
         jq_document_id=jq_document_id,
+        save_to_document=save_to_document,
+        destination_document_id=destination_document_id,
+        destination_title=destination_title,
+        destination_is_shareable=destination_is_shareable,
     )
     db.add(profile)
     await db.commit()

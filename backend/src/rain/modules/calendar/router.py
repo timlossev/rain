@@ -138,6 +138,13 @@ def _has_auto_refresh(entry) -> bool:
     return policy.get("type") == "refresh_document"
 
 
+def _scheduled_export_profile_id(entry) -> int | None:
+    policy = entry.policy_ref or {} if entry else {}
+    if policy.get("type") == "run_export_profile":
+        return policy.get("export_profile_id")
+    return None
+
+
 async def _document_label(tenant_db: AsyncSession, document_id: int | None) -> str:
     """The search_picker's initial display text for a pre-selected
     document -- looked up on demand (a single row) rather than passing
@@ -174,6 +181,8 @@ async def new_entry_form(
             "selected_document_id": document_id,
             "selected_document_label": await _document_label(tenant_db, document_id),
             "auto_refresh": False,
+            "export_profiles": await service.list_schedulable_export_profiles(tenant_db),
+            "selected_export_profile_id": None,
             "redirect_to": safe_relative_path(redirect, default="/calendar"),
             "error": None,
         },
@@ -191,12 +200,14 @@ async def create_entry(
     event_program: str = Form(""),
     document_id: str = Form(""),
     auto_refresh: bool = Form(False),
+    export_profile_id: str = Form(""),
     redirect: str = Form("/calendar"),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db=Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
     doc_id = int(document_id) if document_id else None
+    profile_id = int(export_profile_id) if export_profile_id else None
     await service.create_entry(
         tenant_db,
         title=title.strip(),
@@ -210,7 +221,14 @@ async def create_entry(
         # auto_refresh only means anything alongside a chosen document --
         # a stray checked box with no document selected is a no-op, not
         # an error, same as the old refresh_document_id-alone field was.
-        policy_ref={"type": "refresh_document", "document_id": doc_id} if (auto_refresh and doc_id) else None,
+        # A picked export_profile_id takes precedence over auto_refresh --
+        # the two are mutually exclusive in the UI (one entry does one or
+        # the other), never combined into one policy_ref.
+        policy_ref=(
+            {"type": "run_export_profile", "export_profile_id": profile_id}
+            if profile_id
+            else {"type": "refresh_document", "document_id": doc_id} if (auto_refresh and doc_id) else None
+        ),
         created_by=ctx.user.id,
     )
     return RedirectResponse(safe_relative_path(redirect, default="/calendar"), status_code=status.HTTP_303_SEE_OTHER)
@@ -241,6 +259,8 @@ async def edit_entry_form(
             "selected_document_id": entry.document_id,
             "selected_document_label": await _document_label(tenant_db, entry.document_id),
             "auto_refresh": _has_auto_refresh(entry),
+            "export_profiles": await service.list_schedulable_export_profiles(tenant_db),
+            "selected_export_profile_id": _scheduled_export_profile_id(entry),
             "redirect_to": safe_relative_path(redirect, default="/calendar"),
             "error": None,
         },
@@ -260,6 +280,7 @@ async def update_entry(
     event_program: str = Form(""),
     document_id: str = Form(""),
     auto_refresh: bool = Form(False),
+    export_profile_id: str = Form(""),
     redirect: str = Form("/calendar"),
     tenant_db=Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
@@ -267,6 +288,7 @@ async def update_entry(
     entry = await service.get_entry(tenant_db, entry_id)
     if entry is not None:
         doc_id = int(document_id) if document_id else None
+        profile_id = int(export_profile_id) if export_profile_id else None
         await service.update_entry(
             tenant_db,
             entry,
@@ -279,7 +301,11 @@ async def update_entry(
             emit_syslog_event=emit_syslog_event,
             event_program=event_program.strip() or None,
             document_id=doc_id,
-            policy_ref={"type": "refresh_document", "document_id": doc_id} if (auto_refresh and doc_id) else None,
+            policy_ref=(
+                {"type": "run_export_profile", "export_profile_id": profile_id}
+                if profile_id
+                else {"type": "refresh_document", "document_id": doc_id} if (auto_refresh and doc_id) else None
+            ),
         )
     return RedirectResponse(safe_relative_path(redirect, default="/calendar"), status_code=status.HTTP_303_SEE_OTHER)
 
