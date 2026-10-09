@@ -11,10 +11,19 @@ from rain.db.tenant_models import ServiceCatalogItem, SyslogEvent, Ticket, Ticke
 
 
 async def _event_count(ctx: RequestContext) -> int | None:
+    """Pending (not yet promoted into a ticket) events only -- the same
+    "untreated" definition rain.modules.tickets.service.
+    purge_pending_events/the retention sweep use, not a lifetime total.
+    A promoted event is kept forever (its ticket's source_event_id
+    stays valid) and is never part of anyone's cleanup backlog, so
+    counting it here just inflates this badge with numbers neither
+    "Purge all now" nor the retention sweep will ever move."""
     if ctx.active_tenant is None:
         return None
     async with tenant_session(ctx.active_tenant.schema_name) as db:
-        return await db.scalar(select(func.count(SyslogEvent.id)))
+        return await db.scalar(
+            select(func.count(SyslogEvent.id)).where(SyslogEvent.promoted_ticket_id.is_(None))
+        )
 
 
 async def _active_catalog_item_count(ctx: RequestContext) -> int | None:
