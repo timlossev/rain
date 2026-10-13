@@ -566,6 +566,30 @@ async def list_landing_page_documents(db: AsyncSession) -> list[Document]:
     return list(result.scalars())
 
 
+async def update_portal_pin_flag(db: AsyncSession, doc: Document, pin_to_portal: bool) -> None:
+    doc.pin_to_portal = pin_to_portal
+    await db.commit()
+
+
+async def get_portal_pinned_document(db: AsyncSession) -> Document | None:
+    """The client portal's pinned-document card (rain.modules.portal.
+    router.portal_form), between "Today's events" and the main form --
+    None if nothing is pinned, in which case that card is skipped
+    entirely. Requires is_shareable too, not just pin_to_portal alone --
+    the portal is a public, unauthenticated surface, so a document an
+    admin pinned but forgot to also mark shareable must never show up
+    here. Most-recently-updated wins if more than one happens to be
+    pinned at once (unlike the landing page, which shows every flagged
+    document -- this card has room for exactly one)."""
+    result = await db.execute(
+        select(Document)
+        .where(Document.pin_to_portal.is_(True), Document.is_shareable.is_(True))
+        .order_by(Document.updated_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 async def update_webhook_config(
     db: AsyncSession,
     doc: Document,

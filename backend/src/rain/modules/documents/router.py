@@ -697,6 +697,23 @@ async def update_document_landing_page(
     )
 
 
+@router.post("/{document_id:int}/pin-to-portal")
+async def update_document_portal_pin(
+    document_id: int,
+    pin_to_portal: bool = Form(False),
+    redirect_tab: str = Form(""),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    doc = await service.get_document(tenant_db, document_id)
+    if doc is not None:
+        await service.update_portal_pin_flag(tenant_db, doc, pin_to_portal)
+    tab_suffix = f"&tab={redirect_tab}" if redirect_tab else ""
+    return RedirectResponse(
+        f"/documents/{doc.doc_number if doc else document_id}?ok=1{tab_suffix}", status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
 @router.post("/{document_id:int}/refresh-on-view")
 async def update_document_refresh_on_view(
     document_id: int,

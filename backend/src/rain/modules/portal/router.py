@@ -34,11 +34,13 @@ from __future__ import annotations
 
 import io
 import re
+import zipfile
 from typing import Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from rain.core import captcha
 from rain.core.pagination import paginate
@@ -51,6 +53,7 @@ from rain.modules.calendar import service as calendar_service
 from rain.modules.catalog import service as catalog_service
 from rain.modules.documents import service as document_service
 from rain.modules.documents import storage as document_storage
+from rain.modules.documents import textbody
 from rain.modules.tickets import service as ticket_service
 from rain.modules.tickets.schemas import SEVERITIES, TICKET_TYPE_PREFIX
 from rain.web.templating import templates
@@ -179,6 +182,32 @@ async def _resolve_portal_access(
     return tenant, flags
 
 
+async def _pinned_document_entry(tenant_db: AsyncSession) -> dict | None:
+    """The Trust Center's pinned-document card (between "Today's events"
+    and the main form) -- same rendered-Markdown/plain-text preview
+    shape as rain.modules.home's landing-page documents, built here
+    instead of imported from there since this is a single optional
+    document (get_portal_pinned_document), not a list. None (skip the
+    whole card) when nothing is pinned, or when the pinned document has
+    no inline body to preview (a PDF/image, same silent skip
+    rain.modules.home.router's own loop already does for that case)."""
+    doc = await document_service.get_portal_pinned_document(tenant_db)
+    if doc is None:
+        return None
+    kind = textbody.body_kind(doc.filename)
+    if kind is None:
+        return None
+    try:
+        text = textbody.decode_body(document_storage.get_storage().read(doc.storage_key))
+    except FileNotFoundError:
+        return None
+    return {
+        "doc": doc,
+        "html": textbody.render_markdown(text) if kind == "markdown" else None,
+        "text": text if kind == "text" else None,
+    }
+
+
 @router.get("/{tenant_slug}", response_class=HTMLResponse)
 async def portal_form(
     request: Request,
@@ -228,9 +257,10 @@ async def portal_form(
         # This whole page has no server-tracked "which tab is open" state
         # (app.js's [data-tabs] is purely client-side, reset on every full
         # page load) -- a GET reload triggered by the status filter would
-        # otherwise silently bounce the visitor back to the first tab
-        # (Request Something), losing their place on Report Something
-        # right after they used the very control that's on that tab.
+        # otherwise silently bounce the visitor back to the default tab
+        # (Trust Center if this tenant has one, else Request Something),
+        # losing their place on Report Something right after they used
+        # the very control that's on that tab.
         # ticket_status being present in the URL at all (even "", from
         # "All statuses") is the signal this reload was that filter, not
         # a fresh page visit -- same reasoning extends to `created`,
@@ -244,7 +274,11 @@ async def portal_form(
         active_tab = (
             "shared"
             if anonymous_shared_only
-            else "tickets" if ticket_status is not None or created or page is not None else "catalog"
+            else (
+                "tickets"
+                if ticket_status is not None or created or page is not None
+                else "shared" if shareable_documents.total else "catalog"
+            )
         )
 
         reported = (
@@ -309,6 +343,7 @@ async def portal_form(
             if user is not None
             else {"escalation_webhook_id": None, "escalate_button_label": "Escalate"}
         )
+        pinned_document = await _pinned_document_entry(tenant_db)
 
     captcha_a, captcha_b, captcha_token = captcha.new_challenge()
     return templates.TemplateResponse(
@@ -337,6 +372,7 @@ async def portal_form(
             "shareable_documents_label": shareable_documents_label,
             "catalog_items": catalog_items,
             "todays_events": todays_events,
+            "pinned_document": pinned_document,
             "can_escalate": escalation_settings["escalation_webhook_id"] is not None,
             "escalate_label": escalation_settings["escalate_button_label"],
             "created": created_ticket.ticket_number if created_ticket is not None else "",
@@ -610,4 +646,37 @@ async def portal_shared_document_download(tenant_slug: str, doc_ref: str):
         io.BytesIO(data),
         media_type=doc.mime_type or "application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{doc.filename}"'},
+    )
+
+
+@router.get("/{tenant_slug}/shared-documents/download-all")
+async def portal_shared_documents_download_all(tenant_slug: str):
+    """The Trust Center tab's "Bulk download" button -- every is_shareable
+    document for this tenant, zipped into one file. Same public-by-
+    design scope as portal_shared_document_download just above (no
+    _resolve_portal_access call, no user parameter): a signed-out
+    visitor can already reach each of these documents one at a time
+    from the Shareable documents tab, this is just a convenience
+    bundling of exactly that same set, nothing wider. 404 if there's
+    nothing shareable to bundle, same as the tab itself not appearing
+    in that case. Each document's own doc_number is prefixed onto its
+    filename inside the zip so two documents that happen to share a
+    filename don't collide."""
+    tenant = await _resolve_portal_tenant(tenant_slug)
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    async with tenant_session(tenant.schema_name) as tenant_db:
+        docs = await document_service.list_shareable_documents(tenant_db)
+        if not docs:
+            raise HTTPException(status.HTTP_404_NOT_FOUND)
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for doc in docs:
+                data = document_storage.get_storage().read(doc.storage_key)
+                zf.writestr(f"{doc.doc_number} - {doc.filename}", data)
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{tenant.slug}-trust-center-documents.zip"'},
     )

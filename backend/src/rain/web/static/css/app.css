@@ -1762,7 +1762,7 @@ td.actions { text-align: right; white-space: nowrap; }
    the standalone catalog_form.html both always carry this now that tabs
    (or, for catalog_form.html, a form that can be arbitrarily long) are
    never conditional on sign-in status the way they used to be. */
-.portal-shell.portal-wide { max-width: 960px; }
+.portal-shell.portal-wide { max-width: 1200px; }
 /* Scoped override, not a change to :root -- only this page's own header
    pill and card (buttons, focus rings, the severity select) should go
    neutral when a tenant has turned instance branding off for it; every

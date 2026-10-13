@@ -91,6 +91,28 @@
   </div>
   {% endif %}
 
+  {% if pinned_document %}
+  {# The Trust Center's pinned-document highlight (rain.modules.
+     documents.service.get_portal_pinned_document) -- same rendered-
+     Markdown/plain-text preview as the internal app's "Show on landing
+     page" cards (home/index.html), just singular and portal-scoped.
+     Skipped entirely when nothing is pinned. #}
+  <div class="card portal-card" style="margin-bottom:16px;">
+    <div class="card-title-row">
+      <div class="card-title">{{ pinned_document.doc.title }}</div>
+      {% set last_updated = pinned_document.doc.last_refreshed_at or pinned_document.doc.updated_at or pinned_document.doc.created_at %}
+      {% if last_updated %}
+      <span class="badge timestamp-pill">Version from {{ last_updated.strftime("%Y-%m-%d %H:%M") }}</span>
+      {% endif %}
+    </div>
+    {% if pinned_document.html %}
+    <div class="doc-md-preview">{{ pinned_document.html | safe }}</div>
+    {% else %}
+    <pre class="doc-preview-text">{{ pinned_document.text }}</pre>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="card portal-card">
     {% if created %}<div class="flash flash-ok">Submitted as <strong>{{ created }}</strong>.</div>{% endif %}
     {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
@@ -127,16 +149,22 @@
          this becomes a burger-toggled dropdown instead, reusing the
          generic [data-menu] click-toggle/outside-click/Escape plumbing
          (app.js) that already drives the topbar user-menu -- no new JS
-         needed. An anonymous visitor's Sign in lives here too (this
-         page has no topbar to put it in otherwise); a signed-in
-         visitor's own identity/sign-out/back-to-app lives in the
-         top-right dropdown instead (see .portal-header above), not
-         here -- this menu is tab navigation, not an account menu. #}
+         needed. An anonymous visitor's way in is "Get full access" on
+         the Trust Center tab itself (this page has no topbar to put a
+         plain Sign in link in otherwise), with a fallback Sign in link
+         appended here only for a tenant with no Trust Center tab at
+         all; a signed-in visitor's own identity/sign-out/back-to-app
+         lives in the top-right dropdown instead (see .portal-header
+         above), not here -- this menu is tab navigation, not an
+         account menu. #}
       <div class="portal-nav-menu" data-menu>
         <button type="button" class="portal-nav-toggle" data-menu-toggle aria-haspopup="true" aria-expanded="false" title="Menu">
           <span class="nav-icon">{{ nav_icon("menu") }}</span> Menu
         </button>
         <div class="tab-buttons" data-menu-panel hidden>
+          {% if shareable_documents.total %}
+          <button type="button" class="tab-btn {{ 'active' if active_tab == 'shared' else '' }}" data-tab-btn="shared">{{ shareable_documents_label }}</button>
+          {% endif %}
           {% if not anonymous_shared_only %}
           <button type="button" class="tab-btn {{ 'active' if active_tab == 'catalog' else '' }}" data-tab-btn="catalog">Request Something</button>
           <button type="button" class="tab-btn {{ 'active' if active_tab == 'tickets' else '' }}" data-tab-btn="tickets">Report Something</button>
@@ -148,15 +176,45 @@
           <button type="button" class="tab-btn" data-tab-btn="approvals">Pending Actions{% if pending_count %} ({{ pending_count }}){% endif %}</button>
           <button type="button" class="tab-btn" data-tab-btn="documents">Document Archive</button>
           {% endif %}
-          {% if shareable_documents.total %}
-          <button type="button" class="tab-btn {{ 'active' if active_tab == 'shared' else '' }}" data-tab-btn="shared">{{ shareable_documents_label }}</button>
-          {% endif %}
-          {% if not user %}
+          {% if not user and not shareable_documents.total %}
+          {# No Trust Center tab to carry a "Get full access" button of
+             its own (see that tab's panel below) -- keep a plain sign-in
+             link here as a fallback so an anonymous visitor on a tenant
+             with nothing shareable still has a way in. #}
           <div class="portal-nav-divider"></div>
           <a class="tab-btn" href="/login?next={{ ('/portal/' ~ tenant.slug) | urlencode }}">Sign in</a>
           {% endif %}
         </div>
       </div>
+
+      {% if shareable_documents.total %}
+      <div class="tab-panel {{ 'active' if active_tab == 'shared' else '' }}" data-tab-panel="shared">
+        <div class="portal-section-title" style="justify-content:space-between; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span>{{ shareable_documents_label }}</span>
+          <span style="display:flex; gap:8px; flex-wrap:wrap;">
+            {% if not user %}
+            <a class="btn btn-sm btn-primary" href="/login?next={{ ('/portal/' ~ tenant.slug) | urlencode }}">Get full access</a>
+            {% endif %}
+            <a class="btn btn-sm" href="/portal/{{ tenant.slug }}/shared-documents/download-all">Bulk download</a>
+          </span>
+        </div>
+        <div class="table-scroll">
+        <table>
+          <thead><tr><th>Number</th><th>Title</th><th>Updated</th></tr></thead>
+          <tbody>
+            {% for d in shareable_documents.items %}
+            <tr>
+              <td>{{ d.doc_number }}</td>
+              <td><a href="/portal/{{ tenant.slug }}/shared-documents/{{ d.doc_number }}/download">{{ d.title }}</a></td>
+              <td class="muted">{{ d.updated_at.strftime("%Y-%m-%d %H:%M") if d.updated_at else "-" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {{ pg.render_pagination(shareable_documents, param="shared_page") }}
+      </div>
+      {% endif %}
 
       {% if not anonymous_shared_only %}
       <div class="tab-panel {{ 'active' if active_tab == 'catalog' else '' }}" data-tab-panel="catalog">
@@ -254,26 +312,6 @@
         {% else %}
         <p class="muted portal-signin-hint">Sign in to see tickets you've reported.</p>
         {% endif %}
-      </div>
-      {% endif %}
-
-      {% if shareable_documents.total %}
-      <div class="tab-panel {{ 'active' if active_tab == 'shared' else '' }}" data-tab-panel="shared">
-        <div class="table-scroll">
-        <table>
-          <thead><tr><th>Number</th><th>Title</th><th>Updated</th></tr></thead>
-          <tbody>
-            {% for d in shareable_documents.items %}
-            <tr>
-              <td>{{ d.doc_number }}</td>
-              <td><a href="/portal/{{ tenant.slug }}/shared-documents/{{ d.doc_number }}/download">{{ d.title }}</a></td>
-              <td class="muted">{{ d.updated_at.strftime("%Y-%m-%d %H:%M") if d.updated_at else "-" }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        </div>
-        {{ pg.render_pagination(shareable_documents, param="shared_page") }}
       </div>
       {% endif %}
 

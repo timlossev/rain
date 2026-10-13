@@ -1058,6 +1058,17 @@ class Document(TenantBase):
     # and independent of is_shareable above -- a document can be one,
     # the other, both, or neither.
     show_on_landing_page: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Opt-in (see migration 0055): the Trust Center's own equivalent of
+    # show_on_landing_page above, highlighting this document between
+    # "Today's events" and the main form on the public client portal
+    # (rain.modules.portal) instead of the internal landing page --
+    # independent of it, a tenant can pin a different document (or
+    # none) to each. Deliberately NOT sufficient on its own to make a
+    # document public: rain.modules.documents.service.
+    # get_portal_pinned_document only returns a document that is both
+    # pinned AND is_shareable, so this can never leak a non-public
+    # document by itself. Off by default.
+    pin_to_portal: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # DB-generated (GENERATED ALWAYS AS ... STORED, see migrations 0023
     # and 0039) from doc_number/title/tags/description -- never written
     # from Python, only ever read (search_vector.op("@@")(...)), see

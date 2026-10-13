@@ -198,6 +198,21 @@
         {% endif %}
       </div>
     </div>
+
+    <div class="field">
+      <label>Trust Center</label>
+      <div>
+        <form method="post" action="/documents/{{ doc.id }}/pin-to-portal" class="inline">
+          <input type="hidden" name="redirect_tab" value="visibility">
+          <label class="checkbox-row"><input type="checkbox" name="pin_to_portal" onchange="this.form.submit()" {% if doc.pin_to_portal %}checked{% endif %}> Pin to the client portal</label>
+        </form>
+        {% if not doc.is_shareable %}
+        <div class="field-hint">Also needs "Shareable in the client portal" above - a pinned document that isn't shareable stays hidden from the portal.</div>
+        {% elif not body_kind %}
+        <div class="field-hint">This document has no inline body (not a .txt/.md file) - checking this does nothing until it does.</div>
+        {% endif %}
+      </div>
+    </div>
   </div>
 
   {% if body_kind %}
