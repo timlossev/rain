@@ -531,6 +531,33 @@ columns only), the same column table as every export screen, a format
 reveals the same jq transform step tickets' own Export screen has --
 see that section for what it does.
 
+### Export Recipes
+
+A jq transform reshapes one export; it can't pull in a second,
+independently-scoped one. Export Recipes (its own sidebar item) is
+for when the output you need is assembled from several sources at
+once -- an OSCAL System Security Plan built from a Certification
+Package row, a Components register, and the Security Control register
+together, say (see
+[`docs/compliance-templates/README.md`](compliance-templates/README.md)
+and
+[`docs/oscal-ssp-showcase.md`](oscal-ssp-showcase.md) for that exact
+walkthrough).
+
+A recipe is a named, ordered list of steps. Each step picks an
+existing saved export profile (Ticket- or Asset-scoped, either one,
+freely mixed within the same recipe) and, optionally, its own jq
+filter Document -- overriding that profile's own saved filter for this
+step's purposes, not stacking with it. Running the recipe runs every
+step fresh, collects each one's result keyed by its own label into one
+object, then -- if an "assembly filter" Document is picked -- runs
+that one more time over the whole collected object to produce the
+final document. With no assembly filter set, the recipe's own output
+is just that collected `{label: value}` object as-is, still useful on
+its own for bundling several related exports into one download.
+Always downloads as JSON (an assembled, nested document doesn't flatten
+to CSV rows).
+
 ## Documents
 
 Submenu: All Documents, Kanban, New document.

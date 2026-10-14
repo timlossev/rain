@@ -28,30 +28,42 @@ class JqTransformError(ValueError):
     "didn't work"."""
 
 
-def apply_jq_filter(rows: list[dict[str, Any]], filter_program: str) -> str:
-    """Runs `filter_program` against `rows` as one JSON input document
-    and returns the result re-serialized as indented JSON text -- the
-    same shape exporter.render_json() already produces with no filter
-    set, so this is a drop-in replacement for the plain export, not a
-    second output format alongside it.
+def apply_jq_filter_value(value: Any, filter_program: str) -> Any:
+    """Runs `filter_program` against `value` as one JSON input document
+    and returns the parsed result as a plain Python value (not
+    re-serialized text) -- for a caller that's going to nest the result
+    into something larger (rain.core.export_recipe's per-step and
+    assembly filters) rather than hand it straight to a client as a
+    download. apply_jq_filter below is the text-returning wrapper most
+    callers actually want.
 
     A jq program can emit zero, one, or several outputs for one input
-    (`.[] | select(...)`, say) -- `.compile(...).input_value(rows).all()`
+    (`.[] | select(...)`, say) -- `.compile(...).input_value(value).all()`
     always returns a list of whatever it produced. Exactly one output is
     used as-is (the common case: `map(...)`, a `{...}` object
-    constructor, a bare `.`) so a filter that reshapes the whole row
-    list into one document round-trips as that one document, not a
+    constructor, a bare `.`) so a filter that reshapes the whole input
+    into one document round-trips as that one document, not a
     single-element array wrapping it; zero or several outputs are left
-    as a JSON array of whatever came out, the same convention the `jq`
-    CLI's own multi-document stdout implies when a filter produces more
-    than one JSON value."""
+    as a list of whatever came out, the same convention the `jq` CLI's
+    own multi-document stdout implies when a filter produces more than
+    one JSON value."""
     try:
         program = jq.compile(filter_program)
     except ValueError as exc:
         raise JqTransformError(f"jq filter did not compile: {exc}") from exc
     try:
-        results = program.input_value(rows).all()
+        results = program.input_value(value).all()
     except ValueError as exc:
         raise JqTransformError(f"jq filter failed while running: {exc}") from exc
-    output = results[0] if len(results) == 1 else results
+    return results[0] if len(results) == 1 else results
+
+
+def apply_jq_filter(rows: list[dict[str, Any]], filter_program: str) -> str:
+    """Runs `filter_program` against `rows` and returns the result
+    re-serialized as indented JSON text -- the same shape
+    exporter.render_json() already produces with no filter set, so this
+    is a drop-in replacement for the plain export, not a second output
+    format alongside it. See apply_jq_filter_value above for exactly how
+    the filter is run; this is just that plus json.dumps."""
+    output = apply_jq_filter_value(rows, filter_program)
     return json.dumps(output, indent=2, default=str)

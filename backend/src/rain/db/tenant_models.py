@@ -215,6 +215,89 @@ class ExportProfile(TenantBase):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class ExportRecipe(TenantBase):
+    """A named, ordered list of ExportRecipeStep rows plus one optional
+    "assembly" filter -- the fan-out-then-merge answer to a problem a
+    single ExportProfile's own jq_document_id can't reach: assembling
+    one output document (e.g. an OSCAL System Security Plan) out of
+    *several* independently-scoped exports (a Certification Package
+    asset row's own characteristics, a Components asset type's rows,
+    the Security Control register's rows, ...), not just reshaping one
+    export on its own.
+
+    Deliberately scope-agnostic at this level (unlike ExportProfile,
+    which is pinned to one of "ticket"/"asset") -- a recipe's own steps
+    each carry their own ExportProfile, which already knows its own
+    scope, so a single recipe can freely mix ticket- and asset-scoped
+    steps (see rain.core.export_recipe.run_export_recipe).
+
+    Always runs to one JSON document, never CSV -- the entire point is
+    nesting structured per-step results into a larger structure, which
+    a flat CSV row shape can't hold."""
+
+    __tablename__ = "export_recipes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    # Runs over every step's already-collected {label: value} dict (see
+    # run_export_recipe) -- the thing that turns N separate fragments
+    # into one real document (OSCAL's top-level envelope, say). Optional:
+    # with none set, the recipe's own output is just that same
+    # {label: value} dict, unmodified -- still useful on its own ("give
+    # me these three fragments bundled into one file") even before
+    # anyone's written the combining filter.
+    assembly_filter_document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    steps: Mapped[list["ExportRecipeStep"]] = relationship(
+        back_populates="recipe", cascade="all, delete-orphan", order_by="ExportRecipeStep.step_order"
+    )
+
+
+class ExportRecipeStep(TenantBase):
+    """One step of an ExportRecipe -- run the referenced ExportProfile's
+    own export (rebuilding its rows fresh each time, same as Calendar's
+    own run_saved_export_profile does for a single profile), then apply
+    this step's own filter_document_id if set. That per-step filter
+    *overrides* the profile's own jq_document_id for this step's
+    purposes rather than stacking with it -- the same saved profile
+    (say, "Security Control - all columns") can feed one shape into
+    this recipe and a completely different one into another, without
+    needing a separate copy of the profile per recipe.
+
+    ON DELETE CASCADE on export_profile_id (not SET NULL): a step with
+    no profile left to run is not a step, it's a hole in the recipe --
+    deleting the profile it depends on removes the step outright rather
+    than leaving a silently-broken one behind. Nothing in the app
+    deletes an ExportProfile today, so this is a dormant guarantee for
+    whenever that changes, not a path exercised yet."""
+
+    __tablename__ = "export_recipe_steps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    recipe_id: Mapped[int] = mapped_column(ForeignKey("export_recipes.id", ondelete="CASCADE"), index=True)
+    step_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # The key this step's own output is nested under in the dict handed
+    # to the recipe's assembly filter (and, with no assembly filter set,
+    # in the recipe's own raw output) -- e.g. "characteristics",
+    # "components", "controls". Unique-per-recipe is a convention, not
+    # an enforced constraint; a repeated label just means the later
+    # step's output wins that key in the assembled dict.
+    label: Mapped[str] = mapped_column(String(100))
+    export_profile_id: Mapped[int] = mapped_column(ForeignKey("export_profiles.id", ondelete="CASCADE"))
+    filter_document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
+
+    recipe: Mapped[ExportRecipe] = relationship(back_populates="steps")
+    # filter_document_id has no relationship() here, same as
+    # ExportProfile's own jq_document_id/destination_document_id just
+    # above -- resolved via document_service.get_document_text_body
+    # when a step actually runs, not eager-loaded.
+    export_profile: Mapped[ExportProfile] = relationship()
+
+
 class TenantConfig(TenantBase):
     """Per-tenant runtime settings (event retention, etc.) -- the same
     key/value pattern as control.global_config, scoped to one tenant

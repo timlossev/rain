@@ -33,7 +33,7 @@ Three subfolders, by what you do with the file:
 | `bundles/fedramp-ocr-fields.rain` | *Ticket* fields | FedRAMP CR26's Ongoing Certification Report -- additive alongside the POA&M template, not a replacement for it (see `docs/itsm-controls-mapping.md`'s CA-5 entry) |
 | `bundles/fedramp-ver-fields.rain` | *Ticket* fields | FedRAMP's Vulnerability Evaluation and Reporting activity (VER-RPT-VDT/VER-RPT-AVI/VER-TFR-MRH) -- N-rating, IRV/LEV classification, PAIN reduction history, and final disposition on Vulnerability tickets. Pairs with `fedramp-ocr-fields.rain`'s own "Accepted vulnerability (OCR)" flag (reused here, not duplicated) to split a vulnerability between the two report shapes. |
 | `bundles/fedramp-incident-report-fields.rain` | *Ticket* fields | FedRAMP's unified Incident Report (IEC-CSO-IIR/OIR/FIR) on Incident tickets -- one set of fields covers all three report types in the lifecycle, "FedRAMP report type" names which one a given export represents. |
-| `bundles/fedramp-certification-package.rain` | FedRAMP Certification Package asset type | Mirrors fedramp.gov's Certification Package Overview schema (2026-06-24) -- CSP/service-identity metadata, only relevant to a tenant that's itself a FedRAMP-certified CSP, not a general-purpose register |
+| `bundles/fedramp-certification-package.rain` | FedRAMP Certification Package asset type | Mirrors fedramp.gov's Certification Package Overview schema (2026-06-24) -- CSP/service-identity metadata, only relevant to a tenant that's itself a FedRAMP-certified CSP, not a general-purpose register. Also carries FIPS 199 confidentiality/integrity/availability impact and an authorization boundary description, for `oscal-system-characteristics.jq` (see "Export Recipes and the OSCAL System Security Plan" below) -- those two aren't part of the marketplace schema above. |
 | `bundles/fedramp-package-contacts.rain` | FedRAMP Package Contact asset type | The same schema's repeating `contactInformation` array -- pairs with `fedramp-certification-package.rain` |
 | `bundles/fedramp-package-repositories.rain` | FedRAMP Package Repository asset type | The same schema's `trustCenter`/`secureConfigurationGuidance`/`additionalRepositories` -- pairs with `fedramp-certification-package.rain` |
 | `bundles/security-control-register.rain` | Security Control asset type | Any control catalog (NIST 800-53, ISO 27001 Annex A, SOC 2, CMMC, ...) -- one row per control implementation statement, plus Last Assessment Date/Last Assessment Result/Assessor for recording assessment outcomes directly on the row they apply to. Pairs with `oscal-control-implementation.jq`, below, which exports this register as an OSCAL control-implementation fragment, and with `assessment-register.rain` for tracking the assessment engagements themselves. |
@@ -164,6 +164,37 @@ fragment's `implemented-requirements` into that document's own
 `control-implementation` object. See the comment block at the top of
 the `.jq` file itself for exactly what it expects and how it derives
 each object's `uuid`.
+
+## Export Recipes and the OSCAL System Security Plan
+
+Export Recipes (its own sidebar item, not something Config Bundles
+imports) is the feature built to go the rest of the way: a saved,
+ordered list of steps, each running an existing export profile fresh
+and optionally reshaping it with its own jq filter, collected into one
+object keyed by each step's own label, then optionally run through one
+more "assembly" filter to produce a single combined document. It
+exists because a single export's own jq transform -- `oscal-control-
+implementation.jq` above included -- can only ever reshape *that one*
+export; it has no way to pull in a second, independently-scoped one.
+See [`docs/user-guide.md`](../user-guide.md)'s own "Export Recipes"
+section for how to build one.
+
+Three more transforms here exist specifically to be a recipe's own
+steps, not to run standalone from an export screen's own transform
+picker (though nothing stops you from doing that with
+`oscal-system-characteristics.jq`/`oscal-system-implementation.jq`
+either, same as any other transform in this folder):
+
+| File | Recipe step | Source |
+|---|---|---|
+| `transforms/oscal-system-characteristics.jq` | `characteristics` | FedRAMP Certification Package asset type -- now also carrying FIPS 199 confidentiality/integrity/availability impact and an authorization boundary description (added for this), alongside its existing CSP/service-identity fields |
+| `transforms/oscal-system-implementation.jq` | `components` | Software Component asset type (`software-inventory-register.rain`) -- no new fields needed, its existing Component type/Version/Vendor/Status already cover an OSCAL component record |
+| `transforms/oscal-control-implementation.jq` | `controls` | Security Control register, above -- unchanged; its output is already shaped `{"control-implementation": {...}}`, so it lifts straight into the assembled document with no changes needed |
+| `transforms/oscal-ssp-assembly.jq` | the recipe's own assembly filter | Combines the three steps' collected results into one real `system-security-plan` object -- `metadata`/`import-profile` are boilerplate (two constants at the top of the file, EDIT THESE BEFORE USE); `system-implementation.users`/`back-matter.resources` are schema-present but empty, since neither has a RAIN asset/Document concept backing it yet |
+
+Full walkthrough, against a live instance, with real data at every
+step: [`docs/oscal-ssp-showcase.md`](../oscal-ssp-showcase.md)'s own
+"From fragment to a full System Security Plan" section.
 
 ## Tracking assessments
 
@@ -337,9 +368,16 @@ serviceProperties/assessor), `transforms/fedramp-package-contacts-export.jq`
 register by which "Repository type(s)" each row names -- see that
 file's own header). Three separate Assets exports (one per asset type)
 feeding three separate transformers, then hand-assembled into one
-document -- an Assets export can't join across asset types, so this
-can't be one step the way the single-asset-type exports elsewhere in
-this file are.
+document -- an Assets export can't join across asset types on its own,
+so this can't be one step the way the single-asset-type exports
+elsewhere in this file are. **Export Recipes** (see "Export Recipes
+and the OSCAL System Security Plan" below) can turn this into one
+step: a three-step recipe, one per transformer above, with no
+assembly filter set (the recipe's own raw `{label: value}` output
+already has everything you'd otherwise copy-paste by hand into place)
+-- the manual version below still works and needs no extra setup, but
+the recipe is less error-prone for a document you regenerate
+regularly.
 
 1. Import `bundles/fedramp-certification-package.rain`,
    `bundles/fedramp-package-contacts.rain`, and

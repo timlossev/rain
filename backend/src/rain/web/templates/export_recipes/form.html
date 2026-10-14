@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% import "_search_picker.html" as picker %}
+{% block title %}{{ "Edit" if recipe else "New" }} Export Recipe - {{ branding.instance_name }}{% endblock %}
+{% block help_text %}Each step runs an existing saved export profile fresh, optionally reshaped by its own jq filter. The assembly filter (optional) runs once more, over all the steps' results collected into one object keyed by each step's label -- e.g. {{ '{characteristics: ..., components: ..., controls: ...}' }}. With no assembly filter, the recipe's own output is just that collected object.{% endblock %}
+{% block content_class %}content-full{% endblock %}
+{% block content %}
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+<div class="panel-row" style="justify-content:flex-end;">
+  <a class="btn btn-sm" href="/export-recipes">&larr; All recipes</a>
+</div>
+
+<div class="card">
+  <form method="post" action="{{ '/export-recipes/' ~ recipe.id ~ '/edit' if recipe else '/export-recipes' }}">
+    <div class="field">
+      <label for="name">Recipe name</label>
+      <input type="text" id="name" name="name" value="{{ recipe.name if recipe else '' }}" placeholder="OSCAL System Security Plan" required autofocus>
+    </div>
+
+    <h3>Steps, in order</h3>
+    <p class="field-hint">Each step needs a profile picked - label and filter are both optional (a blank label defaults to "step1", "step2", ...).
+      {% if not profiles %}No saved export profiles exist yet - save one from the Tickets or Assets export screen first.{% endif %}</p>
+
+    {% set initial_visible = [(step_prefill | length), 1] | max %}
+    <div data-step-field data-step-min="1" data-step-max="{{ step_range | length }}">
+    <div data-step-rows>
+      {% for i in step_range %}
+      {% set prefill = step_prefill.get(i) %}
+      <div class="card" data-step-row style="background:var(--surface-sunken); margin-bottom:10px; padding:14px;" {% if i > initial_visible %}hidden{% endif %}>
+        <div class="form-row form-row-top" style="margin-bottom:0;">
+          <div class="field" style="flex:0 0 50px;">
+            <label>Step</label>
+            <div style="padding-top:8px; font-weight:700; color:var(--text-muted);">{{ i }}</div>
+          </div>
+          <div class="field" style="flex:0 0 160px;">
+            <label for="step_label_{{ i }}">Label</label>
+            <input type="text" id="step_label_{{ i }}" name="step_label_{{ i }}" value="{{ prefill.label if prefill else '' }}" placeholder="{% if i == 1 %}characteristics{% elif i == 2 %}components{% elif i == 3 %}controls{% else %}step{{ i }}{% endif %}">
+          </div>
+          <div class="field">
+            <label for="step_profile_{{ i }}">Export profile</label>
+            <select id="step_profile_{{ i }}" name="step_profile_{{ i }}">
+              <option value="">-</option>
+              {% set current_scope = none %}
+              {% for p in profiles %}
+                {% if p.scope != current_scope %}
+                  {% if current_scope is not none %}</optgroup>{% endif %}
+                  <optgroup label="{{ 'Ticket profiles' if p.scope == 'ticket' else 'Asset profiles' }}">
+                  {% set current_scope = p.scope %}
+                {% endif %}
+                <option value="{{ p.id }}" {% if prefill and prefill.export_profile_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+              {% endfor %}
+              {% if current_scope is not none %}</optgroup>{% endif %}
+            </select>
+          </div>
+          {{ picker.search_picker("step_filter_" ~ i, "/documents/search", label="Filter (optional)", initial_value=prefill.filter_document_id if prefill else none, initial_label=prefill.filter_document_label if prefill else "", placeholder="Search documents...") }}
+          <div class="field" style="flex:0 0 auto;">
+            <label class="field-label-spacer">Remove</label>
+            <button type="button" class="btn btn-sm btn-danger" data-remove-step-btn>Remove</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="btn btn-sm" data-add-step-btn style="margin-bottom:16px;">+ Add step</button>
+    </div>
+
+    <h3>Assembly filter (optional)</h3>
+    <p class="field-hint">Runs once, over all the steps' results collected into one object keyed by label. Leave unset to just get that collected object back as-is.</p>
+    {{ picker.search_picker("assembly_filter_document_id", "/documents/search", label="Use a saved ruleset", initial_value=selected_assembly_filter_document_id, initial_label=selected_assembly_filter_document_label, placeholder="Search documents...") }}
+
+    <div style="margin-top:20px;">
+      <button class="btn btn-primary" type="submit">{{ "Save changes" if recipe else "Create recipe" }}</button>
+      <a class="btn" href="/export-recipes">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -131,6 +131,7 @@ def create_app() -> FastAPI:
     from rain.modules.assets import nav as _assets_nav  # noqa: F401
     from rain.modules.calendar import nav as _calendar_nav  # noqa: F401
     from rain.modules.documents import nav as _documents_nav  # noqa: F401
+    from rain.modules.export_recipes import nav as _export_recipes_nav  # noqa: F401
     from rain.modules.home import nav as _home_nav  # noqa: F401
     from rain.modules.tickets import nav as _tickets_nav  # noqa: F401
 
@@ -140,6 +141,7 @@ def create_app() -> FastAPI:
     from rain.modules.calendar.router import router as calendar_router
     from rain.modules.catalog.router import router as catalog_router
     from rain.modules.documents.router import router as documents_router
+    from rain.modules.export_recipes.router import router as export_recipes_router
     from rain.modules.home.router import router as home_router
     from rain.modules.portal.router import router as portal_router
     from rain.modules.search.router import router as search_router
@@ -157,6 +159,7 @@ def create_app() -> FastAPI:
     app.include_router(catalog_router)
     app.include_router(documents_router)
     app.include_router(calendar_router)
+    app.include_router(export_recipes_router)
     app.include_router(search_router)
     app.include_router(portal_router)
 
