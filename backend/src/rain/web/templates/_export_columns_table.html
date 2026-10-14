@@ -1,0 +1,35 @@
+{#
+  Shared by tickets/export.html and assets/export.html -- the column
+  picker every export screen uses. Field shows the column's own name,
+  read-only, always the same regardless of edits; Header is what the
+  export's own column title actually is, editable, defaulting to the
+  same text as Field until renamed. Keeping both visible (rather than
+  just Header, which used to be the only name shown) means renaming a
+  column never loses track of which field it actually is.
+
+  The badge next to "Columns" counts how many are checked -- kept live
+  by app.js's [data-export-columns] handler (same one that already
+  auto-fills a blank Order on page load).
+
+  Usage: {% include "_export_columns_table.html" %} inside a <form>,
+  needs `columns` in the template context.
+#}
+<div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+  <h3 style="margin:0;">Columns</h3>
+  <span class="badge" data-export-column-count></span>
+</div>
+<div data-export-columns>
+  <table>
+    <thead><tr><th>Include</th><th>Field</th><th>Header</th><th>Order</th></tr></thead>
+    <tbody>
+      {% for col in columns %}
+      <tr>
+        <td><input type="checkbox" id="use_{{ col.source }}" name="use_{{ col.source }}" value="{{ col.source }}" {% if col.checked %}checked{% endif %}></td>
+        <td class="muted" title="{{ col.source }}">{{ col.field_label }}</td>
+        <td><input type="text" name="header_{{ col.source }}" value="{{ col.header }}"></td>
+        <td><input type="number" name="order_{{ col.source }}" style="width:70px;" value="{{ col.order }}"></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

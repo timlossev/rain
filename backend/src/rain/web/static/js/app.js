@@ -860,12 +860,27 @@ document.addEventListener("DOMContentLoaded", () => {
   window.RAIN = window.RAIN || {};
   window.RAIN.activateActivitySortToggle = activateActivitySortToggle;
 
-  // Export column picker: keep the "order" input in sync with visual position.
-  document.querySelectorAll("[data-export-columns]").forEach((table) => {
-    table.querySelectorAll("input[type=checkbox]").forEach((cb, idx) => {
-      const orderInput = table.querySelector(`input[name="order_${cb.value}"]`);
+  // Export column picker: keep the "order" input in sync with visual
+  // position, and the "N of M selected" badge (see
+  // _export_columns_table.html) live as checkboxes are toggled. The
+  // [data-export-columns] container wraps the table rather than being
+  // the table itself, so the badge (a sibling of the table, not inside
+  // it) is still reachable from here.
+  document.querySelectorAll("[data-export-columns]").forEach((container) => {
+    const checkboxes = Array.from(container.querySelectorAll("input[type=checkbox]"));
+    checkboxes.forEach((cb, idx) => {
+      const orderInput = container.querySelector(`input[name="order_${cb.value}"]`);
       if (orderInput && !orderInput.value) orderInput.value = String(idx);
     });
+
+    const counter = container.parentElement.querySelector("[data-export-column-count]");
+    if (counter) {
+      const refreshCount = () => {
+        counter.textContent = `${checkboxes.filter((cb) => cb.checked).length} of ${checkboxes.length} selected`;
+      };
+      checkboxes.forEach((cb) => cb.addEventListener("change", refreshCount));
+      refreshCount();
+    }
   });
 
   // Approval Flow step builder: the server pre-renders data-step-max rows

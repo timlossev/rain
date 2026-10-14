@@ -8,7 +8,7 @@
 {% if ctx.user.is_internal_admin %}
 <div class="card">
   <div class="card-title">Platform configuration bundle</div>
-  <p class="field-hint" style="margin-top:0;">Everything instance-wide: instance name/accent color/font/logo, the client portal background image, the SMTP relay, LDAP and SAML provider config, and syslog source routing rules. One bundle for the whole install, not per tenant.</p>
+  <p class="field-hint" style="margin-top:0;">Everything instance-wide: instance name/accent color/font/logo, the client portal background image, the SMTP relay, LDAP and SAML provider config, and syslog source routing rules. One bundle for the whole install.</p>
 
   <form method="post" action="/admin/config-bundle/platform/export">
     <label class="checkbox-row"><input type="checkbox" name="include_secrets" value="true"> Include secrets (SMTP/LDAP passwords)</label>

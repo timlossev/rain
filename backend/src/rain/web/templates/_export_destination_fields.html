@@ -29,7 +29,7 @@
       Save to a Document
     </label>
   </div>
-  <div class="field-hint">Save to a Document only supports CSV/JSON, not Excel.</div>
+  <div class="field-hint">Save to a Document supports CSV and JSON only.</div>
 </div>
 
 <div class="form-section" data-action-fields="save_to_document">
@@ -41,6 +41,6 @@
   </div>
   <div class="field">
     <label class="checkbox-row"><input type="checkbox" name="destination_is_shareable" {% if selected_destination_is_shareable %}checked{% endif %}> Flag as Trust Center (public)</label>
-    <div class="field-hint">A saved profile used from Calendar needs a document picked above, not just a title -- a scheduled run always overwrites, it never creates one unattended.</div>
+    <div class="field-hint">A saved profile used from Calendar needs a document picked above -- a scheduled run always overwrites it.</div>
   </div>
 </div>

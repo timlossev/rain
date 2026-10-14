@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Export Assets - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Export assets to CSV, JSON, or Excel. Pick an asset type to bring in its custom fields as columns, adjust headers/order, and optionally save the layout as a reusable profile - or load one you saved before.{% endblock %}
+{% block help_text %}Export assets to CSV, JSON, or Excel. Pick an asset type to bring in its custom fields as columns, adjust headers/order, and optionally save the layout as a reusable profile - or load one you saved before. Need several exports combined into one document? See Export Recipes.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 <div class="card">
@@ -29,20 +29,7 @@
 
   <form method="post" action="/assets/export" enctype="multipart/form-data">
     <input type="hidden" name="asset_type_id" value="{{ selected_type or '' }}">
-    <h3>Columns</h3>
-    <table data-export-columns>
-      <thead><tr><th>Include</th><th>Source</th><th>Header</th><th>Order</th></tr></thead>
-      <tbody>
-        {% for col in columns %}
-        <tr>
-          <td><input type="checkbox" id="use_{{ col.source }}" name="use_{{ col.source }}" value="{{ col.source }}" {% if col.checked %}checked{% endif %}></td>
-          <td class="muted">{{ col.source }}</td>
-          <td><input type="text" name="header_{{ col.source }}" value="{{ col.header }}"></td>
-          <td><input type="number" name="order_{{ col.source }}" style="width:70px;" value="{{ col.order }}"></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {% include "_export_columns_table.html" %}
 
     <div class="form-row" style="margin-top:16px;">
       <div class="field field-w160">
@@ -72,6 +59,7 @@
 {% if profiles %}
 <div class="card">
   <div class="card-title">Saved export profiles</div>
+  <p class="field-hint" style="margin-top:-6px;">Need one document built from several of these at once? <a href="/export-recipes">Export Recipes</a> runs them together and merges the results.</p>
   <table>
     <thead><tr><th>Name</th><th>Format</th><th>Columns</th><th></th></tr></thead>
     <tbody>
