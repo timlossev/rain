@@ -1,0 +1,65 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-10-15T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "Case management fields starter template",
+  "secrets_included": false,
+  "custom_fields": [
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "incident",
+      "field_key": "subject_or_responsible_party",
+      "label": "Subject / responsible party",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 0
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "incident",
+      "field_key": "violation_type",
+      "label": "Suspected violation type",
+      "field_type": "select",
+      "select_options": ["Policy Violation", "Regulatory Violation", "Contractual Violation", "Data Handling Violation", "Other"],
+      "is_required": false,
+      "sort_order": 1
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "incident",
+      "field_key": "investigation_status",
+      "label": "Investigation status",
+      "field_type": "select",
+      "select_options": ["Open", "Under Review", "Substantiated", "Unsubstantiated", "Closed"],
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "incident",
+      "field_key": "findings",
+      "label": "Findings",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "ticket",
+      "asset_type_key": null,
+      "ticket_type": "incident",
+      "field_key": "disposition",
+      "label": "Disposition / consequence",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    }
+  ]
+}

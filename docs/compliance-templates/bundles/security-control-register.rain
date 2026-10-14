@@ -10,7 +10,7 @@
       "key": "security_control",
       "name": "Security Control",
       "icon": null,
-      "description": "One row per control implementation statement -- a NIST 800-53 (or other catalog) control, how it's implemented, and by whom. Each Asset's own \"Name\" field identifies the control (and part, if tracked at that level), e.g. \"AC-2(a) Account Management\". Populate by hand, or bulk-import one of the FedRAMP rev5 baseline question lists (nist-800-53-rev5-low/moderate/high.csv, same directory), the ISO/IEC 27001:2022 Annex A control list (iso-27001-2022-annex-a-controls.csv), or the SOC 2 Type II control list (soc2-type2-controls.csv) to start from a real, currently-applicable control set instead of a blank register. Pairs with the oscal-control-implementation.jq transformer (see docs/compliance-templates/README.md) to export this register as an OSCAL control-implementation fragment.",
+      "description": "One row per control implementation statement -- a NIST 800-53 (or other catalog) control, how it's implemented, and by whom. Each Asset's own \"Name\" field identifies the control (and part, if tracked at that level), e.g. \"AC-2(a) Account Management\". Populate by hand, or bulk-import one of the FedRAMP rev5 baseline question lists (nist-800-53-rev5-low/moderate/high.csv, same directory), the ISO/IEC 27001:2022 Annex A control list (iso-27001-2022-annex-a-controls.csv), the SOC 2 Type II control list (soc2-type2-controls.csv), or one of the CMMC level lists (cmmc-level-1/2/3-controls.csv) to start from a real, currently-applicable control set instead of a blank register. Pairs with the oscal-control-implementation.jq transformer (see docs/compliance-templates/README.md) to export this register as an OSCAL control-implementation fragment, and with assessment-register.rain (same directory) for tracking assessments against these same rows.",
       "is_active": true,
       "sort_order": 0
     }
@@ -95,6 +95,36 @@
       "select_options": null,
       "is_required": false,
       "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "last_assessment_date",
+      "label": "Last Assessment Date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 8
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "last_assessment_result",
+      "label": "Last Assessment Result",
+      "field_type": "select",
+      "select_options": ["Satisfied", "Other Than Satisfied", "Not Applicable", "Not Assessed"],
+      "is_required": false,
+      "sort_order": 9
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "assessor",
+      "label": "Assessor",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 10
     }
   ]
 }
