@@ -1,0 +1,648 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-10-17T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "OSCAL System Security Plan starter kit (asset types + export recipe, one import)",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "fedramp_certification_package",
+      "name": "FedRAMP Certification Package",
+      "icon": null,
+      "description": "One row per FedRAMP-certified cloud service offering this tenant operates -- most tenants only ever need one. Mirrors fedramp.gov's own Certification Package Overview schema (fedramp-certification-package-overview-schema-2026-06-24.json): the CSP/service-identity metadata FedRAMP's marketplace listing expects, not a control-implementation SSP. Each Asset's own \"Name\" field is the service's own name (serviceName in that schema) -- pairs with fedramp-package-contacts.rain and fedramp-package-repositories.rain for the two repeating sections that schema carries as arrays. The FIPS 199/authorization boundary fields (added for OSCAL) aren't part of that marketplace schema -- they exist to feed transforms/oscal-system-characteristics.jq, the first step of the OSCAL System Security Plan Export Recipe (see docs/oscal-ssp-showcase.md).",
+      "is_active": true,
+      "sort_order": 0
+    },
+    {
+      "key": "software_component",
+      "name": "Software Component",
+      "icon": null,
+      "description": "One row per in-scope Control Plane software component, container image, package, or dependency -- a Software Bill of Materials (SBOM) register. Each Asset's own \"Name\" field is the component or package name. Distinct from the Software License Register (`software-license-register.rain`), which tracks vendor agreements and renewals, not what's actually running.",
+      "is_active": true,
+      "sort_order": 0
+    },
+    {
+      "key": "security_control",
+      "name": "Security Control",
+      "icon": null,
+      "description": "One row per control implementation statement -- a NIST 800-53 (or other catalog) control, how it's implemented, and by whom. Each Asset's own \"Name\" field identifies the control (and part, if tracked at that level), e.g. \"AC-2(a) Account Management\". Populate by hand, or bulk-import one of the FedRAMP rev5 baseline question lists (nist-800-53-rev5-low/moderate/high.csv, same directory), the ISO/IEC 27001:2022 Annex A control list (iso-27001-2022-annex-a-controls.csv), the SOC 2 Type II control list (soc2-type2-controls.csv), or one of the CMMC level lists (cmmc-level-1/2/3-controls.csv) to start from a real, currently-applicable control set instead of a blank register. Pairs with the oscal-control-implementation.jq transformer (see docs/compliance-templates/README.md) to export this register as an OSCAL control-implementation fragment, and with assessment-register.rain (same directory) for tracking assessments against these same rows.",
+      "is_active": true,
+      "sort_order": 0
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "provider_name",
+      "label": "Provider name",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "service_acronym",
+      "label": "Service acronym",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "service_description",
+      "label": "Service description",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "certification_type",
+      "label": "Certification type",
+      "field_type": "select",
+      "select_options": [
+        "20x",
+        "Rev5"
+      ],
+      "is_required": true,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "fedramp_package_id",
+      "label": "FedRAMP package ID",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "uei_number",
+      "label": "UEI number (SAM.gov)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "website",
+      "label": "Website",
+      "field_type": "url",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "service_type",
+      "label": "Service type (comma-separated -- SaaS, PaaS, IaaS)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "deployment_model",
+      "label": "Deployment model",
+      "field_type": "select",
+      "select_options": [
+        "Public Cloud",
+        "Government-Only Cloud",
+        "Hybrid Cloud",
+        "Community Cloud",
+        "Government Community Cloud"
+      ],
+      "is_required": true,
+      "sort_order": 8
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "business_category",
+      "label": "Business category (comma-separated, up to 10)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 9
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "assessor_name",
+      "label": "Assessor (3PAO) name",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 10
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "assessor_id",
+      "label": "Assessor ID (6 digits)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 11
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "next_ocr_date",
+      "label": "Next Ongoing Certification Report date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 12
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "logo_url",
+      "label": "Logo URL (png/jpeg/gif/svg/webp/ico/bmp/tiff)",
+      "field_type": "url",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 13
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "confidentiality_impact",
+      "label": "FIPS 199 confidentiality impact",
+      "field_type": "select",
+      "select_options": [
+        "Low",
+        "Moderate",
+        "High"
+      ],
+      "is_required": false,
+      "sort_order": 14
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "integrity_impact",
+      "label": "FIPS 199 integrity impact",
+      "field_type": "select",
+      "select_options": [
+        "Low",
+        "Moderate",
+        "High"
+      ],
+      "is_required": false,
+      "sort_order": 15
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "availability_impact",
+      "label": "FIPS 199 availability impact",
+      "field_type": "select",
+      "select_options": [
+        "Low",
+        "Moderate",
+        "High"
+      ],
+      "is_required": false,
+      "sort_order": 16
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "field_key": "authorization_boundary_description",
+      "label": "Authorization boundary description",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 17
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "component_type",
+      "label": "Component type",
+      "field_type": "select",
+      "select_options": [
+        "Application",
+        "Library / dependency",
+        "Container image",
+        "Operating system package",
+        "Firmware",
+        "Other"
+      ],
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "version",
+      "label": "Version",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "vendor_or_source",
+      "label": "Vendor / source",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "source_repository_url",
+      "label": "Source repository",
+      "field_type": "url",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "digest_or_hash",
+      "label": "Digest / hash",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "license",
+      "label": "License",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "in_scope",
+      "label": "In authorization boundary",
+      "field_type": "boolean",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "last_reviewed_date",
+      "label": "Last reviewed",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "known_vulnerabilities",
+      "label": "Known vulnerabilities (CVE list or reference)",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 8
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "parent_component",
+      "label": "Parent component / dependency of",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 9
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "field_key": "status",
+      "label": "Status",
+      "field_type": "select",
+      "select_options": [
+        "Active",
+        "Deprecated",
+        "Removed",
+        "Under review"
+      ],
+      "is_required": true,
+      "sort_order": 10
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "control_id",
+      "label": "Control ID",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "statement_id",
+      "label": "Statement ID",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "control_question",
+      "label": "Control Question",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "implementation_status",
+      "label": "Implementation Status",
+      "field_type": "select",
+      "select_options": [
+        "Implemented",
+        "Partially Implemented",
+        "Planned",
+        "Alternative Implementation",
+        "Not Applicable"
+      ],
+      "is_required": true,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "narrative",
+      "label": "Narrative",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "responsible_role",
+      "label": "Responsible Role",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "parameters",
+      "label": "Parameters",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "remarks",
+      "label": "Remarks",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "last_assessment_date",
+      "label": "Last Assessment Date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 8
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "last_assessment_result",
+      "label": "Last Assessment Result",
+      "field_type": "select",
+      "select_options": [
+        "Satisfied",
+        "Other Than Satisfied",
+        "Not Applicable",
+        "Not Assessed"
+      ],
+      "is_required": false,
+      "sort_order": 9
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "assessor",
+      "label": "Assessor",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 10
+    }
+  ],
+  "export_profiles": [
+    {
+      "name": "OSCAL - Certification Package",
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "format": "json",
+      "columns": [
+        {
+          "source": "name",
+          "header": "Name",
+          "order": 0
+        },
+        {
+          "source_field_key": "service_description",
+          "header": "Service description",
+          "order": 1
+        },
+        {
+          "source_field_key": "confidentiality_impact",
+          "header": "FIPS 199 confidentiality impact",
+          "order": 2
+        },
+        {
+          "source_field_key": "integrity_impact",
+          "header": "FIPS 199 integrity impact",
+          "order": 3
+        },
+        {
+          "source_field_key": "availability_impact",
+          "header": "FIPS 199 availability impact",
+          "order": 4
+        },
+        {
+          "source_field_key": "authorization_boundary_description",
+          "header": "Authorization boundary description",
+          "order": 5
+        },
+        {
+          "source_field_key": "fedramp_package_id",
+          "header": "FedRAMP package ID",
+          "order": 6
+        }
+      ]
+    },
+    {
+      "name": "OSCAL - Software Components",
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "format": "json",
+      "columns": [
+        {
+          "source": "ci_number",
+          "header": "CI Number",
+          "order": 0
+        },
+        {
+          "source": "name",
+          "header": "Name",
+          "order": 1
+        },
+        {
+          "source_field_key": "component_type",
+          "header": "Component type",
+          "order": 2
+        },
+        {
+          "source_field_key": "version",
+          "header": "Version",
+          "order": 3
+        },
+        {
+          "source_field_key": "vendor_or_source",
+          "header": "Vendor / source",
+          "order": 4
+        },
+        {
+          "source_field_key": "digest_or_hash",
+          "header": "Digest / hash",
+          "order": 5
+        },
+        {
+          "source_field_key": "license",
+          "header": "License",
+          "order": 6
+        },
+        {
+          "source": "status",
+          "header": "Status",
+          "order": 7
+        },
+        {
+          "source_field_key": "known_vulnerabilities",
+          "header": "Known vulnerabilities (CVE list or reference)",
+          "order": 8
+        }
+      ]
+    },
+    {
+      "name": "OSCAL - Security Controls",
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "format": "json",
+      "columns": [
+        {
+          "source": "ci_number",
+          "header": "CI Number",
+          "order": 0
+        },
+        {
+          "source_field_key": "control_id",
+          "header": "Control ID",
+          "order": 1
+        },
+        {
+          "source_field_key": "statement_id",
+          "header": "Statement ID",
+          "order": 2
+        },
+        {
+          "source_field_key": "implementation_status",
+          "header": "Implementation Status",
+          "order": 3
+        },
+        {
+          "source_field_key": "narrative",
+          "header": "Narrative",
+          "order": 4
+        },
+        {
+          "source_field_key": "responsible_role",
+          "header": "Responsible Role",
+          "order": 5
+        },
+        {
+          "source_field_key": "parameters",
+          "header": "Parameters",
+          "order": 6
+        },
+        {
+          "source_field_key": "remarks",
+          "header": "Remarks",
+          "order": 7
+        }
+      ]
+    }
+  ],
+  "export_recipes": [
+    {
+      "name": "OSCAL System Security Plan",
+      "steps": [
+        {
+          "label": "characteristics",
+          "export_profile_scope": "asset",
+          "export_profile_name": "OSCAL - Certification Package"
+        },
+        {
+          "label": "components",
+          "export_profile_scope": "asset",
+          "export_profile_name": "OSCAL - Software Components"
+        },
+        {
+          "label": "controls",
+          "export_profile_scope": "asset",
+          "export_profile_name": "OSCAL - Security Controls"
+        }
+      ]
+    }
+  ]
+}

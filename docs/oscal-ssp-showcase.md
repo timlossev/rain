@@ -140,64 +140,54 @@ rest. On its own, this is still only a fragment, not a complete
 system-implementation aren't something a per-control asset row has any
 way to know. Section 5 below is the rest of that story.
 
-## 5. From fragment to a full System Security Plan, via Export Recipes
+## 5. A full System Security Plan, not just a fragment
 
-A single export's jq transform can only ever reshape *that* export --
-it has no way to pull in a second, independently-scoped one. Export
-Recipes (a sidebar item of its own) is the feature built to close that
-gap: run several saved export profiles together, each optionally
-reshaped by its own filter, then merge all their results into one
-document with a final "assembly" filter. The OSCAL SSP is the recipe
-this was built for.
+Section 4's fragment is only `control-implementation`. A full SSP also
+needs `system-characteristics` and `system-implementation` -- things a
+Security Control row can't know (system name, FIPS categorization,
+component inventory). Export Recipes is how RAIN produces all three in
+one file: run several saved exports together, then merge the results.
 
-Three sources, three new/updated pieces:
+### Fastest path: one import
 
-| Step label | Export profile (Assets, format JSON, every column) | Filter Document |
+`bundles/oscal-ssp-starter-kit.rain` sets up everything -- 3 asset
+types (FedRAMP Certification Package, Software Component, Security
+Control), their fields, 3 export profiles, and the recipe that ties
+them together. Admin > Config Bundles > Tenant > Import, fill in one
+Certification Package row and your software inventory, then add
+filter Documents for the three `transforms/oscal-*.jq` files (see
+below) and attach them to the recipe's steps. Everything else is
+already wired up.
+
+### What the recipe actually does
+
+| Step | Source | Filter |
 |---|---|---|
-| `characteristics` | asset type **FedRAMP Certification Package** | `transforms/oscal-system-characteristics.jq` |
-| `components` | asset type **Software Component** (`software-inventory-register.rain`) | `transforms/oscal-system-implementation.jq` |
-| `controls` | asset type **Security Control** -- the exact register sections 1-4 above already built up | `transforms/oscal-control-implementation.jq` (unchanged; its output is already shaped `{"control-implementation": {...}}`, so this filter just lifts straight into place) |
+| `characteristics` | FedRAMP Certification Package | `oscal-system-characteristics.jq` |
+| `components` | Software Component | `oscal-system-implementation.jq` |
+| `controls` | Security Control (sections 1-4 above) | `oscal-control-implementation.jq`, unchanged |
 
-`fedramp-certification-package.rain` now also carries FIPS 199
-confidentiality/integrity/availability impact and an authorization
-boundary description, alongside its existing CSP/service-identity
-fields -- fill those in on your one Certification Package row, since
-`oscal-system-characteristics.jq` reads them to compute the system's
-overall security-sensitivity-level (FIPS 199's own "high water mark"
-rule: the highest of the three).
+An assembly filter, `oscal-ssp-assembly.jq`, combines the three into
+one `system-security-plan` document.
 
-To reproduce:
+### If you already have some of this
 
-1. Admin > Config Bundles > Tenant > Import the (updated)
-   `fedramp-certification-package.rain` and `software-inventory-
-   register.rain`, if you haven't already. Fill in one Certification
-   Package row (including the new FIPS 199/boundary fields) and your
-   real software inventory.
-2. Save the three export profiles in the table above (Tickets/Assets
-   export screen > column picker > "Save as profile").
-3. Documents > New document > Type new content > `.jq`, paste in each
-   of the three filter files above, one Document per filter.
-4. Documents > New document once more for `transforms/oscal-ssp-
-   assembly.jq` -- the recipe's own "assembly filter."
-5. Export Recipes > New recipe. Three steps, each one profile from the
-   table paired with its own filter Document, labeled exactly
-   `characteristics`/`components`/`controls` (the assembly filter
-   reads the recipe's own collected results by those labels). Assembly
-   filter: the Document from step 4.
-6. Run it. One download, one real `system-security-plan` object --
-   `metadata`/`import-profile` are boilerplate (two constants at the
-   top of the assembly filter, `ssp_title`/`import_profile_href`, EDIT
-   THESE BEFORE USE), `system-characteristics` from step 1,
-   `system-implementation.components` from step 2,
-   `control-implementation` from step 3 -- the exact same fragment
-   section 4 above downloads on its own, just lifted into place here
-   instead.
+Already running the Security Control register? Import just
+`bundles/oscal-ssp-export-recipe.rain` instead -- the 3 profiles and
+the recipe, no asset types. It expects `fedramp-certification-
+package.rain`, `software-inventory-register.rain`, and `security-
+control-register.rain` to already be imported.
 
-Honest about what's still a placeholder even in this assembled
-document: `system-implementation.users` and `back-matter.resources`
-are schema-present but empty -- neither has a RAIN asset/Document
-concept backing it yet. Everything else is real, generated data, not
-hand-assembled.
+Either way, filter Documents aren't part of the import (Documents are
+data, not config -- see Admin > Config Bundles' own note on this).
+Create 4 Documents from the `.jq` files in `transforms/`, then open
+Export Recipes > the new recipe and attach each one.
+
+### Still placeholders
+
+`system-implementation.users` and `back-matter.resources` come back
+empty -- nothing in RAIN feeds them yet. Everything else in the
+document is real data.
 
 ## Where this stands next to a dedicated GRC tool
 

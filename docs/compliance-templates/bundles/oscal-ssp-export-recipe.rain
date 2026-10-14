@@ -1,0 +1,68 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-10-17T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "OSCAL System Security Plan Export Recipe starter template",
+  "secrets_included": false,
+  "export_profiles": [
+    {
+      "name": "OSCAL - Certification Package",
+      "scope": "asset",
+      "asset_type_key": "fedramp_certification_package",
+      "format": "json",
+      "columns": [
+        {"source": "name", "header": "Name", "order": 0},
+        {"source_field_key": "service_description", "header": "Service description", "order": 1},
+        {"source_field_key": "confidentiality_impact", "header": "FIPS 199 confidentiality impact", "order": 2},
+        {"source_field_key": "integrity_impact", "header": "FIPS 199 integrity impact", "order": 3},
+        {"source_field_key": "availability_impact", "header": "FIPS 199 availability impact", "order": 4},
+        {"source_field_key": "authorization_boundary_description", "header": "Authorization boundary description", "order": 5},
+        {"source_field_key": "fedramp_package_id", "header": "FedRAMP package ID", "order": 6}
+      ]
+    },
+    {
+      "name": "OSCAL - Software Components",
+      "scope": "asset",
+      "asset_type_key": "software_component",
+      "format": "json",
+      "columns": [
+        {"source": "ci_number", "header": "CI Number", "order": 0},
+        {"source": "name", "header": "Name", "order": 1},
+        {"source_field_key": "component_type", "header": "Component type", "order": 2},
+        {"source_field_key": "version", "header": "Version", "order": 3},
+        {"source_field_key": "vendor_or_source", "header": "Vendor / source", "order": 4},
+        {"source_field_key": "digest_or_hash", "header": "Digest / hash", "order": 5},
+        {"source_field_key": "license", "header": "License", "order": 6},
+        {"source": "status", "header": "Status", "order": 7},
+        {"source_field_key": "known_vulnerabilities", "header": "Known vulnerabilities (CVE list or reference)", "order": 8}
+      ]
+    },
+    {
+      "name": "OSCAL - Security Controls",
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "format": "json",
+      "columns": [
+        {"source": "ci_number", "header": "CI Number", "order": 0},
+        {"source_field_key": "control_id", "header": "Control ID", "order": 1},
+        {"source_field_key": "statement_id", "header": "Statement ID", "order": 2},
+        {"source_field_key": "implementation_status", "header": "Implementation Status", "order": 3},
+        {"source_field_key": "narrative", "header": "Narrative", "order": 4},
+        {"source_field_key": "responsible_role", "header": "Responsible Role", "order": 5},
+        {"source_field_key": "parameters", "header": "Parameters", "order": 6},
+        {"source_field_key": "remarks", "header": "Remarks", "order": 7}
+      ]
+    }
+  ],
+  "export_recipes": [
+    {
+      "name": "OSCAL System Security Plan",
+      "steps": [
+        {"label": "characteristics", "export_profile_scope": "asset", "export_profile_name": "OSCAL - Certification Package"},
+        {"label": "components", "export_profile_scope": "asset", "export_profile_name": "OSCAL - Software Components"},
+        {"label": "controls", "export_profile_scope": "asset", "export_profile_name": "OSCAL - Security Controls"}
+      ]
+    }
+  ]
+}

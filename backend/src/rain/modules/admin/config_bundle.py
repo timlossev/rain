@@ -13,11 +13,12 @@ support one directory per tenant), and syslog source routing rules.
 **Tenant bundle** (`rain_tenant_config`): one tenant's own configuration
 -- asset types, custom fields, ticket statuses, groups and local users,
 notification channels, webhooks, approval flows, Event Promotion
-Policies, Platform Response Rules, and Service Catalog items. Explicitly
-excludes any actual DATA (tickets, assets, documents, syslog events) and
-the ML rule sidecar's trained runtime state (TicketRuleState) -- neither
-is "configuration" in the sense this bundle means, and neither has a
-sane meaning transplanted onto a different tenant/instance.
+Policies, Platform Response Rules, Service Catalog items, and (saved)
+export profiles and recipes. Explicitly excludes any actual DATA
+(tickets, assets, documents, syslog events) and the ML rule sidecar's
+trained runtime state (TicketRuleState) -- neither is "configuration"
+in the sense this bundle means, and neither has a sane meaning
+transplanted onto a different tenant/instance.
 
 The two bundle kinds are deliberately independent -- importing one never
 requires the other to have been imported first (though a syslog source
@@ -76,6 +77,9 @@ from rain.db.tenant_models import (
     ApprovalFlowStep,
     AssetType,
     CustomField,
+    ExportProfile,
+    ExportRecipe,
+    ExportRecipeStep,
     Group,
     GroupMembership,
     NotificationChannel,
@@ -350,7 +354,16 @@ async def build_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, *, includ
     asset_types = list((await tenant_db.execute(select(AssetType).order_by(AssetType.sort_order, AssetType.name))).scalars())
     asset_type_key_by_id = {a.id: a.key for a in asset_types}
     custom_fields = list((await tenant_db.execute(select(CustomField))).scalars())
+    field_key_by_id = {f.id: f.field_key for f in custom_fields}
     ticket_statuses = list((await tenant_db.execute(select(TicketStatus).order_by(TicketStatus.sort_order))).scalars())
+
+    export_profiles = list(
+        (await tenant_db.execute(select(ExportProfile).order_by(ExportProfile.scope, ExportProfile.name))).scalars()
+    )
+    export_profile_key_by_id = {p.id: (p.scope, p.name) for p in export_profiles}
+    export_recipes = list(
+        (await tenant_db.execute(select(ExportRecipe).options(selectinload(ExportRecipe.steps)).order_by(ExportRecipe.name))).scalars()
+    )
 
     groups = list((await tenant_db.execute(select(Group).order_by(Group.name))).scalars())
     group_name_by_id = {g.id: g.name for g in groups}
@@ -627,6 +640,65 @@ async def build_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, *, includ
             }
         )
 
+    # Each column's "source" is either a builtin exporter key (ci_number,
+    # name, external_id, status) or "field_<id>" -- the id half of which
+    # means nothing on another instance, same reason asset_type_id/
+    # field_id get resolved to their own key/field_key everywhere else
+    # in this file. Re-expressed here as "source_field_key" so apply_
+    # tenant_bundle can re-resolve it against whichever CustomField row
+    # (scope + asset_type + field_key) exists on the target.
+    def _export_profile_columns_out(columns: list[dict]) -> list[dict]:
+        out = []
+        for c in columns:
+            source = c.get("source", "")
+            if source.startswith("field_"):
+                field_key = field_key_by_id.get(int(source[len("field_") :]))
+                if field_key is None:
+                    continue  # the field itself no longer exists; nothing to carry
+                out.append({"source_field_key": field_key, "header": c.get("header", ""), "order": c.get("order", 0)})
+            else:
+                out.append({"source": source, "header": c.get("header", ""), "order": c.get("order", 0)})
+        return out
+
+    export_profiles_out = []
+    for p in export_profiles:
+        export_profiles_out.append(
+            {
+                "name": p.name,
+                "scope": p.scope,
+                "asset_type_key": asset_type_key_by_id.get(p.asset_type_id) if p.asset_type_id else None,
+                "format": p.format,
+                "columns": _export_profile_columns_out(p.columns),
+            }
+        )
+        # jq_document_id/destination_document_id (and the save_to_document
+        # settings that go with the latter) all reference a specific
+        # Document -- data, not configuration, same reasoning as every
+        # other Document reference dropped elsewhere in this file (see
+        # chat_memory_document_id above). Left out of the bundle
+        # entirely rather than exported as a raw id that would mean
+        # nothing (or the wrong thing) on import.
+        if p.jq_document_id:
+            warnings.append(f"Export profile '{p.name}': its saved JSON-transform ruleset isn't included -- re-pick it after import.")
+        if p.save_to_document:
+            warnings.append(f"Export profile '{p.name}': its \"save to document\" destination isn't included -- re-configure it after import.")
+
+    export_recipes_out = []
+    for r in export_recipes:
+        steps_out = []
+        for st in sorted(r.steps, key=lambda s: s.step_order):
+            profile_key = export_profile_key_by_id.get(st.export_profile_id)
+            if profile_key is None:
+                warnings.append(f"Export recipe '{r.name}' step '{st.label}': its export profile no longer exists -- step skipped.")
+                continue
+            profile_scope, profile_name = profile_key
+            steps_out.append({"label": st.label, "export_profile_scope": profile_scope, "export_profile_name": profile_name})
+            if st.filter_document_id:
+                warnings.append(f"Export recipe '{r.name}' step '{st.label}': its own jq filter isn't included -- re-pick it after import.")
+        if r.assembly_filter_document_id:
+            warnings.append(f"Export recipe '{r.name}': its assembly filter isn't included -- re-pick it after import.")
+        export_recipes_out.append({"name": r.name, "steps": steps_out})
+
     return {
         "bundle_type": TENANT_BUNDLE_TYPE,
         "bundle_version": BUNDLE_VERSION,
@@ -647,6 +719,8 @@ async def build_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, *, includ
         "event_policies": event_policies_out,
         "platform_response_rules": platform_rules_out,
         "service_catalog": catalog_out,
+        "export_profiles": export_profiles_out,
+        "export_recipes": export_recipes_out,
         "warnings": warnings,
     }
 
@@ -661,7 +735,20 @@ async def apply_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, data: dic
         await set_tenant_configs(tenant_db, portable, updated_by=updated_by)
         result.bump("tenant settings", len(portable))
 
-    asset_type_id_by_key: dict[str, int] = {}
+    # Seeded from what's already here, not just this bundle's own
+    # "asset_types" list -- export_profiles/export_recipes below can
+    # reference an asset type a *different*, already-imported bundle
+    # defined (the OSCAL recipe bundle's own case: it has no
+    # "asset_types" section of its own at all, by design, and expects
+    # fedramp-certification-package.rain/software-inventory-
+    # register.rain/security-control-register.rain to already be in
+    # place). Entries from this bundle's own "asset_types" list below
+    # still overlay/update this same dict as they're processed, so a
+    # self-contained bundle that defines and references its own asset
+    # type in one file works exactly as before.
+    asset_type_id_by_key: dict[str, int] = {
+        a.key: a.id for a in (await tenant_db.execute(select(AssetType))).scalars()
+    }
     for entry in data.get("asset_types", []):
         row, created = await _upsert_by_key(
             tenant_db,
@@ -711,6 +798,76 @@ async def apply_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, data: dic
         if entry["scope"] == "ticket":
             existing.ticket_type = entry.get("ticket_type") or None
     await tenant_db.flush()
+
+    # Re-queried fresh rather than built inside the loop above: a brand
+    # new CustomField has no id until it's actually flushed, and that
+    # loop only flushes once, at its very end.
+    field_id_by_scope_key: dict[tuple[str, int | None, str], int] = {
+        (f.scope, f.asset_type_id, f.field_key): f.id for f in (await tenant_db.execute(select(CustomField))).scalars()
+    }
+
+    export_profile_id_by_scope_name: dict[tuple[str, str], int] = {}
+    for entry in data.get("export_profiles", []):
+        asset_type_key = entry.get("asset_type_key")
+        asset_type_id = asset_type_id_by_key.get(asset_type_key) if asset_type_key else None
+        if asset_type_key and asset_type_id is None:
+            result.warnings.append(f"Export profile '{entry['name']}': asset type '{asset_type_key}' not found -- skipped.")
+            continue
+        scope = entry.get("scope", "asset")
+
+        columns = []
+        for c in entry.get("columns", []):
+            if "source_field_key" in c:
+                field_id = field_id_by_scope_key.get((scope, asset_type_id, c["source_field_key"]))
+                if field_id is None:
+                    result.warnings.append(
+                        f"Export profile '{entry['name']}': column field '{c['source_field_key']}' not found -- column skipped."
+                    )
+                    continue
+                columns.append({"source": f"field_{field_id}", "header": c.get("header", ""), "order": c.get("order", 0)})
+            else:
+                columns.append({"source": c.get("source", ""), "header": c.get("header", ""), "order": c.get("order", 0)})
+
+        existing = (
+            await tenant_db.execute(select(ExportProfile).where(ExportProfile.scope == scope, ExportProfile.name == entry["name"]))
+        ).scalar_one_or_none()
+        if existing is None:
+            existing = ExportProfile(scope=scope, name=entry["name"], created_by=updated_by)
+            tenant_db.add(existing)
+            result.bump("export profiles")
+        else:
+            result.bump("export profiles (updated)")
+        existing.asset_type_id = asset_type_id
+        existing.format = entry.get("format", "csv")
+        existing.columns = columns
+        await tenant_db.flush()
+        export_profile_id_by_scope_name[(scope, entry["name"])] = existing.id
+
+    for entry in data.get("export_recipes", []):
+        steps_in = []
+        for step in entry.get("steps", []):
+            profile_key = (step.get("export_profile_scope", "asset"), step.get("export_profile_name", ""))
+            profile_id = export_profile_id_by_scope_name.get(profile_key)
+            if profile_id is None:
+                result.warnings.append(
+                    f"Export recipe '{entry['name']}' step '{step.get('label')}': export profile "
+                    f"'{step.get('export_profile_name')}' not found -- step skipped."
+                )
+                continue
+            steps_in.append((step.get("label", ""), profile_id))
+
+        existing = (await tenant_db.execute(select(ExportRecipe).where(ExportRecipe.name == entry["name"]))).scalar_one_or_none()
+        if existing is None:
+            existing = ExportRecipe(name=entry["name"], created_by=updated_by)
+            tenant_db.add(existing)
+            result.bump("export recipes")
+        else:
+            result.bump("export recipes (updated)")
+        existing.steps = [
+            ExportRecipeStep(step_order=i, label=label, export_profile_id=profile_id) for i, (label, profile_id) in enumerate(steps_in)
+        ]
+        result.bump("export recipe steps", len(steps_in))
+        await tenant_db.flush()
 
     for entry in data.get("ticket_statuses", []):
         _, created = await _upsert_by_key(

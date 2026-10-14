@@ -533,30 +533,23 @@ see that section for what it does.
 
 ### Export Recipes
 
-A jq transform reshapes one export; it can't pull in a second,
-independently-scoped one. Export Recipes (its own sidebar item) is
-for when the output you need is assembled from several sources at
-once -- an OSCAL System Security Plan built from a Certification
-Package row, a Components register, and the Security Control register
-together, say (see
+A jq transform reshapes one export. Export Recipes runs several
+exports together and merges the results -- for an output that needs
+more than one source, like an OSCAL System Security Plan built from a
+Certification Package row, a Components register, and the Security
+Control register. See
 [`docs/compliance-templates/README.md`](compliance-templates/README.md)
-and
-[`docs/oscal-ssp-showcase.md`](oscal-ssp-showcase.md) for that exact
-walkthrough).
+and [`docs/oscal-ssp-showcase.md`](oscal-ssp-showcase.md) for that
+walkthrough.
 
-A recipe is a named, ordered list of steps. Each step picks an
-existing saved export profile (Ticket- or Asset-scoped, either one,
-freely mixed within the same recipe) and, optionally, its own jq
-filter Document -- overriding that profile's own saved filter for this
-step's purposes, not stacking with it. Running the recipe runs every
-step fresh, collects each one's result keyed by its own label into one
-object, then -- if an "assembly filter" Document is picked -- runs
-that one more time over the whole collected object to produce the
-final document. With no assembly filter set, the recipe's own output
-is just that collected `{label: value}` object as-is, still useful on
-its own for bundling several related exports into one download.
-Always downloads as JSON (an assembled, nested document doesn't flatten
-to CSV rows).
+A recipe is an ordered list of steps. Each step picks a saved export
+profile (ticket- or asset-scoped, freely mixed) and, optionally, its
+own jq filter -- overriding the profile's own saved filter, not
+stacking with it. Running the recipe runs every step, collects each
+result under its own label, then -- if you've picked an "assembly
+filter" -- runs that once more over the collected object to produce
+the final document. No assembly filter just means you get that
+collected object back as-is. Always downloads as JSON.
 
 ## Documents
 
