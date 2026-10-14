@@ -1,0 +1,18 @@
+Name,External ID,Control ID,Statement ID,Control Question
+AC.L1-3.1.1 Authorized Access Control,AC.L1-3.1.1,AC.L1-3.1.1,,"Limit information system access to authorized users, processes acting on behalf of authorized users, or devices (including other information systems)."
+AC.L1-3.1.2 Transaction & Function Control,AC.L1-3.1.2,AC.L1-3.1.2,,Limit information system access to the types of transactions and functions that authorized users are permitted to execute.
+AC.L1-3.1.20 External Connections,AC.L1-3.1.20,AC.L1-3.1.20,,Verify and control/limit connections to and use of external information systems.
+AC.L1-3.1.22 Control Public Information,AC.L1-3.1.22,AC.L1-3.1.22,,Control information posted or processed on publicly accessible information systems.
+IA.L1-3.5.1 Identification,IA.L1-3.5.1,IA.L1-3.5.1,,"Identify information system users, processes acting on behalf of users, or devices."
+IA.L1-3.5.2 Authentication,IA.L1-3.5.2,IA.L1-3.5.2,,"Authenticate (or verify) the identities of those users, processes, or devices, as a prerequisite to allowing access to organizational information systems."
+MP.L1-3.8.3 Media Disposal,MP.L1-3.8.3,MP.L1-3.8.3,,Sanitize or destroy information system media containing Federal Contract Information before disposal or release for reuse.
+PE.L1-3.10.1 Limit Physical Access,PE.L1-3.10.1,PE.L1-3.10.1,,"Limit physical access to organizational information systems, equipment, and the respective operating environments to authorized individuals."
+PE.L1-3.10.3 Escort Visitors,PE.L1-3.10.3,PE.L1-3.10.3,,Escort visitors and monitor visitor activity.
+PE.L1-3.10.4 Physical Access Logs,PE.L1-3.10.4,PE.L1-3.10.4,,Maintain audit logs of physical access.
+PE.L1-3.10.5 Manage Physical Access,PE.L1-3.10.5,PE.L1-3.10.5,,Control and manage physical access devices.
+SC.L1-3.13.1 Boundary Protection,SC.L1-3.13.1,SC.L1-3.13.1,,"Monitor, control, and protect organizational communications (i.e., information transmitted or received by organizational information systems) at the external boundaries and key internal boundaries of the information systems."
+SC.L1-3.13.5 Public-Access System Separation,SC.L1-3.13.5,SC.L1-3.13.5,,Implement subnetworks for publicly accessible system components that are physically or logically separated from internal networks.
+SI.L1-3.14.1 Flaw Remediation,SI.L1-3.14.1,SI.L1-3.14.1,,"Identify, report, and correct information and information system flaws in a timely manner."
+SI.L1-3.14.2 Malicious Code Protection,SI.L1-3.14.2,SI.L1-3.14.2,,Provide protection from malicious code at appropriate locations within organizational information systems.
+SI.L1-3.14.4 Update Malicious Code Protection,SI.L1-3.14.4,SI.L1-3.14.4,,Update malicious code protection mechanisms when new releases are available.
+SI.L1-3.14.5 System & File Scanning,SI.L1-3.14.5,SI.L1-3.14.5,,"Perform periodic scans of the information system and real-time scans of files from external sources as files are downloaded, opened, or executed."
