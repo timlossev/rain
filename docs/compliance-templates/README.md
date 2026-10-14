@@ -12,7 +12,7 @@ Three subfolders, by what you do with the file:
 |---|---|---|
 | `bundles/` | `.rain` config bundles | Admin > Config Bundles > Tenant > Import |
 | `transforms/` | `.jq` export transforms | Tickets/Assets > Export's "JSON transform (optional)" |
-| `data/` | Real register *data* (`.csv`), not config, plus the script that generates it | Assets > Import |
+| `data/` | Real register *data* (`.csv`), not config, plus the script that generates it -- see [`data/README.md`](data/README.md) for exactly what's ready to import as-is vs. what needs a script run first | Assets > Import |
 
 | File | Seeds | Why |
 |---|---|---|
