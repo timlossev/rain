@@ -721,8 +721,8 @@ input[type=checkbox] { width: auto; margin-right: 6px; }
 .field-w140 { flex: 0 0 140px; }
 .field-w160 { flex: 0 0 160px; }
 .field-narrow { flex: 0 0 200px; }
-.form-row { display: flex; gap: 16px; }
-.form-row > .field { flex: 1; }
+.form-row { display: flex; gap: 16px; margin-bottom: 16px; }
+.form-row > .field { flex: 1; margin-bottom: 0; }
 /* A form-row whose fields have unequal-height content (e.g. one field's
    label wraps to two lines, or one field is a multi-row textarea next to
    single-line inputs) reads as visually "floating" out of line with
@@ -1204,6 +1204,7 @@ table.calendar-grid th { text-align: center; padding: 6px; font-size: 0.72rem; c
    forcing the whole page to. */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+table:not(:last-child) { margin-bottom: 16px; }
 th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 th { color: var(--text-muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
 /* Column headers (thead th) specifically -- more specific than the bare
