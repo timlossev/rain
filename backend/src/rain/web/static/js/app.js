@@ -366,25 +366,37 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!previewModal) return;
       previewTitle.textContent = btn.dataset.docTitle || "";
       previewBody.innerHTML = "<p class=\"muted\">Loading...</p>";
-      // data-doc-full-view (optional): a "Full view" button under the
-      // preview, for a page with no other way to reach the full
-      // document (the client portal's Document Archive) -- omitted
+      // data-doc-full-view (optional): a button under the preview, for a
+      // page with no other way to reach the full document (the client
+      // portal's Document Archive, or -- labeled "Download" via data-
+      // doc-full-view-label -- the Trust Center tab, which has no full
+      // page to link to at all for a signed-out visitor) -- omitted
       // elsewhere (ticket/asset Linked Documents already has its own
       // separate "open document" pencil icon next to the trigger).
       if (previewActions && previewFullViewBtn) {
         if (btn.dataset.docFullView) {
           previewFullViewBtn.href = btn.dataset.docFullView;
+          previewFullViewBtn.textContent = btn.dataset.docFullViewLabel || "Full view";
           previewActions.hidden = false;
         } else {
           previewActions.hidden = true;
         }
       }
       previewModal.hidden = false;
+      // data-doc-preview-url/data-doc-download-url (optional): override
+      // the default /documents/{id}/... endpoints, which require_login
+      // and resolve the tenant from the session -- neither fits a
+      // signed-out Trust Center visitor, who fetches a public,
+      // shareable-only portal route instead (same docId value, just not
+      // a real document id in that case -- the doc_number already in
+      // data-doc-preview, since the portal route resolves by ref too).
+      const previewUrl = btn.dataset.docPreviewUrl || `/documents/${docId}/body-preview`;
+      const downloadUrl = btn.dataset.docDownloadUrl || `/documents/${docId}/download`;
       try {
-        const resp = await fetch(`/documents/${docId}/body-preview`);
+        const resp = await fetch(previewUrl);
         if (resp.status === 400) {
           previewModal.hidden = true;
-          window.open(`/documents/${docId}/download`, "_blank");
+          window.open(downloadUrl, "_blank");
           return;
         }
         previewBody.innerHTML = resp.ok ? await resp.text() : "<p class=\"muted\">Couldn't load preview.</p>";

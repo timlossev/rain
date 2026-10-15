@@ -649,6 +649,36 @@ async def portal_shared_document_download(tenant_slug: str, doc_ref: str):
     )
 
 
+@router.get("/{tenant_slug}/shared-documents/{doc_ref}/body-preview")
+async def portal_shared_document_body_preview(tenant_slug: str, doc_ref: str):
+    """Trust Center's own preview-modal fetch target -- same rendered-body
+    fragment rain.modules.documents.router.body_preview returns (so the
+    inline editor's Preview tab, the PDF export, and this all agree), but
+    public and shareable-only like portal_shared_document_download right
+    above, not require_login: a signed-out Trust Center visitor browsing
+    is_shareable documents should be able to preview one before
+    downloading it, same as every other document surface already lets a
+    signed-in user do."""
+    tenant = await _resolve_portal_tenant(tenant_slug)
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    async with tenant_session(tenant.schema_name) as tenant_db:
+        doc = await document_service.get_document_by_ref(tenant_db, doc_ref)
+        if doc is None or not doc.is_shareable:
+            raise HTTPException(status.HTTP_404_NOT_FOUND)
+        kind = textbody.body_kind(doc.filename)
+        if kind is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "This document type has no inline preview.")
+        try:
+            text = textbody.decode_body(document_storage.get_storage().read(doc.storage_key))
+        except FileNotFoundError:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Stored file is missing.")
+    if kind == "markdown":
+        return HTMLResponse(textbody.render_markdown(text))
+    escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return HTMLResponse(f"<pre class=\"doc-preview-text\">{escaped}</pre>")
+
+
 @router.get("/{tenant_slug}/shared-documents/download-all")
 async def portal_shared_documents_download_all(tenant_slug: str):
     """The Trust Center tab's "Bulk download" button -- every is_shareable

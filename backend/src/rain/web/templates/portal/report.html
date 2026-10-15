@@ -205,7 +205,9 @@
             {% for d in shareable_documents.items %}
             <tr>
               <td>{{ d.doc_number }}</td>
-              <td><a href="/portal/{{ tenant.slug }}/shared-documents/{{ d.doc_number }}/download">{{ d.title }}</a></td>
+              <td>
+                <button type="button" class="doc-link-preview-btn" data-doc-preview="{{ d.doc_number }}" data-doc-title="{{ d.doc_number }}: {{ d.title }}" data-doc-preview-url="/portal/{{ tenant.slug }}/shared-documents/{{ d.doc_number }}/body-preview" data-doc-download-url="/portal/{{ tenant.slug }}/shared-documents/{{ d.doc_number }}/download" data-doc-full-view="/portal/{{ tenant.slug }}/shared-documents/{{ d.doc_number }}/download" data-doc-full-view-label="Download" title="Preview">{{ d.title }}</button>
+              </td>
               <td class="muted">{{ d.updated_at.strftime("%Y-%m-%d %H:%M") if d.updated_at else "-" }}</td>
             </tr>
             {% endfor %}
@@ -375,7 +377,7 @@
       <div class="tab-panel" data-tab-panel="documents">
         <div class="table-scroll">
         <table>
-          <thead><tr><th>Number</th><th>Title</th><th>Updated</th></tr></thead>
+          <thead><tr><th>Number</th><th>Title</th><th>Tags</th><th>Updated</th></tr></thead>
           <tbody>
             {% for d in documents.items %}
             <tr>
@@ -383,10 +385,11 @@
               <td>
                 <button type="button" class="doc-link-preview-btn" data-doc-preview="{{ d.id }}" data-doc-title="{{ d.doc_number }}: {{ d.title }}" data-doc-full-view="/documents/{{ d.doc_number }}" title="Preview">{{ d.title }}</button>
               </td>
+              <td>{% for t in d.tags %}<span class="badge">{{ t }}</span> {% endfor %}</td>
               <td class="muted">{{ d.updated_at.strftime("%Y-%m-%d %H:%M") if d.updated_at else "-" }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="3" class="muted">No documents yet.</td></tr>
+            <tr><td colspan="4" class="muted">No documents yet.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -417,11 +420,13 @@
 {# Same reasoning as the ticket timeline modal above -- base.html's own
    copy of this is {% if ctx %}-gated and never renders here. Same ids
    as that one, so app.js's existing [data-doc-preview] handler (and
-   its data-doc-full-view "Full view" button support) wires up with no
-   portal-specific JS at all. Document Archive's own trigger is what
-   sets data-doc-full-view, since unlike ticket/asset Linked Documents
-   this page has no separate "open document" icon next to the preview
-   trigger. #}
+   its data-doc-full-view button support) wires up with no portal-
+   specific JS at all. Shared by both Document Archive (signed-in,
+   fetches the normal require_login'd /documents/... endpoints) and
+   Trust Center (signed-out visitors included, via data-doc-preview-url/
+   data-doc-download-url overriding those to the public, shareable-only
+   portal routes instead) -- rendered outside any {% if user %}/
+   anonymous_shared_only gate so it's available to either tab. #}
 <div class="modal-overlay" id="doc-preview-modal" hidden data-modal>
   <div class="modal-box modal-box-wide">
     <div class="modal-header">
