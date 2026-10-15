@@ -50,6 +50,38 @@ CEF, JSON, and Splunk-style key=value bodies with no per-source setup
 -- pointing whatever's already generating alerts at RAIN is enough to
 get started.
 
+## Framework coverage
+
+Frameworks with a dedicated starter template, control-set data, or
+export transformer in [`docs/compliance-templates/`](docs/compliance-templates/):
+
+| Framework | What RAIN ships for it |
+|---|---|
+| FedRAMP (Rev 5 Low/Moderate/High) | Real control-register baselines (424/688/791 controls), OSCAL System Security Plan assembly |
+| FedRAMP CR26 (2026 Consolidated Rules) | VER/OCR/SCN/Incident Report export transformers, SBOM/ConMon/crypto-module registers -- see [`docs/fedramp-cr26-showcase.md`](docs/fedramp-cr26-showcase.md) and [`docs/cr26-coverage-showcase.md`](docs/cr26-coverage-showcase.md) |
+| NIST SP 800-53 Rev 5 | Same control register, independent of FedRAMP's own packaging |
+| ISO/IEC 27001:2022 | 93-control Annex A data set |
+| SOC 2 Type II | 60-control data set across all five Trust Services Criteria |
+| CMMC Levels 1-3 | 134 practices total (17 + 110 + 24), NIST SP 800-171/800-172-derived |
+
+Everywhere else, RAIN's case for compliance is
+[`docs/itsm-controls-mapping.md`](docs/itsm-controls-mapping.md)'s
+argument: change/incident/access/personnel tickets and a CMDB are the
+evidentiary artifact these frameworks actually require, regardless of
+which control ID names it -- covering PCI-DSS v4.0, SOX ITGC, Germany's
+BSI IT-Grundschutz, France's ANSSI SecNumCloud, the Netherlands' BIO,
+Spain's ENS, Poland's KSC/NIS2, Canada's ITSG-33/GC PBMM and OSFI B-13,
+Singapore's MAS TRM, Japan's METI/FISC guidelines, and Australia's
+Essential Eight/ISM, all without a framework-specific template.
+[`docs/eucs-compliance-assessment.md`](docs/eucs-compliance-assessment.md)
+gives the EU's still-draft EUCS scheme the same domain-by-domain
+treatment -- RAIN is self-hosted infrastructure a cloud provider could
+use as evidence, never the thing EUCS itself certifies. Germany's
+C5:2026 catalogue ships only as an extraction script
+(`docs/compliance-templates/data/extract_c5_controls.py`), not a
+redistributable CSV -- the catalogue's CC BY-ND license doesn't permit
+distributing an adapted copy.
+
 ## Capabilities
 
 - Landing page shows a welcome message, or a flagged document
