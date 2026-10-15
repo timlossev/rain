@@ -267,24 +267,27 @@ time reloads this page with the error instead of downloading anything.
 
 ### Import (tickets)
 
-Records Authority > Import. Upload a CSV, JSON, Nessus `.nessus`, or
-OpenVAS/GVM XML file, then map columns to Type, Title, Description,
-Severity, Dedup key, and any custom fields -- Type and Title required,
-the rest optional. Each row becomes an incident or vulnerability
-ticket; a Change row is rejected (a change needs an approval flow,
-which a spreadsheet can't express -- file those by hand). The result
-screen reports how many tickets were created (and, with a Dedup key,
-reopened or unchanged) and lists any per-row errors or warnings.
+Records Authority > Import. Upload a CSV, JSON, Nessus `.nessus`,
+OpenVAS/GVM XML, or Amazon Inspector JSON findings report, then map
+columns to Type, Title, Description, Severity, Dedup key, and any
+custom fields -- Type and Title required, the rest optional. Each row
+becomes an incident or vulnerability ticket; a Change row is rejected
+(a change needs an approval flow, which a spreadsheet can't express --
+file those by hand). The result screen reports how many tickets were
+created (and, with a Dedup key, reopened or unchanged) and lists any
+per-row errors or warnings.
 
 A Nessus `.nessus` file (the plain-XML scan export, not the proprietary
-Nessus DB format) or an OpenVAS/GVM XML export arrives pre-mapped
-either way: Info-level findings are dropped before becoming rows;
-everything else -- Type, Title, Description, Severity, Dedup key, and,
-if `docs/compliance-templates/bundles/vulnerability-scan-finding-fields.rain`
-is imported, the scanner metadata fields (vendor-neutral labels, so the
-same fields fill in for either scanner) -- is filled in and still
-reviewable. The template is optional; the import creates real, deduped
-vulnerability tickets either way.
+Nessus DB format), an OpenVAS/GVM XML export, or an Inspector JSON
+findings report (the console's CSV option isn't supported -- AWS
+doesn't publish a stable column list for it) arrives pre-mapped either
+way: Info/Informational-level findings are dropped before becoming
+rows; everything else -- Type, Title, Description, Severity, Dedup
+key, and, if `docs/compliance-templates/bundles/vulnerability-scan-
+finding-fields.rain` is imported, the scanner metadata fields (vendor-
+neutral labels, so the same fields fill in regardless of scanner) --
+is filled in and still reviewable. The template is optional; the
+import creates real, deduped vulnerability tickets either way.
 
 Dedup key makes re-running the same import safe on a recurring basis:
 map it to a column unique per row (a scan's own finding ID, or a

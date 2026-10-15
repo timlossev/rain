@@ -907,29 +907,37 @@ the same three-way create/leave-alone/reopen logic) rather than
 Nessus-specific parsing logic living inside a generic CSV/JSON
 importer that has no idea what a "plugin ID" is.
 
-**Native `.nessus`/OpenVAS-XML upload (`rain.modules.tickets.
-nessus_parser`/`.openvas_parser`) still respects that boundary -- neither
-lives inside the generic importer, they feed it.** `parse_nessus_rows`/
-`parse_openvas_rows` each turn their own scanner's export into the exact
-same flat `list[dict]` shape CSV/JSON already produce, dispatched via the
-same `fmt` parameter `sniff_headers`/`parse_rows` already branched on
-(`"nessus"`/`"openvas"` are just two more cases, same as `"json"`). The
-one thing that trick buys beyond "two more accepted formats": both
-parsers share one column list (`rain.modules.tickets.vuln_scan_columns.
-SCAN_COLUMNS`) deliberately named to exactly match this importer's own
-target labels ("Type", "Title", "Dedup key (optional)", ...) and
-`vulnerability-scan-finding-fields.rain`'s own field labels -- vendor-
-neutral ("Scanner check ID"/"Check name"/"Check family" rather than
-"Nessus plugin ID") specifically so the one template and the one set of
-custom fields covers a Nessus plugin or an OpenVAS/GVM NVT either way.
-`import_preview`'s existing case-insensitive exact-match auto-suggestion
-(written for arbitrary CSV headers, no changes needed) then wires up a
-fully pre-filled mapping screen for either format on its own. Either
-upload's dedup key and host+port+check-ID composite are synthesized by
-its own parser the same way (namespaced `nessus:`/`openvas:` so the two
-scanners' keys can't collide even against the same host); a CSV upload
-still needs that composed by hand ahead of time, per the paragraph
-above.
+**Native `.nessus`/OpenVAS-XML/Inspector-JSON upload (`rain.modules.
+tickets.nessus_parser`/`.openvas_parser`/`.inspector_parser`) still
+respects that boundary -- none of the three lives inside the generic
+importer, they feed it.** `parse_nessus_rows`/`parse_openvas_rows`/
+`parse_inspector_rows` each turn their own source's export into the
+exact same flat `list[dict]` shape CSV/JSON already produce, dispatched
+via the same `fmt` parameter `sniff_headers`/`parse_rows` already
+branched on (`"nessus"`/`"openvas"`/`"inspector"` are just three more
+cases, same as `"json"`). The one thing that trick buys beyond "three
+more accepted formats": all three parsers share one column list
+(`rain.modules.tickets.vuln_scan_columns.SCAN_COLUMNS`) deliberately
+named to exactly match this importer's own target labels ("Type",
+"Title", "Dedup key (optional)", ...) and `vulnerability-scan-finding-
+fields.rain`'s own field labels -- vendor-neutral ("Scanner check ID"/
+"Check name"/"Check family" rather than "Nessus plugin ID")
+specifically so the one template and the one set of custom fields
+covers a Nessus plugin, an OpenVAS/GVM NVT, or an Inspector CVE/finding
+type either way. `import_preview`'s existing case-insensitive
+exact-match auto-suggestion (written for arbitrary CSV headers, no
+changes needed) then wires up a fully pre-filled mapping screen for any
+of the three on its own. Each upload's dedup key is synthesized by its
+own parser the same way (namespaced `nessus:`/`openvas:`/`inspector:`
+so no two sources' keys can collide even against the same host) --
+Inspector's own `findingArn` is already a stable, globally unique id on
+its own, unlike Nessus/OpenVAS's synthesized host+port+check-ID
+composite, which still needs that built by hand ahead of a CSV upload,
+per the paragraph above. Inspector's CSV export is deliberately not
+supported -- AWS documents it as an undocumented ~45-column subset with
+no published, stable header list, unlike the JSON export, which is
+fully specified by the Finding API shape `inspector_parser.py` reads
+directly.
 
 ## Document Repository
 

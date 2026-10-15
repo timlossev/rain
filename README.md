@@ -33,8 +33,8 @@ Scheme for Cloud Services. Custom asset types and ticket fields let
 RAIN adapt to any framework's paperwork with no code --
 [`docs/compliance-templates/`](docs/compliance-templates/) ships
 twenty ready-to-import `.rain` config bundles (a risk register, a
-vulnerability scan finding-fields set covering Nessus and OpenVAS/GVM
-alike, FedRAMP's 2026 quarterly reporting fields, a NIST 800-53 control
+vulnerability scan finding-fields set covering Nessus, OpenVAS/GVM, and
+Amazon Inspector alike, FedRAMP's 2026 quarterly reporting fields, a NIST 800-53 control
 register with an OSCAL export transformer, a Significant Change
 Notification export, an SBOM/software inventory register, a Continuous
 Monitoring submission register, and others) for registers most
@@ -80,7 +80,7 @@ get started.
 - Shareable documents ("Trust Center") for public-facing compliance proof
 - Global full-text search across tickets, documents, and assets
 - CSV/JSON/Excel import and export wherever records live, plus native
-  Nessus/OpenVAS vulnerability scan import straight into tickets
+  Nessus/OpenVAS/Amazon Inspector vulnerability scan import straight into tickets
 - Branded PDF export for tickets and documents
 - Export/import platform and tenant configuration as a `.rain` config
   bundle, for cloning a setup onto another instance or seeding one from

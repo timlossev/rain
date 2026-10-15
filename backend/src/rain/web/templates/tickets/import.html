@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Import Tickets - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Upload a CSV, JSON, or vulnerability scan export (Nessus .nessus, or OpenVAS/GVM XML), then map its columns to ticket fields on the next screen (a scan export arrives pre-mapped, still reviewable there). Each row becomes a new incident or vulnerability - change tickets need an approval flow attached by hand, so they aren't importable here. A .nessus file is the plain-XML scan export ("File &gt; Export &gt; Nessus" on a completed scan), not the separate, proprietary Nessus DB transfer format. An OpenVAS/GVM export is the report's own XML format ("Report &gt; Download &gt; XML" in the GSA web UI, or the same shape from gvm-cli). Either way, Info-level findings are skipped, and each finding is looked up by a scan-derived dedup key, so re-uploading a later scan of the same hosts updates matching tickets instead of duplicating them.{% endblock %}
+{% block help_text %}Upload a CSV, JSON, or vulnerability scan export (Nessus .nessus, OpenVAS/GVM XML, or an Amazon Inspector findings report), then map its columns to ticket fields on the next screen (a scan export arrives pre-mapped, still reviewable there). Each row becomes a new incident or vulnerability - change tickets need an approval flow attached by hand, so they aren't importable here. A .nessus file is the plain-XML scan export ("File &gt; Export &gt; Nessus" on a completed scan), not the separate, proprietary Nessus DB transfer format. An OpenVAS/GVM export is the report's own XML format ("Report &gt; Download &gt; XML" in the GSA web UI, or the same shape from gvm-cli). An Inspector export is its JSON findings report (Findings &gt; All findings &gt; Export findings &gt; JSON, or the CreateFindingsReport API) - the CSV option isn't supported, since AWS doesn't publish a stable column list for it. Either way, Info-level findings are skipped, and each finding is looked up by a scan-derived dedup key, so re-uploading a later scan of the same hosts updates matching tickets instead of duplicating them.{% endblock %}
 {% block content %}
 <div class="card" style="max-width:560px;">
   <form method="post" action="/tickets/import/preview" enctype="multipart/form-data">
@@ -11,6 +11,7 @@
         <option value="json">JSON (array of objects)</option>
         <option value="nessus">Nessus scan export (.nessus)</option>
         <option value="openvas">OpenVAS / GVM scan export (.xml)</option>
+        <option value="inspector">Amazon Inspector findings report (.json)</option>
       </select>
     </div>
     <div class="field">
