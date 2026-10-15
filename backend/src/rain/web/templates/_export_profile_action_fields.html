@@ -1,0 +1,37 @@
+{#
+  Shared by tickets/export.html and assets/export.html -- what happens
+  to these column/format/destination settings as a saved ExportProfile,
+  as one choice alongside (not a separate action from) actually running
+  the export: don't save, update the profile that's currently loaded
+  (selected_profile_id), or save them as a brand new one. Submitting the
+  form always runs the export per _export_destination_fields.html's own
+  choice; this just additionally writes/updates a profile first.
+
+  Usage: {% include "_export_profile_action_fields.html" %} inside a
+  <form>, anywhere before the submit button.
+#}
+<div data-pill-scope>
+  <div class="field">
+    <label>Save these settings as a profile?</label>
+    <div class="pill-radio-group" data-pill-select>
+      <label class="type-pill pill-radio">
+        <input type="radio" name="profile_action" value="none" checked> Don't save
+      </label>
+      {% if selected_profile_id %}
+      <label class="type-pill pill-radio">
+        <input type="radio" name="profile_action" value="update"> Update "{{ selected_profile_name }}"
+      </label>
+      {% endif %}
+      <label class="type-pill pill-radio">
+        <input type="radio" name="profile_action" value="save_new"> Save as a new profile
+      </label>
+    </div>
+  </div>
+
+  <div class="form-section" data-action-fields="save_new">
+    <div class="field" style="max-width:360px;">
+      <label for="save_as">Profile name</label>
+      <input type="text" id="save_as" name="save_as" placeholder="e.g. Servers - quarterly audit">
+    </div>
+  </div>
+</div>

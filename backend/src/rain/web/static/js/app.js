@@ -760,7 +760,14 @@ document.addEventListener("DOMContentLoaded", () => {
   // multiple-instances reason as data-action-type-select.
   document.querySelectorAll("[data-pill-select]").forEach((group) => {
     const radios = group.querySelectorAll("input[type=radio]");
-    const scope = group.closest("form") || document;
+    // [data-pill-scope] (optional) narrows this to a wrapper tighter than
+    // the whole form -- needed the moment a single form has *two*
+    // independent pill groups (e.g. export's own "Destination" pills
+    // alongside a "Save as profile" pill group): without it, each
+    // group's sync would also toggle the other's [data-action-fields]
+    // panels against its own value, hiding them incorrectly. Falls back
+    // to the old form-wide scope for every existing single-group page.
+    const scope = group.closest("[data-pill-scope]") || group.closest("form") || document;
     const fieldGroups = scope.querySelectorAll("[data-action-fields]");
     if (!radios.length || !fieldGroups.length) return;
     const syncPillFields = () => {

@@ -648,7 +648,7 @@ async def export_run(
     fmt: str = Form("csv"),
     save_as: str = Form(""),
     profile_id: str = Form(""),
-    intent: str = Form("export"),
+    profile_action: str = Form("none"),
     destination_mode: str = Form("download"),
     destination_document_id: str = Form(""),
     destination_title: str = Form(""),
@@ -676,8 +676,8 @@ async def export_run(
     destination_document_id_val = int(destination_document_id) if destination_document_id.strip() else None
     loaded_profile_id = int(profile_id) if profile_id.strip() else None
 
-    if intent == "update_profile":
-        existing = await service.get_export_profile(tenant_db, loaded_profile_id) if loaded_profile_id else None
+    if profile_action == "update" and loaded_profile_id:
+        existing = await service.get_export_profile(tenant_db, loaded_profile_id)
         if existing is None:
             context = await _export_form_context(
                 tenant_db,
@@ -703,10 +703,6 @@ async def export_run(
             destination_title=destination_title.strip() or None,
             destination_is_shareable=destination_is_shareable,
         )
-        return RedirectResponse(
-            f"/assets/export?profile_id={existing.id}&asset_type_id={type_id or ''}&ok=1",
-            status_code=status.HTTP_303_SEE_OTHER,
-        )
 
     # xlsx is binary -- see tickets/router.py's export_run, same reasoning.
     if save_to_document and fmt == "xlsx":
@@ -728,7 +724,7 @@ async def export_run(
 
     rows = await exporter.build_rows(tenant_db, asset_type_id=type_id, columns=columns)
 
-    if save_as.strip():
+    if profile_action == "save_new" and save_as.strip():
         await service.save_export_profile(
             tenant_db,
             name=save_as.strip(),

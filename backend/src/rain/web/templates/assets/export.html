@@ -4,28 +4,15 @@
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 <div class="card">
-  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
-  <div class="form-row">
-    <form method="get" action="/assets/export" class="field" style="margin-bottom:0;">
-      <label for="asset_type_id">Asset type (columns update to match)</label>
-      <select id="asset_type_id" name="asset_type_id" onchange="this.form.submit()">
-        <option value="">All types (built-in columns only)</option>
-        {% for t in asset_types %}
-        <option value="{{ t.id }}" {% if selected_type == t.id %}selected{% endif %}>{{ t.name }}</option>
-        {% endfor %}
-      </select>
-    </form>
-    <form method="get" action="/assets/export" class="field" style="margin-bottom:0;">
-      <input type="hidden" name="asset_type_id" value="{{ selected_type or '' }}">
-      <label for="profile_id">Load a saved profile</label>
-      <select id="profile_id" name="profile_id" onchange="this.form.submit()">
-        <option value="">Start from scratch</option>
-        {% for p in profiles %}
-        <option value="{{ p.id }}" {% if selected_profile_id == p.id %}selected{% endif %}>{{ p.name }}</option>
-        {% endfor %}
-      </select>
-    </form>
-  </div>
+  <form method="get" action="/assets/export" class="field" style="max-width:360px;">
+    <label for="asset_type_id">Asset type (columns update to match)</label>
+    <select id="asset_type_id" name="asset_type_id" onchange="this.form.submit()">
+      <option value="">All types (built-in columns only)</option>
+      {% for t in asset_types %}
+      <option value="{{ t.id }}" {% if selected_type == t.id %}selected{% endif %}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </form>
 
   {% if profiles %}
   <table style="margin-top:16px;">
@@ -51,6 +38,7 @@
 </div>
 
 <div class="card">
+  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
   <form method="post" action="/assets/export" enctype="multipart/form-data">
     <input type="hidden" name="asset_type_id" value="{{ selected_type or '' }}">
     <input type="hidden" name="profile_id" value="{{ selected_profile_id or '' }}">
@@ -69,18 +57,11 @@
 
     {% include "_jq_transform_fields.html" %}
 
+    <h3>Output</h3>
     {% include "_export_destination_fields.html" %}
+    {% include "_export_profile_action_fields.html" %}
 
-    <div class="field" style="max-width:360px;">
-      <label for="save_as">Save as a new profile</label>
-      <input type="text" id="save_as" name="save_as" placeholder="e.g. Servers - quarterly audit">
-      <div class="field-hint">Optional - reuse this column layout next time instead of rebuilding it.</div>
-    </div>
-
-    <button class="btn btn-primary" type="submit" name="intent" value="export">Export</button>
-    {% if selected_profile_id %}
-    <button class="btn" type="submit" name="intent" value="update_profile">Update "{{ selected_profile_name }}" with these settings</button>
-    {% endif %}
+    <button class="btn btn-primary" type="submit" style="margin-top:16px;">Run export</button>
   </form>
 </div>
 {% endblock %}

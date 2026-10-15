@@ -3,22 +3,9 @@
 {% block help_text %}Export tickets to CSV, JSON, or Excel. Filter by type/status, and choose which columns to include, their header text, and their order - the same column set used across the app's exports. Save the layout as a reusable profile, or load one you saved before. Need several exports combined into one document? See Export Recipes.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
+{% if profiles %}
 <div class="card">
-  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
-  <form method="get" action="/tickets/export/run">
-    <div class="field" style="max-width:360px; margin-bottom:0;">
-      <label for="profile_id">Load a saved profile</label>
-      <select id="profile_id" name="profile_id" onchange="this.form.submit()">
-        <option value="">Start from scratch</option>
-        {% for p in profiles %}
-        <option value="{{ p.id }}" {% if selected_profile_id == p.id %}selected{% endif %}>{{ p.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-  </form>
-
-  {% if profiles %}
-  <table style="margin-top:16px;">
+  <table>
     <thead><tr><th>Saved profile</th><th>Format</th><th>Columns</th><th></th></tr></thead>
     <tbody>
       {% for p in profiles %}
@@ -37,10 +24,11 @@
     </tbody>
   </table>
   <p class="field-hint">Need one document built from several of these at once? <a href="/export-recipes">Export Recipes</a> runs them together and merges the results.</p>
-  {% endif %}
 </div>
+{% endif %}
 
 <div class="card">
+  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
   <form method="post" action="/tickets/export/run" enctype="multipart/form-data">
     <input type="hidden" name="profile_id" value="{{ selected_profile_id or '' }}">
     <div class="form-row">
@@ -72,18 +60,11 @@
 
     {% include "_jq_transform_fields.html" %}
 
+    <h3>Output</h3>
     {% include "_export_destination_fields.html" %}
+    {% include "_export_profile_action_fields.html" %}
 
-    <div class="form-row" style="margin-top:16px;">
-      <div class="field">
-        <label for="save_as">Save as a new reusable profile (optional)</label>
-        <input type="text" id="save_as" name="save_as" placeholder="e.g. Change window audit">
-      </div>
-    </div>
-    <button class="btn btn-primary" type="submit" name="intent" value="export">Export</button>
-    {% if selected_profile_id %}
-    <button class="btn" type="submit" name="intent" value="update_profile">Update "{{ selected_profile_name }}" with these settings</button>
-    {% endif %}
+    <button class="btn btn-primary" type="submit" style="margin-top:16px;">Run export</button>
   </form>
 </div>
 {% endblock %}

@@ -17,30 +17,32 @@
   <form>, after the Format select.
 #}
 {% import "_search_picker.html" as picker %}
-<div class="field">
-  <label>Destination</label>
-  <div class="pill-radio-group" data-pill-select>
-    <label class="type-pill pill-radio">
-      <input type="radio" name="destination_mode" value="download" {% if not selected_save_to_document %}checked{% endif %}>
-      Download file
-    </label>
-    <label class="type-pill pill-radio">
-      <input type="radio" name="destination_mode" value="save_to_document" {% if selected_save_to_document %}checked{% endif %}>
-      Save to a Document
-    </label>
+<div data-pill-scope>
+  <div class="field">
+    <label>Destination</label>
+    <div class="pill-radio-group" data-pill-select>
+      <label class="type-pill pill-radio">
+        <input type="radio" name="destination_mode" value="download" {% if not selected_save_to_document %}checked{% endif %}>
+        Download file
+      </label>
+      <label class="type-pill pill-radio">
+        <input type="radio" name="destination_mode" value="save_to_document" {% if selected_save_to_document %}checked{% endif %}>
+        Save to a Document
+      </label>
+    </div>
+    <div class="field-hint">Save to a Document supports CSV and JSON only.</div>
   </div>
-  <div class="field-hint">Save to a Document supports CSV and JSON only.</div>
-</div>
 
-<div class="form-section" data-action-fields="save_to_document">
-  <div class="form-section-title">Document destination</div>
-  {{ picker.search_picker("destination_document_id", "/documents/search", label="Overwrite an existing document", initial_value=selected_destination_document_id, initial_label=selected_destination_document_label, placeholder="Search documents...") }}
-  <div class="field">
-    <label for="destination_title">...or title for a new one (if no document is picked above)</label>
-    <input type="text" id="destination_title" name="destination_title" value="{{ selected_destination_title }}" placeholder="e.g. FedRAMP Ongoing Certification Report">
-  </div>
-  <div class="field">
-    <label class="checkbox-row"><input type="checkbox" name="destination_is_shareable" {% if selected_destination_is_shareable %}checked{% endif %}> Flag as Trust Center (public)</label>
-    <div class="field-hint">A saved profile used from Calendar needs a document picked above -- a scheduled run always overwrites it.</div>
+  <div class="form-section" data-action-fields="save_to_document">
+    <div class="form-section-title">Document destination</div>
+    {{ picker.search_picker("destination_document_id", "/documents/search", label="Overwrite an existing document", initial_value=selected_destination_document_id, initial_label=selected_destination_document_label, placeholder="Search documents...") }}
+    <div class="field">
+      <label for="destination_title">...or title for a new one (if no document is picked above)</label>
+      <input type="text" id="destination_title" name="destination_title" value="{{ selected_destination_title }}" placeholder="e.g. FedRAMP Ongoing Certification Report">
+    </div>
+    <div class="field">
+      <label class="checkbox-row"><input type="checkbox" name="destination_is_shareable" {% if selected_destination_is_shareable %}checked{% endif %}> Flag as Trust Center (public)</label>
+      <div class="field-hint">A saved profile used from Calendar needs a document picked above -- a scheduled run always overwrites it.</div>
+    </div>
   </div>
 </div>
