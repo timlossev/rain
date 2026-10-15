@@ -126,16 +126,27 @@ async def get_active_tenant(
 ) -> Tenant | None:
     """`client` users are pinned to their one tenant. `internal_admin` users
     carry their current selection on the session row (set by the tenant
-    switcher) and may have none selected yet."""
+    switcher) and may have none selected yet.
+
+    Resolved fresh from the database on every request, with no caching
+    anywhere in between -- which is what makes a deactivated tenant
+    (`Tenant.is_active`) take effect immediately for anyone already
+    mid-session with it selected, not just at their next login. Treated
+    the same as "no tenant selected" (None) rather than handing back the
+    inactive row: a client falls into TenantRequiredError's existing
+    "contact your administrator" page, and an internal_admin gets bounced
+    to the tenant switcher to pick a different one."""
     if not user.is_internal_admin:
         if user.home_tenant_id is None:
             return None
-        return await control_db.get(Tenant, user.home_tenant_id)
+        tenant = await control_db.get(Tenant, user.home_tenant_id)
+        return tenant if tenant is not None and tenant.is_active else None
 
     session_row: SessionRow | None = getattr(request.state, "session_row", None)
     if session_row is None or session_row.active_tenant_id is None:
         return None
-    return await control_db.get(Tenant, session_row.active_tenant_id)
+    tenant = await control_db.get(Tenant, session_row.active_tenant_id)
+    return tenant if tenant is not None and tenant.is_active else None
 
 
 async def require_active_tenant(tenant: Tenant | None = Depends(get_active_tenant)) -> Tenant:
@@ -177,7 +188,7 @@ async def resolve_ws_tenant_schema(cookie_token: str | None) -> tuple[CurrentUse
         if tenant_id is None:
             return None
         tenant = await control_db.get(Tenant, tenant_id)
-        if tenant is None:
+        if tenant is None or not tenant.is_active:
             return None
 
         return current_user, tenant.schema_name

@@ -2,7 +2,7 @@
 {% import "_pagination.html" as pg with context %}
 {% import "_modal.html" as modal %}
 {% block title %}Tenants - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Manage tenants (customer organizations), each with its own isolated database schema. Internal admins can switch their active tenant from here.{% endblock %}
+{% block help_text %}Manage tenants (customer organizations), each with its own isolated database schema. Internal admins can switch their active tenant from here. Deactivating a tenant blocks it immediately, even for someone already mid-session with it selected -- a client sees a "contact your administrator" page, an internal admin gets bounced back to this list.{% endblock %}
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 <div class="panel-row" style="justify-content:flex-end;">
@@ -18,7 +18,15 @@
         <td>{{ tenant.name }}</td>
         <td>{{ tenant.slug }}</td>
         <td class="muted">{{ tenant.schema_name }}</td>
-        <td>{% if tenant.is_active %}<span class="badge badge-accent">active</span>{% else %}<span class="badge">inactive</span>{% endif %}</td>
+        <td>
+          <form method="post" action="/admin/tenants/{{ tenant.id }}/toggle" class="inline" style="display:flex; align-items:center; gap:8px;">
+            <label class="switch" title="{{ 'Deactivate' if tenant.is_active else 'Activate' }} {{ tenant.name }}">
+              <input type="checkbox" {% if tenant.is_active %}checked{% endif %} onchange="this.form.submit()">
+              <span class="switch-slider"></span>
+            </label>
+            <span class="muted">{{ "active" if tenant.is_active else "inactive" }}</span>
+          </form>
+        </td>
         <td class="actions">
           {% if ctx.user.is_internal_admin %}
           <form class="inline" method="post" action="/admin/tenants/switch">

@@ -19,7 +19,10 @@
         <td>{{ u.display_name }}</td>
         <td>{{ u.email }}</td>
         <td><span class="badge">{{ u.role_key }}</span></td>
-        <td class="muted">{{ u.tenant.name if u.tenant else "-" }}</td>
+        <td class="muted">
+          {{ u.tenant.name if u.tenant else "-" }}
+          {% if u.tenant and not u.tenant.is_active %}<span class="badge badge-danger" title="This tenant is deactivated -- {{ u.email }} can't sign in until it's reactivated.">disabled</span>{% endif %}
+        </td>
         <td>{% if u.auth_source == "ldap" %}<span class="badge">LDAP</span>{% else %}<span class="muted">local</span>{% endif %}</td>
         <td>{% if u.is_active %}<span class="badge badge-accent">active</span>{% else %}<span class="badge">disabled</span>{% endif %}</td>
         <td class="muted">{{ u.last_login_at.strftime("%Y-%m-%d %H:%M") if u.last_login_at else "never" }}</td>

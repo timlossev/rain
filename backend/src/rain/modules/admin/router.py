@@ -349,6 +349,22 @@ async def switch_tenant(request: Request, tenant_id: int = Form(...), _: Current
     return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.post("/tenants/{tenant_id:int}/toggle")
+async def toggle_tenant(tenant_id: int, _: CurrentUser = Depends(require_internal_admin)):
+    # No session to invalidate here -- rain.core.tenancy.get_active_tenant
+    # re-checks Tenant.is_active fresh on every request, so flipping this
+    # off takes effect immediately for anyone already mid-session with
+    # this tenant selected (an internal_admin gets bounced to this same
+    # list, a client lands on the "contact your administrator" page) --
+    # not just at their next login.
+    async with control_session() as session:
+        tenant = await session.get(Tenant, tenant_id)
+        if tenant is not None:
+            tenant.is_active = not tenant.is_active
+            await session.commit()
+    return RedirectResponse("/admin/tenants", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.get("/users", response_class=HTMLResponse)
 async def users_list(
     request: Request,
