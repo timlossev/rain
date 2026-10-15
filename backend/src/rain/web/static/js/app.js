@@ -358,12 +358,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const previewModal = document.querySelector("#doc-preview-modal");
   const previewBody = document.querySelector("#doc-preview-body");
   const previewTitle = document.querySelector("#doc-preview-title");
+  const previewActions = document.querySelector("#doc-preview-actions");
+  const previewFullViewBtn = document.querySelector("#doc-preview-full-view-btn");
   document.querySelectorAll("[data-doc-preview]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const docId = btn.dataset.docPreview;
       if (!previewModal) return;
       previewTitle.textContent = btn.dataset.docTitle || "";
       previewBody.innerHTML = "<p class=\"muted\">Loading...</p>";
+      // data-doc-full-view (optional): a "Full view" button under the
+      // preview, for a page with no other way to reach the full
+      // document (the client portal's Document Archive) -- omitted
+      // elsewhere (ticket/asset Linked Documents already has its own
+      // separate "open document" pencil icon next to the trigger).
+      if (previewActions && previewFullViewBtn) {
+        if (btn.dataset.docFullView) {
+          previewFullViewBtn.href = btn.dataset.docFullView;
+          previewActions.hidden = false;
+        } else {
+          previewActions.hidden = true;
+        }
+      }
       previewModal.hidden = false;
       try {
         const resp = await fetch(`/documents/${docId}/body-preview`);

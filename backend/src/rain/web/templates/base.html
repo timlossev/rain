@@ -198,6 +198,15 @@
       <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
     </div>
     <div class="modal-body" id="doc-preview-body"><p class="muted">Loading...</p></div>
+    {# Persistent (not re-rendered when the body above is swapped per
+       document) -- only shown when the trigger carries data-doc-full-
+       view, e.g. the client portal's Document Archive, which has no
+       separate "open document" affordance next to the preview trigger
+       the way ticket/asset Linked Documents does (its own pencil-icon
+       link). #}
+    <div class="modal-actions" id="doc-preview-actions" hidden style="padding:0 18px 18px;">
+      <a class="btn btn-primary" id="doc-preview-full-view-btn" href="#">Full view</a>
+    </div>
   </div>
 </div>
 {# Shared by the ticket detail page's own "Analyze root cause" button and

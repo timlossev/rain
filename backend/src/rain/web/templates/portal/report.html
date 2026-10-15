@@ -379,8 +379,10 @@
           <tbody>
             {% for d in documents.items %}
             <tr>
-              <td><a href="/documents/{{ d.doc_number }}">{{ d.doc_number }}</a></td>
-              <td>{{ d.title }}</td>
+              <td>{{ d.doc_number }}</td>
+              <td>
+                <button type="button" class="doc-link-preview-btn" data-doc-preview="{{ d.id }}" data-doc-title="{{ d.doc_number }}: {{ d.title }}" data-doc-full-view="/documents/{{ d.doc_number }}" title="Preview">{{ d.title }}</button>
+              </td>
               <td class="muted">{{ d.updated_at.strftime("%Y-%m-%d %H:%M") if d.updated_at else "-" }}</td>
             </tr>
             {% else %}
@@ -410,6 +412,26 @@
       <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
     </div>
     <div class="modal-body" id="ticket-timeline-body"><p class="muted">Loading...</p></div>
+  </div>
+</div>
+{# Same reasoning as the ticket timeline modal above -- base.html's own
+   copy of this is {% if ctx %}-gated and never renders here. Same ids
+   as that one, so app.js's existing [data-doc-preview] handler (and
+   its data-doc-full-view "Full view" button support) wires up with no
+   portal-specific JS at all. Document Archive's own trigger is what
+   sets data-doc-full-view, since unlike ticket/asset Linked Documents
+   this page has no separate "open document" icon next to the preview
+   trigger. #}
+<div class="modal-overlay" id="doc-preview-modal" hidden data-modal>
+  <div class="modal-box modal-box-wide">
+    <div class="modal-header">
+      <span id="doc-preview-title"></span>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="doc-preview-body"><p class="muted">Loading...</p></div>
+    <div class="modal-actions" id="doc-preview-actions" hidden style="padding:0 18px 18px;">
+      <a class="btn btn-primary" id="doc-preview-full-view-btn" href="#">Full view</a>
+    </div>
   </div>
 </div>
 {% endblock %}
