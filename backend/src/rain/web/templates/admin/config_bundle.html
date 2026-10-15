@@ -1,108 +1,96 @@
 {% extends "base.html" %}
 {% block title %}Config Bundles - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}Export/import configuration as a .rain (JSON) file. Platform (instance-wide: branding, SMTP, LDAP/SAML, syslog routing) and tenant (this tenant's own: statuses, groups/users, channels, webhooks, approval flows, event/response rules, asset types, custom fields, Service Catalog) are independent - import either without the other. No ticket/asset/document data either way; a reference to one specific document is skipped on export, noted in the result. Secrets (passwords, webhook config) are redacted unless "Include secrets" is checked - local users only import with it on. Re-importing upserts by name/key instead of duplicating; an existing local user is never overwritten.{% endblock %}
+{% block help_text %}Export/import configuration as a .rain (JSON) file. Platform and tenant are independent - import either without the other. No ticket/asset/document data either way; a reference to one specific document is skipped on export, noted in the result. Secrets (passwords, webhook config) are redacted unless "Include secrets" is checked - local users only import with it on. Re-importing upserts by name/key instead of duplicating; an existing local user is never overwritten.{% endblock %}
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
-{% set inner_import_active = 'tenant' if (tenant_result is not none or not ctx.user.is_internal_admin) else 'platform' %}
 
-<div class="card" data-tabs>
-  <div class="tab-buttons">
-    <button type="button" class="tab-btn active" data-tab-btn="import">Import</button>
-    <button type="button" class="tab-btn" data-tab-btn="export">Export</button>
-  </div>
+<div class="two-col-cards">
 
-  <div class="tab-panel active" data-tab-panel="import">
-    <div data-tabs>
-      <div class="tab-buttons">
-        {% if ctx.user.is_internal_admin %}
-        <button type="button" class="tab-btn{{ ' active' if inner_import_active == 'platform' }}" data-tab-btn="import-platform">Platform</button>
-        {% endif %}
-        <button type="button" class="tab-btn{{ ' active' if inner_import_active == 'tenant' }}" data-tab-btn="import-tenant">Tenant</button>
-      </div>
+  {% if ctx.user.is_internal_admin %}
+  <div class="card" data-tabs>
+    <div class="card-title">Platform</div>
+    <p class="field-hint">Instance-wide: branding, SMTP, LDAP/SAML, syslog routing.</p>
 
-      {% if ctx.user.is_internal_admin %}
-      <div class="tab-panel{{ ' active' if inner_import_active == 'platform' }}" data-tab-panel="import-platform">
-        <form method="post" action="/admin/config-bundle/platform/import" enctype="multipart/form-data">
-          <div class="field">
-            <label for="platform_bundle_file">Bundle file</label>
-            <input type="file" id="platform_bundle_file" name="bundle_file" accept="application/json,.json,.rain" required>
-          </div>
-          <button class="btn btn-primary" type="submit">Import platform bundle</button>
-        </form>
-        {% if platform_result %}
-        <div style="margin-top:16px;">
-          <p>
-            {% for category, n in platform_result.counts.items() %}<span class="badge badge-accent">{{ n }} {{ category }}</span> {% endfor %}
-            {% if not platform_result.counts %}<span class="muted">Nothing applied.</span>{% endif %}
-          </p>
-          {% if platform_result.warnings %}
-          <h3>Warnings</h3>
-          <ul>{% for w in platform_result.warnings %}<li class="muted">{{ w }}</li>{% endfor %}</ul>
-          {% endif %}
+    <div class="tab-buttons">
+      <button type="button" class="tab-btn active" data-tab-btn="platform-import">Import</button>
+      <button type="button" class="tab-btn" data-tab-btn="platform-export">Export</button>
+    </div>
+
+    <div class="tab-panel active" data-tab-panel="platform-import">
+      <form method="post" action="/admin/config-bundle/platform/import" enctype="multipart/form-data">
+        <div class="field">
+          <label for="platform_bundle_file">Bundle file</label>
+          <input type="file" id="platform_bundle_file" name="bundle_file" accept="application/json,.json,.rain" required>
         </div>
+        <button class="btn btn-primary" type="submit">Import platform bundle</button>
+      </form>
+      {% if platform_result %}
+      <div style="margin-top:16px;">
+        <p>
+          {% for category, n in platform_result.counts.items() %}<span class="badge badge-accent">{{ n }} {{ category }}</span> {% endfor %}
+          {% if not platform_result.counts %}<span class="muted">Nothing applied.</span>{% endif %}
+        </p>
+        {% if platform_result.warnings %}
+        <h3>Warnings</h3>
+        <ul>{% for w in platform_result.warnings %}<li class="muted">{{ w }}</li>{% endfor %}</ul>
         {% endif %}
       </div>
       {% endif %}
+    </div>
 
-      <div class="tab-panel{{ ' active' if inner_import_active == 'tenant' }}" data-tab-panel="import-tenant">
-        {% if not ctx.active_tenant %}
-        <p class="muted">Select a tenant (Admin &gt; Tenants &gt; Switch to) first.</p>
-        {% else %}
-        <form method="post" action="/admin/config-bundle/tenant/import" enctype="multipart/form-data">
-          <div class="field">
-            <label for="tenant_bundle_file">Bundle file for {{ ctx.active_tenant.name }}</label>
-            <input type="file" id="tenant_bundle_file" name="bundle_file" accept="application/json,.json,.rain" required>
-          </div>
-          <button class="btn btn-primary" type="submit">Import tenant bundle</button>
-        </form>
-        {% if tenant_result %}
-        <div style="margin-top:16px;">
-          <p>
-            {% for category, n in tenant_result.counts.items() %}<span class="badge badge-accent">{{ n }} {{ category }}</span> {% endfor %}
-            {% if not tenant_result.counts %}<span class="muted">Nothing applied.</span>{% endif %}
-          </p>
-          {% if tenant_result.warnings %}
-          <h3>Warnings</h3>
-          <ul>{% for w in tenant_result.warnings %}<li class="muted">{{ w }}</li>{% endfor %}</ul>
-          {% endif %}
-        </div>
-        {% endif %}
-        {% endif %}
-      </div>
+    <div class="tab-panel" data-tab-panel="platform-export">
+      <form method="post" action="/admin/config-bundle/platform/export">
+        <label class="checkbox-row"><input type="checkbox" name="include_secrets" value="true"> Include secrets</label>
+        <div class="field-hint">SMTP/LDAP passwords. Off by default.</div>
+        <button class="btn btn-primary" type="submit" style="margin-top:8px;">Export platform bundle</button>
+      </form>
     </div>
   </div>
+  {% endif %}
 
-  <div class="tab-panel" data-tab-panel="export">
-    <div data-tabs>
-      <div class="tab-buttons">
-        {% if ctx.user.is_internal_admin %}
-        <button type="button" class="tab-btn active" data-tab-btn="export-platform">Platform</button>
+  <div class="card" data-tabs>
+    <div class="card-title">Tenant</div>
+    <p class="field-hint">This tenant's own: statuses, groups/users, channels, webhooks, approval flows, event/response rules, asset types, custom fields, Service Catalog.</p>
+
+    {% if not ctx.active_tenant %}
+    <p class="muted">Select a tenant (Admin &gt; Tenants &gt; Switch to) first.</p>
+    {% else %}
+    <div class="tab-buttons">
+      <button type="button" class="tab-btn active" data-tab-btn="tenant-import">Import</button>
+      <button type="button" class="tab-btn" data-tab-btn="tenant-export">Export</button>
+    </div>
+
+    <div class="tab-panel active" data-tab-panel="tenant-import">
+      <form method="post" action="/admin/config-bundle/tenant/import" enctype="multipart/form-data">
+        <div class="field">
+          <label for="tenant_bundle_file">Bundle file for {{ ctx.active_tenant.name }}</label>
+          <input type="file" id="tenant_bundle_file" name="bundle_file" accept="application/json,.json,.rain" required>
+        </div>
+        <button class="btn btn-primary" type="submit">Import tenant bundle</button>
+      </form>
+      {% if tenant_result %}
+      <div style="margin-top:16px;">
+        <p>
+          {% for category, n in tenant_result.counts.items() %}<span class="badge badge-accent">{{ n }} {{ category }}</span> {% endfor %}
+          {% if not tenant_result.counts %}<span class="muted">Nothing applied.</span>{% endif %}
+        </p>
+        {% if tenant_result.warnings %}
+        <h3>Warnings</h3>
+        <ul>{% for w in tenant_result.warnings %}<li class="muted">{{ w }}</li>{% endfor %}</ul>
         {% endif %}
-        <button type="button" class="tab-btn{{ '' if ctx.user.is_internal_admin else ' active' }}" data-tab-btn="export-tenant">Tenant</button>
-      </div>
-
-      {% if ctx.user.is_internal_admin %}
-      <div class="tab-panel active" data-tab-panel="export-platform">
-        <form method="post" action="/admin/config-bundle/platform/export">
-          <label class="checkbox-row"><input type="checkbox" name="include_secrets" value="true"> Include secrets</label>
-          <div class="field-hint">SMTP/LDAP passwords. Off by default.</div>
-          <button class="btn btn-primary" type="submit" style="margin-top:8px;">Export platform bundle</button>
-        </form>
       </div>
       {% endif %}
-
-      <div class="tab-panel{{ '' if ctx.user.is_internal_admin else ' active' }}" data-tab-panel="export-tenant">
-        {% if not ctx.active_tenant %}
-        <p class="muted">Select a tenant (Admin &gt; Tenants &gt; Switch to) first.</p>
-        {% else %}
-        <form method="post" action="/admin/config-bundle/tenant/export">
-          <label class="checkbox-row"><input type="checkbox" name="include_secrets" value="true"> Include secrets</label>
-          <div class="field-hint">Channel/webhook config, local users' password hashes. Off by default.</div>
-          <button class="btn btn-primary" type="submit" style="margin-top:8px;">Export tenant bundle</button>
-        </form>
-        {% endif %}
-      </div>
     </div>
+
+    <div class="tab-panel" data-tab-panel="tenant-export">
+      <form method="post" action="/admin/config-bundle/tenant/export">
+        <label class="checkbox-row"><input type="checkbox" name="include_secrets" value="true"> Include secrets</label>
+        <div class="field-hint">Channel/webhook config, local users' password hashes. Off by default.</div>
+        <button class="btn btn-primary" type="submit" style="margin-top:8px;">Export tenant bundle</button>
+      </form>
+    </div>
+    {% endif %}
   </div>
+
 </div>
 {% endblock %}

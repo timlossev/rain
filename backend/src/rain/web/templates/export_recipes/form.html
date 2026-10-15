@@ -50,7 +50,6 @@
               {% endfor %}
               {% if ns.current_group is not none %}</optgroup>{% endif %}
             </select>
-            <div class="field-hint">Grouped by what it exports -- a profile you already saved on a Tickets or Assets export screen.</div>
           </div>
           {{ picker.search_picker("step_filter_" ~ i, "/documents/search", label="Filter (optional)", initial_value=prefill.filter_document_id if prefill else none, initial_label=prefill.filter_document_label if prefill else "", placeholder="Search documents...") }}
           <div class="field" style="flex:0 0 auto;">
