@@ -3,7 +3,7 @@
 {% block help_text %}Run several saved export profiles together and merge their results into one JSON document -- for a shape no single export can produce on its own (e.g. an OSCAL System Security Plan, built from a Certification Package profile, a Components profile, and the Security Control register in one file). Each step runs its own profile, optionally reshaped by its own jq filter; a final "assembly" filter (optional) combines all the steps' results into one document.{% endblock %}
 {% block content %}
 <div class="panel-row" style="justify-content:flex-end;">
-  <a class="btn btn-primary" href="/export-recipes/new">+ New recipe</a>
+  <a class="btn btn-primary" href="/assets/export-recipes/new">+ New recipe</a>
 </div>
 
 <div class="card">
@@ -19,9 +19,9 @@
         <td class="muted">{% if r.assembly_filter_document_id %}Set{% else %}None -- raw step results{% endif %}</td>
         <td class="muted">{% if r.save_to_document %}Document{% else %}Download{% endif %}</td>
         <td class="actions">
-          <a class="btn btn-sm" href="/export-recipes/{{ r.id }}/run">Run</a>
-          <a class="btn btn-sm" href="/export-recipes/{{ r.id }}/edit">Edit</a>
-          <form class="inline" method="post" action="/export-recipes/{{ r.id }}/delete" data-confirm="Delete recipe '{{ r.name }}'?">
+          <a class="btn btn-sm" href="/assets/export-recipes/{{ r.id }}/run">Run</a>
+          <a class="btn btn-sm" href="/assets/export-recipes/{{ r.id }}/edit">Edit</a>
+          <form class="inline" method="post" action="/assets/export-recipes/{{ r.id }}/delete" data-confirm="Delete recipe '{{ r.name }}'?">
             <button class="btn btn-sm btn-danger" type="submit">Delete</button>
           </form>
         </td>

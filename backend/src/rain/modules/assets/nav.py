@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from rain.core.nav_registry import NavNode, nav_registry
 from rain.core.tenancy import RequestContext
 from rain.db.base import tenant_session
-from rain.db.tenant_models import Asset, AssetType
+from rain.db.tenant_models import Asset, AssetType, ExportRecipe
 
 
 async def _asset_type_children(ctx: RequestContext) -> list[NavNode]:
@@ -29,6 +29,17 @@ async def _active_asset_count(ctx: RequestContext) -> int | None:
         return await db.scalar(select(func.count(Asset.id)).where(Asset.status == "active"))
 
 
+async def _recipe_count(ctx: RequestContext) -> int | None:
+    # Export Recipes can mix ticket- and asset-scoped steps (see rain.core.
+    # export_recipe), so it isn't an Assets-only feature -- it lives here
+    # in the nav only because that's where it reads most naturally next to
+    # Export, not because recipes are scoped to assets.
+    if ctx.active_tenant is None:
+        return None
+    async with tenant_session(ctx.active_tenant.schema_name) as db:
+        return await db.scalar(select(func.count(ExportRecipe.id)))
+
+
 nav_registry.register(
     NavNode(
         key="assets",
@@ -41,8 +52,9 @@ nav_registry.register(
             NavNode(key="assets-all", label="All Assets", href="/assets", order=1),
             NavNode(key="assets-by-type", label="By Type", href="/assets/by-type", order=2, children_provider=_asset_type_children),
             NavNode(key="assets-fields", label="Custom Fields", href="/assets/fields", order=3),
-            NavNode(key="assets-export", label="Export", href="/assets/export", order=4),
-            NavNode(key="assets-import", label="Import", href="/assets/import", order=5),
+            NavNode(key="assets-export", label="Simple Export", href="/assets/export", order=4),
+            NavNode(key="assets-export-recipes", label="Export Recipes", href="/assets/export-recipes", order=5, count_provider=_recipe_count),
+            NavNode(key="assets-import", label="Import", href="/assets/import", order=6),
             # Asset Types now lives under Admin > Tenant Administration
             # (rain.modules.admin.nav) -- defining the asset schema itself
             # reads as an administration function, not a day-to-day Assets

@@ -172,8 +172,9 @@ each object's `uuid`.
 One export's jq filter can only reshape that export. An OSCAL System
 Security Plan needs three different sources merged into one document
 -- system characteristics, components, and control implementation.
-Export Recipes (sidebar item, Admin > Config Bundles can import one
-too) runs several saved export profiles and merges the results.
+Export Recipes (Assets > Export Recipes, right next to Simple Export;
+Admin > Config Bundles can import one too) runs several saved export
+profiles and merges the results.
 
 Two bundles set this up:
 

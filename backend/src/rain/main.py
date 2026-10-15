@@ -131,7 +131,6 @@ def create_app() -> FastAPI:
     from rain.modules.assets import nav as _assets_nav  # noqa: F401
     from rain.modules.calendar import nav as _calendar_nav  # noqa: F401
     from rain.modules.documents import nav as _documents_nav  # noqa: F401
-    from rain.modules.export_recipes import nav as _export_recipes_nav  # noqa: F401
     from rain.modules.home import nav as _home_nav  # noqa: F401
     from rain.modules.tickets import nav as _tickets_nav  # noqa: F401
 

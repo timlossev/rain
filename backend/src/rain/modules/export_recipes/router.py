@@ -27,7 +27,7 @@ from rain.modules.export_recipes import service
 from rain.web.nav import build_nav_context
 from rain.web.templating import templates
 
-router = APIRouter(prefix="/export-recipes", tags=["Export Recipes"])
+router = APIRouter(prefix="/assets/export-recipes", tags=["Export Recipes"])
 
 # Comfortably more than the ~4 steps a full OSCAL SSP assembly needs
 # (system-characteristics, components, control-implementation, back-
@@ -167,7 +167,7 @@ async def recipe_create(
         destination_title=destination_title.strip() or None,
         destination_is_shareable=destination_is_shareable,
     )
-    return RedirectResponse("/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/assets/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/{recipe_id:int}/edit", response_class=HTMLResponse)
@@ -180,7 +180,7 @@ async def recipe_edit_form(
 ):
     recipe = await service.get_recipe(tenant_db, recipe_id)
     if recipe is None:
-        return RedirectResponse("/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse("/assets/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
     context = await _form_context(tenant_db, ctx, recipe=recipe)
     return templates.TemplateResponse(request, "export_recipes/form.html", context)
 
@@ -201,7 +201,7 @@ async def recipe_update(
 ):
     recipe = await service.get_recipe(tenant_db, recipe_id)
     if recipe is None:
-        return RedirectResponse("/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse("/assets/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
     form = await request.form()
     steps = _collect_steps(form)
     if not steps:
@@ -218,7 +218,7 @@ async def recipe_update(
         destination_title=destination_title.strip() or None,
         destination_is_shareable=destination_is_shareable,
     )
-    return RedirectResponse("/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/assets/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/{recipe_id:int}/delete")
@@ -230,7 +230,7 @@ async def recipe_delete(
     recipe = await service.get_recipe(tenant_db, recipe_id)
     if recipe is not None:
         await service.delete_recipe(tenant_db, recipe)
-    return RedirectResponse("/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/assets/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/{recipe_id:int}/run")
@@ -242,7 +242,7 @@ async def recipe_run(
 ):
     recipe = await service.get_recipe(tenant_db, recipe_id)
     if recipe is None:
-        return RedirectResponse("/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse("/assets/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
     body = await run_export_recipe(tenant_db, recipe)
 
     if recipe.save_to_document:
@@ -250,7 +250,7 @@ async def recipe_run(
             doc = await document_service.get_document(tenant_db, recipe.destination_document_id)
             if doc is None:
                 return RedirectResponse(
-                    f"/export-recipes/{recipe.id}/edit?error=The+document+picked+to+overwrite+no+longer+exists.",
+                    f"/assets/export-recipes/{recipe.id}/edit?error=The+document+picked+to+overwrite+no+longer+exists.",
                     status_code=status.HTTP_303_SEE_OTHER,
                 )
             await document_service.update_body(tenant_db, doc, body)

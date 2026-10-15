@@ -526,21 +526,23 @@ skip; auto-suggested from header names. Result screen: rows created
 vs. updated (matched/updated by External ID; unmatched rows created
 new), plus per-row errors.
 
-### Export
+### Simple Export
 
-Assets > Export. Pick an asset type (or "All types" for built-in
-columns only), the same column table as every export screen, a format
-(CSV/JSON/Excel), and an optional saved-profile name. Picking JSON also
-reveals the same jq transform step tickets' own Export screen has --
-see that section for what it does.
+Assets > Simple Export. Pick an asset type (or "All types" for
+built-in columns only), the same column table as every export screen,
+a format (CSV/JSON/Excel), a destination (download, or save straight
+into a Document, optionally Trust Center-flagged), and a profile
+choice (don't save, update the one just loaded, or save as new).
+Picking JSON also reveals the same jq transform step tickets' own
+Export screen has -- see that section for what it does.
 
 ### Export Recipes
 
-A jq transform reshapes one export. Export Recipes runs several
-exports together and merges the results -- for an output that needs
-more than one source, like an OSCAL System Security Plan built from a
-Certification Package row, a Components register, and the Security
-Control register. See
+A jq transform reshapes one export. Export Recipes, right next to
+Simple Export, runs several exports together and merges the results --
+for an output that needs more than one source, like an OSCAL System
+Security Plan built from a Certification Package row, a Components
+register, and the Security Control register. See
 [`docs/compliance-templates/README.md`](compliance-templates/README.md)
 and [`docs/oscal-ssp-showcase.md`](oscal-ssp-showcase.md) for that
 walkthrough.
@@ -552,7 +554,8 @@ stacking with it. Running the recipe runs every step, collects each
 result under its own label, then -- if you've picked an "assembly
 filter" -- runs that once more over the collected object to produce
 the final document. No assembly filter just means you get that
-collected object back as-is. Always downloads as JSON.
+collected object back as-is. Same destination choice as Simple Export
+-- download, or save into a Document.
 
 ## Documents
 

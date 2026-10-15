@@ -6,11 +6,11 @@
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 <div class="panel-row" style="justify-content:flex-end;">
-  <a class="btn btn-sm" href="/export-recipes">&larr; All recipes</a>
+  <a class="btn btn-sm" href="/assets/export-recipes">&larr; All recipes</a>
 </div>
 
 <div class="card">
-  <form method="post" action="{{ '/export-recipes/' ~ recipe.id ~ '/edit' if recipe else '/export-recipes' }}">
+  <form method="post" action="{{ '/assets/export-recipes/' ~ recipe.id ~ '/edit' if recipe else '/assets/export-recipes' }}">
     <div class="field">
       <label for="name">Recipe name</label>
       <input type="text" id="name" name="name" value="{{ recipe.name if recipe else '' }}" placeholder="OSCAL System Security Plan" required autofocus>
@@ -72,7 +72,7 @@
 
     <div style="margin-top:20px;">
       <button class="btn btn-primary" type="submit">{{ "Save changes" if recipe else "Create recipe" }}</button>
-      <a class="btn" href="/export-recipes">Cancel</a>
+      <a class="btn" href="/assets/export-recipes">Cancel</a>
     </div>
   </form>
 </div>
