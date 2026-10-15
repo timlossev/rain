@@ -775,8 +775,13 @@ nothing pulled from a CDN), button style (Square or Rounded), an
 optional logo (up to 5MB; leaving the field empty on edit keeps the
 current one). Applies immediately, across every tenant.
 
-**Tenants.** A table (Name, Slug, schema name, Active) with "+ New
-tenant" (Name, Slug) and a "Switch to" button per tenant.
+**Tenants.** A table (Name, Slug, schema name, an on/off switch for
+Active) with "+ New tenant" (Name, Slug) and a "Switch to" button per
+tenant. Deactivating one blocks it immediately, even for someone
+already mid-session with it selected -- a client lands on a "contact
+your administrator" page, an internal admin gets bounced back to this
+same list; Admin > Users flags an affected client with a "disabled"
+pill next to their tenant's name.
 
 **Auth Providers.** Local (always on), LDAP, SAML -- each shows
 enabled/last-synced. Configure pages:
