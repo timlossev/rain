@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from rain.db.tenant_models import ExportProfile, ExportRecipe, ExportRecipeStep
+from rain.db.tenant_models import AssetType, ExportProfile, ExportRecipe, ExportRecipeStep
 
 
 def _recipe_stmt():
@@ -28,13 +28,33 @@ async def get_recipe(db: AsyncSession, recipe_id: int) -> ExportRecipe | None:
     )
 
 
-async def list_all_export_profiles(db: AsyncSession) -> list[ExportProfile]:
+async def list_all_export_profiles(db: AsyncSession) -> list[dict[str, Any]]:
     """Every saved profile, ticket- and asset-scoped alike -- a recipe
     step can be either, unlike the plain export screens (each of which
-    only ever lists its own scope's profiles). Ordered by scope so the
-    step picker's <option> groups land together."""
+    only ever lists its own scope's profiles). Each entry carries a
+    group_label ("Tickets", or the targeted asset type's own name)
+    instead of the bare scope string, so the step picker's <optgroup>
+    can tell the user what a profile actually runs against -- a
+    profile's own name (e.g. "OSCAL - Certification Package") doesn't
+    say that on its own."""
     result = await db.execute(select(ExportProfile).order_by(ExportProfile.scope, ExportProfile.name))
-    return list(result.scalars())
+    profiles = list(result.scalars())
+    asset_type_ids = {p.asset_type_id for p in profiles if p.asset_type_id}
+    asset_type_name_by_id: dict[int, str] = {}
+    if asset_type_ids:
+        rows = await db.execute(select(AssetType.id, AssetType.name).where(AssetType.id.in_(asset_type_ids)))
+        asset_type_name_by_id = dict(rows.all())
+    out = []
+    for p in profiles:
+        if p.scope == "ticket":
+            group_label = "Tickets"
+        elif p.asset_type_id:
+            group_label = asset_type_name_by_id.get(p.asset_type_id, "Assets (deleted type)")
+        else:
+            group_label = "Assets (all types)"
+        out.append({"id": p.id, "name": p.name, "group_label": group_label})
+    out.sort(key=lambda p: (p["group_label"], p["name"]))
+    return out
 
 
 async def create_recipe(

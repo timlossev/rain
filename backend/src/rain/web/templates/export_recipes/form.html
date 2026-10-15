@@ -39,17 +39,18 @@
             <label for="step_profile_{{ i }}">Export profile</label>
             <select id="step_profile_{{ i }}" name="step_profile_{{ i }}">
               <option value="">-</option>
-              {% set current_scope = none %}
+              {% set ns = namespace(current_group=none) %}
               {% for p in profiles %}
-                {% if p.scope != current_scope %}
-                  {% if current_scope is not none %}</optgroup>{% endif %}
-                  <optgroup label="{{ 'Ticket profiles' if p.scope == 'ticket' else 'Asset profiles' }}">
-                  {% set current_scope = p.scope %}
+                {% if p.group_label != ns.current_group %}
+                  {% if ns.current_group is not none %}</optgroup>{% endif %}
+                  <optgroup label="{{ p.group_label }}">
+                  {% set ns.current_group = p.group_label %}
                 {% endif %}
                 <option value="{{ p.id }}" {% if prefill and prefill.export_profile_id == p.id %}selected{% endif %}>{{ p.name }}</option>
               {% endfor %}
-              {% if current_scope is not none %}</optgroup>{% endif %}
+              {% if ns.current_group is not none %}</optgroup>{% endif %}
             </select>
+            <div class="field-hint">Grouped by what it exports -- a profile you already saved on a Tickets or Assets export screen.</div>
           </div>
           {{ picker.search_picker("step_filter_" ~ i, "/documents/search", label="Filter (optional)", initial_value=prefill.filter_document_id if prefill else none, initial_label=prefill.filter_document_label if prefill else "", placeholder="Search documents...") }}
           <div class="field" style="flex:0 0 auto;">
