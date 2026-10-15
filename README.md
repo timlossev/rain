@@ -32,13 +32,14 @@ for how far that argument extends to the EU Cybersecurity Certification
 Scheme for Cloud Services. Custom asset types and ticket fields let
 RAIN adapt to any framework's paperwork with no code --
 [`docs/compliance-templates/`](docs/compliance-templates/) ships
-twenty ready-to-import `.rain` config bundles (a risk register, a
+twenty-six ready-to-import `.rain` config bundles (a risk register, a
 vulnerability scan finding-fields set covering Nessus, OpenVAS/GVM, and
 Amazon Inspector alike, FedRAMP's 2026 quarterly reporting fields, a NIST 800-53 control
 register with an OSCAL export transformer, a Significant Change
 Notification export, an SBOM/software inventory register, a Continuous
-Monitoring submission register, and others) for registers most
-compliance teams would otherwise build by hand.
+Monitoring submission register, a case-management/assessment-tracking
+kit, and others) for registers most compliance teams would otherwise
+build by hand.
 
 Those tickets have to come from somewhere, so RAIN is deliberately
 "bring your own" for detection -- monitoring, SIEM, XDR, antivirus,
@@ -73,7 +74,12 @@ get started.
   own Kanban board grouped by tag or by owner; optional review-due
   tracking and assignable, notified read acknowledgment
 - Custom jq export transforms for framework-specific machine-readable
-  output (OSCAL, Significant Change Notifications, ...)
+  output (OSCAL, Significant Change Notifications, ...), with Export
+  Recipes to merge several saved exports into one assembled document
+  (e.g. a full OSCAL System Security Plan)
+- Any export can write straight into a Document instead of
+  downloading, optionally flagged Trust Center, and be re-run on a
+  Calendar schedule
 - Per-tenant calendar with recurring entries and a syslog bridge
 - Tenant-defined Service Catalog forms that produce tickets on submission
 - Public client portal for external incident reporting and requests
@@ -110,8 +116,9 @@ instance, in their own primers:
   repetition folding and ML anomaly detection against real syslog
   events.
 - [`docs/oscal-ssp-showcase.md`](docs/oscal-ssp-showcase.md) --
-  importing the real FedRAMP High baseline as a control register and
-  exporting it as OSCAL.
+  importing the real FedRAMP High baseline as a control register,
+  exporting it as OSCAL, and assembling a full System Security Plan
+  with Export Recipes.
 - [`docs/fedramp-cr26-showcase.md`](docs/fedramp-cr26-showcase.md) --
   FedRAMP's 2026 Consolidated Rules (CR26) explained through a real
   Significant Change Notification example.
