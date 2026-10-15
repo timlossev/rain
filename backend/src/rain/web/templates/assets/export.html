@@ -29,6 +29,7 @@
 
   <form method="post" action="/assets/export" enctype="multipart/form-data">
     <input type="hidden" name="asset_type_id" value="{{ selected_type or '' }}">
+    <input type="hidden" name="profile_id" value="{{ selected_profile_id or '' }}">
     {% include "_export_columns_table.html" %}
 
     <div class="form-row" style="margin-top:16px;">
@@ -47,12 +48,15 @@
     {% include "_export_destination_fields.html" %}
 
     <div class="field" style="max-width:360px;">
-      <label for="save_as">Save as profile</label>
+      <label for="save_as">Save as a new profile</label>
       <input type="text" id="save_as" name="save_as" placeholder="e.g. Servers - quarterly audit">
       <div class="field-hint">Optional - reuse this column layout next time instead of rebuilding it.</div>
     </div>
 
-    <button class="btn btn-primary" type="submit">Export</button>
+    <button class="btn btn-primary" type="submit" name="intent" value="export">Export</button>
+    {% if selected_profile_id %}
+    <button class="btn" type="submit" name="intent" value="update_profile">Update "{{ selected_profile_name }}" with these settings</button>
+    {% endif %}
   </form>
 </div>
 
@@ -68,7 +72,12 @@
         <td>{{ p.name }}</td>
         <td class="muted">{{ p.format }}</td>
         <td class="muted">{{ p.columns | length }}</td>
-        <td class="actions"><a class="btn btn-sm" href="/assets/export?profile_id={{ p.id }}{% if p.asset_type_id %}&asset_type_id={{ p.asset_type_id }}{% endif %}">Load</a></td>
+        <td class="actions">
+          <a class="btn btn-sm" href="/assets/export?profile_id={{ p.id }}{% if p.asset_type_id %}&asset_type_id={{ p.asset_type_id }}{% endif %}">Load</a>
+          <form class="inline" method="post" action="/assets/export/profiles/{{ p.id }}/delete" data-confirm="Delete profile '{{ p.name }}'?">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

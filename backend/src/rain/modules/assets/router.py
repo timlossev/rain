@@ -15,6 +15,7 @@ from starlette.convertors import Convertor, register_url_convertor
 from rain.core.export_columns import merge_profile_columns
 from rain.core.jq_transform import JqTransformError, apply_jq_filter
 from rain.core.pagination import paginate
+from rain.core.query_params import optional_int
 from rain.core.rbac import require_admin, require_login
 from rain.core.tenancy import CurrentUser, RequestContext, get_request_context, get_tenant_db
 from rain.core.tenant_config import get_tenant_config
@@ -59,7 +60,7 @@ router = APIRouter(prefix="/assets", tags=["Assets"])
 @router.get("", response_class=HTMLResponse)
 async def list_assets(
     request: Request,
-    asset_type_id: int | None = None,
+    asset_type_id: str | None = None,
     q: str = "",
     sort: str = "",
     dir: str = "asc",
@@ -68,6 +69,7 @@ async def list_assets(
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
+    asset_type_id = optional_int(asset_type_id)
     nav = await build_nav_context(ctx)
     q = q.strip()
     page_size = await get_tenant_config(tenant_db, "default_page_size")
@@ -581,14 +583,17 @@ async def _export_form_context(
     destination_document = (
         await document_service.get_document(tenant_db, destination_document_id) if destination_document_id else None
     )
+    profiles = await service.list_export_profiles(tenant_db)
+    selected_profile_for_name = next((p for p in profiles if p.id == profile_id), None) if profile_id else None
     return {
         **nav,
         "ctx": ctx,
         "asset_types": await service.list_asset_types(tenant_db),
         "columns": columns,
-        "profiles": await service.list_export_profiles(tenant_db),
+        "profiles": profiles,
         "selected_type": asset_type_id,
         "selected_profile_id": profile_id,
+        "selected_profile_name": selected_profile_for_name.name if selected_profile_for_name else "",
         "selected_fmt": fmt,
         "selected_jq_document_id": jq_document_id,
         "selected_jq_document_label": f"{jq_document.doc_number}: {jq_document.title}" if jq_document else "",
@@ -606,12 +611,14 @@ async def _export_form_context(
 @router.get("/export", response_class=HTMLResponse)
 async def export_form(
     request: Request,
-    asset_type_id: int | None = None,
-    profile_id: int | None = None,
+    asset_type_id: str | None = None,
+    profile_id: str | None = None,
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
+    asset_type_id = optional_int(asset_type_id)
+    profile_id = optional_int(profile_id)
     profiles = await service.list_export_profiles(tenant_db)
     selected_profile = next((p for p in profiles if p.id == profile_id), None) if profile_id else None
     if selected_profile is not None and asset_type_id is None:
@@ -640,6 +647,8 @@ async def export_run(
     asset_type_id: str = Form(""),
     fmt: str = Form("csv"),
     save_as: str = Form(""),
+    profile_id: str = Form(""),
+    intent: str = Form("export"),
     destination_mode: str = Form("download"),
     destination_document_id: str = Form(""),
     destination_title: str = Form(""),
@@ -665,6 +674,39 @@ async def export_run(
     jq_document_id_raw = str(form.get("jq_document_id") or "").strip()
     jq_document_id = int(jq_document_id_raw) if jq_document_id_raw else None
     destination_document_id_val = int(destination_document_id) if destination_document_id.strip() else None
+    loaded_profile_id = int(profile_id) if profile_id.strip() else None
+
+    if intent == "update_profile":
+        existing = await service.get_export_profile(tenant_db, loaded_profile_id) if loaded_profile_id else None
+        if existing is None:
+            context = await _export_form_context(
+                tenant_db,
+                ctx,
+                asset_type_id=type_id,
+                profile_id=None,
+                columns=merge_profile_columns(await exporter.available_columns(tenant_db, type_id), columns),
+                fmt=fmt,
+                jq_document_id=jq_document_id,
+                error="That saved profile no longer exists.",
+            )
+            return templates.TemplateResponse(request, "assets/export.html", context, status_code=400)
+        await service.update_export_profile(
+            tenant_db,
+            existing,
+            name=existing.name,
+            asset_type_id=type_id,
+            fmt=fmt,
+            columns=columns,
+            jq_document_id=jq_document_id,
+            save_to_document=save_to_document,
+            destination_document_id=destination_document_id_val,
+            destination_title=destination_title.strip() or None,
+            destination_is_shareable=destination_is_shareable,
+        )
+        return RedirectResponse(
+            f"/assets/export?profile_id={existing.id}&asset_type_id={type_id or ''}&ok=1",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
 
     # xlsx is binary -- see tickets/router.py's export_run, same reasoning.
     if save_to_document and fmt == "xlsx":
@@ -768,6 +810,19 @@ async def export_run(
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/export/profiles/{profile_id:int}/delete")
+async def delete_export_profile(
+    profile_id: int,
+    ctx: RequestContext = Depends(get_request_context),
+    tenant_db: AsyncSession = Depends(get_tenant_db),
+    _: CurrentUser = Depends(require_login),
+):
+    profile = await service.get_export_profile(tenant_db, profile_id)
+    if profile is not None:
+        await service.delete_export_profile(tenant_db, profile)
+    return RedirectResponse("/assets/export?ok=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
 # ------------------------------------------------------------- import ----

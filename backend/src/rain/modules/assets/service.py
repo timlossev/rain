@@ -233,6 +233,42 @@ async def list_export_profiles(db: AsyncSession) -> list[ExportProfile]:
     return list(result.scalars())
 
 
+async def get_export_profile(db: AsyncSession, profile_id: int) -> ExportProfile | None:
+    profile = await db.get(ExportProfile, profile_id)
+    return profile if profile and profile.scope == "asset" else None
+
+
+async def update_export_profile(
+    db: AsyncSession,
+    profile: ExportProfile,
+    *,
+    name: str,
+    asset_type_id: int | None,
+    fmt: str,
+    columns: list[dict],
+    jq_document_id: int | None,
+    save_to_document: bool,
+    destination_document_id: int | None,
+    destination_title: str | None,
+    destination_is_shareable: bool,
+) -> None:
+    profile.name = name
+    profile.asset_type_id = asset_type_id
+    profile.format = fmt
+    profile.columns = columns
+    profile.jq_document_id = jq_document_id
+    profile.save_to_document = save_to_document
+    profile.destination_document_id = destination_document_id
+    profile.destination_title = destination_title
+    profile.destination_is_shareable = destination_is_shareable
+    await db.commit()
+
+
+async def delete_export_profile(db: AsyncSession, profile: ExportProfile) -> None:
+    await db.delete(profile)
+    await db.commit()
+
+
 async def save_export_profile(
     db: AsyncSession,
     *,

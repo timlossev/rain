@@ -18,6 +18,7 @@
   </form>
 
   <form method="post" action="/tickets/export/run" enctype="multipart/form-data">
+    <input type="hidden" name="profile_id" value="{{ selected_profile_id or '' }}">
     <div class="form-row">
       <div class="field">
         <label for="ticket_type">Type</label>
@@ -51,11 +52,14 @@
 
     <div class="form-row" style="margin-top:16px;">
       <div class="field">
-        <label for="save_as">Save as a reusable profile (optional)</label>
+        <label for="save_as">Save as a new reusable profile (optional)</label>
         <input type="text" id="save_as" name="save_as" placeholder="e.g. Change window audit">
       </div>
     </div>
-    <button class="btn btn-primary" type="submit">Export</button>
+    <button class="btn btn-primary" type="submit" name="intent" value="export">Export</button>
+    {% if selected_profile_id %}
+    <button class="btn" type="submit" name="intent" value="update_profile">Update "{{ selected_profile_name }}" with these settings</button>
+    {% endif %}
   </form>
 </div>
 
@@ -71,7 +75,12 @@
         <td>{{ p.name }}</td>
         <td class="muted">{{ p.format }}</td>
         <td class="muted">{{ p.columns | length }}</td>
-        <td class="actions"><a class="btn btn-sm" href="/tickets/export/run?profile_id={{ p.id }}">Load</a></td>
+        <td class="actions">
+          <a class="btn btn-sm" href="/tickets/export/run?profile_id={{ p.id }}">Load</a>
+          <form class="inline" method="post" action="/tickets/export/profiles/{{ p.id }}/delete" data-confirm="Delete profile '{{ p.name }}'?">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
