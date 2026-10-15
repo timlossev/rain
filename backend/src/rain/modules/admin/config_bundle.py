@@ -856,7 +856,20 @@ async def apply_tenant_bundle(tenant_db: AsyncSession, tenant: Tenant, data: dic
                 continue
             steps_in.append((step.get("label", ""), profile_id))
 
-        existing = (await tenant_db.execute(select(ExportRecipe).where(ExportRecipe.name == entry["name"]))).scalar_one_or_none()
+        # selectinload(.steps) matters here, unlike the ExportProfile
+        # lookup above: reassigning existing.steps below (cascade="all,
+        # delete-orphan") needs the *current* collection loaded already
+        # to diff against -- an unloaded collection lazy-loads
+        # synchronously on assignment, outside any awaited context,
+        # which raises asyncpg's "greenlet_spawn has not been called"
+        # (confirmed live) the moment a recipe of this name already
+        # exists, e.g. re-importing oscal-ssp-export-recipe.rain after
+        # oscal-ssp-starter-kit.rain already created the same recipe.
+        existing = (
+            await tenant_db.execute(
+                select(ExportRecipe).options(selectinload(ExportRecipe.steps)).where(ExportRecipe.name == entry["name"])
+            )
+        ).scalar_one_or_none()
         if existing is None:
             existing = ExportRecipe(name=entry["name"], created_by=updated_by)
             tenant_db.add(existing)
