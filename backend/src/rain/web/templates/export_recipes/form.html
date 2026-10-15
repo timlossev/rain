@@ -67,6 +67,9 @@
     <p class="field-hint">Runs once, over all the steps' results collected into one object keyed by label. Leave unset to just get that collected object back as-is.</p>
     {{ picker.search_picker("assembly_filter_document_id", "/documents/search", label="Use a saved ruleset", initial_value=selected_assembly_filter_document_id, initial_label=selected_assembly_filter_document_label, placeholder="Search documents...") }}
 
+    <h3>Output</h3>
+    {% include "_export_destination_fields.html" %}
+
     <div style="margin-top:20px;">
       <button class="btn btn-primary" type="submit">{{ "Save changes" if recipe else "Create recipe" }}</button>
       <a class="btn" href="/export-recipes">Cancel</a>

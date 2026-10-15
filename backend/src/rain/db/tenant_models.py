@@ -249,6 +249,16 @@ class ExportRecipe(TenantBase):
     assembly_filter_document_id: Mapped[int | None] = mapped_column(
         ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
     )
+    # Destination, same shape and meaning as ExportProfile's own fields
+    # above -- false (the default, every pre-migration row) means a run
+    # still just downloads; true + a document picked means "overwrite
+    # that document instead."
+    save_to_document: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    destination_document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+    )
+    destination_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    destination_is_shareable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

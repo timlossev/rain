@@ -82,6 +82,11 @@ async def _form_context(
         if recipe is not None and recipe.assembly_filter_document_id
         else None
     )
+    destination_doc = (
+        await document_service.get_document(tenant_db, recipe.destination_document_id)
+        if recipe is not None and recipe.destination_document_id
+        else None
+    )
 
     return {
         **nav,
@@ -92,6 +97,11 @@ async def _form_context(
         "step_prefill": step_prefill,
         "selected_assembly_filter_document_id": recipe.assembly_filter_document_id if recipe else None,
         "selected_assembly_filter_document_label": f"{assembly_doc.doc_number}: {assembly_doc.title}" if assembly_doc else "",
+        "selected_save_to_document": recipe.save_to_document if recipe else False,
+        "selected_destination_document_id": recipe.destination_document_id if recipe else None,
+        "selected_destination_document_label": f"{destination_doc.doc_number}: {destination_doc.title}" if destination_doc else "",
+        "selected_destination_title": (recipe.destination_title or "") if recipe else "",
+        "selected_destination_is_shareable": recipe.destination_is_shareable if recipe else False,
         "error": error,
     }
 
@@ -133,6 +143,10 @@ async def recipe_create(
     request: Request,
     name: str = Form(...),
     assembly_filter_document_id: str = Form(""),
+    destination_mode: str = Form("download"),
+    destination_document_id: str = Form(""),
+    destination_title: str = Form(""),
+    destination_is_shareable: bool = Form(False),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
@@ -148,6 +162,10 @@ async def recipe_create(
         steps=steps,
         assembly_filter_document_id=int(assembly_filter_document_id) if assembly_filter_document_id.strip() else None,
         actor_id=ctx.user.id,
+        save_to_document=destination_mode == "save_to_document",
+        destination_document_id=int(destination_document_id) if destination_document_id.strip() else None,
+        destination_title=destination_title.strip() or None,
+        destination_is_shareable=destination_is_shareable,
     )
     return RedirectResponse("/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -173,6 +191,10 @@ async def recipe_update(
     recipe_id: int,
     name: str = Form(...),
     assembly_filter_document_id: str = Form(""),
+    destination_mode: str = Form("download"),
+    destination_document_id: str = Form(""),
+    destination_title: str = Form(""),
+    destination_is_shareable: bool = Form(False),
     ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
@@ -191,6 +213,10 @@ async def recipe_update(
         name=name.strip(),
         steps=steps,
         assembly_filter_document_id=int(assembly_filter_document_id) if assembly_filter_document_id.strip() else None,
+        save_to_document=destination_mode == "save_to_document",
+        destination_document_id=int(destination_document_id) if destination_document_id.strip() else None,
+        destination_title=destination_title.strip() or None,
+        destination_is_shareable=destination_is_shareable,
     )
     return RedirectResponse("/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -210,6 +236,7 @@ async def recipe_delete(
 @router.get("/{recipe_id:int}/run")
 async def recipe_run(
     recipe_id: int,
+    ctx: RequestContext = Depends(get_request_context),
     tenant_db: AsyncSession = Depends(get_tenant_db),
     _: CurrentUser = Depends(require_login),
 ):
@@ -217,6 +244,30 @@ async def recipe_run(
     if recipe is None:
         return RedirectResponse("/export-recipes", status_code=status.HTTP_303_SEE_OTHER)
     body = await run_export_recipe(tenant_db, recipe)
+
+    if recipe.save_to_document:
+        if recipe.destination_document_id:
+            doc = await document_service.get_document(tenant_db, recipe.destination_document_id)
+            if doc is None:
+                return RedirectResponse(
+                    f"/export-recipes/{recipe.id}/edit?error=The+document+picked+to+overwrite+no+longer+exists.",
+                    status_code=status.HTTP_303_SEE_OTHER,
+                )
+            await document_service.update_body(tenant_db, doc, body)
+        else:
+            doc = await document_service.create_document_from_bytes(
+                tenant_db,
+                tenant_schema=ctx.active_tenant.schema_name,
+                title=recipe.destination_title or recipe.name,
+                filename=f"{recipe.name}.json",
+                mime_type="application/json",
+                data=body.encode("utf-8"),
+                actor_id=ctx.user.id,
+            )
+        if recipe.destination_is_shareable:
+            await document_service.update_sharing(tenant_db, doc, True)
+        return RedirectResponse(f"/documents/{doc.doc_number}?ok=1", status_code=status.HTTP_303_SEE_OTHER)
+
     slug = "".join(c if c.isalnum() else "-" for c in recipe.name.lower()).strip("-") or "export-recipe"
     return Response(
         body,

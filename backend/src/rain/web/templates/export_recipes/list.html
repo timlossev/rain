@@ -8,7 +8,7 @@
 
 <div class="card">
   <table>
-    <thead><tr><th>Name</th><th>Steps</th><th>Assembly filter</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Steps</th><th>Assembly filter</th><th>Destination</th><th></th></tr></thead>
     <tbody>
       {% for r in recipes %}
       <tr>
@@ -17,6 +17,7 @@
           {% for s in r.steps %}{{ loop.index }}. {{ s.label }}{% if not loop.last %}<br>{% endif %}{% else %}No steps.{% endfor %}
         </td>
         <td class="muted">{% if r.assembly_filter_document_id %}Set{% else %}None -- raw step results{% endif %}</td>
+        <td class="muted">{% if r.save_to_document %}Document{% else %}Download{% endif %}</td>
         <td class="actions">
           <a class="btn btn-sm" href="/export-recipes/{{ r.id }}/run">Run</a>
           <a class="btn btn-sm" href="/export-recipes/{{ r.id }}/edit">Edit</a>
@@ -26,7 +27,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="4" class="muted">No export recipes yet.</td></tr>
+      <tr><td colspan="5" class="muted">No export recipes yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

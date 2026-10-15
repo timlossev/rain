@@ -58,11 +58,24 @@ async def list_all_export_profiles(db: AsyncSession) -> list[dict[str, Any]]:
 
 
 async def create_recipe(
-    db: AsyncSession, *, name: str, steps: list[dict[str, Any]], assembly_filter_document_id: int | None, actor_id: int
+    db: AsyncSession,
+    *,
+    name: str,
+    steps: list[dict[str, Any]],
+    assembly_filter_document_id: int | None,
+    actor_id: int,
+    save_to_document: bool = False,
+    destination_document_id: int | None = None,
+    destination_title: str | None = None,
+    destination_is_shareable: bool = False,
 ) -> ExportRecipe:
     recipe = ExportRecipe(
         name=name,
         assembly_filter_document_id=assembly_filter_document_id,
+        save_to_document=save_to_document,
+        destination_document_id=destination_document_id,
+        destination_title=destination_title,
+        destination_is_shareable=destination_is_shareable,
         created_by=actor_id,
         steps=[
             ExportRecipeStep(
@@ -86,6 +99,10 @@ async def update_recipe(
     name: str,
     steps: list[dict[str, Any]],
     assembly_filter_document_id: int | None,
+    save_to_document: bool = False,
+    destination_document_id: int | None = None,
+    destination_title: str | None = None,
+    destination_is_shareable: bool = False,
 ) -> None:
     """Steps have no identity worth preserving across an edit (just an
     ordered label/profile/filter list) -- same reasoning as Approval
@@ -95,6 +112,10 @@ async def update_recipe(
     cascade="all, delete-orphan" to actually delete the old rows."""
     recipe.name = name
     recipe.assembly_filter_document_id = assembly_filter_document_id
+    recipe.save_to_document = save_to_document
+    recipe.destination_document_id = destination_document_id
+    recipe.destination_title = destination_title
+    recipe.destination_is_shareable = destination_is_shareable
     recipe.steps = [
         ExportRecipeStep(
             step_order=i,

@@ -6,7 +6,7 @@
 <div class="card">
   {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
   <form method="get" action="/tickets/export/run">
-    <div class="field" style="max-width:360px;">
+    <div class="field" style="max-width:360px; margin-bottom:0;">
       <label for="profile_id">Load a saved profile</label>
       <select id="profile_id" name="profile_id" onchange="this.form.submit()">
         <option value="">Start from scratch</option>
@@ -17,6 +17,30 @@
     </div>
   </form>
 
+  {% if profiles %}
+  <table style="margin-top:16px;">
+    <thead><tr><th>Saved profile</th><th>Format</th><th>Columns</th><th></th></tr></thead>
+    <tbody>
+      {% for p in profiles %}
+      <tr>
+        <td>{{ p.name }}</td>
+        <td class="muted">{{ p.format }}</td>
+        <td>{% for c in p.columns %}<span class="badge">{{ c.header }}</span> {% endfor %}</td>
+        <td class="actions">
+          <a class="btn btn-sm" href="/tickets/export/run?profile_id={{ p.id }}">Edit</a>
+          <form class="inline" method="post" action="/tickets/export/profiles/{{ p.id }}/delete" data-confirm="Delete profile '{{ p.name }}'?">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="field-hint">Need one document built from several of these at once? <a href="/export-recipes">Export Recipes</a> runs them together and merges the results.</p>
+  {% endif %}
+</div>
+
+<div class="card">
   <form method="post" action="/tickets/export/run" enctype="multipart/form-data">
     <input type="hidden" name="profile_id" value="{{ selected_profile_id or '' }}">
     <div class="form-row">
@@ -62,29 +86,4 @@
     {% endif %}
   </form>
 </div>
-
-{% if profiles %}
-<div class="card">
-  <div class="card-title">Saved export profiles</div>
-  <p class="field-hint" style="margin-top:-6px;">Need one document built from several of these at once? <a href="/export-recipes">Export Recipes</a> runs them together and merges the results.</p>
-  <table>
-    <thead><tr><th>Name</th><th>Format</th><th>Columns</th><th></th></tr></thead>
-    <tbody>
-      {% for p in profiles %}
-      <tr>
-        <td>{{ p.name }}</td>
-        <td class="muted">{{ p.format }}</td>
-        <td class="muted">{{ p.columns | length }}</td>
-        <td class="actions">
-          <a class="btn btn-sm" href="/tickets/export/run?profile_id={{ p.id }}">Load</a>
-          <form class="inline" method="post" action="/tickets/export/profiles/{{ p.id }}/delete" data-confirm="Delete profile '{{ p.name }}'?">
-            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
 {% endblock %}
