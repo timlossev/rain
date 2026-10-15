@@ -53,12 +53,14 @@ def _branding_context(request):
     return {"branding": config_store.as_dict()}
 
 
-def top_nav_label(nodes, path: str) -> str | None:
-    """Label of the top-level nav category (Admin, Tickets, ...) whose href
-    is the longest matching prefix of the current request path -- backs the
-    "Menu > Category > Page" breadcrumb in base.html. Matches "/admin" and
-    "/admin/users/3/edit" but not "/administration"."""
-    best_label: str | None = None
+def top_nav_label(nodes, path: str) -> tuple[str, str] | None:
+    """(label, href) of the top-level nav category (Admin, Tickets, ...)
+    whose href is the longest matching prefix of the current request
+    path -- backs the clickable "Menu > Category > Page" breadcrumb in
+    base.html, letting that middle crumb link back to the category's own
+    landing page. Matches "/admin" and "/admin/users/3/edit" but not
+    "/administration"."""
+    best: tuple[str, str] | None = None
     best_len = -1
     for node in nodes:
         href = node.href
@@ -67,9 +69,9 @@ def top_nav_label(nodes, path: str) -> str | None:
         href_path = href.split("?", 1)[0].rstrip("/") or "/"
         matches = path == href_path or path.startswith(href_path + "/")
         if matches and len(href_path) > best_len:
-            best_label = node.label
+            best = (node.label, href)
             best_len = len(href_path)
-    return best_label
+    return best
 
 
 def nl2br(value: str | None) -> Markup:

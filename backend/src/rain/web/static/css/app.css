@@ -152,6 +152,8 @@ p { margin: 0 0 1em; }
    below; it just keeps the whole topbar (nowrap) stretching wider than
    the viewport instead of truncating in place. */
 .breadcrumb-item { min-width: 0; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.breadcrumb-link { text-decoration: none; }
+.breadcrumb-link:hover { color: var(--text); text-decoration: underline; }
 .breadcrumb-sep { flex-shrink: 0; color: var(--sidebar-text-dim); font-size: 0.85rem; }
 .topbar-search {
   display: flex;

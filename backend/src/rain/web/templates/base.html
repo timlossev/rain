@@ -122,13 +122,13 @@
       {% set full_title = self.title() %}
       {% set brand_suffix = " - " ~ branding.instance_name %}
       {% if full_title.endswith(brand_suffix) %}{% set leaf_label = full_title[:-(brand_suffix|length)] %}{% else %}{% set leaf_label = full_title %}{% endif %}
-      {% set top_label = top_nav_label(nav_tree, request.url.path) %}
+      {% set top_crumb = top_nav_label(nav_tree, request.url.path) %}
       <div class="breadcrumb" style="margin-right:auto;">
         <button type="button" class="nav-open-btn" data-nav-open title="Toggle menu">
           <span class="nav-icon">{{ nav_icon("menu") }}</span> Menu
         </button>
-        {% if top_label %}<span class="breadcrumb-sep">&rsaquo;</span><span class="breadcrumb-item">{{ top_label }}</span>{% endif %}
-        {% if leaf_label and leaf_label != top_label %}<span class="breadcrumb-sep">&rsaquo;</span><span class="breadcrumb-item">{{ leaf_label }}</span>{% endif %}
+        {% if top_crumb %}<span class="breadcrumb-sep">&rsaquo;</span><a class="breadcrumb-item breadcrumb-link" href="{{ top_crumb[1] }}">{{ top_crumb[0] }}</a>{% endif %}
+        {% if leaf_label and leaf_label != (top_crumb[0] if top_crumb else none) %}<span class="breadcrumb-sep">&rsaquo;</span><span class="breadcrumb-item">{{ leaf_label }}</span>{% endif %}
         {# striptags forces plain text regardless of whether Jinja treats the
            block's own output as pre-escaped "safe" markup -- without it, a
            literal "&" inside a {% block help_text %} (unlike one passed as a

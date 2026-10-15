@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_search_picker.html" as picker %}
 {% block title %}{{ "Edit" if entry else "New" }} calendar entry - {{ branding.instance_name }}{% endblock %}
-{% block help_text %}One-time or recurring entries. Optionally emit a syslog event on each occurrence (Event Promotion Policies can react to it), or tie the entry to a document.{% endblock %}
+{% block help_text %}One-time or recurring entries. Optionally emit a syslog event on each occurrence (Event Promotion Policies can react to it), or tie the entry to a document - it shows up on that document's own Calendar tab (e.g. "due for revision every quarter"), and can auto-refresh from its webhook on each occurrence if it has one configured.{% endblock %}
 {% block content_class %}content-full{% endblock %}
 {% block content %}
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
@@ -43,7 +43,6 @@
       {{ picker.search_picker("document_id", "/documents/search", label="Document (optional)", initial_value=selected_document_id, initial_label=selected_document_label, placeholder="Search documents...") }}
       <div class="field"><label class="checkbox-row field-align-checkbox"><input type="checkbox" name="auto_refresh" {% if auto_refresh %}checked{% endif %}> Also auto-refresh from its webhook</label></div>
     </div>
-    <div class="field-hint">Shows up on the document's own Calendar tab (e.g. "due for revision every quarter"). Auto-refresh only takes effect for a document with a webhook configured.</div>
 
     {% if export_profiles %}
     <h3>Or run a saved export profile</h3>
