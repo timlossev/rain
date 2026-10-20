@@ -77,10 +77,14 @@ Essential Eight/ISM, all without a framework-specific template.
 gives the EU's still-draft EUCS scheme the same domain-by-domain
 treatment -- RAIN is self-hosted infrastructure a cloud provider could
 use as evidence, never the thing EUCS itself certifies. Germany's
-C5:2026 catalogue ships only as an extraction script
-(`docs/compliance-templates/data/extract_c5_controls.py`), not a
-redistributable CSV -- the catalogue's CC BY-ND license doesn't permit
-distributing an adapted copy.
+C5:2026 catalogue, and the Cloud Security Alliance's Cloud Controls
+Matrix behind CSA STAR certification (also the base register for
+Singapore government cloud work via MTCS SS 584), each ship only as an
+extraction script
+(`docs/compliance-templates/data/extract_c5_controls.py`,
+`extract_ccm_controls.py`), not a redistributable CSV -- neither
+catalogue's detailed control text can be redistributed without a
+license.
 
 ## Capabilities
 

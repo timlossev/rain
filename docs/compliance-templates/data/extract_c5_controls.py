@@ -1,18 +1,23 @@
 """Turns BSI's Cloud Computing Compliance Controls Catalogue (C5:2026)
 machine-readable YAML into the same import-ready CSV shape the FedRAMP/
-ISO 27001/SOC 2 kits use: https://www.bsi.bund.de/SharedDocs/Downloads/EN/
-BSI/CloudComputing/ComplianceControlsCatalogue/2026/C5_machine_readable.zip
+ISO 27001/SOC 2 kits use.
 
-Unlike those three, this script's *output* isn't checked into the repo --
-only the script is. The C5 catalogue is licensed CC BY-ND 4.0 (Attribution-
-NoDerivatives): https://creativecommons.org/licenses/by-nd/4.0/. ND
-specifically withholds permission to distribute an adapted version of the
-work, and a CSV reformatting BSI's own requirement text into RAIN's column
-shape is exactly that -- fine to generate and import into your own tenant
-(private use isn't what ND restricts), not fine for this repo to commit
-and push to GitHub on your behalf. Run this yourself against your own
-downloaded copy instead; see docs/compliance-templates/README.md for the
-reasoning and the rest of this usage note.
+## What to download yourself -- this repo ships none of it
+
+Go to https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/CloudComputing/
+ComplianceControlsCatalogue/2026/C5_machine_readable.zip (no account
+needed, BSI's own public download) and unzip it next to this script.
+This script's *output*, unlike this directory's other extractors,
+isn't checked into the repo -- only the script is. The C5 catalogue is
+licensed CC BY-ND 4.0 (Attribution-NoDerivatives):
+https://creativecommons.org/licenses/by-nd/4.0/. ND specifically
+withholds permission to distribute an adapted version of the work, and
+a CSV reformatting BSI's own requirement text into RAIN's column shape
+is exactly that -- fine to generate and import into your own tenant
+(private use isn't what ND restricts), not fine for this repo to
+commit and push to GitHub on your behalf. Run this yourself against
+your own downloaded copy instead; see docs/compliance-templates/
+README.md for the reasoning and the rest of this usage note.
 
 Expects the zip's *_Machine-Readable_en folder extracted next to this
 script (one YAML file per control domain -- AM.yml, BCM.yml, COM.yml,

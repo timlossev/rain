@@ -419,9 +419,38 @@ inventories -- with artifact evidence, not narrative.
 
 MAS TRM requires initial incident notification within 1 hour --
 achievable only with automated ticketing capturing onset/notification/
-escalation timestamps. CSA CCCS, Singapore's government cloud
-framework, maps to ISO 27001 and FedRAMP with the same evidence
-requirements.
+escalation timestamps.
+
+**Singapore -- MTCS SS 584** (Multi-Tier Cloud Security, Singapore's
+own cloud security standard administered via Singapore's Cyber
+Security Agency; Level 3 is the tier government cloud work typically
+requires) and **CSA STAR** (the Cloud Security Alliance's global
+certification, built on their Cloud Controls Matrix -- not the same
+"CSA" as the one above, confusingly; Singapore's IMDA formally
+cross-mapped the two schemes in its own CSA-STAR-to-MTCS
+cross-certification documents, so control evidence built for one goes
+a long way toward the other):
+
+| ITSM Practice | CCM / MTCS Domain |
+|---|---|
+| Change tickets / CAB | Change Control and Configuration Management |
+| CMDB | Infrastructure and Virtualization Security |
+| Incident tickets | Security Incident Management, E-Discovery, and Cloud Forensics |
+| Access workflows | Identity and Access Management |
+| Personnel lifecycle | Human Resources |
+
+Neither catalogue's detailed control text is freely redistributable --
+the CCM requires a CSA license the moment you customize or embed it,
+and MTCS SS 584 is a paid Singapore Standard with no public control
+text at all -- so this is domain-level mapping only, the same
+treatment PCI-DSS and the other frameworks in this section get.
+Unlike those, though, there's a script: `data/extract_ccm_controls.py`
+in [`docs/compliance-templates/`](compliance-templates/) reshapes
+your own downloaded copy of the CCM into the same Security
+Control register every other framework here uses, the same "script,
+not a checked-in CSV" treatment already in place for Germany's C5
+catalogue -- see that directory's own README for the full reasoning
+and usage.
 
 **Japan** -- METI Cybersecurity Management Guidelines (Ver 3.0, 2023)
 require documented change management, incident tracking, a living
