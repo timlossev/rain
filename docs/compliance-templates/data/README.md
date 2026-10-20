@@ -46,13 +46,15 @@ globally, so nothing collides.
 | Catalog | Why no ready-made CSV | What to run |
 |---|---|---|
 | BSI's C5:2026 | The catalogue is CC BY-ND (No Derivatives) licensed -- that withholds permission to redistribute an *adapted* version of the work, which a CSV conversion would be. Generating one for your own tenant is fine; this repo shipping one on your behalf isn't. | `extract_c5_controls.py` against your own downloaded copy of BSI's machine-readable YAML -- see the script's own docstring for the exact download URL and filename it expects. |
+| CSA's Cloud Controls Matrix (CCM) -- for CSA STAR certification, and the base register for Singapore government cloud work via MTCS SS 584 | CSA requires a license to customize or embed the CCM, and Singapore's MTCS SS 584 is a paid Standard that holds its control text privately with nothing free to extract from at all. | `extract_ccm_controls.py` against your own downloaded copy of CSA's CCM v4 spreadsheet -- see the script's own docstring for the exact download URL, why its column matching is deliberately loose, and how CSA STAR and MTCS relate. |
 
-Every other `extract_*.py` here (`extract_fedramp_baseline.py`,
-`extract_iso27001_controls.py`, `extract_soc2_controls.py`,
-`extract_cmmc_level1.py`, `extract_cmmc_level2.py`,
-`extract_cmmc_level3.py`) is **not** something you need to run --
-their output already ships as the CSVs listed above. They exist so
-the CSVs can be regenerated later (a future NIST/CMMC revision, a
-corrected upstream export, ...) without hand-editing hundreds of rows;
-each one's own docstring names its upstream source and the exact
-filename/URL to download before running it.
+`extract_fedramp_baseline.py`, `extract_iso27001_controls.py`,
+`extract_soc2_controls.py`, `extract_cmmc_level1.py`,
+`extract_cmmc_level2.py`, and `extract_cmmc_level3.py` already have
+their output checked in as the CSVs listed above, so running them
+again is only for regenerating a file later (a future NIST/CMMC
+revision, a corrected upstream export, ...), never a setup step.
+`extract_c5_controls.py` and `extract_ccm_controls.py` are the two
+exceptions: running one of those is how you get the CSV in the first
+place. Each script's own docstring names its upstream source and the
+exact filename/URL to download before running it.
