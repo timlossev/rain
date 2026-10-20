@@ -79,12 +79,11 @@ treatment -- RAIN is self-hosted infrastructure a cloud provider could
 use as evidence, never the thing EUCS itself certifies. Germany's
 C5:2026 catalogue, and the Cloud Security Alliance's Cloud Controls
 Matrix behind CSA STAR certification (also the base register for
-Singapore government cloud work via MTCS SS 584), each ship only as an
-extraction script
+Singapore government cloud work via MTCS SS 584), each ship as an
+extraction script instead
 (`docs/compliance-templates/data/extract_c5_controls.py`,
-`extract_ccm_controls.py`), not a redistributable CSV -- neither
-catalogue's detailed control text can be redistributed without a
-license.
+`extract_ccm_controls.py`), since both catalogues require a license to
+redistribute their detailed control text.
 
 ## Capabilities
 

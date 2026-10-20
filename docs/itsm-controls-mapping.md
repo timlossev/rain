@@ -187,15 +187,26 @@ a dedicated mechanism instead of relying on judgment:
   "Requires acknowledgment from" is a dedicated feature: tracked
   pending state, client-portal surfacing, automatic email, Platform
   Response Rule trigger.
-- PL-2 (System Security Plan), supporting tier -- a document's
+- PL-2 (System Security Plan), supporting tier. A document's
   review-due date is a dedicated field with an overdue flag and
-  filter. A stronger claim on the same control: the Security Control
-  asset type (`docs/compliance-templates/bundles/security-control-register.rain`)
-  tracks per-control implementation statements directly, and its own
-  jq export transformer (`oscal-control-implementation.jq`) produces
-  a machine-readable OSCAL `control-implementation` fragment from
-  them -- the actual control-implementation content an SSP's bulk
-  consists of, not just a reminder to keep one current.
+  filter. The Security Control asset type
+  (`docs/compliance-templates/bundles/security-control-register.rain`)
+  makes a stronger claim on the same control: it tracks per-control
+  implementation statements directly, and its own jq export
+  transformer (`oscal-control-implementation.jq`) produces a
+  machine-readable OSCAL `control-implementation` fragment from them,
+  the actual content an SSP's bulk consists of. Export Recipes
+  (sidebar, under Assets, next to Simple Export) extends this to the
+  full document: it runs that same control-implementation export
+  alongside two more, `oscal-system-characteristics.jq` (FIPS 199
+  impact and authorization boundary, from the FedRAMP Certification
+  Package asset) and `oscal-system-implementation.jq` (the component
+  inventory, from the Software Component asset), then merges all
+  three into one real `system-security-plan` OSCAL document via
+  `oscal-ssp-assembly.jq`. `bundles/oscal-ssp-starter-kit.rain` seeds
+  everything the recipe needs in one import; see
+  [`docs/oscal-ssp-showcase.md`](oscal-ssp-showcase.md) for the full
+  walkthrough against the real High baseline.
 
 That's a real promotion into the same category the 33 already uses.
 What it isn't is a re-stated 37/409 headline: the 33 was counted
@@ -241,7 +252,15 @@ lowers setup cost, it doesn't change a control's classification here.
   certified CSP, unlike every other template on this list.
   `subprocessor-register.rain` picked up three matching fields for that
   same schema's third-party-resource reporting rather than a fourth new
-  template, since it's the same vendor register either way.
+  template, since it's the same vendor register either way. That
+  schema's own "Trust Center" field records a URL. RAIN's own Trust
+  Center (a tenant's shareable Documents, `is_shareable`, surfaced at
+  the public `/portal/{tenant}` page with the same preview-before-
+  download modal the authenticated Document Archive uses) can host
+  the content that URL points at directly: flag the SSP, pen test
+  summary, or other public-facing artifact's Document as shareable,
+  and the Certification Package Overview's own field records this
+  same instance.
 - **RA-5 / RA-7 (Vulnerability Scanning / Risk Response)** -- RAIN is
   the remediation-tracking half, not the scanner. Tickets > Import
   accepts a Nessus `.nessus` export, an OpenVAS/GVM XML export, or an
@@ -425,11 +444,11 @@ escalation timestamps.
 own cloud security standard administered via Singapore's Cyber
 Security Agency; Level 3 is the tier government cloud work typically
 requires) and **CSA STAR** (the Cloud Security Alliance's global
-certification, built on their Cloud Controls Matrix -- not the same
-"CSA" as the one above, confusingly; Singapore's IMDA formally
-cross-mapped the two schemes in its own CSA-STAR-to-MTCS
-cross-certification documents, so control evidence built for one goes
-a long way toward the other):
+certification, built on their Cloud Controls Matrix -- a separate
+organization that happens to share the "CSA" initials with the one
+above; Singapore's IMDA formally cross-mapped the two schemes in its
+own CSA-STAR-to-MTCS cross-certification documents, so control
+evidence built for one goes a long way toward the other):
 
 | ITSM Practice | CCM / MTCS Domain |
 |---|---|
@@ -439,18 +458,17 @@ a long way toward the other):
 | Access workflows | Identity and Access Management |
 | Personnel lifecycle | Human Resources |
 
-Neither catalogue's detailed control text is freely redistributable --
-the CCM requires a CSA license the moment you customize or embed it,
-and MTCS SS 584 is a paid Singapore Standard with no public control
-text at all -- so this is domain-level mapping only, the same
-treatment PCI-DSS and the other frameworks in this section get.
-Unlike those, though, there's a script: `data/extract_ccm_controls.py`
-in [`docs/compliance-templates/`](compliance-templates/) reshapes
-your own downloaded copy of the CCM into the same Security
-Control register every other framework here uses, the same "script,
-not a checked-in CSV" treatment already in place for Germany's C5
-catalogue -- see that directory's own README for the full reasoning
-and usage.
+Both catalogues restrict their detailed control text: the CCM requires
+a CSA license the moment you customize or embed it, and MTCS SS 584 is
+a paid Singapore Standard with its control text held privately. This
+stays at domain-level mapping, the same treatment PCI-DSS and the
+other frameworks in this section get. There's still a script though:
+`data/extract_ccm_controls.py` in
+[`docs/compliance-templates/`](compliance-templates/) reshapes your
+own downloaded copy of the CCM into the same Security Control register
+every other framework here uses, the same script-only treatment
+already in place for Germany's C5 catalogue -- see that directory's
+own README for the full reasoning and usage.
 
 **Japan** -- METI Cybersecurity Management Guidelines (Ver 3.0, 2023)
 require documented change management, incident tracking, a living
@@ -495,6 +513,27 @@ PCI-DSS v4.0's "customized approach" still requires documented risk
 analysis and control-effectiveness evidence -- evidence generation is
 non-negotiable either way.
 
+**SOC 2 Type II** (AICPA Trust Services Criteria; a CPA firm's report
+based on an observation period, typically 6-12 months, assessing
+controls over that whole window):
+
+| ITSM Practice | SOC 2 Common Criteria |
+|---|---|
+| Change tickets / CAB | CC8.1 -- changes authorized, designed, tested, approved, and implemented |
+| CMDB | CC6.1 -- logical access controls over protected information assets, which presupposes a current inventory to scope access against |
+| Incident tickets | CC7.2-CC7.5 -- identify, respond to, and recover from security incidents |
+| Access workflows | CC6.2/CC6.3 -- provisioning and deprovisioning of authorized access |
+| Personnel lifecycle | CC6.5 -- access removed on termination or role change |
+| Vulnerability management | CC7.1 -- detect and monitor for vulnerabilities and anomalies |
+
+No OSCAL or other machine-readable submission format here -- an
+auditor samples tickets/records directly during fieldwork, same
+evidentiary standard as everything else in this document, just without
+a transformer to export toward. `data/soc2-type2-controls.csv` (60
+controls across all five Trust Services Criteria) pairs with
+`security-control-register.rain`, the same register NIST 800-53/ISO
+27001/CMMC below all use.
+
 **SOX -- IT General Controls** (all U.S. public companies; ITGCs
 tested under PCAOB AS 2201):
 
@@ -532,6 +571,29 @@ Japan, Singapore, and more). Annex A control mapping:
 ISO 27001 auditors sample changes, incidents, access events, and
 off-boarding events, and require the corresponding records -- the same
 evidentiary standard as FedRAMP 3PAOs, PCI QSAs, and SOX auditors.
+
+**CMMC** (Cybersecurity Maturity Model Certification, for DoD
+contractors handling Federal Contract Information or Controlled
+Unclassified Information; Level 2's practices are NIST SP 800-171
+Rev 2's own requirements, Level 3 layers NIST SP 800-172 on top):
+
+| ITSM Practice | CMMC Level 2 Practice |
+|---|---|
+| Change tickets / CAB | CM.L2-3.4.4 -- analyze the security impact of changes before implementation |
+| CMDB | CM.L2-3.4.1 -- baseline configurations and inventories of organizational systems |
+| Incident tickets | IR.L2-3.6.2 -- track, document, and report incidents |
+| Access workflows | AC.L2-3.1.1 -- limit system access to authorized users, processes, and devices |
+| Personnel lifecycle | PS.L2-3.9.2 -- protect CUI systems during and after personnel actions like terminations and transfers |
+| Vulnerability remediation tracking | RA.L2-3.11.2/3.11.3 -- periodic scanning, remediation per risk assessment; `vulnerability-scan-finding-fields.rain` and `poam-tracking-fields.rain` cover this pair |
+
+Level 1's 17 practices (FAR 52.204-21(b)'s basic FCI safeguarding)
+stay narrower than this and skip change/incident/CMDB entirely --
+those arrive with Level 2's CUI scope. `data/cmmc-level-1-controls.csv`,
+`-level-2-`, and `-level-3-` (134 practices total) pair with
+`security-control-register.rain`, the same register every catalog in
+this section uses. That register's own Last Assessment Date/Result/
+Assessor fields sit alongside whichever catalog's rows are loaded,
+added uniformly rather than per-framework.
 
 ---
 
