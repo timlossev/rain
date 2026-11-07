@@ -59,6 +59,7 @@ export transformer in [`docs/compliance-templates/`](docs/compliance-templates/)
 |---|---|
 | FedRAMP (Rev 5 Low/Moderate/High) | Real control-register baselines (424/688/791 controls), OSCAL System Security Plan assembly |
 | FedRAMP CR26 (2026 Consolidated Rules) | VER/OCR/SCN/Incident Report export transformers, SBOM/ConMon/crypto-module registers -- see [`docs/fedramp-cr26-showcase.md`](docs/fedramp-cr26-showcase.md) and [`docs/cr26-coverage-showcase.md`](docs/cr26-coverage-showcase.md) |
+| FedRAMP 20x Key Security Indicators | Real 46-indicator register across all 10 families, Security Decision Record export via Export Recipe -- see [`docs/fedramp-ksi-showcase.md`](docs/fedramp-ksi-showcase.md) |
 | NIST SP 800-53 Rev 5 | Same control register, independent of FedRAMP's own packaging |
 | ISO/IEC 27001:2022 | 93-control Annex A data set |
 | SOC 2 Type II | 60-control data set across all five Trust Services Criteria |
@@ -168,6 +169,9 @@ instance, in their own primers:
 - [`docs/cr26-coverage-showcase.md`](docs/cr26-coverage-showcase.md) --
   SBOM/software inventory, cryptographic module tracking, and
   Continuous Monitoring submissions against real CR26 review areas.
+- [`docs/fedramp-ksi-showcase.md`](docs/fedramp-ksi-showcase.md) --
+  answering real FedRAMP 20x Key Security Indicators and publishing
+  the resulting Security Decision Record to a live Trust Center.
 
 ## Quickstart
 

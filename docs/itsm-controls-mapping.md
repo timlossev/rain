@@ -260,7 +260,17 @@ lowers setup cost, it doesn't change a control's classification here.
   the content that URL points at directly: flag the SSP, pen test
   summary, or other public-facing artifact's Document as shareable,
   and the Certification Package Overview's own field records this
-  same instance.
+  same instance. FedRAMP 20x's own continuous-assessment model asks
+  for structured evidence against 46 published Key Security
+  Indicators (KSIs), not a one-time audit narrative --
+  `fedramp-ksi-starter-kit.rain` seeds the real indicator set and
+  `fedramp-ksi-export.jq`/`fedramp-ksi-sdr-assembly.jq` fill in the
+  Security Decision Record's `keySecurityIndicators` section via an
+  Export Recipe, the same Trust Center publish step as everything
+  else on this list. See
+  [`docs/fedramp-ksi-showcase.md`](fedramp-ksi-showcase.md) for a
+  worked example against real indicator data, including a
+  `Not Implemented` finding tracked through to a linked ticket.
 - **RA-5 / RA-7 (Vulnerability Scanning / Risk Response)** -- RAIN is
   the remediation-tracking half, not the scanner. Tickets > Import
   accepts a Nessus `.nessus` export, an OpenVAS/GVM XML export, or an
