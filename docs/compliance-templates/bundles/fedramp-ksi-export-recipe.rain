@@ -1,0 +1,103 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-11-07T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "FedRAMP Security Decision Record Export Recipe starter template",
+  "secrets_included": false,
+  "export_profiles": [
+    {
+      "name": "FedRAMP SDR - Security Controls",
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "format": "json",
+      "columns": [
+        {
+          "source_field_key": "control_id",
+          "header": "Control ID",
+          "order": 0
+        },
+        {
+          "source_field_key": "implementation_status",
+          "header": "Implementation Status",
+          "order": 1
+        },
+        {
+          "source_field_key": "narrative",
+          "header": "Narrative",
+          "order": 2
+        }
+      ]
+    },
+    {
+      "name": "FedRAMP SDR - Key Security Indicators",
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "format": "json",
+      "columns": [
+        {
+          "source_field_key": "control_id",
+          "header": "Control ID",
+          "order": 0
+        },
+        {
+          "source_field_key": "implementation_status",
+          "header": "Implementation Status",
+          "order": 1
+        },
+        {
+          "source_field_key": "narrative",
+          "header": "Narrative",
+          "order": 2
+        },
+        {
+          "source_field_key": "validation",
+          "header": "Validation",
+          "order": 3
+        },
+        {
+          "source_field_key": "assessment",
+          "header": "Assessment",
+          "order": 4
+        },
+        {
+          "source_field_key": "tests",
+          "header": "Tests",
+          "order": 5
+        },
+        {
+          "source_field_key": "evidence_type",
+          "header": "Evidence Type",
+          "order": 6
+        },
+        {
+          "source_field_key": "evidence_description",
+          "header": "Evidence Description",
+          "order": 7
+        },
+        {
+          "source_field_key": "evidence_location",
+          "header": "Evidence Location",
+          "order": 8
+        }
+      ]
+    }
+  ],
+  "export_recipes": [
+    {
+      "name": "FedRAMP Security Decision Record",
+      "steps": [
+        {
+          "label": "controls",
+          "export_profile_scope": "asset",
+          "export_profile_name": "FedRAMP SDR - Security Controls"
+        },
+        {
+          "label": "ksis",
+          "export_profile_scope": "asset",
+          "export_profile_name": "FedRAMP SDR - Key Security Indicators"
+        }
+      ]
+    }
+  ]
+}

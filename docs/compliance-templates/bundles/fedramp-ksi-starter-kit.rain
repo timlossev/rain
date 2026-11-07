@@ -1,0 +1,383 @@
+{
+  "bundle_type": "rain_tenant_config",
+  "bundle_version": 1,
+  "exported_at": "2026-11-07T00:00:00+00:00",
+  "source_tenant_slug": "template",
+  "source_tenant_name": "FedRAMP 20x Key Security Indicators starter template",
+  "secrets_included": false,
+  "asset_types": [
+    {
+      "key": "security_control",
+      "name": "Security Control",
+      "icon": null,
+      "description": "One row per control implementation statement -- a NIST 800-53 (or other catalog) control, how it's implemented, and by whom. Each Asset's own \"Name\" field identifies the control (and part, if tracked at that level), e.g. \"AC-2(a) Account Management\". Populate by hand, or bulk-import one of the FedRAMP rev5 baseline question lists (nist-800-53-rev5-low/moderate/high.csv, same directory), the ISO/IEC 27001:2022 Annex A control list (iso-27001-2022-annex-a-controls.csv), the SOC 2 Type II control list (soc2-type2-controls.csv), or one of the CMMC level lists (cmmc-level-1/2/3-controls.csv) to start from a real, currently-applicable control set instead of a blank register. Pairs with the oscal-control-implementation.jq transformer (see docs/compliance-templates/README.md) to export this register as an OSCAL control-implementation fragment, and with assessment-register.rain (same directory) for tracking assessments against these same rows.",
+      "is_active": true,
+      "sort_order": 0
+    },
+    {
+      "key": "fedramp_ksi",
+      "name": "Key Security Indicator",
+      "icon": null,
+      "description": "One row per FedRAMP 20x Key Security Indicator (KSI) -- 46 indicators across 10 families (Cybersecurity Education, Change Management, Cloud Native Architecture, Identity and Access Management, Incident Response, Monitoring/Logging/Auditing, Policy and Inventory, Recovery Planning, Supply Chain Risk, Service Configuration). Bulk-import fedramp-20x-key-security-indicators.csv (same directory) to start from the real, current indicator set, then fill in Implementation Status/Narrative/Validation/Assessment/Tests/Evidence by hand. Pairs with fedramp-ksi-export.jq and the FedRAMP Security Decision Record Export Recipe (see docs/compliance-templates/README.md) to fill in a real Security Decision Record's own keySecurityIndicators section, and with assessment-register.rain for tracking assessments against these same rows.",
+      "is_active": true,
+      "sort_order": 1
+    }
+  ],
+  "custom_fields": [
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "control_id",
+      "label": "Control ID",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "statement_id",
+      "label": "Statement ID",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "control_question",
+      "label": "Control Question",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "implementation_status",
+      "label": "Implementation Status",
+      "field_type": "select",
+      "select_options": ["Implemented", "Partially Implemented", "Planned", "Alternative Implementation", "Not Applicable"],
+      "is_required": true,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "narrative",
+      "label": "Narrative",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "responsible_role",
+      "label": "Responsible Role",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "parameters",
+      "label": "Parameters",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "remarks",
+      "label": "Remarks",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "last_assessment_date",
+      "label": "Last Assessment Date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 8
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "last_assessment_result",
+      "label": "Last Assessment Result",
+      "field_type": "select",
+      "select_options": ["Satisfied", "Other Than Satisfied", "Not Applicable", "Not Assessed"],
+      "is_required": false,
+      "sort_order": 9
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "field_key": "assessor",
+      "label": "Assessor",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 10
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "control_id",
+      "label": "Control ID",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 0
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "family",
+      "label": "Family",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 1
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "control_question",
+      "label": "Control Question",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 2
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "related_controls",
+      "label": "Related Controls",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 3
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "implementation_status",
+      "label": "Implementation Status",
+      "field_type": "select",
+      "select_options": ["Implemented", "Partially Implemented", "Not Implemented"],
+      "is_required": true,
+      "sort_order": 4
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "narrative",
+      "label": "Narrative",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 5
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "validation",
+      "label": "Validation",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 6
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "assessment",
+      "label": "Assessment",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 7
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "tests",
+      "label": "Tests",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": true,
+      "sort_order": 8
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "evidence_type",
+      "label": "Evidence Type",
+      "field_type": "select",
+      "select_options": ["Log", "Report", "Screenshot", "Configuration", "Policy", "Procedure", "Audit Record"],
+      "is_required": false,
+      "sort_order": 9
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "evidence_description",
+      "label": "Evidence Description",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 10
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "evidence_location",
+      "label": "Evidence Location",
+      "field_type": "url",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 11
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "last_assessment_date",
+      "label": "Last Assessment Date",
+      "field_type": "date",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 12
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "last_assessment_result",
+      "label": "Last Assessment Result",
+      "field_type": "select",
+      "select_options": ["Satisfied", "Other Than Satisfied", "Not Applicable", "Not Assessed"],
+      "is_required": false,
+      "sort_order": 13
+    },
+    {
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "field_key": "assessor",
+      "label": "Assessor",
+      "field_type": "text",
+      "select_options": null,
+      "is_required": false,
+      "sort_order": 14
+    }
+  ],
+  "export_profiles": [
+    {
+      "name": "FedRAMP SDR - Security Controls",
+      "scope": "asset",
+      "asset_type_key": "security_control",
+      "format": "json",
+      "columns": [
+        {
+          "source_field_key": "control_id",
+          "header": "Control ID",
+          "order": 0
+        },
+        {
+          "source_field_key": "implementation_status",
+          "header": "Implementation Status",
+          "order": 1
+        },
+        {
+          "source_field_key": "narrative",
+          "header": "Narrative",
+          "order": 2
+        }
+      ]
+    },
+    {
+      "name": "FedRAMP SDR - Key Security Indicators",
+      "scope": "asset",
+      "asset_type_key": "fedramp_ksi",
+      "format": "json",
+      "columns": [
+        {
+          "source_field_key": "control_id",
+          "header": "Control ID",
+          "order": 0
+        },
+        {
+          "source_field_key": "implementation_status",
+          "header": "Implementation Status",
+          "order": 1
+        },
+        {
+          "source_field_key": "narrative",
+          "header": "Narrative",
+          "order": 2
+        },
+        {
+          "source_field_key": "validation",
+          "header": "Validation",
+          "order": 3
+        },
+        {
+          "source_field_key": "assessment",
+          "header": "Assessment",
+          "order": 4
+        },
+        {
+          "source_field_key": "tests",
+          "header": "Tests",
+          "order": 5
+        },
+        {
+          "source_field_key": "evidence_type",
+          "header": "Evidence Type",
+          "order": 6
+        },
+        {
+          "source_field_key": "evidence_description",
+          "header": "Evidence Description",
+          "order": 7
+        },
+        {
+          "source_field_key": "evidence_location",
+          "header": "Evidence Location",
+          "order": 8
+        }
+      ]
+    }
+  ],
+  "export_recipes": [
+    {
+      "name": "FedRAMP Security Decision Record",
+      "steps": [
+        {
+          "label": "controls",
+          "export_profile_scope": "asset",
+          "export_profile_name": "FedRAMP SDR - Security Controls"
+        },
+        {
+          "label": "ksis",
+          "export_profile_scope": "asset",
+          "export_profile_name": "FedRAMP SDR - Key Security Indicators"
+        }
+      ]
+    }
+  ]
+}

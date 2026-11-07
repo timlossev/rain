@@ -1,16 +1,19 @@
 # Control-set data
 
 Real register *data* (`.csv`), not config -- an Assets > Import file,
-not a Config Bundle. Every CSV here has the same five columns (`Name`,
-`External ID`, `Control ID`, `Statement ID`, `Control Question`)
-matching `bundles/security-control-register.rain`'s own custom field
-labels exactly, so Assets > Import (asset type Security Control,
-format CSV) auto-suggests every column mapping -- pick the asset type,
-upload the file, confirm the mapping, done. `Statement ID` is blank in
-every file here: it only exists so you can later split a control you
-track at a lettered-sub-part level into several rows sharing one
-`Control ID`; none of the catalogs below have an official lettered
-breakdown of their own.
+not a Config Bundle. Every CSV here carries the same core columns
+(`Name`, `External ID`, `Control ID`, `Statement ID`, `Control
+Question`) matching the target asset type's own custom field labels
+exactly, so Assets > Import auto-suggests every column mapping --
+pick the asset type, upload the file, confirm the mapping, done.
+`Statement ID` is blank in every file here: it only exists so you can
+later split a control you track at a lettered-sub-part level into
+several rows sharing one `Control ID`; none of the catalogs below have
+an official lettered breakdown of their own. The Key Security
+Indicators file below carries two extra columns (`Family`, `Related
+Controls`) matching `fedramp-ksi-starter-kit.rain`'s own additional
+fields -- still the same auto-suggested mapping, just a couple more
+columns to confirm.
 
 Every `extract_*.py` script here regenerates its matching `.csv` from
 the catalog's own upstream source (an official government CSV/XML
@@ -22,7 +25,7 @@ license doesn't permit shipping a ready-made file at all.
 
 ## Ready to import right now
 
-No script, no download, no setup -- these seven CSVs are already
+No script, no download, no setup -- these eight CSVs are already
 checked into this folder exactly as Assets > Import expects them:
 
 | File | Rows | Catalog |
@@ -35,6 +38,7 @@ checked into this folder exactly as Assets > Import expects them:
 | `cmmc-level-1-controls.csv` | 17 | CMMC Level 1 (FAR 52.204-21(b)'s basic safeguarding requirements) |
 | `cmmc-level-2-controls.csv` | 110 | CMMC Level 2 -- NIST SP 800-171 Rev 2's 110 requirements, relabeled with CMMC practice IDs |
 | `cmmc-level-3-controls.csv` | 24 | CMMC Level 3's *additional* practices on top of Level 2 (import both for the full 134-practice set) -- DoD's selected subset of NIST SP 800-172 |
+| `fedramp-20x-key-security-indicators.csv` | 46 | FedRAMP 20x's real Key Security Indicators across 10 families, published by FedRAMP itself as machine-readable data -- a U.S. government work, so this one ships as a ready CSV the same as the others here, not a script-only extractor |
 
 Tracking against more than one of these at once (e.g. NIST 800-53
 Moderate *and* SOC 2) is fine -- import both into the same Security
@@ -50,10 +54,11 @@ globally, so nothing collides.
 
 `extract_fedramp_baseline.py`, `extract_iso27001_controls.py`,
 `extract_soc2_controls.py`, `extract_cmmc_level1.py`,
-`extract_cmmc_level2.py`, and `extract_cmmc_level3.py` already have
-their output checked in as the CSVs listed above, so running them
-again is only for regenerating a file later (a future NIST/CMMC
-revision, a corrected upstream export, ...), never a setup step.
+`extract_cmmc_level2.py`, `extract_cmmc_level3.py`, and
+`extract_fedramp_ksi.py` already have their output checked in as the
+CSVs listed above, so running any of them again is only for
+regenerating a file later (a future NIST/CMMC/KSI revision, a
+corrected upstream export, ...), never a setup step.
 `extract_c5_controls.py` and `extract_ccm_controls.py` are the two
 exceptions: running one of those is how you get the CSV in the first
 place. Each script's own docstring names its upstream source and the

@@ -7,18 +7,19 @@
 # Record, part of fedramp-security-decision-record-schema-2026-06-24.
 # json.
 #
-# This is a FRAGMENT, not a complete Security Decision Record -- that
-# schema's other three sections (fedRampRequirements, which needs
-# separate implementation/validation/assessment narrative statements per
-# FRR, not a single status+description the way a control does;
-# keySecurityIndicators, same shape plus structured test/evidence
-# records; portsAndProtocols) describe things no asset type in this
-# repo tracks yet -- RAIN's Security Control register models "one
-# control, one status, one narrative," not "one requirement, three
-# separate narrative arrays plus an evidence array." Those three come
-# out as present-but-empty placeholders below; filling them in means
-# either hand-authoring that JSON directly or building the asset
-# types/fields to track them first (ask if you want that built).
+# This covers one section: securityControls. fedRampRequirements and
+# portsAndProtocols still come out as present-but-empty placeholders
+# below -- no asset type in this repo models either one yet.
+#
+# keySecurityIndicators now has real coverage of its own: run this
+# transform as one step of the FedRAMP Security Decision Record Export
+# Recipe (fedramp-ksi-starter-kit.rain, see docs/compliance-templates/
+# README.md) alongside fedramp-ksi-export.jq as a second step, with
+# fedramp-ksi-sdr-assembly.jq as the recipe's assembly filter -- that
+# produces one complete document with both sections actually filled
+# in. Run standalone (as below), this transform's own output still
+# carries keySecurityIndicators as an empty placeholder, same as
+# before.
 #
 # parameterValues (per-parameter id/value pairs within a control) is
 # also left out -- the register's own "Parameters" field is free text
